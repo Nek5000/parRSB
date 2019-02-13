@@ -261,7 +261,7 @@ void GenmapSortLocal(GenmapHandle h, int field) {
                   TYPE_DOUBLE, globalId, TYPE_LONG, &h->buf);
   } else if(field == GENMAP_GLOBALID) {
     sarray_sort_2(struct GenmapElement_private, elements, (GenmapUInt)lelt,
-                  globalId, TYPE_LONG, fiedler, TYPE_LONG, &h->buf);
+                  globalId, TYPE_LONG, fiedler, TYPE_DOUBLE, &h->buf);
   }
 }
 
