@@ -25,7 +25,6 @@ struct GenmapComm_private {
   struct comm gsComm;
   struct gs_data *verticesHandle;
   buffer buf;
-  GenmapScalar *laplacianWeights;
 };
 //
 // GenmapElements

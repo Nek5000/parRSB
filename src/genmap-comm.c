@@ -7,15 +7,12 @@ int GenmapCreateComm(GenmapComm *c, GenmapCommExternal ce) {
   comm_init(&(*c)->gsComm, ce);
   buffer_init(&(*c)->buf, 1024);
   (*c)->verticesHandle = NULL;
-  (*c)->laplacianWeights = NULL;
   return 0;
 }
 
 int GenmapDestroyComm(GenmapComm c) {
   if(c->verticesHandle)
     gs_free(c->verticesHandle);
-  if(c->laplacianWeights)
-    GenmapFree(c->laplacianWeights);
   if(&c->gsComm)
     comm_free(&c->gsComm);
   if(&c->buf)
