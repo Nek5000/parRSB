@@ -40,7 +40,7 @@ int GenmapInitLaplacian(GenmapHandle h, GenmapComm c, GenmapVector weights) {
     for(j = 0; j < nv; j++)
       u[nv * i + j] = 1.;
 
-  gs(u, genmap_gs_scalar, gs_add, 0, c->verticesHandle, &c->buf);
+  gs(u, genmap_gs_scalar, gs_add, 0, c->verticesHandle, &h->buf);
 
   assert(weights->size == lelt);
 
@@ -77,7 +77,7 @@ int GenmapLaplacian(GenmapHandle h, GenmapComm c, GenmapVector u,
     for(j = 0; j < nv; j++)
       ucv[nv * i + j] = u->data[i];
 
-  gs(ucv, genmap_gs_scalar, gs_add, 0, c->verticesHandle, &c->buf);
+  gs(ucv, genmap_gs_scalar, gs_add, 0, c->verticesHandle, &h->buf);
 
   for(i = 0; i < lelt; i++) {
     v->data[i] = weights->data[i] * u->data[i];
