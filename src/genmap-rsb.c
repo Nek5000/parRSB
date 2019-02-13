@@ -252,42 +252,42 @@ void GenmapSplitByMedian(GenmapHandle h) {
   } while(downLimit - start < lelt);
 }
 
-void GenmapSortLocal(GenmapHandle h, int field, buffer *buf0) {
+void GenmapSortLocal(GenmapHandle h, int field) {
   GenmapElements elements = GenmapGetElements(h);
   GenmapInt lelt = GenmapGetNLocalElements(h);
 
   if(field == GENMAP_FIEDLER) { // Fiedler
     sarray_sort_2(struct GenmapElement_private, elements, (GenmapUInt)lelt, fiedler,
-                  TYPE_DOUBLE, globalId, TYPE_LONG, buf0);
+                  TYPE_DOUBLE, globalId, TYPE_LONG, &h->buf);
   } else if(field == GENMAP_GLOBALID) {
     sarray_sort_2(struct GenmapElement_private, elements, (GenmapUInt)lelt,
-                  globalId, TYPE_LONG, globalId, TYPE_LONG, buf0);
+                  globalId, TYPE_LONG, globalId, TYPE_LONG, &h->buf);
   }
 }
 
-void GenmapAssignBins(GenmapHandle h, int field, buffer *buf0) {
+void GenmapAssignBins(GenmapHandle h, int field) {
   GenmapElements elements = GenmapGetElements(h);
   GenmapInt lelt = GenmapGetNLocalElements(h);
 
   if(field == GENMAP_FIEDLER) { // Fiedler
     // sort locally according to Fiedler vector
     sarray_sort_2(struct GenmapElement_private, elements, (GenmapUInt)lelt, fiedler,
-                  TYPE_DOUBLE, globalId, TYPE_LONG, buf0);
+                  TYPE_DOUBLE, globalId, TYPE_LONG, &h->buf);
     // set the bin based on Fiedler vector
     GenmapSetFiedlerBin(h);
   } else if(GENMAP_GLOBALID) {
     // sort locally according to globalId
     sarray_sort_2(struct GenmapElement_private, elements, (GenmapUInt)lelt,
-                  globalId, TYPE_LONG, globalId, TYPE_LONG, buf0);
+                  globalId, TYPE_LONG, globalId, TYPE_LONG, &h->buf);
     // set the bin based on globalId
     GenmapSetGlobalIdBin(h);
   }
 }
 
-void GenmapBinSort(GenmapHandle h, int field, buffer *buf0) {
-  GenmapAssignBins(h, field, buf0);
+void GenmapBinSort(GenmapHandle h, int field) {
+  GenmapAssignBins(h, field);
   GenmapCrystalTransfer(h, GENMAP_PROC);
-  GenmapSortLocal(h, field, buf0);
+  GenmapSortLocal(h, field);
 
   GenmapScan(h, GenmapGetLocalComm(h));
   if(field == GENMAP_FIEDLER) {
@@ -297,7 +297,7 @@ void GenmapBinSort(GenmapHandle h, int field, buffer *buf0) {
   }
 
   GenmapCrystalTransfer(h, GENMAP_PROC);
-  GenmapSortLocal(h, field, buf0);
+  GenmapSortLocal(h, field);
 }
 
 void GenmapRSB(GenmapHandle h) {
@@ -308,7 +308,6 @@ void GenmapRSB(GenmapHandle h) {
     printf("running RSB "), fflush(stdout);
 
   GenmapCrystalInit(h, GenmapGetLocalComm(h));
-  buffer buf0 = null_buffer;
 
   while(GenmapCommSize(GenmapGetLocalComm(h)) > 1) {
     if(GenmapCommRank(GenmapGetGlobalComm(h)) == 0
@@ -329,7 +328,7 @@ void GenmapRSB(GenmapHandle h) {
       global = 0;
     } while(ipass < npass && iter == maxIter);
 
-    GenmapBinSort(h, 0, &buf0);
+    GenmapBinSort(h, GENMAP_FIEDLER);
     int bin;
     GenmapInt np = GenmapCommSize(GenmapGetLocalComm(h));
     GenmapInt id = GenmapCommRank(GenmapGetLocalComm(h));
@@ -341,10 +340,9 @@ void GenmapRSB(GenmapHandle h) {
     GenmapSetLocalComm(h, c);
 
 #if defined(GENMAP_PAUL)
-    GenmapBinSort(h, 1, &buf0);
+    GenmapBinSort(h, GENMAP_GLOBALID);
 #endif
   }
 
   GenmapCrystalFinalize(h);
-  buffer_free(&buf0);
 }
