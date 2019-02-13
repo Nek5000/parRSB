@@ -252,19 +252,6 @@ void GenmapSplitByMedian(GenmapHandle h) {
   } while(downLimit - start < lelt);
 }
 
-void GenmapSortLocal(GenmapHandle h, int field) {
-  GenmapElements elements = GenmapGetElements(h);
-  GenmapInt lelt = GenmapGetNLocalElements(h);
-
-  if(field == GENMAP_FIEDLER) { // Fiedler
-    sarray_sort_2(struct GenmapElement_private, elements, (GenmapUInt)lelt, fiedler,
-                  TYPE_DOUBLE, globalId, TYPE_LONG, &h->buf);
-  } else if(field == GENMAP_GLOBALID) {
-    sarray_sort_2(struct GenmapElement_private, elements, (GenmapUInt)lelt,
-                  globalId, TYPE_LONG, fiedler, TYPE_DOUBLE, &h->buf);
-  }
-}
-
 void GenmapAssignBins(GenmapHandle h, int field) {
   GenmapSortLocal(h, field);
 

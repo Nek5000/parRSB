@@ -78,22 +78,3 @@ void GenmapSplitComm(GenmapHandle h, GenmapComm *c, int bin) {
   GenmapCrystalInit(h, *c);
 }
 
-int GenmapCrystalInit(GenmapHandle h, GenmapComm c) {
-  crystal_init(&(h->cr), &(c->gsComm));
-  return 0;
-}
-
-int GenmapCrystalTransfer(GenmapHandle h, int field) {
-  if(field == GENMAP_ORIGIN)
-    sarray_transfer(struct GenmapElement_private, &(h->elementArray), origin, 0,
-                    &(h->cr));
-  else if(field == GENMAP_PROC)
-    sarray_transfer(struct GenmapElement_private, &(h->elementArray), proc, 0,
-                    &(h->cr));
-  return 0;
-}
-
-int GenmapCrystalFinalize(GenmapHandle h) {
-  crystal_free(&(h->cr));
-  return 0;
-}

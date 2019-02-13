@@ -88,8 +88,6 @@ void GenmapSetLocalStartIndex(GenmapHandle h, GenmapLong localStart);
 
 int GenmapGetNVertices(GenmapHandle h);
 void GenmapSetNVertices(GenmapHandle, int nVertices);
-
-void GenmapScan(GenmapHandle h, GenmapComm c);
 //
 // GenmapComm
 //
@@ -100,9 +98,15 @@ int GenmapGop(GenmapComm c, void *v, GenmapInt size, GenmapDataType type,
               GenmapInt op);
 int GenmapDestroyComm(GenmapComm c);
 void GenmapSplitComm(GenmapHandle h, GenmapComm *c, int bin);
+//
+// Wrappers for gslib functions
+//
 int GenmapCrystalInit(GenmapHandle h, GenmapComm c);
 int GenmapCrystalTransfer(GenmapHandle h, int field);
 int GenmapCrystalFinalize(GenmapHandle h);
+
+void GenmapScan(GenmapHandle h, GenmapComm c);
+void GenmapSortLocal(GenmapHandle h, int field);
 //
 // Function to read/write from/to FILE
 //
