@@ -11,7 +11,7 @@
 
 #define PREFIX gslib_
 #define FPREFIX fgslib_
-
+/*
 // Data type sint/uint
 // (defualt) int
 // #define USE_LONG long
@@ -22,6 +22,7 @@
 // #define GLOBAL_LONG long
 // #define GLOBAL_LONG_LONG long long
 // #define GLOBAL_LONG_LONG
+*/
 #define GLOBAL_LONG_LONG
 
 #include <stdlib.h>

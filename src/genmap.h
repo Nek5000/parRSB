@@ -107,6 +107,9 @@ int GenmapCrystalFinalize(GenmapHandle h);
 
 void GenmapScan(GenmapHandle h, GenmapComm c);
 void GenmapSortLocal(GenmapHandle h, int field);
+
+int GenmapGSSetup(GenmapComm c, GenmapLong *vertices, GenmapUInt numPoints);
+void GenmapGSAdd(GenmapComm c, GenmapScalar *u);
 //
 // Function to read/write from/to FILE
 //
