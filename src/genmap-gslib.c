@@ -41,6 +41,9 @@ void GenmapSortLocal(GenmapHandle h, int field) {
 // gather-scatter functionality
 //
 int GenmapGSSetup(GenmapComm c, GenmapLong *vertices, GenmapUInt numPoints) {
+  if(c->verticesHandle)
+    gs_free(c->verticesHandle);
+
   c->verticesHandle = gs_setup(vertices, numPoints, &c->gsComm, 0,
                                gs_crystal_router, 0);
   return c->verticesHandle != NULL;

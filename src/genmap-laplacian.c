@@ -17,9 +17,6 @@ int GenmapInitLaplacian(GenmapHandle h, GenmapComm c, GenmapVector weights) {
     }
   }
 
-  if(c->verticesHandle)
-    gs_free(c->verticesHandle);
-
 #if defined(GENMAP_DEBUG)
   double t1 = GenmapGetMaxRss();
   if(GenmapCommRank(GenmapGetLocalComm(h)) == 0)
