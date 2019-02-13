@@ -266,19 +266,12 @@ void GenmapSortLocal(GenmapHandle h, int field) {
 }
 
 void GenmapAssignBins(GenmapHandle h, int field) {
-  GenmapElements elements = GenmapGetElements(h);
-  GenmapInt lelt = GenmapGetNLocalElements(h);
+  GenmapSortLocal(h, field);
 
   if(field == GENMAP_FIEDLER) { // Fiedler
-    // sort locally according to Fiedler vector
-    sarray_sort_2(struct GenmapElement_private, elements, (GenmapUInt)lelt, fiedler,
-                  TYPE_DOUBLE, globalId, TYPE_LONG, &h->buf);
     // set the bin based on Fiedler vector
     GenmapSetFiedlerBin(h);
   } else if(GENMAP_GLOBALID) {
-    // sort locally according to globalId
-    sarray_sort_2(struct GenmapElement_private, elements, (GenmapUInt)lelt,
-                  globalId, TYPE_LONG, globalId, TYPE_LONG, &h->buf);
     // set the bin based on globalId
     GenmapSetGlobalIdBin(h);
   }
