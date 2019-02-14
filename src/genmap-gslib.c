@@ -1,6 +1,26 @@
 #include "genmap-impl.h"
 #include "genmap-gslib.h"
 //
+// comm, buffer and array init, finalize
+//
+int GenmapGSCommInit(GenmapComm c, GenmapCommExternal ce) {
+  comm_init(&c->gsComm, ce);
+  c->verticesHandle =  NULL;
+}
+
+int GenmapGSCommFinalize(GenmapComm c) {
+  if(&c->gsComm)
+    comm_free(&c->gsComm);
+}
+
+int GenmapBufferInit(GenmapComm c, size_t size) {
+  buffer_init(&c->buf, size);
+}
+
+int GenmapBufferFinalize(GenmapComm c) {
+  if(&c->buf)
+    buffer_free(&c->buf);
+}
 // Crystal Router
 //
 int GenmapCrystalInit(GenmapHandle h, GenmapComm c) {
@@ -51,4 +71,9 @@ int GenmapGSSetup(GenmapComm c, GenmapLong *vertices, GenmapUInt numPoints) {
 
 void GenmapGSAdd(GenmapComm c, GenmapScalar *u) {
   gs(u, genmap_gs_scalar, gs_add, 0, c->verticesHandle, &c->buf);
+}
+
+int GenmapGSFree(GenmapComm c) {
+  if(c->verticesHandle)
+    gs_free(c->verticesHandle);
 }

@@ -4,21 +4,16 @@
 //
 int GenmapCreateComm(GenmapComm *c, GenmapCommExternal ce) {
   GenmapMalloc(1, c);
-  comm_init(&(*c)->gsComm, ce);
-  buffer_init(&(*c)->buf, 1024);
-  (*c)->verticesHandle = NULL;
+  GenmapGSCommInit(*c, ce);
+  GenmapBufferInit(*c, 1024);
   return 0;
 }
 
 int GenmapDestroyComm(GenmapComm c) {
-  if(c->verticesHandle)
-    gs_free(c->verticesHandle);
-  if(&c->gsComm)
-    comm_free(&c->gsComm);
-  if(&c->buf)
-    buffer_free(&c->buf);
+  GenmapGSFree(c);
+  GenmapGSCommFinalize(c);
+  GenmapBufferFinalize(c);
   GenmapFree(c);
-
   return 0;
 }
 

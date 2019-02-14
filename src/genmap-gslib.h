@@ -49,5 +49,12 @@
 #define TYPE_LONG   1
 #define TYPE_FLOAT  2
 #define TYPE_DOUBLE 3
-
+//
+// GenmapComm
+//
+struct GenmapComm_private {
+  struct comm gsComm;
+  struct gs_data *verticesHandle;
+  buffer buf;
+};
 #endif

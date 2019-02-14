@@ -19,14 +19,6 @@
 #define GENMAP_PROC 2
 #define GENMAP_ORIGIN 3
 //
-// GenmapComm
-//
-struct GenmapComm_private {
-  struct comm gsComm;
-  struct gs_data *verticesHandle;
-  buffer buf;
-};
-//
 // GenmapElements
 //
 struct GenmapElement_private {
