@@ -72,4 +72,3 @@ void GenmapSplitComm(GenmapHandle h, GenmapComm *c, int bin) {
   MPI_Comm_free(&local);
   GenmapCrystalInit(h, *c);
 }
-
