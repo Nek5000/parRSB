@@ -11,8 +11,8 @@ int GenmapCreateComm(GenmapComm *c, GenmapCommExternal ce) {
 
 int GenmapDestroyComm(GenmapComm c) {
   GenmapGSFree(c);
-  GenmapGSCommFinalize(c);
   GenmapBufferFinalize(c);
+  GenmapGSCommFinalize(c);
   GenmapFree(c);
   return 0;
 }

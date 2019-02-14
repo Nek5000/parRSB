@@ -104,6 +104,7 @@ void GenmapSortLocal(GenmapHandle h, int field);
 
 int GenmapGSSetup(GenmapComm c, GenmapLong *vertices, GenmapUInt numPoints);
 void GenmapGSAdd(GenmapComm c, GenmapScalar *u);
+void GenmapGSMax(GenmapComm c, GenmapLong *u);
 int GenmapGSFree(GenmapComm c);
 
 void GenmapScan(GenmapHandle h, GenmapComm c);

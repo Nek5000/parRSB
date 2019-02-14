@@ -49,12 +49,15 @@ void GenmapSortLocal(GenmapHandle h, int field) {
   GenmapElements elements = GenmapGetElements(h);
   GenmapInt lelt = GenmapGetNLocalElements(h);
 
+  // To get the buffer space
+  GenmapComm c = GenmapGetGlobalComm(h);
+
   if(field == GENMAP_FIEDLER) { // Fiedler
     sarray_sort_2(struct GenmapElement_private, elements, (GenmapUInt)lelt,
-                  fiedler, TYPE_DOUBLE, globalId, TYPE_LONG, &h->buf);
+                  fiedler, TYPE_DOUBLE, globalId, TYPE_LONG, &c->buf);
   } else if(field == GENMAP_GLOBALID) {
     sarray_sort_2(struct GenmapElement_private, elements, (GenmapUInt)lelt,
-                  globalId, TYPE_LONG, fiedler, TYPE_DOUBLE, &h->buf);
+                  globalId, TYPE_LONG, fiedler, TYPE_DOUBLE, &c->buf);
   }
 }
 //
@@ -73,7 +76,12 @@ void GenmapGSAdd(GenmapComm c, GenmapScalar *u) {
   gs(u, genmap_gs_scalar, gs_add, 0, c->verticesHandle, &c->buf);
 }
 
+void GenmapGSMax(GenmapComm c, GenmapLong *u) {
+  gs(u, genmap_gs_long, gs_max, 0, c->verticesHandle, &c->buf);
+}
+
 int GenmapGSFree(GenmapComm c) {
   if(c->verticesHandle)
     gs_free(c->verticesHandle);
+  return 0;
 }

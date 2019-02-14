@@ -48,7 +48,6 @@ struct GenmapHandle_private {
 
   struct array elementArray;
   struct crystal cr;
-  buffer buf;
 
   int dbgLevel;
   int printStat;
