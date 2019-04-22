@@ -1,40 +1,75 @@
 DEBUG ?= 0
-PAUL ?= 1
 CC ?= mpicc
+CXX ?= mpic++
+CXXFLAGS ?= -O2
 CFLAGS ?= -O2
+GPU ?= 1
+PAUL ?= 1
+PP=
 
-SRCROOT=.
-GSLIBDIR=$(GSLIBPATH)
+ifndef GSLIBPATH
+  $(error "Required variable GSLIBPATH not set.")
+endif
+GSLIBDIR =  $(GSLIBPATH)
 
-SRCDIR  =$(SRCROOT)/src
-BUILDDIR=$(SRCROOT)/build
-TESTDIR =$(SRCROOT)/example
+SRCROOT  =  .
+SRCDIR   =  $(SRCROOT)/src
+TESTDIR  =  $(SRCROOT)/example
+BUILDDIR ?= $(SRCROOT)/build
 
 TARGET=parRSB
-TESTS=$(TESTDIR)/example
-LIB=src/lib$(TARGET).a
+LIB=$(SRCDIR)/lib$(TARGET).a
 
 INCFLAGS=-I$(SRCDIR) -I$(GSLIBDIR)/include
-
+TESTINCFLAGS=-I$(GSLIBDIR)/include -I$(BUILDDIR)/include
 TESTLDFLAGS:=-L$(BUILDDIR)/lib -l$(TARGET) -L $(GSLIBDIR)/lib -lgs -lm $(LDFLAGS)
 
-ifneq (,$(strip $(DESTDIR)))
-INSTALL_ROOT = $(DESTDIR)
-else
-INSTALL_ROOT = $(SRCROOT)/build
+CSRC:= \
+  $(SRCDIR)/genmap.c \
+  $(SRCDIR)/genmap-vector.c \
+  $(SRCDIR)/genmap-handle.c \
+  $(SRCDIR)/genmap-comm.c \
+  $(SRCDIR)/genmap-eigen.c \
+  $(SRCDIR)/genmap-laplacian.c \
+  $(SRCDIR)/genmap-lanczos.c \
+  $(SRCDIR)/genmap-rsb.c \
+  $(SRCDIR)/genmap-chelpers.c \
+  $(SRCDIR)/parRSB.c 
+
+TESTS:= \
+  $(TESTDIR)/example
+
+ifeq ($(GPU),1)
+  ifndef OCCA_DIR
+    $(error "Required ENV-variable OCCA_DIR is not set.")
+  endif
+  ifndef PARRSB_DIR
+    $(error "Required variable PARRSB_DIR not set.")
+  endif
+
+  CFLAGS += -DPARRSB_GPU -DPARRSB_OKL_DIR="\"$(PARRSB_DIR)/okl/\""
+  INCFLAGS += -I$(OCCA_DIR)/include
+  CSRC += $(SRCDIR)/genmap-occa.c
+
+  TESTINCFLAGS += -I$(OCCA_DIR)
+  TESTLDFLAGS += -Wl,-rpath,$(OCCA_DIR)/lib -L$(OCCA_DIR)/lib -locca
+
+  CXXSRC =
 endif
 
-CSRCS:= $(SRCDIR)/genmap.c \
-  	$(SRCDIR)/genmap-vector.c $(SRCDIR)/genmap-handle.c $(SRCDIR)/genmap-comm.c \
-	$(SRCDIR)/genmap-eigen.c $(SRCDIR)/genmap-laplacian.c $(SRCDIR)/genmap-lanczos.c \
-	$(SRCDIR)/genmap-rsb.c \
-	$(SRCDIR)/genmap-chelpers.c \
-	$(SRCDIR)/parRSB.c 
-COBJS:=$(CSRCS:.c=.o)
+COBJS:=$(CSRC:.c=.c.o)
+OBJS:=$(COBJS)
 
-SRCOBJS:=$(COBJS)
+ifeq ($(GPU),1)
+  CXXOBJS:=$(CXXSRC:.cpp=.cpp.o)
+  OBJS += $(CXXOBJS)
+endif
 
-PP=
+ifneq (,$(strip $(DESTDIR)))
+  INSTALL_ROOT = $(DESTDIR)
+else
+  INSTALL_ROOT = $(BUILDDIR)
+endif
 
 ifneq ($(DEBUG),0)
   PP += -g -DGENMAP_DEBUG
@@ -57,10 +92,9 @@ install: lib
 	@mkdir -p $(INSTALL_ROOT)/include 2>/dev/null
 	@cp $(SRCDIR)/parRSB.h $(INSTALL_ROOT)/include 2>/dev/null
 
-
-.PHONY: $(TARGET)
-lib: $(SRCOBJS)
-	@$(AR) cr $(LIB) $(SRCOBJS)
+.PHONY: lib
+lib: $(OBJS)
+	@$(AR) cr $(LIB) $(OBJS)
 	@ranlib $(LIB)
 
 .PHONY: check
@@ -69,14 +103,17 @@ ifeq ($(GSLIBPATH),)
 	$(error Specify GSLIBPATH=<path to gslib>/build)
 endif
 
-$(COBJS): %.o: %.c
-	$(CC) $(CFLAGS) $(PP) $(INCFLAGS) -c $< -o $@
+$(COBJS): %.c.o: %.c
+	$(CC) $(CFLAGS) $(PP) $(INCFLAGS) -c $< -o $@ $(LDFLAGS)
+
+$(CXXOBJS): %.cpp.o: %.cpp
+	$(CXX) $(CXXFLAGS) $(PP) $(INCFLAGS) -c $< -o $@ $(LDFLAGS)
 
 .PHONY: tests
 tests: $(TESTS)
 
 $(TESTS): lib install
-	$(CC) $(CFLAGS) -I$(GSLIBDIR)/include -I$(BUILDDIR)/include $@.c -o $@ $(TESTLDFLAGS)
+	$(CC) $(CFLAGS) $(TESTINCFLAGS) $@.c -o $@ $(TESTLDFLAGS)
 
 .PHONY: clean
 clean:

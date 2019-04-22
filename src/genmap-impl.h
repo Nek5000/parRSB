@@ -1,3 +1,7 @@
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #ifndef _GENMAP_IMPL_H_
 #define _GENMAP_IMPL_H_
 
@@ -8,6 +12,10 @@
 
 #ifdef GENMAP_DEBUG
 #include <stdio.h>
+#endif
+
+#if defined(PARRSB_GPU)
+#  include<occa.h>
 #endif
 
 #include "genmap.h"
@@ -62,6 +70,10 @@ struct GenmapHandle_private {
 
   int dbgLevel;
   int printStat;
+
+#if defined(PARRSB_GPU)
+  occaDevice device;
+#endif
 };
 //
 // GenmapHandle
@@ -82,4 +94,8 @@ struct GenmapVector_private {
 #define GenmapCalloc(n, p) GenmapCallocArray ((n), sizeof(**(p)), p)
 #define GenmapRealloc(n, p) GenmapReallocArray((n), sizeof(**(p)), p)
 
+#endif
+
+#ifdef __cplusplus
+}
 #endif

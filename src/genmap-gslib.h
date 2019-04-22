@@ -1,3 +1,7 @@
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #ifndef _GENMAP_GSLIB_H_
 #define _GENMAP_GSLIB_H_
 
@@ -10,7 +14,6 @@
 // (default) int
 // #define GLOBAL_LONG long
 // #define GLOBAL_LONG_LONG long long
-// #define GLOBAL_LONG_LONG
 
 #include "gslib.h"
 
@@ -27,4 +30,8 @@
 #define TYPE_FLOAT  2
 #define TYPE_DOUBLE 3
 
+#endif
+
+#ifdef __cplusplus
+}
 #endif

@@ -1,5 +1,8 @@
 #include "genmap-impl.h"
-#include "genmap-io.h"
+
+#if defined(PARRSB_GPU)
+# include "genmap-occa.h"
+#endif
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -16,9 +19,12 @@ int GenmapInit(GenmapHandle *h, GenmapCommExternal ce) {
   h_->elementArray.ptr = NULL;
   h_->elementArray.n = (*h)->elementArray.max = 0;
 
-  h_->dbgLevel = 0;
+  h_->dbgLevel = 1;
   h_->printStat = 0;
 
+#if defined(PARRSB_GPU)
+  GenmapOccaDeviceConfig(h_);
+#endif
   return 0;
 }
 //

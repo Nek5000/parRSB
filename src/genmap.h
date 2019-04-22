@@ -1,3 +1,7 @@
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #ifndef _GENMAP_H_
 #define _GENMAP_H_
 //
@@ -160,4 +164,8 @@ void GenmapRSB(GenmapHandle h);
 //
 double GenmapGetMaxRss();
 void GenmapPrintStack();
+#endif
+
+#ifdef __cplusplus
+}
 #endif

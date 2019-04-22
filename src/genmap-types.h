@@ -1,3 +1,7 @@
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #ifndef _GENMAP_TYPES_H_
 #define _GENMAP_TYPES_H_
 
@@ -31,4 +35,8 @@ typedef double GenmapScalar;
 
 #define GENMAP_SCALAR MPI_DOUBLE
 
+#endif
+
+#ifdef __cplusplus
+}
 #endif
