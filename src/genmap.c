@@ -1,7 +1,7 @@
 #include "genmap-impl.h"
 
 #if defined(PARRSB_GPU)
-# include "genmap-occa.h"
+# include "parRSB-occa.h"
 #endif
 
 #include <stdlib.h>
@@ -23,7 +23,7 @@ int GenmapInit(GenmapHandle *h, GenmapCommExternal ce) {
   h_->printStat = 0;
 
 #if defined(PARRSB_GPU)
-  GenmapOccaDeviceConfig(h_);
+  parRSBOccaSetup(h_);
 #endif
   return 0;
 }
@@ -37,6 +37,10 @@ int GenmapFinalize(GenmapHandle h) {
     GenmapDestroyComm(h->local);
 
   array_free(&(h->elementArray));
+
+#if defined(PARRSB_GPU)
+  GenmapFree(h->krylov);
+#endif
 
   GenmapFree(h);
 
@@ -76,4 +80,12 @@ int GenmapFree(void *p) {
   free(p);
   p = NULL;
   return 0;
+}
+
+parRSBKrylov parRSBGetKrylov(GenmapHandle h) {
+#if defined(PARRSB_GPU)
+  return h->krylov;
+#else
+  return NULL;
+#endif
 }

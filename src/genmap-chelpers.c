@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <sys/resource.h>
 #include <string.h>
+#include <assert.h>
 
 #include "genmap.h"
 

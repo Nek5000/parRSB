@@ -89,3 +89,7 @@ int GenmapCrystalFinalize(GenmapHandle h) {
   crystal_free(&(h->cr));
   return 0;
 }
+
+MPI_Comm GenmapGetMPIComm(GenmapComm c) {
+  return c->gsComm.c;
+}

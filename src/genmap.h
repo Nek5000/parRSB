@@ -1,21 +1,13 @@
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #ifndef _GENMAP_H_
 #define _GENMAP_H_
 //
 // Header for Genmap types
 //
 #include "genmap-types.h"
-//
-// Header for gslib
-//
-#include "genmap-gslib.h"
-//
-// Header for MPI
-//
-#include <mpi.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 //
 // Genmap Operators
 //
@@ -34,23 +26,6 @@ extern "C" {
 #define GENMAP_DP_TOL 1e-12
 #define GENMAP_TOL GENMAP_DP_TOL
 //
-// Genmap readers
-//
-#define GENMAP_READER_LEN 256
-#define GENMAP_MAX_READERS 32
-//
-// GenmapCommExternal
-//
-typedef MPI_Datatype GenmapDataType;
-typedef MPI_Comm GenmapCommExternal;
-//
-// Genmap Pointer types
-//
-typedef struct GenmapComm_private *GenmapComm;
-typedef struct GenmapHandle_private *GenmapHandle;
-typedef struct GenmapVector_private *GenmapVector;
-typedef struct GenmapElement_private *GenmapElements;
-//
 // Genmap: Init, Finalize
 //
 int GenmapInit(GenmapHandle *h, GenmapCommExternal ce);
@@ -62,6 +37,9 @@ int GenmapMallocArray(size_t n, size_t unit, void *p);
 int GenmapCallocArray(size_t n, size_t unit, void *p);
 int GenmapReallocArray(size_t n, size_t unit, void *p);
 int GenmapFree(void *p);
+#define GenmapMalloc(n, p) GenmapMallocArray ((n), sizeof(**(p)), p)
+#define GenmapCalloc(n, p) GenmapCallocArray ((n), sizeof(**(p)), p)
+#define GenmapRealloc(n, p) GenmapReallocArray((n), sizeof(**(p)), p)
 //
 // GenmapHandle Getters/Setters
 //
@@ -87,6 +65,7 @@ int GenmapGetNVertices(GenmapHandle h);
 void GenmapSetNVertices(GenmapHandle, int nVertices);
 
 void GenmapScan(GenmapHandle h, GenmapComm c);
+parRSBKrylov parRSBGetKrylov(GenmapHandle h);
 //
 // GenmapComm
 //
@@ -100,6 +79,7 @@ void GenmapSplitComm(GenmapHandle h, GenmapComm *c, int bin);
 int GenmapCrystalInit(GenmapHandle h, GenmapComm c);
 int GenmapCrystalTransfer(GenmapHandle h, int field);
 int GenmapCrystalFinalize(GenmapHandle h);
+MPI_Comm GenmapGetMPIComm(GenmapComm c);
 //
 // Function to read/write from/to FILE
 //

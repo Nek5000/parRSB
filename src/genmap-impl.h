@@ -1,7 +1,3 @@
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #ifndef _GENMAP_IMPL_H_
 #define _GENMAP_IMPL_H_
 
@@ -9,16 +5,23 @@ extern "C" {
 #include <stdlib.h>
 #include <assert.h>
 #include <math.h>
-
-#ifdef GENMAP_DEBUG
 #include <stdio.h>
-#endif
-
+//
+// Header for GPU occa implementation
+//
 #if defined(PARRSB_GPU)
-#  include<occa.h>
+#  include <occa.h>
+#  include <parRSB-occa.h>
 #endif
-
+//
+// Header for gslib and genmap API
+//
+#include "genmap-gslib.h"
 #include "genmap.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 //
 // Fiedler fields
 //
@@ -72,7 +75,7 @@ struct GenmapHandle_private {
   int printStat;
 
 #if defined(PARRSB_GPU)
-  occaDevice device;
+  parRSBKrylov krylov;
 #endif
 };
 //
@@ -87,12 +90,6 @@ struct GenmapVector_private {
   GenmapInt size;
   GenmapScalar *data;
 };
-//
-// Memory management routines
-//
-#define GenmapMalloc(n, p) GenmapMallocArray ((n), sizeof(**(p)), p)
-#define GenmapCalloc(n, p) GenmapCallocArray ((n), sizeof(**(p)), p)
-#define GenmapRealloc(n, p) GenmapReallocArray((n), sizeof(**(p)), p)
 
 #endif
 

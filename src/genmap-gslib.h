@@ -1,9 +1,9 @@
+#ifndef _GENMAP_GSLIB_H_
+#define _GENMAP_GSLIB_H_
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#ifndef _GENMAP_GSLIB_H_
-#define _GENMAP_GSLIB_H_
 
 // Data type sint/uint
 // (defualt) int
@@ -29,6 +29,10 @@ extern "C" {
 #define TYPE_LONG   1
 #define TYPE_FLOAT  2
 #define TYPE_DOUBLE 3
+
+#define genmap_gs_long gs_long_long
+#define genmap_gs_int gs_int
+#define genmap_gs_scalar gs_double
 
 #endif
 
