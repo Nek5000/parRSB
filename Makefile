@@ -1,9 +1,9 @@
-DEBUG ?= 1
+DEBUG ?= 0
 CC ?= mpicc
 CXX ?= mpic++
 CXXFLAGS ?= -O2
 CFLAGS ?= -O2
-GPU ?= 1
+GPU ?= 0
 PAUL ?= 1
 PP=
 
@@ -120,7 +120,7 @@ $(TESTOBJ): $(TESTSRC)
 .PHONY: check
 check: 
 ifeq ($(GSLIBPATH),)
-	$(error Specify GSLIBPATH=<path to gslib>/build)
+	$(error "Specify GSLIBPATH=<path to gslib>/build")
 endif
 ifndef OCCA_DIR
  	$(error "Required ENV-variable OCCA_DIR is not set.")
