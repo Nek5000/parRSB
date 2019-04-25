@@ -66,16 +66,20 @@ ifneq ($(GPU),0)
   ifndef PARRSB_DIR
     $(error "Required variable PARRSB_DIR not set.")
   endif
+  ifndef OGS_DIR
+    $(error "Required variable OGS_DIR not set.")
+  endif
 
   CXXSRC += $(SRCDIR)/parRSB-occa.cpp
   CXXOBJ:=$(CXXSRC:.cpp=.cpp.o)
 
   CXXFLAGS += -DPARRSB_GPU -DPARRSB_OKL_DIR="\"$(PARRSB_DIR)/okl/\""
   CFLAGS += -DPARRSB_GPU -DPARRSB_OKL_DIR="\"$(PARRSB_DIR)/okl/\""
-  INCFLAGS += -I$(OCCA_DIR)/include
+  INCFLAGS += -I$(OCCA_DIR)/include -I$(OGS_DIR) -I$(OGS_DIR)/include
 
-  TESTINCFLAGS += -I$(OCCA_DIR) -I$(INSTALL_ROOT)/include
+  TESTINCFLAGS += -I$(INSTALL_ROOT)/include
   TESTLDFLAGS += -Wl,-rpath,$(OCCA_DIR)/lib -L$(OCCA_DIR)/lib -locca
+  TESTLDFLAGS += -Wl,-rpath,$(OGS_DIR) -L$(OGS_DIR) -logs
 endif
 
 OBJ := $(COBJ) $(CXXOBJ)
@@ -123,6 +127,9 @@ ifndef OCCA_DIR
 endif
 ifndef PARRSB_DIR
  	$(error "Required variable PARRSB_DIR not set.")
+endif
+ifndef OGS_DIR
+ 	$(error "Required variable OGS_DIR not set.")
 endif
 
 .PHONY: clean

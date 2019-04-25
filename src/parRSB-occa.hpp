@@ -1,7 +1,10 @@
 #ifndef _PARRSB_OCCA_HPP_
 #define _PARRSB_OCCA_HPP_
 
+#include "genmap-types.h"
+
 #include "occa.hpp"
+#include "ogs.hpp"
 #include "parRSB-occa.h"
 
 struct parRSBKrylov_private {
@@ -39,6 +42,7 @@ struct parRSBKrylov_private {
   //
   // TODO: Add ogs handles
   //
+  ogs_t *ogs;
 };
 
 #endif
