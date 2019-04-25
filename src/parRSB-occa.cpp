@@ -35,6 +35,7 @@ int parRSBOccaSetup(GenmapHandle h) {
   sprintf(deviceConfig, "mode: 'CUDA', device_id: %d", device_id);
 
   parRSBKrylov krylov = parRSBGetKrylov(h);
+  // there is a memory leak here, we don't delete it anywhere
   krylov = new parRSBKrylov_private[1];
   krylov->device.setup((std::string)deviceConfig);
 

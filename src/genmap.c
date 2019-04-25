@@ -38,10 +38,6 @@ int GenmapFinalize(GenmapHandle h) {
 
   array_free(&(h->elementArray));
 
-#if defined(PARRSB_GPU)
-  GenmapFree(h->krylov);
-#endif
-
   GenmapFree(h);
 
   return 0;
