@@ -78,10 +78,8 @@ int GenmapFree(void *p) {
   return 0;
 }
 
-parRSBKrylov parRSBGetKrylov(GenmapHandle h) {
 #if defined(PARRSB_GPU)
+parRSBKrylov parRSBGetKrylov(GenmapHandle h) {
   return h->krylov;
-#else
-  return NULL;
-#endif
 }
+#endif

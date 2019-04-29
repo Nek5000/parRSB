@@ -122,14 +122,16 @@ check:
 ifeq ($(GSLIBPATH),)
 	$(error "Specify GSLIBPATH=<path to gslib>/build")
 endif
-ifndef OCCA_DIR
- 	$(error "Required ENV-variable OCCA_DIR is not set.")
-endif
-ifndef PARRSB_DIR
- 	$(error "Required variable PARRSB_DIR not set.")
-endif
-ifndef OGS_DIR
- 	$(error "Required variable OGS_DIR not set.")
+ifneq ($(GPU),0)
+  ifndef OCCA_DIR
+   	$(error "Required ENV-variable OCCA_DIR is not set.")
+  endif
+  ifndef PARRSB_DIR
+   	$(error "Required variable PARRSB_DIR not set.")
+  endif
+  ifndef OGS_DIR
+   	$(error "Required variable OGS_DIR not set.")
+  endif
 endif
 
 .PHONY: clean

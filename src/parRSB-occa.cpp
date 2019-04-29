@@ -72,16 +72,22 @@ int parRSBOccaSetup(GenmapHandle h) {
 }
 
 int parRSBLaplacianSetup(GenmapHandle h) {
-  GenmapInt nLocal = GenmapGetNLocalElements(h);
+  GenmapInt lelt = GenmapGetNLocalElements(h);
+  GenmapInt nv = GenmapGetNVertices(h);
+  GenmapUInt numPoints = (GenmapUInt) nv * lelt;
+
+  GenmapLong *vertices;
+  parRSBGetVertices(h, vertices);
+
   parRSBKrylov krylov = parRSBGetKrylov(h);
 
-  krylov->r = (GenmapScalar *) calloc(nLocal, sizeof(GenmapScalar));
-  krylov->p = (GenmapScalar *) calloc(nLocal, sizeof(GenmapScalar));
-  krylov->w = (GenmapScalar *) calloc(nLocal, sizeof(GenmapScalar));
-  krylov->weights = (GenmapScalar *) calloc(nLocal, sizeof(GenmapScalar));
+  krylov->r = (GenmapScalar *) calloc(lelt, sizeof(GenmapScalar));
+  krylov->p = (GenmapScalar *) calloc(lelt, sizeof(GenmapScalar));
+  krylov->w = (GenmapScalar *) calloc(lelt, sizeof(GenmapScalar));
+  krylov->weights = (GenmapScalar *) calloc(lelt, sizeof(GenmapScalar));
 
-  krylov->o_r       = krylov->device.malloc(nLocal * sizeof(GenmapScalar));
-  krylov->o_p       = krylov->device.malloc(nLocal * sizeof(GenmapScalar));
-  krylov->o_w       = krylov->device.malloc(nLocal * sizeof(GenmapScalar));
-  krylov->o_weights = krylov->device.malloc(nLocal * sizeof(GenmapScalar));
+  krylov->o_r       = krylov->device.malloc(lelt * sizeof(GenmapScalar));
+  krylov->o_p       = krylov->device.malloc(lelt * sizeof(GenmapScalar));
+  krylov->o_w       = krylov->device.malloc(lelt * sizeof(GenmapScalar));
+  krylov->o_weights = krylov->device.malloc(lelt * sizeof(GenmapScalar));
 }

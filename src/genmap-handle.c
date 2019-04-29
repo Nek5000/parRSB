@@ -39,6 +39,22 @@ int GenmapGetNVertices(GenmapHandle h) {
   return h->nv;
 }
 
+void parRSBGetVertices(GenmapHandle h, GenmapLong *vertices) {
+  GenmapInt lelt = GenmapGetNLocalElements(h);
+  GenmapInt nv = GenmapGetNVertices(h);
+  GenmapUInt numPoints = (GenmapUInt) nv * lelt;
+
+  GenmapMalloc(numPoints, &vertices);
+
+  GenmapElements elements = GenmapGetElements(h);
+  GenmapInt i, j;
+  for(i = 0; i < lelt; i++) {
+    for(j = 0; j < nv; j++) {
+      vertices[i * nv + j] = elements[i].vertices[j];
+    }
+  }
+}
+
 void GenmapSetNVertices(GenmapHandle h, int nVertices) {
   h->nv = nVertices;
 }

@@ -59,10 +59,13 @@ GenmapLong GenmapGetLocalStartIndex(GenmapHandle h);
 void GenmapSetLocalStartIndex(GenmapHandle h, GenmapLong localStart);
 
 int GenmapGetNVertices(GenmapHandle h);
+void parRSBGetVertices(GenmapHandle h, GenmapLong *vertices);
 void GenmapSetNVertices(GenmapHandle, int nVertices);
 
 void GenmapScan(GenmapHandle h, GenmapComm c);
+#if defined(PARRSB_GPU)
 parRSBKrylov parRSBGetKrylov(GenmapHandle h);
+#endif
 //
 // GenmapComm
 //
