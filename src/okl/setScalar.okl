@@ -1,0 +1,57 @@
+@kernel void setScalar(const dlong N,
+                      const dfloat alpha,
+                      @restrict dfloat *  x){
+  
+  for(dlong n=0;n<N;++n;@tile(256,@outer,@inner)){
+    if(n<N){
+      x[n] = alpha;
+    }
+  }
+}
+
+@kernel void gatherFromVertices(const dlong nelt,
+                      @restrict const dfloat *  u,
+                      @restrict dfloat *  weights){
+  
+  for(dlong n=0;n<nelt;++n;@tile(256,@outer,@inner)){
+    if(n<nelt){
+      dfloat wght = 0.f; 
+      for(int i=0; i<p_NV; i++) {
+        // Change the stride
+        wght += u[p_NV*n+i];
+      }
+      weights[n] = -1.0*wght;
+    }
+  }
+}
+
+@kernel void scatterToVertices(const dlong nelt,
+                      @restrict const dfloat *  u,
+                      @restrict dfloat *  ucv){
+  
+  for(dlong n=0;n<nelt;++n;@tile(256,@outer,@inner)){
+    if(n<nelt){
+      for(int i=0; i<p_NV; i++) {
+        uvc[n*p_NV+i] = u[n];
+      }
+    }
+  }
+}
+
+@kernel void laplacian(const dlong nelt,
+                      @restrict const dfloat *  u,
+                      @restrict dfloat *  weights,
+                      @restrict dfloat *  ucv,
+                      @restrict dfloat * v){
+  
+  for(dlong n=0;n<nelt;++n;@tile(256,@outer,@inner)){
+    if(n<nelt){
+      dfloat tmp = u[n]*weights[n]; 
+      for(int i=0; i<p_NV; i++) {
+        // Change the stride
+        tmp += ucv[p_NV*n+i];
+      }
+      v[n] = tmp;
+    }
+  }
+}

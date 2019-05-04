@@ -57,7 +57,7 @@ TESTOBJ:=$(TESTSRC:.c=.c.o)
 TESTEXE:=$(TESTSRC:.c=.out)
 
 TESTINCFLAGS=-I$(GSLIBDIR)/include -I$(INSTALL_ROOT)/include
-TESTLDFLAGS:=-L$(INSTALL_ROOT)/lib -l$(TARGET) -L $(GSLIBDIR)/lib -lgs -lm
+TESTLDFLAGS +=-L$(INSTALL_ROOT)/lib -l$(TARGET)
 
 ifneq ($(GPU),0)
   ifndef OCCA_DIR
@@ -78,9 +78,12 @@ ifneq ($(GPU),0)
   INCFLAGS += -I$(OCCA_DIR)/include -I$(OGS_DIR) -I$(OGS_DIR)/include
 
   TESTINCFLAGS += -I$(INSTALL_ROOT)/include
-  TESTLDFLAGS += -Wl,-rpath,$(OCCA_DIR)/lib -L$(OCCA_DIR)/lib -locca
+  ## Following order is important
   TESTLDFLAGS += -Wl,-rpath,$(OGS_DIR) -L$(OGS_DIR) -logs
+  TESTLDFLAGS += -Wl,-rpath,$(OCCA_DIR)/lib -L$(OCCA_DIR)/lib -locca
 endif
+
+TESTLDFLAGS +=-L $(GSLIBDIR)/lib -lgs -lm
 
 OBJ := $(COBJ) $(CXXOBJ)
 
