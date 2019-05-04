@@ -227,6 +227,10 @@ int GenmapAxpbyVector(GenmapVector z, GenmapVector x,
   return 0;
 }
 
+GenmapScalar *parRSBGetVectorData(GenmapVector v) {
+  return v->data;
+}
+
 int GenmapPrintVector(GenmapVector x) {
   /* Asserts:
        - size x > 0
