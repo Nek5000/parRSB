@@ -25,7 +25,8 @@ struct parRSBKrylov_private {
   GenmapScalar *w;
 
   occa::memory o_weights;
-  GenmapScalar *weights;
+  occa::memory o_tmp;
+
   //
   // Kernels
   //
@@ -39,9 +40,12 @@ struct parRSBKrylov_private {
   occa::kernel dotDivideKernel;
   occa::kernel weightedNorm2Kernel;
   occa::kernel norm2Kernel;
-  //
-  // TODO: Add ogs handles
-  //
+
+  occa::kernel setScalar;
+  occa::kernel gatherFromVertices;
+  occa::kernel scatterToVertices;
+  occa::kernel laplacian;
+
   ogs_t *ogs;
 };
 
