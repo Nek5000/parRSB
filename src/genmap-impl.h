@@ -74,6 +74,8 @@ struct GenmapHandle_private {
   int dbgLevel;
   int printStat;
 
+  GenmapVector weights;
+
 #if defined(PARRSB_GPU)
   parRSBKrylov krylov;
 #endif

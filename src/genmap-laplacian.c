@@ -1,6 +1,6 @@
 #include <genmap-impl.h>
 
-int GenmapInitLaplacian(GenmapHandle h, GenmapComm c, GenmapVector weights) {
+int parRSBInitLaplacian(GenmapHandle h) {
   GenmapInt lelt = GenmapGetNLocalElements(h);
   GenmapInt nv = GenmapGetNVertices(h);
   GenmapUInt numPoints = (GenmapUInt) nv * lelt;
@@ -16,8 +16,8 @@ int GenmapInitLaplacian(GenmapHandle h, GenmapComm c, GenmapVector weights) {
     }
   }
 
-  if(c->verticesHandle)
-    gs_free(c->verticesHandle);
+  if(h->local->verticesHandle)
+    gs_free(h->local->verticesHandle);
 
 #if defined(GENMAP_DEBUG)
   double t1 = GenmapGetMaxRss();
@@ -25,8 +25,8 @@ int GenmapInitLaplacian(GenmapHandle h, GenmapComm c, GenmapVector weights) {
     printf("RSS before gs_setup: %lf\n", t1);
 #endif
 
-  c->verticesHandle = gs_setup(vertices, numPoints, &c->gsComm, 0,
-                               gs_crystal_router, 0);
+  h->local->verticesHandle = gs_setup(vertices, numPoints, &h->local->gsComm, 0,
+                                      gs_crystal_router, 0);
 #if defined(GENMAP_DEBUG)
   t1 = GenmapGetMaxRss();
   if(GenmapCommRank(GenmapGetLocalComm(h)) == 0)
@@ -40,19 +40,19 @@ int GenmapInitLaplacian(GenmapHandle h, GenmapComm c, GenmapVector weights) {
     for(j = 0; j < nv; j++)
       u[nv * i + j] = 1.;
 
-  gs(u, genmap_gs_scalar, gs_add, 0, c->verticesHandle, &c->buf);
+  gs(u, genmap_gs_scalar, gs_add, 0, h->local->verticesHandle, &h->local->buf);
 
-  assert(weights->size == lelt);
+  GenmapCreateVector(&h->weights, lelt);
 
   for(i = 0; i < lelt; i++) {
-    weights->data[i] = 0.;
+    h->weights->data[i] = 0.;
     for(j = 0; j < nv; j++) {
-      weights->data[i] += u[nv * i + j];
+      h->weights->data[i] += u[nv * i + j];
     }
   }
 
   for(i = 0; i < lelt; i++) {
-    weights->data[i] *= -1;
+    h->weights->data[i] *= -1;
   }
 
   GenmapFree(u);
@@ -61,8 +61,7 @@ int GenmapInitLaplacian(GenmapHandle h, GenmapComm c, GenmapVector weights) {
   return 0;
 }
 
-int GenmapLaplacian(GenmapHandle h, GenmapComm c, GenmapVector u,
-                    GenmapVector weights, GenmapVector v) {
+int parRSBLaplacian(GenmapHandle h, GenmapVector u, GenmapVector v) {
   assert(u->size == v->size);
   assert(u->size == GenmapGetNLocalElements(h));
 
@@ -77,10 +76,10 @@ int GenmapLaplacian(GenmapHandle h, GenmapComm c, GenmapVector u,
     for(j = 0; j < nv; j++)
       ucv[nv * i + j] = u->data[i];
 
-  gs(ucv, genmap_gs_scalar, gs_add, 0, c->verticesHandle, &c->buf);
+  gs(ucv, genmap_gs_scalar, gs_add, 0, h->local->verticesHandle, &h->local->buf);
 
   for(i = 0; i < lelt; i++) {
-    v->data[i] = weights->data[i] * u->data[i];
+    v->data[i] = h->weights->data[i] * u->data[i];
     for(j = 0; j < nv; j ++) {
       v->data[i] += ucv[nv * i + j];
     }
@@ -89,4 +88,8 @@ int GenmapLaplacian(GenmapHandle h, GenmapComm c, GenmapVector u,
   GenmapFree(ucv);
 
   return 0;
+}
+
+int parRSBFinalizeLaplacian(GenmapHandle h) {
+  GenmapDestroyVector(h->weights);
 }

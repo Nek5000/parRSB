@@ -117,9 +117,9 @@ int GenmapDestroyVector(GenmapVector x);
 //
 // Functions to do Laplacian of the dual graph
 //
-int GenmapInitLaplacian(GenmapHandle h, GenmapComm c, GenmapVector weights);
-int GenmapLaplacian(GenmapHandle h, GenmapComm c, GenmapVector u,
-                    GenmapVector weights, GenmapVector v);
+int parRSBInitLaplacian(GenmapHandle h);
+int parRSBLaplacian(GenmapHandle h, GenmapVector u, GenmapVector v);
+int parRSBFinalizeLaplacian(GenmapHandle h);
 //
 // Eigenvalue/vector calculations
 //
