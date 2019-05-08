@@ -65,23 +65,26 @@ int parRSBOccaSetup(GenmapHandle h) {
                                 PARRSB_OKL_DIR "/dotMultiply.okl", "dotMultiply", prop);
   krylov->dotMultiplyAddKernel = krylov->device.buildKernel(
                                    PARRSB_OKL_DIR "/dotMultiplyAdd.okl", "dotMultiplyAdd", prop);
-  krylov->dotDivideKernel = krylov->device.buildKernel(PARRSB_OKL_DIR "/dotDivide.okl",
-                              "dotDivide", prop);
-  krylov->weightedNorm2Kernel = krylov->device.buildKernel(PARRSB_OKL_DIR "/weightedNorm2.okl",
+  krylov->dotDivideKernel = krylov->device.buildKernel(PARRSB_OKL_DIR
+                            "/dotDivide.okl",
+                            "dotDivide", prop);
+  krylov->weightedNorm2Kernel = krylov->device.buildKernel(
+                                  PARRSB_OKL_DIR "/weightedNorm2.okl",
                                   "weightedNorm2", prop);
-  krylov->norm2Kernel = krylov->device.buildKernel(PARRSB_OKL_DIR "/norm2.okl", "norm2", prop);
+  krylov->norm2Kernel = krylov->device.buildKernel(PARRSB_OKL_DIR "/norm2.okl",
+                        "norm2", prop);
 
   krylov->setScalar = krylov->device.buildKernel(
-                              PARRSB_OKL_DIR "/setScalar.okl", "setScalar", prop);
+                        PARRSB_OKL_DIR "/setScalar.okl", "setScalar", prop);
   krylov->gatherFromVertices = krylov->device.buildKernel(
-                              PARRSB_OKL_DIR "/setScalar.okl", "gatherFromVertices", prop);
+                                 PARRSB_OKL_DIR "/setScalar.okl", "gatherFromVertices", prop);
   krylov->scatterToVertices = krylov->device.buildKernel(
-                              PARRSB_OKL_DIR "/setScalar.okl", "scatterToVertices", prop);
+                                PARRSB_OKL_DIR "/setScalar.okl", "scatterToVertices", prop);
   krylov->laplacian = krylov->device.buildKernel(
-                              PARRSB_OKL_DIR "/setScalar.okl", "laplacian", prop);
+                        PARRSB_OKL_DIR "/setScalar.okl", "laplacian", prop);
 }
 
-int parRSBLaplacianSetup(GenmapHandle h, GenmapComm c) {
+int parRSBInitLaplacian_Occa(GenmapHandle h, GenmapComm c) {
   GenmapInt lelt = GenmapGetNLocalElements(h);
   GenmapInt nv = GenmapGetNVertices(h);
   GenmapUInt numPoints = (GenmapUInt) nv * lelt;
@@ -93,7 +96,7 @@ int parRSBLaplacianSetup(GenmapHandle h, GenmapComm c) {
   parRSBGetVertices(h, vertices);
   krylov->ogs = ogsSetup((dlong) numPoints, vertices, comm, 1, krylov->device);
 
-  krylov->o_tmp = krylov->device.malloc(sizeof(GenmapScalar)*numPoints);
+  krylov->o_tmp = krylov->device.malloc(sizeof(GenmapScalar) * numPoints);
   krylov->o_weights = krylov->device.malloc(lelt * sizeof(GenmapScalar));
 
   krylov->setScalar(numPoints, 1.0, krylov->o_tmp);
@@ -104,14 +107,14 @@ int parRSBLaplacianSetup(GenmapHandle h, GenmapComm c) {
   GenmapFree(vertices);
 }
 
-int parRSBLaplacian(GenmapHandle h, GenmapComm c, occa::memory o_u, occa::memory o_v) {
+int parRSBLaplacian_Occa(GenmapHandle h, occa::memory o_u, occa::memory o_v) {
   GenmapInt lelt = GenmapGetNLocalElements(h);
   GenmapInt nv = GenmapGetNVertices(h);
-  GenmapUInt numPoints = (GenmapUInt) lelt*nv;
+  GenmapUInt numPoints = (GenmapUInt) lelt * nv;
 
   parRSBKrylov krylov = parRSBGetKrylov(h);
 
-  krylov->o_tmp = krylov->device.malloc(sizeof(GenmapScalar)*numPoints);
+  krylov->o_tmp = krylov->device.malloc(sizeof(GenmapScalar) * numPoints);
   krylov->scatterToVertices(lelt, o_u, krylov->o_tmp);
 
   ogsGatherScatter(krylov->o_tmp, dfloatString, "add", krylov->ogs);
