@@ -143,6 +143,43 @@ void parRSBHistoSortUpdateProbes(GenmapHandle h,GenmapLong *count,GenmapInt thre
   }
 }
 
+int parRSBHistoSortSetProc(GenmapHandle h,int field,buffer *buf0) {
+  GenmapElements elements = GenmapGetElements(h);
+  GenmapInt lelt = GenmapGetNLocalElements(h);
+
+  GenmapComm c=GenmapGetGlobalComm(h);
+  int size=GenmapCommSize(c);
+  int rank=GenmapCommRank(c);
+  int nsplitters=3*(size-1);
+  
+  GenmapElements p,e;
+  int i;
+
+  if(field==GENMAP_FIEDLER) {
+    for(p=elements,e=elements+lelt; p!=e; p++){
+      i=1;
+      while(i<size && p->fiedler<h->histogram->probes[3*i-2]) i++;
+      p->proc=i-1;
+    }
+  }
+
+  return 0;
+}
+
+void parRSBHistoSortTransferToProc(GenmapHandle h, int field, buffer *buf0) {
+  GenmapElements elements = GenmapGetElements(h);
+  GenmapInt lelt = GenmapGetNLocalElements(h);
+
+  if(field == GENMAP_FIEDLER) { // Fiedler
+    sarray_transfer(struct GenmapElement_private, &(h->elementArray), proc, 0,
+                    &(h->cr));
+    GenmapScan(h, GenmapGetLocalComm(h));
+  } else if(field == GENMAP_GLOBALID) {
+    sarray_transfer(struct GenmapElement_private, &(h->elementArray), proc, 0,
+                    &(h->cr));
+    GenmapScan(h, GenmapGetLocalComm(h));
+  }
+}
 
 void parRSBHistogramSort(GenmapHandle h,GenmapComm c,int field,buffer *buf0) {
   int size=GenmapCommSize(c);
@@ -182,6 +219,14 @@ void parRSBHistogramSort(GenmapHandle h,GenmapComm c,int field,buffer *buf0) {
      // global reduction
      GenmapReduce(c,count,h->histogram->count,nsplitters,GENMAP_LONG,GENMAP_SUM);
   }
+  // set destination processor id for each element
+  parRSBHistoSortSetProc(h,field,buf0);
+
+  // send elements to right processor
+  parRSBHistoSortTransferToProc(h,field,buf0);
+
+  // sort locally.
+  parRSBHistoSortLocalSort(h,field,buf0);
 
   GenmapFree(h->histogram->probes);
   GenmapFree(h->histogram->count);
