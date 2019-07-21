@@ -15,12 +15,21 @@ void parRSBHistoSortInitProbes(GenmapHandle h,int field) {
   int rank=GenmapCommRank(c);
   int nsplitters=3*(size-1);
 
+  // Allocate space for probes and counts
+  GenmapMalloc(nsplitters,&h->histogram->probes);
+  GenmapMalloc(nsplitters,&h->histogram->count);
+  GenmapLong *count;
+  if(rank==0) {
+    GenmapMalloc(nsplitters,&count);
+  }
+
   if(field==GENMAP_FIEDLER){
     // pick 3*(size-1) splitters as probes
     GenmapScalar delta=(1.f-(-1.f))/size;
     for(int i=1; i<size; i++) {
       h->histogram->probes[3*i-3]=-1.f+i*delta-delta/4;
       h->histogram->probes[3*i-2]=-1.f+i*delta;
+      printf("probes: %lf\n",h->histogram->probes[3*i-2]);
       h->histogram->probes[3*i-1]=-1.f+i*delta+delta/4;
     }
 
@@ -152,14 +161,16 @@ int parRSBHistoSortSetProc(GenmapHandle h,int field,buffer *buf0) {
   int rank=GenmapCommRank(c);
   int nsplitters=3*(size-1);
   
-  GenmapElements p,e;
-  int i;
+  GenmapElements p=elements,e=elements+lelt;
+  int i,j=0;
 
   if(field==GENMAP_FIEDLER) {
-    for(p=elements,e=elements+lelt; p!=e; p++){
-      i=1;
-      while(i<size && p->fiedler<h->histogram->probes[3*i-2]) i++;
-      p->proc=i-1;
+    j=0;
+    for(i=0; i<size; i++){
+      while(p!=e && p->fiedler<h->histogram->probes[3*i-2]){
+        p->proc=i;
+        p++;
+      }
     }
   }
 
@@ -184,50 +195,73 @@ void parRSBHistoSortTransferToProc(GenmapHandle h, int field, buffer *buf0) {
 void parRSBHistogramSort(GenmapHandle h,GenmapComm c,int field,buffer *buf0) {
   int size=GenmapCommSize(c);
   int rank=GenmapCommRank(c);
-  int nsplitters=3*(size-1);
-
-  // Allocate space for probes and counts
-  GenmapMalloc(nsplitters,&h->histogram->probes);
-  GenmapMalloc(nsplitters,&h->histogram->count);
-  GenmapLong *count;
-  if(rank==0) {
-    GenmapMalloc(nsplitters,&count);
-  }
+  printf("Size and rank: done\n");
 
   // 10% of load balanced partition size 
-  GenmapInt threshold=(GenmapGetNGlobalElements(h)/size)/10;
+  GenmapInt threshold=(GenmapGetNGlobalElements(h)/size);
   if(threshold<2) threshold=2;
 
   // sort locally.
   parRSBHistoSortLocalSort(h,field,buf0);
+  printf("1st Local sort: done\n");
+
+  // We are done if size==1
+  if(size==1) return;
+
+  // Else we continue
+  int nsplitters=3*(size-1);
+
+  // Allocate space for probes and counts
+  GenmapMalloc(nsplitters,&(h->histogram->probes));
+  GenmapMalloc(nsplitters,&(h->histogram->count));
+  GenmapLong *count;
+  if(rank==0) {
+    GenmapMalloc(nsplitters,&count);
+  }
+  printf("Memory allocation: done\n");
+
   // init probes values
   parRSBHistoSortInitProbes(h,field);
+  printf("Init probes: done\n");
+
   // update counts locally 
   parRSBHistoSortUpdateCounts(h,field);
+  printf("Update counts: done\n");
 
   // global reduction
   GenmapReduce(c,count,h->histogram->count,nsplitters,GENMAP_LONG,GENMAP_SUM);
+  printf("Global reduce: done\n");
 
   while(!parRSBHistoSortReachedThreshold(h,threshold,field)) {
-     parRSBHistoSortUpdateProbes(h,count,threshold,field);
+    parRSBHistoSortUpdateProbes(h,count,threshold,field);
+    printf("Update probes: done\n");
 
-     // TODO: Bcast probes
-     GenmapBcast(c,h->histogram->probes,nsplitters,GENMAP_LONG);
+    // TODO: Bcast probes
+    GenmapBcast(c,h->histogram->probes,nsplitters,GENMAP_LONG);
+    printf("Bcast: done\n");
 
-     parRSBHistoSortUpdateCounts(h,field);
+    parRSBHistoSortUpdateCounts(h,field);
+    printf("Update counts: done\n");
 
-     // global reduction
-     GenmapReduce(c,count,h->histogram->count,nsplitters,GENMAP_LONG,GENMAP_SUM);
+    // global reduction
+    GenmapReduce(c,count,h->histogram->count,nsplitters,GENMAP_LONG,GENMAP_SUM);
+    printf("Global reduce: done\n");
   }
   // set destination processor id for each element
   parRSBHistoSortSetProc(h,field,buf0);
+  printf("Set proc: done\n");
 
   // send elements to right processor
+  GenmapCrystalInit(h, GenmapGetGlobalComm(h));
   parRSBHistoSortTransferToProc(h,field,buf0);
+  GenmapCrystalFinalize(h);
+  printf("Transfer to proc: done\n");
 
   // sort locally.
   parRSBHistoSortLocalSort(h,field,buf0);
+  printf("Local sort: done\n");
 
+  // Finalize sort
   GenmapFree(h->histogram->probes);
   GenmapFree(h->histogram->count);
   if(rank==0) {
