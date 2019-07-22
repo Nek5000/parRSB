@@ -63,6 +63,10 @@ void parRSBHistoSortUpdateCounts(GenmapHandle h,int nsplitters,int field) {
   GenmapElements elements = GenmapGetElements(h);
   GenmapInt lelt = GenmapGetNLocalElements(h);
 
+  for(int i=0; i<nsplitters; i++) {
+    h->histogram->count[i]=0;
+  }
+
   if(field == GENMAP_FIEDLER) {
     // calculate initial counts
     // local
@@ -106,8 +110,7 @@ int parRSBHistoSortReachedThreshold(GenmapHandle h,GenmapComm c,GenmapLong *coun
 
   if(rank==0) {
     for(int i=1; i<size; i++) {
-      printf("count[%d] = " GenmapLongFormat "\n",i,count[3*i-2]);
-      if(abs(count[3*i-2]-partition_size)>threshold) {
+      if(abs(count[3*i-2]-i*partition_size)>threshold) {
         converged=0;
         break;
       }
