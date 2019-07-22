@@ -106,6 +106,7 @@ int parRSBHistoSortReachedThreshold(GenmapHandle h,GenmapComm c,GenmapLong *coun
 
   if(rank==0) {
     for(int i=1; i<size; i++) {
+      printf("count[%d] = " GenmapLongFormat "\n",i,count[3*i-2]);
       if(abs(count[3*i-2]-partition_size)>threshold) {
         converged=0;
         break;
@@ -176,7 +177,6 @@ int parRSBHistoSortSetProc(GenmapHandle h,GenmapComm c,int field,buffer *buf0) {
   if(field==GENMAP_FIEDLER) {
     j=0;
     for(i=1; i<size; i++){
-      printf("count: " GenmapLongFormat "\n",h->histogram->count[3*i-2]);
       while(p!=e && p->fiedler<h->histogram->probes[3*i-2]){
         p->proc=i-1;
         p++;
@@ -244,6 +244,7 @@ void parRSBHistogramSort(GenmapHandle h,GenmapComm c,int field,buffer *buf0) {
   GenmapReduce(c,count,h->histogram->count,nsplitters,GENMAP_LONG,GENMAP_SUM);
   printf("Global reduce: done\n");
 
+  int iter=0;
   while(!parRSBHistoSortReachedThreshold(h,c,count,threshold,field)) {
     parRSBHistoSortUpdateProbes(h,count,threshold,field);
     printf("Update probes: done\n");
@@ -260,8 +261,9 @@ void parRSBHistogramSort(GenmapHandle h,GenmapComm c,int field,buffer *buf0) {
     printf("Global reduce: done\n");
     if(rank==0)
       for(int i=1; i<size; i++) {
-        printf("count[%d]= " GenmapLongFormat "\n",i,count[3*i-2]);
+        printf("iter: %d count[%d]= " GenmapLongFormat "\n",iter,i,count[3*i-2]);
       }
+    iter++;
   }
   // set destination processor id for each element
   parRSBHistoSortSetProc(h,c,field,buf0);
@@ -272,6 +274,8 @@ void parRSBHistogramSort(GenmapHandle h,GenmapComm c,int field,buffer *buf0) {
   parRSBHistoSortTransferToProc(h,field,buf0);
   GenmapCrystalFinalize(h);
   printf("Transfer to proc: done\n");
+
+  GenmapScan(h,c);
 
   // sort locally.
   parRSBHistoSortLocalSort(h,field,buf0);
