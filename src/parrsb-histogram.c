@@ -40,14 +40,9 @@ void parRSBHistoSortInitProbes(GenmapHandle h,int field) {
   }
 }
 
-void parRSBHistoSortUpdateCounts(GenmapHandle h,int field) {
+void parRSBHistoSortUpdateCounts(GenmapHandle h,int nsplitters,int field) {
   GenmapElements elements = GenmapGetElements(h);
   GenmapInt lelt = GenmapGetNLocalElements(h);
-
-  GenmapComm c=GenmapGetGlobalComm(h);
-  int size=GenmapCommSize(c);
-  int rank=GenmapCommRank(c);
-  int nsplitters=3*(size-1);
 
   if(field == GENMAP_FIEDLER) {
     // calculate initial counts
@@ -61,7 +56,6 @@ void parRSBHistoSortUpdateCounts(GenmapHandle h,int field) {
       }
     }
   }
-
 }
 
 void parRSBHistoSortLocalSort(GenmapHandle h,int field,buffer *buf0) {
@@ -81,22 +75,19 @@ void parRSBHistoSortLocalSort(GenmapHandle h,int field,buffer *buf0) {
 
 }
 
-int parRSBHistoSortReachedThreshold(GenmapHandle h,GenmapInt threshold,int field) {
-  GenmapComm c=GenmapGetGlobalComm(h);
+int parRSBHistoSortReachedThreshold(GenmapHandle h,GenmapComm c,GenmapLong *count,
+                                    GenmapInt threshold,int field) {
   int size=GenmapCommSize(c);
   int rank=GenmapCommRank(c);
 
   GenmapLong lelgt = GenmapGetNGlobalElements(h);
   GenmapInt partition_size=lelgt/size;
 
-  GenmapLong *current = h->histogram->count;
-  GenmapScalar *probes = h->histogram->probes;
-
   GenmapInt converged=1;
 
   if(rank==0) {
     for(int i=1; i<size; i++) {
-      if(abs(current[3*i-2]-partition_size)>threshold) {
+      if(abs(count[3*i-2]-partition_size)>threshold) {
         converged=0;
         break;
       }
@@ -152,11 +143,10 @@ void parRSBHistoSortUpdateProbes(GenmapHandle h,GenmapLong *count,GenmapInt thre
   }
 }
 
-int parRSBHistoSortSetProc(GenmapHandle h,int field,buffer *buf0) {
+int parRSBHistoSortSetProc(GenmapHandle h,GenmapComm c,int field,buffer *buf0) {
   GenmapElements elements = GenmapGetElements(h);
   GenmapInt lelt = GenmapGetNLocalElements(h);
 
-  GenmapComm c=GenmapGetGlobalComm(h);
   int size=GenmapCommSize(c);
   int rank=GenmapCommRank(c);
   int nsplitters=3*(size-1);
@@ -166,12 +156,14 @@ int parRSBHistoSortSetProc(GenmapHandle h,int field,buffer *buf0) {
 
   if(field==GENMAP_FIEDLER) {
     j=0;
-    for(i=0; i<size; i++){
+    for(i=1; i<size; i++){
+      printf("count: " GenmapLongFormat "\n",h->histogram->count[3*i-2]);
       while(p!=e && p->fiedler<h->histogram->probes[3*i-2]){
-        p->proc=i;
+        p->proc=i-1;
         p++;
       }
     }
+    if(p!=e) while(p!=e) { p->proc=size-1; p++;}
   }
 
   return 0;
@@ -200,6 +192,7 @@ void parRSBHistogramSort(GenmapHandle h,GenmapComm c,int field,buffer *buf0) {
   // 10% of load balanced partition size 
   GenmapInt threshold=(GenmapGetNGlobalElements(h)/size);
   if(threshold<2) threshold=2;
+  printf("threshold: %d\n",threshold);
 
   // sort locally.
   parRSBHistoSortLocalSort(h,field,buf0);
@@ -225,14 +218,14 @@ void parRSBHistogramSort(GenmapHandle h,GenmapComm c,int field,buffer *buf0) {
   printf("Init probes: done\n");
 
   // update counts locally 
-  parRSBHistoSortUpdateCounts(h,field);
+  parRSBHistoSortUpdateCounts(h,nsplitters,field);
   printf("Update counts: done\n");
 
   // global reduction
   GenmapReduce(c,count,h->histogram->count,nsplitters,GENMAP_LONG,GENMAP_SUM);
   printf("Global reduce: done\n");
 
-  while(!parRSBHistoSortReachedThreshold(h,threshold,field)) {
+  while(!parRSBHistoSortReachedThreshold(h,c,count,threshold,field)) {
     parRSBHistoSortUpdateProbes(h,count,threshold,field);
     printf("Update probes: done\n");
 
@@ -240,7 +233,7 @@ void parRSBHistogramSort(GenmapHandle h,GenmapComm c,int field,buffer *buf0) {
     GenmapBcast(c,h->histogram->probes,nsplitters,GENMAP_LONG);
     printf("Bcast: done\n");
 
-    parRSBHistoSortUpdateCounts(h,field);
+    parRSBHistoSortUpdateCounts(h,nsplitters,field);
     printf("Update counts: done\n");
 
     // global reduction
@@ -248,11 +241,11 @@ void parRSBHistogramSort(GenmapHandle h,GenmapComm c,int field,buffer *buf0) {
     printf("Global reduce: done\n");
   }
   // set destination processor id for each element
-  parRSBHistoSortSetProc(h,field,buf0);
+  parRSBHistoSortSetProc(h,c,field,buf0);
   printf("Set proc: done\n");
 
   // send elements to right processor
-  GenmapCrystalInit(h, GenmapGetGlobalComm(h));
+  GenmapCrystalInit(h,c);
   parRSBHistoSortTransferToProc(h,field,buf0);
   GenmapCrystalFinalize(h);
   printf("Transfer to proc: done\n");

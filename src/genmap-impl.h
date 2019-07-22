@@ -94,8 +94,10 @@ void GenmapAssignBins(GenmapHandle h, int field, buffer *buf0);
 void GenmapTransferToBins(GenmapHandle h, int field, buffer *buf0);
 void GenmapBinSort(GenmapHandle h, int field, buffer *buf0);
 //
-// MergeSort
+// HistoSort
 //
+void parRSBHistogramSort(GenmapHandle h,GenmapComm c,int field,buffer *buf0);
+
 struct parRSBHistogram_private {
   GenmapLong *count;
   GenmapScalar *probes;
