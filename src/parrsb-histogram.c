@@ -5,11 +5,27 @@
 #include <time.h>
 #include <limits.h>
 
-void parRSBHistoSortInitProbes(GenmapHandle h,int field) {
+void parRSBFiedlerMinMax(GenmapHandle h,GenmapComm c,GenmapScalar *min,GenmapScalar *max) {
+  *min = 1; *max = -1;
+
+  GenmapElements e = GenmapGetElements(h);
+  GenmapInt i;
+  for(i = 0; i < GenmapGetNLocalElements(h); i++) {
+    if(e[i].fiedler < *min) {
+      *min = e[i].fiedler;
+    }
+    if(e[i].fiedler > *max) {
+      *max = e[i].fiedler;
+    }
+  }
+
+  GenmapGop(c,min,1,GENMAP_SCALAR,GENMAP_MIN);
+  GenmapGop(c,max,1,GENMAP_SCALAR,GENMAP_MAX);
+}
+
+void parRSBHistoSortInitProbes(GenmapHandle h,GenmapComm c,int field) {
   GenmapElements elements = GenmapGetElements(h);
   GenmapInt lelt = GenmapGetNLocalElements(h);
-
-  GenmapComm c=GenmapGetGlobalComm(h);
 
   int size=GenmapCommSize(c);
   int rank=GenmapCommRank(c);
@@ -23,14 +39,17 @@ void parRSBHistoSortInitProbes(GenmapHandle h,int field) {
     GenmapMalloc(nsplitters,&count);
   }
 
+  GenmapScalar min,max;
+  parRSBFiedlerMinMax(h,c,&min,&max);
+
   if(field==GENMAP_FIEDLER){
     // pick 3*(size-1) splitters as probes
-    GenmapScalar delta=(1.f-(-1.f))/size;
+    GenmapScalar delta=(max-min)/size;
     for(int i=1; i<size; i++) {
-      h->histogram->probes[3*i-3]=-1.f+i*delta-delta/4;
-      h->histogram->probes[3*i-2]=-1.f+i*delta;
+      h->histogram->probes[3*i-3]=min+i*delta-delta/4;
+      h->histogram->probes[3*i-2]=min+i*delta;
       printf("probes: %lf\n",h->histogram->probes[3*i-2]);
-      h->histogram->probes[3*i-1]=-1.f+i*delta+delta/4;
+      h->histogram->probes[3*i-1]=min+i*delta+delta/4;
     }
 
     // initialize the count to zero
@@ -214,7 +233,7 @@ void parRSBHistogramSort(GenmapHandle h,GenmapComm c,int field,buffer *buf0) {
   printf("Memory allocation: done\n");
 
   // init probes values
-  parRSBHistoSortInitProbes(h,field);
+  parRSBHistoSortInitProbes(h,c,field);
   printf("Init probes: done\n");
 
   // update counts locally 
@@ -239,6 +258,10 @@ void parRSBHistogramSort(GenmapHandle h,GenmapComm c,int field,buffer *buf0) {
     // global reduction
     GenmapReduce(c,count,h->histogram->count,nsplitters,GENMAP_LONG,GENMAP_SUM);
     printf("Global reduce: done\n");
+    if(rank==0)
+      for(int i=1; i<size; i++) {
+        printf("count[%d]= " GenmapLongFormat "\n",i,count[3*i-2]);
+      }
   }
   // set destination processor id for each element
   parRSBHistoSortSetProc(h,c,field,buf0);
