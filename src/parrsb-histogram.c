@@ -319,7 +319,7 @@ void parRSBHistogramSort(GenmapHandle h,GenmapComm c,int field,buffer *buf0) {
 
     // global reduction
     GenmapReduce(c,count,h->histogram->count,nsplitters,GENMAP_LONG,GENMAP_SUM);
-#if 1
+#if 0
     if(rank==0)
       for(int i=1; i<size; i++){
         printf("iter: %d count[%d]= " GenmapLongFormat "\n",iter+1,i,count[3*i-2]);
