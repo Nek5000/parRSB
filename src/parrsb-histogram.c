@@ -80,7 +80,8 @@ void parRSBHistoSortInitProbes(GenmapHandle h,GenmapComm c,int field) {
   }
 
   g_delta=(g_max-g_min)/size;
-  for(int i=1; i<size; i++) {
+  int i;
+  for(i=1; i<size; i++) {
     h->histogram->probes[3*i-3]=g_min;
     h->histogram->probes[3*i-2]=g_min+i*g_delta;
     h->histogram->probes[3*i-1]=g_max;
@@ -91,7 +92,8 @@ void parRSBHistoSortUpdateCounts(GenmapHandle h,int nsplitters,int field) {
   GenmapElements elements = GenmapGetElements(h);
   GenmapInt lelt = GenmapGetNLocalElements(h);
 
-  for(int i=0; i<nsplitters; i++) {
+  int i;
+  for(i=0; i<nsplitters; i++) {
     h->histogram->count[i]=0;
   }
 
@@ -99,7 +101,7 @@ void parRSBHistoSortUpdateCounts(GenmapHandle h,int nsplitters,int field) {
   if(field==GENMAP_FIEDLER){
     for(p=elements,e=p+lelt; p!=e; p++){
       // need to update as we don't keep the probes sorted.
-      for(int i=0; i<nsplitters; i++){
+      for(i=0; i<nsplitters; i++){
         if(p->fiedler<h->histogram->probes[i]){
           h->histogram->count[i]++;
         }
@@ -108,7 +110,7 @@ void parRSBHistoSortUpdateCounts(GenmapHandle h,int nsplitters,int field) {
   } else if(field==GENMAP_GLOBALID){
     for(p=elements,e=p+lelt; p!=e; p++){
       // need to update as we don't keep the probes sorted.
-      for(int i=0; i<nsplitters; i++){
+      for(i=0; i<nsplitters; i++){
         if(p->globalId0<h->histogram->probes[i]){
           h->histogram->count[i]++;
         }
@@ -129,8 +131,9 @@ int parRSBHistoSortReachedThreshold(GenmapHandle h,GenmapComm c,GenmapLong *coun
 
   GenmapInt converged=1;
 
+  int i;
   if(rank==0) {
-    for(int i=1; i<size; i++) {
+    for(i=1; i<size; i++) {
       GenmapLong expected=i*partition_size+((i<nrem)?i:nrem);
       if(abs(count[3*i-2]-expected)>threshold) {
         converged=0;
@@ -188,13 +191,14 @@ void parRSBHistoSortUpdateProbes(GenmapHandle h,GenmapComm c,
   GenmapLong lelgt = GenmapGetNGlobalElements(h);
   GenmapInt partition_size=lelgt/size;
 
+  int i;
   if(rank==0) {
-    for(int i=0; i<nsplitters; i++) {
+    for(i=0; i<nsplitters; i++) {
       h->histogram->count[i]=count[i];
     }
 
     if(field == GENMAP_FIEDLER) {
-      for(int i=1; i<size; i++) {
+      for(i=1; i<size; i++) {
         parRSBHistoSortUpdateSplitter(h,c,i,threshold);
       }
     }

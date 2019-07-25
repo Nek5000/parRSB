@@ -193,7 +193,8 @@ void GenmapRSB(GenmapHandle h) {
       global = 0;
     } while(ipass < npass && iter == maxIter);
 
-    GenmapBinSort(h, GENMAP_FIEDLER, &buf0);
+    //GenmapBinSort(h, GENMAP_FIEDLER, &buf0);
+    parRSBHistogramSort(h,GenmapGetLocalComm(h),GENMAP_FIEDLER,&buf0);
 #if defined(GENMAP_DEBUG)
     e = GenmapGetElements(h);
     if(GenmapCommRank(GenmapGetGlobalComm(h)) == 0) {
@@ -223,7 +224,8 @@ void GenmapRSB(GenmapHandle h) {
     GenmapSetLocalComm(h, c);
 
 #if defined(GENMAP_PAUL)
-    GenmapBinSort(h, GENMAP_GLOBALID, &buf0);
+    //GenmapBinSort(h, GENMAP_GLOBALID, &buf0);
+    parRSBHistogramSort(h,GenmapGetLocalComm(h),GENMAP_GLOBALID,&buf0);
 #endif
   }
 
