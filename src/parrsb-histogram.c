@@ -7,21 +7,7 @@
 #include <stdlib.h>
 
 GenmapScalar g_min,g_max,g_delta;
-
-void parRSBHistoSortLocalSort(GenmapHandle h,GenmapComm c,int field,buffer *buf0) {
-  GenmapElements elements = GenmapGetElements(h);
-  GenmapInt lelt = GenmapGetNLocalElements(h);
-
-  if(field == GENMAP_FIEDLER) { // Fiedler
-    // sort locally according to Fiedler vector
-    sarray_sort(struct GenmapElement_private, elements, (GenmapUInt)lelt, fiedler,
-                TYPE_DOUBLE, buf0);
-  } else if(GENMAP_GLOBALID) {
-    // sort locally according to globalId
-    sarray_sort(struct GenmapElement_private, elements, (GenmapUInt)lelt,
-                globalId0, TYPE_LONG, buf0);
-  }
-}
+GenmapLong l_min,l_max;
 
 void parRSBFiedlerMinMax(GenmapHandle h,GenmapComm c,GenmapScalar *min,GenmapScalar *max) {
   *min = 1; *max = -1;
@@ -41,6 +27,39 @@ void parRSBFiedlerMinMax(GenmapHandle h,GenmapComm c,GenmapScalar *min,GenmapSca
   GenmapGop(c,max,1,GENMAP_SCALAR,GENMAP_MAX);
 }
 
+void parRSBGlobalIdMinMax(GenmapHandle h,GenmapComm c,GenmapLong *min,GenmapLong *max) {
+  *min = LONG_MAX; *max = LONG_MIN;
+
+  GenmapElements e = GenmapGetElements(h);
+  GenmapInt i;
+  for(i = 0; i < GenmapGetNLocalElements(h); i++) {
+    if(e[i].globalId0 < *min) {
+      *min = e[i].globalId0;
+    }
+    if(e[i].globalId0 > *max) {
+      *max = e[i].globalId0;
+    }
+  }
+
+  GenmapGop(c,min,1,GENMAP_LONG,GENMAP_MIN);
+  GenmapGop(c,max,1,GENMAP_LONG,GENMAP_MAX);
+}
+
+void parRSBHistoSortLocalSort(GenmapHandle h,GenmapComm c,int field,buffer *buf0) {
+  GenmapElements elements = GenmapGetElements(h);
+  GenmapInt lelt = GenmapGetNLocalElements(h);
+
+  if(field == GENMAP_FIEDLER) { // Fiedler
+    // sort locally according to Fiedler vector
+    sarray_sort(struct GenmapElement_private, elements, (GenmapUInt)lelt, fiedler,
+                TYPE_DOUBLE, buf0);
+  } else if(GENMAP_GLOBALID) {
+    // sort locally according to globalId
+    sarray_sort(struct GenmapElement_private, elements, (GenmapUInt)lelt,
+                globalId0, TYPE_LONG, buf0);
+  }
+}
+
 void parRSBHistoSortInitProbes(GenmapHandle h,GenmapComm c,int field) {
   GenmapElements elements=GenmapGetElements(h);
   GenmapInt lelt=GenmapGetNLocalElements(h);
@@ -53,15 +72,18 @@ void parRSBHistoSortInitProbes(GenmapHandle h,GenmapComm c,int field) {
   GenmapMalloc(nsplitters,&h->histogram->probes);
   GenmapMalloc(nsplitters,&h->histogram->count);
 
-  parRSBFiedlerMinMax(h,c,&g_min,&g_max);
+  if(field==GENMAP_FIEDLER)
+    parRSBFiedlerMinMax(h,c,&g_min,&g_max);
+  else if(field==GENMAP_GLOBALID) {
+    parRSBGlobalIdMinMax(h,c,&l_min,&l_max);
+    g_max=l_max; g_min=l_min;
+  }
 
-  if(field==GENMAP_FIEDLER){
-    g_delta=(g_max-g_min)/size;
-    for(int i=1; i<size; i++) {
-      h->histogram->probes[3*i-3]=g_min;
-      h->histogram->probes[3*i-2]=g_min+i*g_delta;
-      h->histogram->probes[3*i-1]=g_max;
-    }
+  g_delta=(g_max-g_min)/size;
+  for(int i=1; i<size; i++) {
+    h->histogram->probes[3*i-3]=g_min;
+    h->histogram->probes[3*i-2]=g_min+i*g_delta;
+    h->histogram->probes[3*i-1]=g_max;
   }
 }
 
@@ -74,7 +96,7 @@ void parRSBHistoSortUpdateCounts(GenmapHandle h,int nsplitters,int field) {
   }
 
   GenmapElements p,e;
-  if(field == GENMAP_FIEDLER){
+  if(field==GENMAP_FIEDLER){
     for(p=elements,e=p+lelt; p!=e; p++){
       // need to update as we don't keep the probes sorted.
       for(int i=0; i<nsplitters; i++){
@@ -83,11 +105,21 @@ void parRSBHistoSortUpdateCounts(GenmapHandle h,int nsplitters,int field) {
         }
       }
     }
+  } else if(field==GENMAP_GLOBALID){
+    for(p=elements,e=p+lelt; p!=e; p++){
+      // need to update as we don't keep the probes sorted.
+      for(int i=0; i<nsplitters; i++){
+        if(p->globalId0<h->histogram->probes[i]){
+          h->histogram->count[i]++;
+        }
+      }
+    }
   }
 }
 
 int parRSBHistoSortReachedThreshold(GenmapHandle h,GenmapComm c,GenmapLong *count,
-                                    GenmapInt threshold,int field) {
+                                    GenmapInt threshold)
+{
   int size=GenmapCommSize(c);
   int rank=GenmapCommRank(c);
 
@@ -185,6 +217,12 @@ int parRSBHistoSortSetProc(GenmapHandle h,GenmapComm c,int field,buffer *buf0) {
       while(i<size && p->fiedler>h->histogram->probes[3*i-2]) i++;
       p->proc=i-1;
     }
+  } else if(field==GENMAP_GLOBALID) {
+    for(p=elements,e=elements+lelt; p!=e; p++){
+      i=1;
+      while(i<size && p->globalId0>h->histogram->probes[3*i-2]) i++;
+      p->proc=i-1;
+    }
   }
 
   return 0;
@@ -252,7 +290,7 @@ void parRSBHistogramSort(GenmapHandle h,GenmapComm c,int field,buffer *buf0) {
 #endif
 
   int iter=0;
-  while(!parRSBHistoSortReachedThreshold(h,c,count,threshold,field)){
+  while(!parRSBHistoSortReachedThreshold(h,c,count,threshold)){
     parRSBHistoSortUpdateProbes(h,c,count,threshold,field);
 #if 0
     if(rank==0)
