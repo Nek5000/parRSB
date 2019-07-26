@@ -253,7 +253,7 @@ void parRSBHistogramSort(GenmapHandle h,GenmapComm c,int field,buffer *buf0) {
 
   // 10% of load balanced partition size 
   GenmapInt threshold=(GenmapGetNGlobalElements(h)/(10*size));
-  if(threshold<2) threshold=1;
+  if(threshold<2) threshold=2;
 
   // sort locally.
   parRSBHistoSortLocalSort(h,c,field,buf0);
@@ -335,9 +335,7 @@ void parRSBHistogramSort(GenmapHandle h,GenmapComm c,int field,buffer *buf0) {
   parRSBHistoSortSetProc(h,c,field,buf0);
 
   // send elements to right processor
-  GenmapCrystalInit(h,c);
   parRSBHistoSortTransferToProc(h,field,buf0);
-  GenmapCrystalFinalize(h);
 
   GenmapScan(h,c);
 
@@ -350,4 +348,8 @@ void parRSBHistogramSort(GenmapHandle h,GenmapComm c,int field,buffer *buf0) {
   if(rank==0) {
     GenmapFree(count);
   }
+#if 1
+    if(rank==0)
+      printf("Done with histo-sort\n");
+#endif
 }
