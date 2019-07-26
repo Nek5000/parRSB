@@ -205,7 +205,7 @@ void GenmapRSB(GenmapHandle h) {
       }
     }
     MPI_Barrier(GenmapGetGlobalComm(h)->gsComm.c);
-    if(GenmapCommRank(GenmapGetGlobalComm(h)) == 1) {
+    if(GenmapCommRank(GenmapGetGlobalComm(h)) == 0) {
       for(int i = 0; i < GenmapGetNLocalElements(h); i++) {
         printf("\nglobalId="GenmapLongFormat",Fiedler(%d):"GenmapScalarFormat,
                e[i].globalId, i, e[i].fiedler);
