@@ -252,7 +252,7 @@ void parRSBHistogramSort(GenmapHandle h,GenmapComm c,int field,buffer *buf0) {
   int print_rank=GenmapCommRank(GenmapGetGlobalComm(h));
 
   // 10% of load balanced partition size 
-  GenmapInt threshold=(GenmapGetNGlobalElements(h)/(10*size));
+  GenmapInt threshold=(GenmapGetNGlobalElements(h)/(20*size));
   if(threshold<2) threshold=1;
 
   // sort locally.
