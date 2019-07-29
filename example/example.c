@@ -52,7 +52,7 @@ int main(int argc, char *argv[]) {
   for(data = eList.ptr, e = 0; e < nel; ++e) {
     data[e].proc = part[e];
     data[e].id   = con.el[e];
-    for(int n = 0; n < nv; ++n) {
+    for(n = 0; n < nv; ++n) {
       data[e].vtx[n] = con.vl[e * nv + n];
     }
   }
