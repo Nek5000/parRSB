@@ -172,7 +172,7 @@ void parRSBHistoSortUpdateSplitter(GenmapHandle h,GenmapComm c,int i,int field,
   } else { // we are going to dump the larger probe
     probes[indx+1]=probes[indx];
   }
-  
+
   probes[indx]=probes[indx-1]+(probes[indx+1]-probes[indx-1])/2;
 }
 
@@ -206,7 +206,7 @@ int parRSBHistoSortSetProc(GenmapHandle h,GenmapComm c,int field,buffer *buf0) {
 
   int size=GenmapCommSize(c);
   int rank=GenmapCommRank(c);
-  
+
   GenmapElements p,e;
   int i;
 
@@ -242,6 +242,43 @@ void parRSBHistoSortTransferToProc(GenmapHandle h, int field, buffer *buf0) {
   }
 }
 
+void parRSBHistoSortLoadBalance(GenmapHandle h,GenmapComm c)
+{
+  GenmapElements elements = GenmapGetElements(h);
+  GenmapInt lelt = GenmapGetNLocalElements(h);
+
+  int size=GenmapCommSize(c);
+  int rank=GenmapCommRank(c);
+
+  GenmapLong out[2][1],buf[2][1],in[1];
+  //calculate destination procs
+  GenmapLong n1=lelt;
+  in[0]=n1;
+  comm_scan(out,&(c->gsComm),genmap_gs_long,gs_add,in,1,buf);
+
+  GenmapLong start=out[0][0];
+  GenmapLong nelg =out[1][0];
+
+  GenmapInt pNel=nelg/size;
+  GenmapInt nrem=nelg-pNel*size;
+  int id=start/pNel;
+
+  GenmapLong up=(id+1)*pNel+((id<nrem)?(id+1):nrem);
+  //printf("rank=%d np1=%d nelg1=%lld start1=%lld n1=%lld up=%lld lelt=%d\n",rank,
+  //       size,nelg,start,n1,up,lelt);
+  GenmapInt i=0;
+  while(i<lelt) {
+    if((i+start)<up){
+      elements[i].proc=id;
+      //printf("fiedler=%lf,id=%d\n",elements[i].fiedler,elements[i].proc);
+      i++;
+    }else{
+      id++;
+      up=(id+1)*pNel+((id<nrem)?(id+1):nrem);
+    }
+  }
+}
+
 void parRSBHistogramSort(GenmapHandle h,GenmapComm c,int field,buffer *buf0) {
   GenmapScan(h,c);
 
@@ -251,7 +288,7 @@ void parRSBHistogramSort(GenmapHandle h,GenmapComm c,int field,buffer *buf0) {
 
   int print_rank=GenmapCommRank(GenmapGetGlobalComm(h));
 
-  // 10% of load balanced partition size 
+  // 10% of load balanced partition size
   GenmapInt threshold=(GenmapGetNGlobalElements(h)/(20*size));
   if(threshold<2) threshold=1;
 
@@ -281,7 +318,7 @@ void parRSBHistogramSort(GenmapHandle h,GenmapComm c,int field,buffer *buf0) {
     }
 #endif
 
-  // update counts locally 
+  // update counts locally
   parRSBHistoSortUpdateCounts(h,nsplitters,field);
 
   // global reduction
@@ -351,6 +388,12 @@ void parRSBHistogramSort(GenmapHandle h,GenmapComm c,int field,buffer *buf0) {
 
   // sort locally.
   parRSBHistoSortLocalSort(h,c,field,buf0);
+
+  // do a load balancing step
+  parRSBHistoSortLoadBalance(h,c);
+
+  // send elements to right processor
+  parRSBHistoSortTransferToProc(h,field,buf0);
 
   // Finalize sort
   GenmapFree(h->histogram->probes);
