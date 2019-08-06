@@ -61,24 +61,30 @@ int parRSB_partMesh(int *part, long long *vtx, int nel, int nve, int *options,
 
     GenmapRSB(h);
 
+    if(id==0) printf("RSB ... done.\n");
+
     e = GenmapGetElements(h);
     for(j = 0; j < GenmapGetNLocalElements(h); j++) {
       e[j].proc = GenmapCommRank(GenmapGetGlobalComm(h));
     }
 
+    if(id==0) printf("Transfering elements back.\n");
     GenmapCrystalInit(h, GenmapGetGlobalComm(h));
     GenmapCrystalTransfer(h, GENMAP_ORIGIN);
     GenmapCrystalFinalize(h);
 
+    if(id==0) printf("Checking assert statement.\n");
     // This should hold true
     assert(GenmapGetNLocalElements(h) == nel);
 
+    if(id==0) printf("Local sort.\n");
     e = GenmapGetElements(h);
     buffer buf; buffer_init(&buf, 1024);
     sarray_sort(struct GenmapElement_private, e, (unsigned int)nel, globalId,
                 TYPE_LONG, &buf);
     buffer_free(&buf);
 
+    if(id==0) printf("Set destination proc.\n");
     for(i = 0; i < nel; i++) {
       part[i] = e[i].proc;
     }
