@@ -12,12 +12,12 @@ Parition mesh using Nek5000's vertex connectivity (con) file.
 #include "parRSB.h"
 #include "quality.h"
 
-#define MAXNV 8 /* maximum number of vertices per element */
-typedef struct {
-  int proc;
-  long long id;
-  long long vtx[MAXNV];
-} elm_data;
+#define CHECK_ERR(ierr) do{\
+  if(ierr){\
+    MPI_Finalize();\
+    return ierr;\
+  }\
+} while(0);
 
 int main(int argc, char *argv[]) {
   struct comm comm;
@@ -48,8 +48,9 @@ int main(int argc, char *argv[]) {
 
   ierr = 0;
   struct con con = {};
-  if (color != MPI_UNDEFINED) ierr = conRead(conFile, &con, comm_read);
-  if(ierr) goto quit;
+  if(color != MPI_UNDEFINED)
+    ierr = conRead(conFile, &con, comm_read);
+  CHECK_ERR(ierr);
 
   comm_bcast(&comm, &con.nv, sizeof(int), 0);
   nv = con.nv;
@@ -61,7 +62,7 @@ int main(int argc, char *argv[]) {
   options[2] = 0; /* not used           */
 
   ierr = parRSB_partMesh(part, con.vl, nel, nv, options, comm.c);
-  if(ierr) goto quit;
+  CHECK_ERR(ierr);
 
   /* redistribute data */
   array_init(elm_data, &eList, nel), eList.n = nel;
@@ -96,7 +97,5 @@ int main(int argc, char *argv[]) {
   array_free(&eList);
   comm_free(&comm);
 
-quit:
-  MPI_Finalize();
-  return ierr;
+  return 0;
 }

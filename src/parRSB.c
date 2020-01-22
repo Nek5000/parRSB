@@ -3,17 +3,7 @@
 #include <stdio.h>
 #include <time.h>
 
-#include "genmap.h"
-#include "genmap-impl.h"
 #include "parRSB.h"
-
-#define MAXNV 8 /* maximum number of vertices per element */
-typedef struct {
-  int proc;
-  GenmapLong id;
-  int part;
-  long long vtx[MAXNV];
-} elm_data;
 
 void fparRSB_partMesh(int *part, long long *vtx, int *nel, int *nve,
                       int *options, int *comm, int *err) {
