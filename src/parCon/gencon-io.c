@@ -4,13 +4,13 @@
 #include "gencon-impl.h"
 #include "exa-memory.h"
 
-#define readT(coords,buf,T,nVertex) do { \
-    memcpy(coords,buf,sizeof(T)*nVertex); \
-  } while(0)
+#define readT(coords,buf,T,nVertex) do{\
+  memcpy(coords,buf,sizeof(T)*nVertex);\
+} while(0)
 
 #define writeInt(dest,val) do{\
-    memcpy(dest,&(val),sizeof(int));\
-  } while(0)
+  memcpy(dest,&(val),sizeof(int));\
+} while(0)
 
 int hypercubeToPreprocessor[GC_MAX_VERTICES]={0,1,3,2,4,5,7,6};
 int eface [GC_MAX_FACES]={4,2,1,3,5,6};
@@ -34,10 +34,11 @@ int transferBoundaryFaces(exaHandle h,Mesh mesh){
   }
 
   exaComm c=exaGetComm(h);
-  exaArrayTransfer(mesh->boundary,offsetof(struct Boundary_private,proc),1,c);
+  exaArrayTransfer(mesh->boundary,
+    offsetof(struct Boundary_private,proc),1,c);
 }
 
-int readCo2Header(exaHandle h,Mesh *mesh_,MPI_File file){
+int readCo2Header(exaHandle h,Mesh mesh,MPI_File file){
   char version[BUFSIZ];
   int nelgt,nDim,nelgv,err;
   MPI_Status st;
@@ -59,8 +60,6 @@ int readCo2Header(exaHandle h,Mesh *mesh_,MPI_File file){
   nelt+=(rank<nrem ? 1: 0);
 
   // Initialize the mesh structure
-  exaMalloc(1,mesh_);
-  Mesh mesh=*mesh_;
   mesh->nDim=nDim;
   mesh->nVertex=nVertex;
   mesh->nNeighbors=nDim;
@@ -149,14 +148,21 @@ int readCo2Boundaries(exaHandle h,Mesh mesh,MPI_File file){
 
   /* calculate offset for the curve side data */
   MPI_Offset curveOffset=headerSize+nelgt*elemDataSize;
-  if(rank==0) MPI_File_read_at(file,curveOffset,bufL,sizeof(long),MPI_BYTE,&st);
+  if(rank==0)
+    MPI_File_read_at(file,curveOffset,bufL,sizeof(long),MPI_BYTE,&st);
   MPI_Bcast(bufL,sizeof(long),MPI_BYTE,0,comm);
-  double ncurvesD; readT(&ncurvesD,bufL,long,1); long ncurves=ncurvesD;
+
+  double ncurvesD; readT(&ncurvesD,bufL,long,1);
+  long ncurves=ncurvesD;
 
   /* calculate offset for boundary condition data */
-  MPI_Offset boundaryOffset=curveOffset+sizeof(long)+sizeof(long)*8*ncurves;
-  if(rank==0) MPI_File_read_at(file,boundaryOffset,bufL,sizeof(long),MPI_BYTE,&st);
+  MPI_Offset boundaryOffset=curveOffset+sizeof(long)+\
+    sizeof(long)*8*ncurves;
+  if(rank==0)
+    MPI_File_read_at(file,boundaryOffset,bufL,sizeof(long),\
+      MPI_BYTE,&st);
   MPI_Bcast(bufL,sizeof(long),MPI_BYTE,0,comm);
+
   double nbcsD; readT(&nbcsD,bufL,long,1); long nbcs=nbcsD;
   
   int nbcsLocal=nbcs/size,nrem=nbcs-nbcsLocal*size;
@@ -183,12 +189,14 @@ int readCo2Boundaries(exaHandle h,Mesh mesh,MPI_File file){
     boundary.elementId=tmp[0]-1;
 
     readT(tmp,buf0,long,1);buf0+=sizeof(long);
-    boundary.faceId=tmp[0]-1;boundary.faceId=efacei[boundary.faceId]-1;
+    boundary.faceId=tmp[0]-1;
+    boundary.faceId=efacei[boundary.faceId]-1;
 
     readT(tmp,buf0,long,5);buf0+=5*sizeof(long);
     for(j=0;j<5;j++) boundary.bc[j]=tmp[j];
 
-    readT(boundary.cbc,buf0,char,3);buf0+=sizeof(long);boundary.cbc[3]='\0';
+    readT(boundary.cbc,buf0,char,3);buf0+=sizeof(long);
+    boundary.cbc[3]='\0';
 
     exaArrayAppend(mesh->boundary,&boundary);
   }
@@ -196,7 +204,7 @@ int readCo2Boundaries(exaHandle h,Mesh mesh,MPI_File file){
   free(buf);
 }
 
-int genConReadRe2File(exaHandle h,Mesh *mesh,char *fileName){
+int genConReadRe2File(exaHandle h,Mesh *mesh_,char *fileName){
   int nelt,nDim,nVertex;
   int errs;
 
@@ -205,17 +213,21 @@ int genConReadRe2File(exaHandle h,Mesh *mesh,char *fileName){
   MPI_Comm comm=exaGetMPIComm(h);
 
   MPI_File file;
-  int err=MPI_File_open(comm,fileName,MPI_MODE_RDONLY,MPI_INFO_NULL,&file);
+  int err=MPI_File_open(comm,fileName,MPI_MODE_RDONLY,\
+    MPI_INFO_NULL,&file);
   if(err){
     if(rank==0) printf("Error opening file: %s\n",fileName);
     errs++;
     MPI_Abort(comm,911);
   }
 
+  exaMalloc(1,mesh_);
+  Mesh mesh=*mesh_;
+
   readCo2Header(h,mesh,file);
-  readCo2Coordinates(h,*mesh,file);
-  readCo2Boundaries(h,*mesh,file);
-  transferBoundaryFaces(h,*mesh);
+  readCo2Coordinates(h,mesh,file);
+  readCo2Boundaries(h,mesh,file);
+  transferBoundaryFaces(h,mesh);
 
   err=MPI_File_close(&file);
   if(err) errs++;
@@ -242,9 +254,11 @@ int genConWriteCo2File(exaHandle h,Mesh mesh,char *fileName){
   int errs=0;
 
   MPI_File file;
-  int err=MPI_File_open(comm,fileName,MPI_MODE_CREATE|MPI_MODE_WRONLY,MPI_INFO_NULL,&file);
+  int err=MPI_File_open(comm,fileName,\
+    MPI_MODE_CREATE|MPI_MODE_WRONLY,MPI_INFO_NULL,&file);
   if(err){
-    if(rank==0) printf("Error opening file: %s for writing.\n",fileName);
+    if(rank==0)
+      printf("Error opening file: %s for writing.\n",fileName);
     errs++;
     MPI_Abort(comm,911);
   }
@@ -261,7 +275,8 @@ int genConWriteCo2File(exaHandle h,Mesh mesh,char *fileName){
   char *buf=(char*)calloc(writeSize,sizeof(char)),*buf0=buf;
   MPI_Status st;
   if(rank==0){
-    sprintf(buf0,"%5s%12d%12d%12d",version,(int)nelgt,(int)nelgv,nVertex);
+    sprintf(buf0,"%5s%12d%12d%12d",version,(int)nelgt,(int)nelgv,\
+      nVertex);
     memset (buf0+strlen(buf0),' ',GC_CO2_HEADER_LEN-strlen(buf0));
     buf0[GC_CO2_HEADER_LEN]='\0';
     buf0+=GC_CO2_HEADER_LEN;
