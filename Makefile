@@ -12,8 +12,8 @@ SRCDIR  =$(SRCROOT)/src
 BUILDDIR=$(SRCROOT)/build
 TESTDIR =$(SRCROOT)/example
 
-INCFLAGS=-I$(SRCDIR) -I$(GSLIBDIR)/include -I$(EXADIR)/include \
-  -I$(EXASORTDIR)/include
+INCFLAGS=-I$(SRCDIR) -I$(SRCDIR)/parCon -I$(GSLIBDIR)/include\
+  -I$(EXADIR)/include -I$(EXASORTDIR)/include
 
 LDFLAGS= -L$(GSLIBDIR)/lib -lgs -lm
 EXALDFLAGS= -L$(EXADIR)/lib -lexa
