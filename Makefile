@@ -3,39 +3,38 @@ PAUL ?= 1
 CC ?= mpicc
 CFLAGS ?= -O2
 
-SRCROOT=.
-GSLIBDIR=$(GSLIBPATH)
+GSLIBDIR ?= $(GSLIBPATH)
+EXADIR ?= $(BUILDDIR)/3rd_party/exa/exaCore/build
+EXASORTDIR ?= $(BUILDDIR)/3rd_party/exa/exaSort/build
 
+SRCROOT=.
 SRCDIR  =$(SRCROOT)/src
 BUILDDIR=$(SRCROOT)/build
 TESTDIR =$(SRCROOT)/example
 
-TARGET=parRSB
+INCFLAGS=-I$(SRCDIR) -I$(GSLIBDIR)/include -I$(EXADIR)/include -I$(EXASORTDIR)/include
+
+LDFLAGS= -L$(GSLIBDIR)/lib -lgs -lm
+EXALDFLAGS= -L$(EXADIR)/lib -lexa
+EXASORTLDFLAGS= -L$(EXASORTDIR)/lib -lexaSort
+
+LIB=$(BUILDDIR)/libparRSB.so
 TESTS=$(TESTDIR)/example
-LIB=src/lib$(TARGET).a
+TESTLDFLAGS:=-L$(BUILDDIR)/lib -lparRSB $(EXASORTLDFLAGS) $(EXALDFLAGS) $(LDFLAGS)
 
-INCFLAGS=-I$(SRCDIR) -I$(GSLIBDIR)/include
+PARRSBSRC=$(wildcard $(SRCDIR)/*.c)
+SRCOBJS =$(patsubst $(SRCDIR)/%.c,$(BUILDDIR)/%.o,$(PARRSBSRC))
 
-TESTLDFLAGS:=-L$(BUILDDIR)/lib -l$(TARGET) -L $(GSLIBDIR)/lib -lgs -lm $(LDFLAGS)
-
-ifneq (,$(strip $(DESTDIR)))
-INSTALL_ROOT = $(DESTDIR)
-else
-INSTALL_ROOT = $(SRCROOT)/build
-endif
-
-CSRCS:= $(SRCDIR)/genmap.c \
-  	$(SRCDIR)/genmap-vector.c $(SRCDIR)/genmap-handle.c $(SRCDIR)/genmap-comm.c \
-	$(SRCDIR)/genmap-eigen.c $(SRCDIR)/genmap-laplacian.c $(SRCDIR)/genmap-lanczos.c \
-	$(SRCDIR)/genmap-rsb.c \
-	$(SRCDIR)/parrsb-binsort.c \
-	$(SRCDIR)/genmap-chelpers.c \
-	$(SRCDIR)/parRSB.c 
-COBJS:=$(CSRCS:.c=.o)
-
-SRCOBJS:=$(COBJS)
+PARCONSRC=$(wildcard $(SRCDIR)/parCon/*.c)
+SRCOBJS +=$(patsubst $(SRCDIR)/parCon/%.c,$(BUILDDIR)/parCon/%.o,$(PARCONSRC))
 
 PP=
+
+ifneq (,$(strip $(DESTDIR)))
+  INSTALL_ROOT = $(DESTDIR)
+else
+  INSTALL_ROOT = $(SRCROOT)/build
+endif
 
 ifneq ($(DEBUG),0)
   PP += -g -DGENMAP_DEBUG
@@ -45,11 +44,32 @@ ifneq ($(PAUL),0)
   PP += -DGENMAP_PAUL
 endif
 
+ifeq ($(GSLIBPATH),)
+	$(error Specify GSLIBPATH=<path to gslib>/build)
+endif
+
+CFLAGS += -fPIC
+
 .PHONY: default
-default: check lib install
+default: deps lib install
 
 .PHONY: all
-all: check lib tests install
+all: deps lib tests install
+
+.PHONY: deps
+deps:
+	@cp -rf 3rd_party $(BUILDDIR)/
+	@cd $(BUILDDIR)/3rd_party/exa && GSDIR=$(GSLIBDIR) ./install
+
+$(BUILDDIR)/%.o: $(SRCDIR)/%.c
+	$(CC) $(CFLAGS) $(PP) $(INCFLAGS) -c $< -o $@
+
+$(BUILDDIR)/parCon/%.o: $(SRCDIR)/parCon/%.c
+	$(CC) $(CFLAGS) $(PP) $(INCFLAGS) -c $< -o $@
+
+.PHONY: lib
+lib: deps $(SRCOBJS)
+	$(CC) -shared -o $(LIB) $(SRCOBJS) $(EXASORTLDFLAGS) $(EXALDFLAGS) $(LDFLAGS)
 
 .PHONY: install
 install: lib
@@ -58,37 +78,15 @@ install: lib
 	@mkdir -p $(INSTALL_ROOT)/include 2>/dev/null
 	@cp $(SRCDIR)/parRSB.h $(INSTALL_ROOT)/include 2>/dev/null
 
-
-.PHONY: $(TARGET)
-lib: $(SRCOBJS)
-	@$(AR) cr $(LIB) $(SRCOBJS)
-	@ranlib $(LIB)
-
-.PHONY: check
-check: 
-ifeq ($(GSLIBPATH),)
-	$(error Specify GSLIBPATH=<path to gslib>/build)
-endif
-
-$(COBJS): %.o: %.c
-	$(CC) $(CFLAGS) $(PP) $(INCFLAGS) -c $< -o $@
-
 .PHONY: tests
 tests: $(TESTS)
 
 $(TESTS): lib install
-	$(CC) $(CFLAGS) -I$(GSLIBDIR)/include -I$(BUILDDIR)/include $@.c -o $@ $(TESTLDFLAGS)
+	$(CC) $(CFLAGS) $(INCFLAGS) -I$(BUILDDIR)/include $@.c -o $@ $(TESTLDFLAGS)
 
 .PHONY: clean
 clean:
-	@rm -f $(SRCOBJS) $(LIB) $(TESTS) $(TESTS).o
-
-.PHONY: astyle
-astyle:
-	astyle --style=google --indent=spaces=2 --max-code-length=80 \
-	    --keep-one-line-statements --keep-one-line-blocks --lineend=linux \
-            --suffix=none --preserve-date --formatted --pad-oper \
-	    --unpad-paren example/*.[ch] src/*.[ch]
+	@rm -rf $(BUILDDIR) $(TESTS) $(TESTS).o
 
 print-%:
 	$(info [ variable name]: $*)
@@ -97,3 +95,6 @@ print-%:
 	$(info [expanded value]: $($*))
 	$(info)
 	@true
+
+$(shell mkdir -p $(BUILDDIR))
+$(shell mkdir -p $(BUILDDIR)/parCon)
