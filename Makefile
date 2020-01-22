@@ -12,21 +12,25 @@ SRCDIR  =$(SRCROOT)/src
 BUILDDIR=$(SRCROOT)/build
 TESTDIR =$(SRCROOT)/example
 
-INCFLAGS=-I$(SRCDIR) -I$(GSLIBDIR)/include -I$(EXADIR)/include -I$(EXASORTDIR)/include
+INCFLAGS=-I$(SRCDIR) -I$(GSLIBDIR)/include -I$(EXADIR)/include \
+  -I$(EXASORTDIR)/include
 
 LDFLAGS= -L$(GSLIBDIR)/lib -lgs -lm
 EXALDFLAGS= -L$(EXADIR)/lib -lexa
 EXASORTLDFLAGS= -L$(EXASORTDIR)/lib -lexaSort
 
 LIB=$(BUILDDIR)/libparRSB.so
+
 TESTS=$(TESTDIR)/example
-TESTLDFLAGS:=-L$(BUILDDIR)/lib -lparRSB $(EXASORTLDFLAGS) $(EXALDFLAGS) $(LDFLAGS)
+TESTLDFLAGS:=-L$(BUILDDIR)/lib -lparRSB $(EXASORTLDFLAGS) \
+  $(EXALDFLAGS) $(LDFLAGS)
 
 PARRSBSRC=$(wildcard $(SRCDIR)/*.c)
 SRCOBJS =$(patsubst $(SRCDIR)/%.c,$(BUILDDIR)/%.o,$(PARRSBSRC))
 
 PARCONSRC=$(wildcard $(SRCDIR)/parCon/*.c)
-SRCOBJS +=$(patsubst $(SRCDIR)/parCon/%.c,$(BUILDDIR)/parCon/%.o,$(PARCONSRC))
+SRCOBJS +=$(patsubst $(SRCDIR)/parCon/%.c,$(BUILDDIR)/parCon/%.o,\
+  $(PARCONSRC))
 
 PP=
 
@@ -69,7 +73,8 @@ $(BUILDDIR)/parCon/%.o: $(SRCDIR)/parCon/%.c
 
 .PHONY: lib
 lib: deps $(SRCOBJS)
-	$(CC) -shared -o $(LIB) $(SRCOBJS) $(EXASORTLDFLAGS) $(EXALDFLAGS) $(LDFLAGS)
+	$(CC) -shared -o $(LIB) $(SRCOBJS) $(EXASORTLDFLAGS) \
+    $(EXALDFLAGS) $(LDFLAGS)
 
 .PHONY: install
 install: lib
@@ -82,7 +87,8 @@ install: lib
 tests: $(TESTS)
 
 $(TESTS): lib install
-	$(CC) $(CFLAGS) $(INCFLAGS) -I$(BUILDDIR)/include $@.c -o $@ $(TESTLDFLAGS)
+	$(CC) $(CFLAGS) $(INCFLAGS) -I$(BUILDDIR)/include $@.c -o $@ \
+    $(TESTLDFLAGS)
 
 .PHONY: clean
 clean:
