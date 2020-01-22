@@ -146,3 +146,84 @@ int parRSB_partMesh(int *part, long long *vtx, int nel, int nve,\
 
   return 0;
 }
+
+int parRSB_findConnectivity(double *coord,int nel,int nDim,
+  long long *periodicInfo,int nPeriodicFaces,long long *vertexId,
+  double tol,MPI_Comm comm)
+{
+  exaHandle h;
+  exaInit(&h,comm,"/host");
+
+  Mesh mesh; exaMalloc(1,&mesh);
+
+  assert(nDim==2 || nDim==3);
+  mesh->nDim=nDim;
+  mesh->nVertex=(nDim==2)?4:8;
+  mesh->nNeighbors=nDim;
+  mesh->nelt=nel;
+
+  exaLong out[2][1],buff[2][1],in[1];
+  in[0]=mesh->nelt;
+  exaScan(h,out,in,buff,1,exaLong_t,exaAddOp);
+
+  exaLong start=out[0][0];
+  mesh->nelgt=mesh->nelgv=out[1][0];
+
+  /* initialize array */
+  exaArrayInit(&(mesh->elements),struct Point_private,\
+    mesh->nelt*mesh->nVertex);
+  Point ptr=exaArrayGetPointer(mesh->elements);
+
+  int rank=exaRank(h);
+  int i,j,cnt=0;
+  for(i=0;i<mesh->nelt;i++){
+    for(j=0;j<mesh->nVertex;j++){
+      ptr->x[0]=coord[cnt++];
+      ptr->x[1]=coord[cnt++];
+      ptr->x[2]=coord[cnt++];
+      ptr->elementId=vertexId[i];
+      ptr->sequenceId=mesh->nVertex*(start+i)+j;
+      ptr->origin=rank;
+      ptr++;
+    }
+  }
+
+  exaArrayInit(&mesh->boundary,struct Boundary_private,0);
+  BoundaryFace bc; exaMalloc(1,&bc);
+
+  cnt=0;
+  for(i=0;i<nPeriodicFaces;i++){
+    //TODO: Fix this and simplify internal parCon logic
+    // we only need to represent periodic faces
+    //TODO: Is faceId in symmetric or pre-processor order?
+    bc->elementId=periodicInfo[cnt++]-1;
+    bc->faceId   =periodicInfo[cnt++]-1;
+    bc->bc[0]=periodicInfo[cnt++];
+    bc->bc[1]=periodicInfo[cnt++];
+    strcpy(bc->cbc,GC_PERIODIC);
+    exaArrayAppend(mesh->boundary,bc);
+  }
+
+  exaFree(bc);
+
+  findMinNeighborDistance(h,mesh);
+  findSegments(h,mesh,tol);
+  setGlobalID(h,mesh);
+  sendBack(h,mesh);
+  matchPeriodicFaces(h,mesh);
+
+  ptr=exaArrayGetPointer(mesh->elements);
+
+  cnt=0;
+  for(i=0;i<mesh->nelt;i++){
+    for(j=0;j<mesh->nVertex;j++){
+      vertexId[cnt++]=ptr->globalId+1;
+      ptr++;
+    }
+  }
+
+  freeMesh(mesh);
+  exaFinalize(h);
+
+  return 0;
+}
