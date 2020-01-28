@@ -5,7 +5,8 @@
 #include "exasort.h"
 
 #define sqrDiff(x,y) (((x)-(y))*((x)-(y)))
-#define distance2D(a,b) (sqrDiff((a).x[0],(b).x[0])+sqrDiff((a).x[1],(b).x[1]))
+#define distance2D(a,b)\
+  (sqrDiff((a).x[0],(b).x[0])+sqrDiff((a).x[1],(b).x[1]))
 #define distance3D(a,b) (distance2D(a,b)+sqrDiff((a).x[2],(b).x[2]))
 #define min(a,b) ((a)<(b) ? (a) : (b))
 #define max(a,b) ((a)>(b) ? (a) : (b))

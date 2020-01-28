@@ -27,10 +27,9 @@ typedef struct Element_private *Element;
 typedef struct Boundary_private *BoundaryFace;
 typedef struct Mesh_private *Mesh;
 
-extern int neighborMap[GC_MAX_VERTICES][GC_MAX_NEIGHBORS];
-extern int hypercubeToPreprocessor[GC_MAX_VERTICES];
-extern int eface [GC_MAX_FACES];
-extern int efacei[GC_MAX_FACES];
+extern int NEIGHBOR_MAP[GC_MAX_VERTICES][GC_MAX_NEIGHBORS];
+extern int PRE_TO_SYM_VERTEX[GC_MAX_VERTICES];
+extern int PRE_TO_SYM_FACE[GC_MAX_FACES];
 
 int genConReadRe2File(exaHandle h,Mesh *mesh,char *fileName);
 int findMinNeighborDistance(exaHandle h,Mesh mesh);

@@ -1,6 +1,6 @@
 #include "gencon-impl.h"
 
-int neighborMap[GC_MAX_VERTICES][GC_MAX_NEIGHBORS]={
+int NEIGHBOR_MAP[GC_MAX_VERTICES][GC_MAX_NEIGHBORS]={
   {1,2,4},
   {0,3,5},
   {0,3,6},
@@ -25,7 +25,7 @@ int findMinNeighborDistance(exaHandle h,Mesh mesh){
     for(j=0; j<nVertex; j++){
       p->vertex[j].dx=exaScalarMAX;
       for(k=0; k<nNeighbors; k++){
-        neighbor=neighborMap[j][k];
+        neighbor=NEIGHBOR_MAP[j][k];
         if(nDim==3) d=distance3D(p->vertex[j],p->vertex[neighbor]);
         else d=distance2D(p->vertex[j],p->vertex[neighbor]);
         p->vertex[j].dx=min(p->vertex[j].dx,d);

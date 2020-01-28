@@ -11,7 +11,7 @@ int main(int argc,char *argv[]){
 
   if(argc!=2) {
     if(exaRank(h)==0) printf("Usage: ./example foo.re2\n");
-    exit(0);
+    exit(1);
   }
 
   Mesh mesh;

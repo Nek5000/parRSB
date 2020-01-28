@@ -10,9 +10,11 @@ EXADIR ?= $(BUILDDIR)/3rd_party/exa/exaCore/build
 EXASORTDIR ?= $(BUILDDIR)/3rd_party/exa/exaSort/build
 
 ### Meta info
-SRCDIR=src
-BUILDDIR=build
-EXAMPLEDIR=examples
+SRCROOT=${CURDIR}
+SRCDIR=$(SRCROOT)/src
+EXAMPLEDIR=$(SRCROOT)/examples
+TESTDIR=$(SRCROOT)/tests
+BUILDDIR=$(SRCROOT)/build
 
 ### Flags
 INCFLAGS=-I$(SRCDIR) -I$(SRCDIR)/parCon -I$(GSLIBDIR)/include\
@@ -60,15 +62,16 @@ endif
 CFLAGS += -fPIC
 
 .PHONY: default
-default: deps lib install
+default: build-deps lib install
 
 .PHONY: all
-all: deps lib examples install
+all: build-deps lib examples tests install
 
-.PHONY: deps
-deps:
+.PHONY: build-deps
+build-deps:
 	@cp -rf 3rd_party $(BUILDDIR)/
-	@cd $(BUILDDIR)/3rd_party/exa && GSDIR=$(GSLIBDIR) ./install
+	@cd $(BUILDDIR)/3rd_party/exa &&\
+		GSDIR=$(GSLIBDIR) PREFIX=$(DESTDIR) ./install
 
 $(BUILDDIR)/%.o: $(SRCDIR)/%.c
 	$(CC) $(CFLAGS) $(PP) $(INCFLAGS) -c $< -o $@
@@ -77,7 +80,7 @@ $(BUILDDIR)/parCon/%.o: $(SRCDIR)/parCon/%.c
 	$(CC) $(CFLAGS) $(PP) $(INCFLAGS) -c $< -o $@
 
 .PHONY: lib
-lib: deps $(SRCOBJS)
+lib: build-deps $(SRCOBJS)
 	$(CC) -shared -o $(LIB) $(SRCOBJS) $(EXASORTLDFLAGS) \
     $(EXALDFLAGS) $(LDFLAGS)
 
@@ -93,6 +96,16 @@ examples: lib install $(EXAMPLEOBJ)
 
 $(BUILDDIR)/examples/%: $(EXAMPLEDIR)/%.c
 	$(CC) $(CFLAGS) $(PP) $(INCFLAGS) $< -o $@ $(EXAMPLELDFLAGS)
+
+.PHONY: tests-deps
+tests-deps:
+	@cp -rf $(TESTDIR) $(BUILDDIR)/
+	@cd $(BUILDDIR)/tests && ./test.sh --get-deps
+	
+.PHONY: tests
+tests: tests-deps examples
+	@cd $(BUILDDIR)/tests && EXADIR=$(EXADIR)\
+		EXASORTDIR=$(EXASORTDIR) BUILDDIR=$(BUILDDIR) ./test.sh --run
 
 .PHONY: clean
 clean:

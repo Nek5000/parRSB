@@ -1,0 +1,31 @@
+#
+# nek parameter file
+#
+[GENERAL] 
+dt = 1e-05
+polynomialOrder = 7
+PnPnFormulation = yes
+minNumProcesses = 1
+
+numSteps = 5
+dealiasing = yes
+timestepper = bdf2
+
+userParam01 = -1e-6 # tolerance (use negative value for fixed iter)
+userParam02 = 500   # max iterations
+userParam03 = 100   # number of repetitions
+
+[VELOCITY]
+viscosity = 1
+
+[PROBLEMTYPE]
+equation = incompNS
+
+[PRESSURE]
+residualTol = 1e-08
+residualProj = yes
+
+[VELOCITY]
+residualTol = 1e-12
+density = 1
+viscosity = 0.005

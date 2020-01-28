@@ -291,7 +291,7 @@ int setPeriodicFaceCoordinates(exaHandle h,Mesh mesh){
       //copy vertices to boundary face
       if(k<eSize && ePtr[k].elementId==bPtr[i].elementId){
         int faceId=bPtr[i].faceId;
-        bPtr[i].bc[0]--; bPtr[i].bc[1]--; bPtr[i].bc[1]=efacei[bPtr[i].bc[1]]-1;
+        bPtr[i].bc[0]--; bPtr[i].bc[1]--; bPtr[i].bc[1]=PRE_TO_SYM_FACE[bPtr[i].bc[1]]-1;
         for(j=0;j<nvf;j++) bPtr[i].face.vertex[j]=ePtr[k+faces[faceId][j]-1];
         exaDebug(h,"Periodic BC (element,face): %d %d %d %d %d %d\n",
           bPtr[i].bc[0],bPtr[i].bc[1],

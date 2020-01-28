@@ -1,0 +1,25 @@
+language: c
+os: linux
+compiler: gcc
+
+cache:
+  directories:
+    - gslib
+
+addons:
+  apt:
+    packages:
+      - gfortran
+      - mpich
+      - libmpich-dev
+
+before_install:
+  - test -n $CC && unset CC
+  - test -n $CXX && unset CXX
+    # Install gslib
+  - sh ./.travis.get_gslib.sh
+  - export GSLIBPATH=`pwd`/gslib
+
+script:
+  - CC=mpicc make install
+  - CC=mpicc make tests

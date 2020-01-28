@@ -12,9 +12,9 @@
   memcpy(dest,&(val),sizeof(int));\
 } while(0)
 
-int hypercubeToPreprocessor[GC_MAX_VERTICES]={0,1,3,2,4,5,7,6};
+int PRE_TO_SYM_VERTEX[GC_MAX_VERTICES]={0,1,3,2,4,5,7,6};
 int eface [GC_MAX_FACES]={4,2,1,3,5,6};
-int efacei[GC_MAX_FACES]={3,2,4,1,5,6};
+int PRE_TO_SYM_FACE[GC_MAX_FACES]={3,2,4,1,5,6};
 
 int transferBoundaryFaces(exaHandle h,Mesh mesh){
   int size=exaSize(h);
@@ -116,7 +116,7 @@ int readCo2Coordinates(exaHandle h,Mesh mesh,MPI_File file){
     readT(y     ,buf0,double,nVertex); buf0+=sizeof(double)*nVertex;
     readT(z     ,buf0,double,nVertex); buf0+=sizeof(double)*nVertex;
     for(k=0;k<nVertex;k++){
-      j=hypercubeToPreprocessor[k];
+      j=PRE_TO_SYM_VERTEX[k];
       ptr->x[0]=x[j],ptr->x[1]=y[j],ptr->x[2]=z[j];
       ptr->elementId =start+i;
       ptr->sequenceId=nVertex*(start+i)+k;
@@ -190,7 +190,7 @@ int readCo2Boundaries(exaHandle h,Mesh mesh,MPI_File file){
 
     readT(tmp,buf0,long,1);buf0+=sizeof(long);
     boundary.faceId=tmp[0]-1;
-    boundary.faceId=efacei[boundary.faceId]-1;
+    boundary.faceId=PRE_TO_SYM_FACE[boundary.faceId]-1;
 
     readT(tmp,buf0,long,5);buf0+=5*sizeof(long);
     for(j=0;j<5;j++) boundary.bc[j]=tmp[j];
