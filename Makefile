@@ -1,29 +1,26 @@
+### Build-time user configurations
 DEBUG ?= 0
 PAUL ?= 1
 CC ?= mpicc
 CFLAGS ?= -O2
 
+### Dependencies
 GSLIBDIR ?= $(GSLIBPATH)
 EXADIR ?= $(BUILDDIR)/3rd_party/exa/exaCore/build
 EXASORTDIR ?= $(BUILDDIR)/3rd_party/exa/exaSort/build
 
-SRCROOT=.
-SRCDIR  =$(SRCROOT)/src
-BUILDDIR=$(SRCROOT)/build
-TESTDIR =$(SRCROOT)/example
+### Meta info
+SRCDIR=src
+BUILDDIR=build
+EXAMPLEDIR=examples
 
+### Flags
 INCFLAGS=-I$(SRCDIR) -I$(SRCDIR)/parCon -I$(GSLIBDIR)/include\
   -I$(EXADIR)/include -I$(EXASORTDIR)/include
 
 LDFLAGS= -L$(GSLIBDIR)/lib -lgs -lm
 EXALDFLAGS= -L$(EXADIR)/lib -lexa
 EXASORTLDFLAGS= -L$(EXASORTDIR)/lib -lexaSort
-
-LIB=$(BUILDDIR)/libparRSB.so
-
-TESTS=$(TESTDIR)/example
-TESTLDFLAGS:=-L$(BUILDDIR)/lib -lparRSB $(EXASORTLDFLAGS) \
-  $(EXALDFLAGS) $(LDFLAGS)
 
 PARRSBSRC=$(wildcard $(SRCDIR)/*.c)
 SRCOBJS =$(patsubst $(SRCDIR)/%.c,$(BUILDDIR)/%.o,$(PARRSBSRC))
@@ -32,12 +29,20 @@ PARCONSRC=$(wildcard $(SRCDIR)/parCon/*.c)
 SRCOBJS +=$(patsubst $(SRCDIR)/parCon/%.c,$(BUILDDIR)/parCon/%.o,\
   $(PARCONSRC))
 
+EXAMPLESRC=$(EXAMPLEDIR)/parRSB.c $(EXAMPLEDIR)/parCon.c
+EXAMPLEOBJ=$(patsubst $(EXAMPLEDIR)/%.c,$(BUILDDIR)/examples/%,\
+	$(EXAMPLESRC))
+EXAMPLELDFLAGS=-L$(BUILDDIR)/lib -lparRSB $(EXASORTLDFLAGS)\
+	$(EXALDFLAGS) $(LDFLAGS)
+
+LIB=$(BUILDDIR)/libparRSB.so
+
 PP=
 
 ifneq (,$(strip $(DESTDIR)))
   INSTALL_ROOT = $(DESTDIR)
 else
-  INSTALL_ROOT = $(SRCROOT)/build
+  INSTALL_ROOT = build
 endif
 
 ifneq ($(DEBUG),0)
@@ -58,7 +63,7 @@ CFLAGS += -fPIC
 default: deps lib install
 
 .PHONY: all
-all: deps lib tests install
+all: deps lib examples install
 
 .PHONY: deps
 deps:
@@ -83,16 +88,15 @@ install: lib
 	@mkdir -p $(INSTALL_ROOT)/include 2>/dev/null
 	@cp $(SRCDIR)/parRSB.h $(INSTALL_ROOT)/include 2>/dev/null
 
-.PHONY: tests
-tests: $(TESTS)
+.PHONY: examples
+examples: lib install $(EXAMPLEOBJ)
 
-$(TESTS): lib install
-	$(CC) $(CFLAGS) $(INCFLAGS) -I$(BUILDDIR)/include $@.c -o $@ \
-    $(TESTLDFLAGS)
+$(BUILDDIR)/examples/%: $(EXAMPLEDIR)/%.c
+	$(CC) $(CFLAGS) $(PP) $(INCFLAGS) $< -o $@ $(EXAMPLELDFLAGS)
 
 .PHONY: clean
 clean:
-	@rm -rf $(BUILDDIR) $(TESTS) $(TESTS).o
+	@rm -rf $(BUILDDIR)
 
 print-%:
 	$(info [ variable name]: $*)
@@ -104,3 +108,4 @@ print-%:
 
 $(shell mkdir -p $(BUILDDIR))
 $(shell mkdir -p $(BUILDDIR)/parCon)
+$(shell mkdir -p $(BUILDDIR)/examples)
