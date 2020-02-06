@@ -97,13 +97,10 @@ examples: lib install $(EXAMPLEOBJ)
 $(BUILDDIR)/examples/%: $(EXAMPLEDIR)/%.c
 	$(CC) $(CFLAGS) $(PP) $(INCFLAGS) $< -o $@ $(EXAMPLELDFLAGS)
 
-.PHONY: tests-deps
-tests-deps:
+.PHONY: tests
+tests: examples
 	@cp -rf $(TESTDIR) $(BUILDDIR)/
 	@cd $(BUILDDIR)/tests && ./test.sh --get-deps
-	
-.PHONY: tests
-tests: tests-deps examples
 	@cd $(BUILDDIR)/tests && EXADIR=$(EXADIR)\
 		EXASORTDIR=$(EXASORTDIR) BUILDDIR=$(BUILDDIR) ./test.sh --run
 
