@@ -63,7 +63,8 @@ int compressPeriodicVertices(exaHandle h,Mesh mesh){
   }
 
   exaComm c=exaGetComm(h);
-  exaArrayTransfer(mesh->elements,offsetof(struct Point_private,proc),1,c);
+  exaArrayTransfer(mesh->elements,\
+      offsetof(struct Point_private,proc),1,c);
 }
 
 exaLong findMinBelowI(exaLong min,exaInt I,exaArray arr){
@@ -75,7 +76,9 @@ exaLong findMinBelowI(exaLong min,exaInt I,exaArray arr){
   return min;
 }
 
-int renumberPeriodicVertices(exaHandle h,Mesh mesh,exaArray matched){
+int renumberPeriodicVertices(exaHandle h,Mesh mesh,\
+    exaArray matched)
+{
   minPair ptr=exaArrayGetPointer(matched);
   exaInt size=exaArrayGetSize(matched);
 
@@ -95,8 +98,9 @@ int renumberPeriodicVertices(exaHandle h,Mesh mesh,exaArray matched){
   exaFree(ids);
   exaGSFree(t);
 
-  exaSortArray2(matched,exaLong_t,offsetof(struct minPair_private,orig),
-    exaLong_t,offsetof(struct minPair_private,min));
+  exaSortArray2(matched,\
+      exaLong_t,offsetof(struct minPair_private,orig),\
+      exaLong_t,offsetof(struct minPair_private,min ));
   ptr=exaArrayGetPointer(matched);
 
   exaArray compressed;
@@ -105,17 +109,20 @@ int renumberPeriodicVertices(exaHandle h,Mesh mesh,exaArray matched){
   exaInt sizeMatched=exaArrayGetSize(matched);
   if(sizeMatched) exaArrayAppend(compressed,ptr);
   for(i=1;i<sizeMatched;i++)
-    if(ptr[i].orig!=ptr[i-1].orig) exaArrayAppend(compressed,&ptr[i]);
+    if(ptr[i].orig!=ptr[i-1].orig)
+      exaArrayAppend(compressed,&ptr[i]);
 
   ptr=exaArrayGetPointer(compressed);
   for(i=0;i<exaArrayGetSize(compressed);i++) ptr[i].proc=0;
   exaComm c=exaGetComm(h);
-  exaArrayTransfer(compressed,offsetof(struct minPair_private,proc),1,c);
+  exaArrayTransfer(compressed,\
+      offsetof(struct minPair_private,proc),1,c);
 
   exaInt rank=exaRank(h);
   if(rank==0){
-    exaSortArray2(compressed,exaLong_t,offsetof(struct minPair_private,orig),
-      exaLong_t,offsetof(struct minPair_private,min));
+    exaSortArray2(compressed,\
+        exaLong_t,offsetof(struct minPair_private,orig),
+        exaLong_t,offsetof(struct minPair_private,min ));
     ptr=exaArrayGetPointer(compressed);
     for(i=0;i<exaArrayGetSize(compressed);i++){
       ptr[i].min=findMinBelowI(ptr[i].min,i,compressed);
@@ -144,8 +151,8 @@ int renumberPeriodicVertices(exaHandle h,Mesh mesh,exaArray matched){
   exaGSFree(t);
 }
 
-int findConnectedPeriodicPairs(exaHandle h,Mesh mesh,BoundaryFace f_,BoundaryFace g_,
-  exaArray matched)
+int findConnectedPeriodicPairs(exaHandle h,Mesh mesh,\
+    BoundaryFace f_,BoundaryFace g_,exaArray matched)
 {
   BoundaryFace f,g;
   exaMalloc(1,&f); exaMalloc(1,&g);
@@ -180,8 +187,10 @@ int findConnectedPeriodicPairs(exaHandle h,Mesh mesh,BoundaryFace f_,BoundaryFac
     for(j=0;j<nvf;j++){
       k=(j+i)%nvf;
       k=nvf-1-k;
-      if(nDim==3) d2+=distance3D(f->face.vertex[j],g->face.vertex[k]);
-      if(nDim==2) d2+=distance2D(f->face.vertex[j],g->face.vertex[k]);
+      if(nDim==3)
+        d2+=distance3D(f->face.vertex[j],g->face.vertex[k]);
+      if(nDim==2)
+        d2+=distance2D(f->face.vertex[j],g->face.vertex[k]);
     }
     if(d2<d2Min) {d2Min=d2;shift=i;};
   }
@@ -190,32 +199,37 @@ int findConnectedPeriodicPairs(exaHandle h,Mesh mesh,BoundaryFace f_,BoundaryFac
   exaScalar fgMax=max(fMax,gMax);
   exaScalar tol=(1e-3)*fgMax;
   if(d2Min>tol){
-    fprintf(stderr,"Faces did not match: (d2Min,tol,faceId1,faceId2): %lf %lf %lld %lld\n",
-      d2Min,tol,f->faceId,g->faceId);
+    fprintf(stderr,"Faces did not match: (d2Min,tol,faceId1"\
+        ",faceId2): %lf %lf %lld %lld\n",d2Min,tol,f->faceId,\
+        g->faceId);
     exit(1);
   }
-  exaDebug(h,"Faces matched (elementId,faceId): %lld %lld %lld %lld %lf\n",
-    f->elementId,f->faceId,g->elementId,g->faceId,d2Min
-  );
+  exaDebug(h,"Faces matched (elementId,faceId): "
+      "%lld %lld %lld %lld %lf\n",f->elementId,f->faceId,\
+      g->elementId,g->faceId,d2Min);
 
   struct minPair_private m;
   for(i=0;i<nvf;i++){
     k=(i+shift)%nvf;
     k=nvf-1-k;
-    m.min =min(f->face.vertex[i].globalId,g->face.vertex[k].globalId);
-    m.orig=max(f->face.vertex[i].globalId,g->face.vertex[k].globalId);
+    m.min =min(f->face.vertex[i].globalId,\
+        g->face.vertex[k].globalId);
+    m.orig=max(f->face.vertex[i].globalId,\
+        g->face.vertex[k].globalId);
     exaArrayAppend(matched,&m);
-    exaDebug(h,"faceId/globalId/sequenceId %d/%lld/%lld %d/%lld/%lld\n",
-      i,f->face.vertex[i].globalId,f->face.vertex[i].sequenceId,
-      k,g->face.vertex[k].globalId,g->face.vertex[k].sequenceId
-    );
+    exaDebug(h,"faceId/globalId/sequenceId "
+      "%d/%lld/%lld %d/%lld/%lld\n",
+      i,f->face.vertex[i].globalId,f->face.vertex[i].sequenceId,\
+      k,g->face.vertex[k].globalId,g->face.vertex[k].sequenceId);
     exaDebug(h,"globalId %lld replaced by %lld\n",m.orig,m.min);
   }
 
   exaFree(f); exaFree(g);
 }
 
-int findConnectedPeriodicFaces(exaHandle h,Mesh mesh,exaArray matched){
+int findConnectedPeriodicFaces(exaHandle h,Mesh mesh,\
+    exaArray matched)
+{
   exaInt bSize=exaArrayGetSize(mesh->boundary);
   BoundaryFace ptr=exaArrayGetPointer(mesh->boundary);
   exaInt i,j;

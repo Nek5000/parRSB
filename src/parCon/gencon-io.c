@@ -13,7 +13,6 @@
 } while(0)
 
 int PRE_TO_SYM_VERTEX[GC_MAX_VERTICES]={0,1,3,2,4,5,7,6};
-int eface [GC_MAX_FACES]={4,2,1,3,5,6};
 int PRE_TO_SYM_FACE[GC_MAX_FACES]={3,2,4,1,5,6};
 
 int transferBoundaryFaces(exaHandle h,Mesh mesh){
