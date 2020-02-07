@@ -234,17 +234,17 @@ int findConnectedPeriodicFaces(exaHandle h,Mesh mesh,\
   BoundaryFace ptr=exaArrayGetPointer(mesh->boundary);
   exaInt i,j;
 
-  for(i=0;i<bSize-1;i++){
-    for(j=i+1;j<bSize;j++){
-      if(strcmp(ptr[i].cbc,GC_PERIODIC)==0 && strcmp(ptr[j].cbc,GC_PERIODIC)==0){
-        if(ptr[j].bc[0]==ptr[i].elementId && ptr[j].bc[1]==ptr[i].faceId){
-          exaDebug(h,"Matching (elementId,faceId): (%d %d) (%d %d)\n",
-            ptr[i].elementId,ptr[i].faceId,ptr[j].elementId,ptr[j].faceId);
-          findConnectedPeriodicPairs(h,mesh,&ptr[i],&ptr[j],matched);
-        }
+  for(i=0;i<bSize-1;i++)
+    for(j=i+1;j<bSize;j++)
+      if(ptr[j].bc[0]==ptr[i].elementId &&\
+          ptr[j].bc[1]==ptr[i].faceId){
+        exaDebug(h,"Matching (elementId,faceId): (%d %d)"
+           " (%d %d)\n",\
+          ptr[i].elementId,ptr[i].faceId,\
+          ptr[j].elementId,ptr[j].faceId);
+        findConnectedPeriodicPairs(h,mesh,&ptr[i],&ptr[j],\
+            matched);
       }
-    }
-  }
 }
 
 int gatherMatchingPeriodicFaces(exaHandle h,Mesh mesh){
@@ -259,20 +259,21 @@ int gatherMatchingPeriodicFaces(exaHandle h,Mesh mesh){
 
   exaInt i; exaLong eid;
   for(i=0;i<nFaces;i++){
-    if(strcmp(bPtr[i].cbc,GC_PERIODIC)==0){
-      eid=bPtr[i].bc[0];
-      if(eid<bPtr[i].elementId){
-        exaDebug(h,"Send matching (%d,%d) to (%d,%d).\n",bPtr[i].elementId,bPtr[i].faceId,
-          bPtr[i].bc[0],bPtr[i].bc[1]);
-        if(N==0) bPtr[i].proc=eid/nelt;
-        else if(eid<N) bPtr[i].proc=ceil((eid+1.0)/(nelt+1.0))-1;
-        else bPtr[i].proc=ceil((eid+1.0-N)/nelt)-1+nrem;
-      } else bPtr[i].proc=rank;
-    }
+    eid=bPtr[i].bc[0];
+    if(eid<bPtr[i].elementId){
+      exaDebug(h,"Send matching (%d,%d) to (%d,%d).\n",\
+          bPtr[i].elementId,bPtr[i].faceId,
+          bPtr[i].bc[0]    ,bPtr[i].bc[1]);
+
+      if(N==0) bPtr[i].proc=eid/nelt;
+      else if(eid<N) bPtr[i].proc=ceil((eid+1.0)/(nelt+1.0))-1;
+      else bPtr[i].proc=ceil((eid+1.0-N)/nelt)-1+nrem;
+    } else bPtr[i].proc=rank;
   }
 
   exaComm c=exaGetComm(h);
-  exaArrayTransfer(mesh->boundary,offsetof(struct Boundary_private,proc),1,c);
+  exaArrayTransfer(mesh->boundary,\
+      offsetof(struct Boundary_private,proc),1,c);
 }
 
 int setPeriodicFaceCoordinates(exaHandle h,Mesh mesh){
@@ -282,37 +283,50 @@ int setPeriodicFaceCoordinates(exaHandle h,Mesh mesh){
   exaComm c=exaGetComm(h);
 
   /* Need boundary array to be sorted by elementId */
-  exaSortArray(mesh->boundary,exaLong_t,offsetof(struct Boundary_private,elementId));
+  exaSortArray(mesh->boundary,exaLong_t,\
+      offsetof(struct Boundary_private,elementId));
+
   BoundaryFace bPtr=exaArrayGetPointer(mesh->boundary);
   exaInt bSize     =exaArrayGetSize(mesh->boundary);
   if(bSize==0) return 0;
 
   /* Need element array to be sorted by sequenceId */
-  exaSortArray(mesh->elements,exaLong_t,offsetof(struct Point_private,sequenceId));
+  exaSortArray(mesh->elements,exaLong_t,\
+      offsetof(struct Point_private,sequenceId));
+
   Point ePtr  =exaArrayGetPointer(mesh->elements);
   exaInt eSize=exaArrayGetSize(mesh->elements);
   if(eSize==0) return 0;
 
   int faces[GC_MAX_FACES][GC_MAX_FACE_VERTICES];
-  if(mesh->nDim==3) memcpy(faces,faces3D,GC_MAX_FACES*GC_MAX_FACE_VERTICES*sizeof(int));
-  else memcpy(faces,faces2D,GC_MAX_FACES*GC_MAX_FACE_VERTICES*sizeof(int));
+  if(mesh->nDim==3)
+    memcpy(faces,faces3D,\
+        GC_MAX_FACES*GC_MAX_FACE_VERTICES*sizeof(int));
+  else
+    memcpy(faces,faces2D,\
+        GC_MAX_FACES*GC_MAX_FACE_VERTICES*sizeof(int));
 
   exaInt i=0,k=0;
   int nv=mesh->nVertex,nvf=mesh->nVertex/2,j;
   while(i<bSize){
     if(strcmp(bPtr[i].cbc,GC_PERIODIC)==0){
-      while(k<eSize && ePtr[k].elementId<bPtr[i].elementId) k+=nv;
+      while(k<eSize && ePtr[k].elementId<bPtr[i].elementId)
+        k+=nv;
       //copy vertices to boundary face
       if(k<eSize && ePtr[k].elementId==bPtr[i].elementId){
         int faceId=bPtr[i].faceId;
-        bPtr[i].bc[0]--; bPtr[i].bc[1]--; bPtr[i].bc[1]=PRE_TO_SYM_FACE[bPtr[i].bc[1]]-1;
-        for(j=0;j<nvf;j++) bPtr[i].face.vertex[j]=ePtr[k+faces[faceId][j]-1];
-        exaDebug(h,"Periodic BC (element,face): %d %d %d %d %d %d\n",
-          bPtr[i].bc[0],bPtr[i].bc[1],
-          bPtr[i].face.vertex[0].sequenceId,
-          bPtr[i].face.vertex[1].sequenceId,
-          bPtr[i].face.vertex[2].sequenceId,
-          bPtr[i].face.vertex[3].sequenceId);
+        bPtr[i].bc[0]--; bPtr[i].bc[1]--;
+        bPtr[i].bc[1]=PRE_TO_SYM_FACE[bPtr[i].bc[1]]-1;
+        for(j=0;j<nvf;j++)
+          bPtr[i].face.vertex[j]=ePtr[k+faces[faceId][j]-1];
+
+        exaDebug(h,"Periodic BC (element,face):"
+            " %d %d %d %d %d %d\n",
+            bPtr[i].bc[0],bPtr[i].bc[1],
+            bPtr[i].face.vertex[0].sequenceId,
+            bPtr[i].face.vertex[1].sequenceId,
+            bPtr[i].face.vertex[2].sequenceId,
+            bPtr[i].face.vertex[3].sequenceId);
       }
     }
     i++;
@@ -332,5 +346,6 @@ int matchPeriodicFaces(exaHandle h,Mesh mesh){
 
   exaArrayFree(matched);
 
-  exaSortArray(mesh->elements,exaLong_t,offsetof(struct Point_private,sequenceId));
+  exaSortArray(mesh->elements,exaLong_t,\
+      offsetof(struct Point_private,sequenceId));
 }
