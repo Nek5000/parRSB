@@ -102,19 +102,20 @@ int readCo2Coordinates(exaHandle h,Mesh mesh,MPI_File file){
   if(rank==0) buf0+=headerSize;
 
   /* initialize array */
-  exaArrayInit(&(mesh->elements),struct Point_private,nelt*nVertex);
+  exaArrayInit(&(mesh->elements),struct Point_private,\
+      nelt*nVertex);
   exaArraySetSize(mesh->elements,nelt*nVertex);
   Point ptr=exaArrayGetPointer(mesh->elements);
 
   /* read elements for each rank */
-  double group;
   double x[GC_MAX_VERTICES],y[GC_MAX_VERTICES],z[GC_MAX_VERTICES];
   int i,j,k;
   for(i=0; i<nelt; i++){
-    readT(&group,buf0,double,1      ); buf0+=sizeof(double);
-    readT(x     ,buf0,double,nVertex); buf0+=sizeof(double)*nVertex;
-    readT(y     ,buf0,double,nVertex); buf0+=sizeof(double)*nVertex;
-    readT(z     ,buf0,double,nVertex); buf0+=sizeof(double)*nVertex;
+    // skip group id
+    buf0+=sizeof(double);
+    readT(x ,buf0,double,nVertex); buf0+=sizeof(double)*nVertex;
+    readT(y ,buf0,double,nVertex); buf0+=sizeof(double)*nVertex;
+    readT(z ,buf0,double,nVertex); buf0+=sizeof(double)*nVertex;
     for(k=0;k<nVertex;k++){
       j=PRE_TO_SYM_VERTEX[k];
       ptr->x[0]=x[j],ptr->x[1]=y[j],ptr->x[2]=z[j];
@@ -149,13 +150,14 @@ int readCo2Boundaries(exaHandle h,Mesh mesh,MPI_File file){
   /* calculate offset for the curve side data */
   MPI_Offset curveOffset=headerSize+nelgt*elemDataSize;
   if(rank==0)
-    MPI_File_read_at(file,curveOffset,bufL,sizeof(long),MPI_BYTE,&st);
+    MPI_File_read_at(file,curveOffset,bufL,sizeof(long),\
+        MPI_BYTE,&st);
   MPI_Bcast(bufL,sizeof(long),MPI_BYTE,0,comm);
 
   double ncurvesD; readT(&ncurvesD,bufL,long,1);
   long ncurves=ncurvesD;
 
-  /* calculate offset for boundary condition data */
+  /* calculate offset for boundary conditions data */
   MPI_Offset boundaryOffset=curveOffset+sizeof(long)+\
     sizeof(long)*8*ncurves;
   if(rank==0)
@@ -167,7 +169,8 @@ int readCo2Boundaries(exaHandle h,Mesh mesh,MPI_File file){
   
   int nbcsLocal=nbcs/size,nrem=nbcs-nbcsLocal*size;
   nbcsLocal+=(rank<nrem ? 1 : 0);
-  exaDebug(h,"rank=%d read %d boundary faces.\n",rank,nbcsLocal);
+  exaDebug(h,"rank=%d reads %d boundary faces.\n",rank,
+      nbcsLocal);
 
   exaLong out[2][1],buff[2][1],in[1];
   in[0]=nbcsLocal;
@@ -198,7 +201,8 @@ int readCo2Boundaries(exaHandle h,Mesh mesh,MPI_File file){
     readT(boundary.cbc,buf0,char,3);buf0+=sizeof(long);
     boundary.cbc[3]='\0';
 
-    exaArrayAppend(mesh->boundary,&boundary);
+    if(strcmp(boundary.cbc,GC_PERIODIC)==0)
+      exaArrayAppend(mesh->boundary,&boundary);
   }
 
   free(buf);
@@ -275,9 +279,9 @@ int genConWriteCo2File(exaHandle h,Mesh mesh,char *fileName){
   char *buf=(char*)calloc(writeSize,sizeof(char)),*buf0=buf;
   MPI_Status st;
   if(rank==0){
-    sprintf(buf0,"%5s%12d%12d%12d",version,(int)nelgt,(int)nelgv,\
-      nVertex);
-    memset (buf0+strlen(buf0),' ',GC_CO2_HEADER_LEN-strlen(buf0));
+    sprintf(buf0,"%5s%12d%12d%12d",version,(int)nelgt,\
+        (int)nelgv,nVertex);
+    memset(buf0+strlen(buf0),' ',GC_CO2_HEADER_LEN-strlen(buf0));
     buf0[GC_CO2_HEADER_LEN]='\0';
     buf0+=GC_CO2_HEADER_LEN;
     memcpy(buf0,&test,sizeof(float)),buf0+=sizeof(float);
