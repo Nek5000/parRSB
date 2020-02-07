@@ -309,25 +309,21 @@ int setPeriodicFaceCoordinates(exaHandle h,Mesh mesh){
   exaInt i=0,k=0;
   int nv=mesh->nVertex,nvf=mesh->nVertex/2,j;
   while(i<bSize){
-    if(strcmp(bPtr[i].cbc,GC_PERIODIC)==0){
-      while(k<eSize && ePtr[k].elementId<bPtr[i].elementId)
-        k+=nv;
-      //copy vertices to boundary face
-      if(k<eSize && ePtr[k].elementId==bPtr[i].elementId){
-        int faceId=bPtr[i].faceId;
-        bPtr[i].bc[0]--; bPtr[i].bc[1]--;
-        bPtr[i].bc[1]=PRE_TO_SYM_FACE[bPtr[i].bc[1]]-1;
-        for(j=0;j<nvf;j++)
-          bPtr[i].face.vertex[j]=ePtr[k+faces[faceId][j]-1];
+    while(k<eSize && ePtr[k].elementId<bPtr[i].elementId)
+      k+=nv;
+    //copy vertices to boundary face
+    if(k<eSize && ePtr[k].elementId==bPtr[i].elementId){
+      int faceId=bPtr[i].faceId;
+      for(j=0;j<nvf;j++)
+        bPtr[i].face.vertex[j]=ePtr[k+faces[faceId][j]-1];
 
-        exaDebug(h,"Periodic BC (element,face):"
-            " %d %d %d %d %d %d\n",
-            bPtr[i].bc[0],bPtr[i].bc[1],
-            bPtr[i].face.vertex[0].sequenceId,
-            bPtr[i].face.vertex[1].sequenceId,
-            bPtr[i].face.vertex[2].sequenceId,
-            bPtr[i].face.vertex[3].sequenceId);
-      }
+      exaDebug(h,"Periodic BC (element,face):"
+          " %d %d %d %d %d %d\n",
+          bPtr[i].bc[0],bPtr[i].bc[1],
+          bPtr[i].face.vertex[0].sequenceId,
+          bPtr[i].face.vertex[1].sequenceId,
+          bPtr[i].face.vertex[2].sequenceId,
+          bPtr[i].face.vertex[3].sequenceId);
     }
     i++;
   }

@@ -13,7 +13,7 @@
 } while(0)
 
 int PRE_TO_SYM_VERTEX[GC_MAX_VERTICES]={0,1,3,2,4,5,7,6};
-int PRE_TO_SYM_FACE[GC_MAX_FACES]={3,2,4,1,5,6};
+int PRE_TO_SYM_FACE[GC_MAX_FACES]={2,1,3,0,4,5};
 
 int transferBoundaryFaces(exaHandle h,Mesh mesh){
   int size=exaSize(h);
@@ -183,24 +183,26 @@ int readCo2Boundaries(exaHandle h,Mesh mesh,MPI_File file){
 
   exaArrayInit(&mesh->boundary,struct Boundary_private,0);
 
-  exaInt i,j;
   double tmp[5];
+  char cbc[4];
   struct Boundary_private boundary;
+  exaInt i;
   for(i=0;i<nbcsLocal;i++){
     readT(tmp,buf0,long,1);buf0+=sizeof(long);
     boundary.elementId=tmp[0]-1;
 
     readT(tmp,buf0,long,1);buf0+=sizeof(long);
     boundary.faceId=tmp[0]-1;
-    boundary.faceId=PRE_TO_SYM_FACE[boundary.faceId]-1;
+    boundary.faceId=PRE_TO_SYM_FACE[boundary.faceId];
 
     readT(tmp,buf0,long,5);buf0+=5*sizeof(long);
-    for(j=0;j<5;j++) boundary.bc[j]=tmp[j];
 
-    readT(boundary.cbc,buf0,char,3);buf0+=sizeof(long);
-    boundary.cbc[3]='\0';
+    readT(cbc,buf0,char,3);buf0+=sizeof(long);
+    cbc[3]='\0';
 
-    if(strcmp(boundary.cbc,GC_PERIODIC)==0)
+    if(strcmp(cbc,GC_PERIODIC)==0)
+      boundary.bc[0]=(long)tmp[0]-1;
+      boundary.bc[1]=PRE_TO_SYM_FACE[(long)tmp[1]-1];
       exaArrayAppend(mesh->boundary,&boundary);
   }
 

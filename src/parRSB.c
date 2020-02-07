@@ -198,9 +198,8 @@ int parRSB_findConnectivity(double *coord,int nel,int nDim,
     //TODO: Is faceId in symmetric or pre-processor order?
     bc->elementId=periodicInfo[cnt++]-1;
     bc->faceId   =periodicInfo[cnt++]-1;
-    bc->bc[0]=periodicInfo[cnt++];
-    bc->bc[1]=periodicInfo[cnt++];
-    strcpy(bc->cbc,GC_PERIODIC);
+    bc->bc[0]=periodicInfo[cnt++]-1;
+    bc->bc[1]=periodicInfo[cnt++]-1;
     exaArrayAppend(mesh->boundary,bc);
   }
 

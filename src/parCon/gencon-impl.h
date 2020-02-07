@@ -35,8 +35,7 @@ struct Boundary_private{
   exaLong faceId;
   struct Face_private face;
   int proc;
-  char cbc[4];
-  long bc[5];
+  long bc[2];
 };
 
 struct Mesh_private{
