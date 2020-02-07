@@ -1,4 +1,4 @@
-# parRSB
+# parRSB [![Build Status](https://travis-ci.org/thilinarmtb/parRSB.svg?branch=parcon)](https://travis-ci.org/thilinarmtb/parRSB)
 
 * Computes high quality partitionings using recursive spectral bisection (RSB)
 * Requires MPI and [gslib](https://github.com/gslib/gslib) (requires version 1.0.3 or later)
