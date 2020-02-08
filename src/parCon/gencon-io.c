@@ -109,22 +109,26 @@ int readCo2Coordinates(exaHandle h,Mesh mesh,MPI_File file){
   /* read elements for each rank */
   double x[GC_MAX_VERTICES],y[GC_MAX_VERTICES],z[GC_MAX_VERTICES];
   int i,j,k;
-  for(i=0; i<nelt; i++){
+  for(i=0;i<nelt;i++){
     // skip group id
     buf0+=sizeof(double);
-    readT(x ,buf0,double,nVertex); buf0+=sizeof(double)*nVertex;
-    readT(y ,buf0,double,nVertex); buf0+=sizeof(double)*nVertex;
-    readT(z ,buf0,double,nVertex); buf0+=sizeof(double)*nVertex;
+    readT(x,buf0,double,nVertex); buf0+=sizeof(double)*nVertex;
+    readT(y,buf0,double,nVertex); buf0+=sizeof(double)*nVertex;
+    if(nDim==3)
+      readT(z,buf0,double,nVertex); buf0+=sizeof(double)*nVertex;
+
     for(k=0;k<nVertex;k++){
       j=PRE_TO_SYM_VERTEX[k];
-      ptr->x[0]=x[j],ptr->x[1]=y[j],ptr->x[2]=z[j];
+      ptr->x[0]=x[j],ptr->x[1]=y[j];
+      if(nDim==3)
+        ptr->x[2]=z[j];
+      exaDebug(h,"elem: %d (%lf,%lf)\n",i,ptr->x[0],ptr->x[1]);
       ptr->elementId =start+i;
       ptr->sequenceId=nVertex*(start+i)+k;
       ptr->origin    =rank;
       ptr++;
     }
   }
-
   free(buf);
 
   return 0;
@@ -192,11 +196,9 @@ int readCo2Boundaries(exaHandle h,Mesh mesh,MPI_File file){
     boundary.elementId=tmp[0]-1;
 
     readT(tmp,buf0,long,1);buf0+=sizeof(long);
-    boundary.faceId=tmp[0]-1;
-    boundary.faceId=PRE_TO_SYM_FACE[boundary.faceId];
+    boundary.faceId=PRE_TO_SYM_FACE[(long)tmp[0]-1];
 
     readT(tmp,buf0,long,5);buf0+=5*sizeof(long);
-
     readT(cbc,buf0,char,3);buf0+=sizeof(long);
     cbc[3]='\0';
 
@@ -230,6 +232,10 @@ int genConReadRe2File(exaHandle h,Mesh *mesh_,char *fileName){
   Mesh mesh=*mesh_;
 
   readCo2Header(h,mesh,file);
+  exaDebug(h,"ndim,nvertex,nneighbors,nelgt,nelt:%d %d %d %d "
+      "%d\n",mesh->nDim,mesh->nVertex,mesh->nNeighbors,\
+      mesh->nelgt,mesh->nelt);
+
   readCo2Coordinates(h,mesh,file);
   readCo2Boundaries(h,mesh,file);
   transferBoundaryFaces(h,mesh);

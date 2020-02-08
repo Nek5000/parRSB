@@ -83,7 +83,7 @@ function run_test(){
   local TEST=$1
   local NP=$2
 
-  if [ ${NP} -gt 4 ]; then NP=4; fi
+  if [ ${NP} -gt 8 ]; then NP=7; fi
   mpirun -np ${NP} ./parCon ${CASE}.re2 >parcon.out 2>parcon.err
   if [ -s parcon.err ]; then
     exit_err "Error running parCon."
