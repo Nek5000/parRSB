@@ -6,15 +6,16 @@ CFLAGS ?= -O2
 
 ### Dependencies
 GSLIBDIR ?= $(GSLIBPATH)
-EXADIR ?= $(BUILDDIR)/3rd_party/exa/exaCore/build
-EXASORTDIR ?= $(BUILDDIR)/3rd_party/exa/exaSort/build
 
 ### Meta info
 SRCROOT=${CURDIR}
 SRCDIR=$(SRCROOT)/src
 EXAMPLEDIR=$(SRCROOT)/examples
 TESTDIR=$(SRCROOT)/tests
-BUILDDIR=$(SRCROOT)/build
+
+BUILDDIR ?=$(SRCROOT)/build
+EXADIR ?= $(BUILDDIR)/exaCore/build
+EXASORTDIR ?= $(BUILDDIR)/exaSort/build
 
 ### Flags
 INCFLAGS=-I$(SRCDIR) -I$(SRCDIR)/parCon -I$(GSLIBDIR)/include\
@@ -34,7 +35,7 @@ SRCOBJS +=$(patsubst $(SRCDIR)/parCon/%.c,$(BUILDDIR)/parCon/%.o,\
 EXAMPLESRC=$(EXAMPLEDIR)/parRSB.c $(EXAMPLEDIR)/parCon.c
 EXAMPLEOBJ=$(patsubst $(EXAMPLEDIR)/%.c,$(BUILDDIR)/examples/%,\
 	$(EXAMPLESRC))
-EXAMPLELDFLAGS=-L$(BUILDDIR)/lib -lparRSB $(EXASORTLDFLAGS)\
+EXAMPLELDFLAGS=-L$(BUILDDIR) -lparRSB $(EXASORTLDFLAGS)\
 	$(EXALDFLAGS) $(LDFLAGS)
 
 LIB=$(BUILDDIR)/libparRSB.so
@@ -69,9 +70,8 @@ all: build-deps lib examples tests install
 
 .PHONY: build-deps
 build-deps:
-	@cp -rf 3rd_party $(BUILDDIR)/
-	@cd $(BUILDDIR)/3rd_party/exa &&\
-		GSDIR=$(GSLIBDIR) PREFIX=$(DESTDIR) ./install
+	@cp 3rd_party/exa.install $(BUILDDIR)/
+	@cd $(BUILDDIR) && GSDIR=$(GSLIBDIR) ./exa.install
 
 $(BUILDDIR)/%.o: $(SRCDIR)/%.c
 	$(CC) $(CFLAGS) $(PP) $(INCFLAGS) -c $< -o $@
@@ -87,12 +87,13 @@ lib: build-deps $(SRCOBJS)
 .PHONY: install
 install: lib
 	@mkdir -p $(INSTALL_ROOT)/lib 2>/dev/null
-	@cp -v $(LIB) $(INSTALL_ROOT)/lib 2>/dev/null
+	@cp $(LIB) $(INSTALL_ROOT)/lib/ 2>/dev/null
 	@mkdir -p $(INSTALL_ROOT)/include 2>/dev/null
-	@cp $(SRCDIR)/parRSB.h $(INSTALL_ROOT)/include 2>/dev/null
+	@cp $(SRCDIR)/*.h $(SRCDIR)/parCon/*.h \
+		$(INSTALL_ROOT)/include/ 2>/dev/null
 
 .PHONY: examples
-examples: lib install $(EXAMPLEOBJ)
+examples: lib $(EXAMPLEOBJ)
 
 $(BUILDDIR)/examples/%: $(EXAMPLEDIR)/%.c
 	$(CC) $(CFLAGS) $(PP) $(INCFLAGS) $< -o $@ $(EXAMPLELDFLAGS)
@@ -102,7 +103,8 @@ tests: examples
 	@cp -rf $(TESTDIR) $(BUILDDIR)/
 	@cd $(BUILDDIR)/tests && ./test.sh --get-deps
 	@cd $(BUILDDIR)/tests && EXADIR=$(EXADIR)\
-		EXASORTDIR=$(EXASORTDIR) BUILDDIR=$(BUILDDIR) ./test.sh --run
+		EXASORTDIR=$(EXASORTDIR) BUILDDIR=$(BUILDDIR)\
+		./test.sh --run
 
 .PHONY: clean
 clean:

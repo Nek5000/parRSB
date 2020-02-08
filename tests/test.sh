@@ -102,8 +102,8 @@ function run_test(){
 }
 
 function run_test_suite(){
-  cd bbbb
-  for i in ../[bp]0*; do
+  cd ${CASE}
+  for i in ../[wp]*; do
     setup_test $i
 
     NP=${i:(-3)};
