@@ -13,8 +13,7 @@ base.rea
 #=======================================================================
 #
 Box
--1  -1  -1                                        nelx,nely,nelz for Box
+-1  -1                                        nelx,nely,nelz for Box
 0 1 1.                                               x0,x1,gain  (rescaled in usrdat)
 0 1 1.                                               y0,y1,gain  (rescaled in usrdat)
-0 1 1.                                               z0,z1,gain
-W  ,W  ,W  ,W  ,W  ,W                                bc's  (3 chars each!)
+W  ,W  ,W  ,W                                  bc's  (3 chars each!)

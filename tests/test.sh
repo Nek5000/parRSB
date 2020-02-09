@@ -1,6 +1,6 @@
 #!/bin/bash
 
-export CASE=bp5
+export CASE=nek-case
 export VERBOSE=0
 
 export NEK_SOURCE_ROOT=`pwd`/Nek5000
@@ -70,9 +70,8 @@ function setup_test(){
 }
 
 function run_nek5000(){
-  local CASE=$1
-  local NP=$2
-  local TEST=$3
+  local NP=$1
+  local TEST=$2
 
   echo ${CASE}   >  SESSION.NAME
   echo `pwd`'/' >>  SESSION.NAME
@@ -81,7 +80,12 @@ function run_nek5000(){
 
 function run_test(){
   local TEST=$1
-  local NP=$2
+  local NP=1
+
+  if [ $# -gt 1 ]; then NP=$2;
+  else NP=${i:(-3)}; fi
+
+  setup_test $i
 
   if [ ${NP} -gt 8 ]; then NP=7; fi
   mpirun -np ${NP} ./parCon ${CASE}.re2 >parcon.out 2>parcon.err
@@ -91,7 +95,7 @@ function run_test(){
 
   TEST="`dir_resolve \"${TEST}\"`"
   TEST=`basename ${TEST}`
-  run_nek5000 ${CASE} ${NP} ${TEST}
+  run_nek5000 ${NP} ${TEST}
 
   success=`grep 'run successful: dying ' nek.${TEST}.out | wc -l`
   if [ ${success} -eq 0 ]; then
@@ -103,11 +107,15 @@ function run_test(){
 
 function run_test_suite(){
   cd ${CASE}
-  for i in ../[wp]*; do
-    setup_test $i
-
-    NP=${i:(-3)};
-    run_test ${i} ${NP}
+  # Run 2d tests first
+  cp SIZE.2d SIZE
+  for i in ../[wp]2d*; do
+    run_test ${i}
+  done
+  # Run 3d tests
+  cp SIZE.3d SIZE
+  for i in ../[wp]3d*; do
+    run_test ${i}
   done
   cd - 2>/dev/null 1>&2
 }
