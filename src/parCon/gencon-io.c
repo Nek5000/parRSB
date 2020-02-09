@@ -202,12 +202,13 @@ int readCo2Boundaries(exaHandle h,Mesh mesh,MPI_File file){
     readT(cbc,buf0,char,3);buf0+=sizeof(long);
     cbc[3]='\0';
 
-    if(strcmp(cbc,GC_PERIODIC)==0)
+    if(strcmp(cbc,GC_PERIODIC)==0){
+      exaDebug(h,"Periodic face found.\n");
       boundary.bc[0]=(long)tmp[0]-1;
       boundary.bc[1]=PRE_TO_SYM_FACE[(long)tmp[1]-1];
       exaArrayAppend(mesh->boundary,&boundary);
+    }
   }
-
   free(buf);
 }
 
@@ -296,7 +297,7 @@ int genConWriteCo2File(exaHandle h,Mesh mesh,char *fileName){
 
   Point ptr=exaArrayGetPointer(mesh->elements);
   int i,k,temp;
-  for(i=0; i<nelt; i++){
+  for(i=0;i<nelt;i++){
     temp=ptr->elementId+1;
     writeInt(buf0,temp); buf0+=sizeof(int);
     for(k=0;k<nVertex;k++){
