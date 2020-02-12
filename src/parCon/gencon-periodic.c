@@ -21,25 +21,28 @@ struct minPair_private{
 typedef struct minPair_private* minPair;
 
 int compressPeriodicVertices(exaHandle h,Mesh mesh){
-  exaSort(mesh->elements,exaLong_t,offsetof(struct Point_private,globalId),
-    exaSortAlgoBinSort,1,exaGetComm(h));
+  exaSort(mesh->elements,exaLong_t,\
+    offsetof(struct Point_private,globalId),
+    exaSortAlgoBinSort,0,exaGetComm(h));
 
   Point   points=exaArrayGetPointer(mesh->elements);
   exaInt nPoints=exaArrayGetSize(mesh->elements);
 
-  exaInt i,unique=0;
+  exaInt i,nUnique=0;
   if(nPoints){
     exaLong current=points[0].globalId;
-    points[0].globalId=0;
+    points[0].globalId=nUnique;
     for(i=1;i<nPoints;i++)
-      if(points[i].globalId!=current){
-        current=points[i].globalId;
-        points[i].globalId=++unique;
-      } else points[i].globalId=unique;
+      if(points[i].globalId==current)
+        points[i].globalId=nUnique;
+      else{
+        current=points[i].globalId,++nUnique;
+        points[i].globalId=nUnique;
+      }
   }
 
   exaLong out[2][1],buf[2][1],in[1];
-  if(nPoints) in[0]=unique+1;
+  if(nPoints) in[0]=nUnique+1;
   else in[0]=0;
 
   exaScan(h,out,in,buf,1,exaLong_t,exaAddOp);
@@ -60,6 +63,7 @@ int compressPeriodicVertices(exaHandle h,Mesh mesh){
     if(N==0) points[i].proc=eid/nelt;
     else if(eid+1<=N) points[i].proc=ceil((eid+1.0)/(nelt+1.0))-1;
     else points[i].proc=ceil((eid+1.0-N)/nelt)-1+nrem;
+    exaDebug(h,"elem/proc: %lld/%d\n",eid+1,points[i].proc);
   }
 
   exaComm c=exaGetComm(h);
@@ -338,7 +342,7 @@ int matchPeriodicFaces(exaHandle h,Mesh mesh){
 
   findConnectedPeriodicFaces(h,mesh,matched);
   renumberPeriodicVertices(h,mesh,matched);
-  //compressPeriodicVertices(h,mesh);
+  compressPeriodicVertices(h,mesh);
 
   exaArrayFree(matched);
 

@@ -292,7 +292,7 @@ int genConWriteCo2File(exaHandle h,Mesh mesh,char *fileName){
   if(rank==0){
     sprintf(buf0,"%5s%12d%12d%12d",version,(int)nelgt,\
         (int)nelgv,nVertex);
-    exaDebug(h,"%5s%12d%12d%12d",version,(int)nelgt,\
+    exaDebug(h,"%5s%12d%12d%12d\n",version,(int)nelgt,\
         (int)nelgv,nVertex);
     memset(buf0+strlen(buf0),' ',GC_CO2_HEADER_LEN-strlen(buf0));
     buf0[GC_CO2_HEADER_LEN]='\0';
