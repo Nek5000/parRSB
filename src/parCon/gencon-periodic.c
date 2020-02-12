@@ -322,12 +322,7 @@ int setPeriodicFaceCoordinates(exaHandle h,Mesh mesh){
         bPtr[i].face.vertex[j]=ePtr[k+faces[faceId][j]-1];
 
       exaDebug(h,"Periodic BC (element,face):"
-          " %d %d %d %d %d %d\n",
-          bPtr[i].bc[0],bPtr[i].bc[1],
-          bPtr[i].face.vertex[0].sequenceId,
-          bPtr[i].face.vertex[1].sequenceId,
-          bPtr[i].face.vertex[2].sequenceId,
-          bPtr[i].face.vertex[3].sequenceId);
+        "(%d,%d)\n",bPtr[i].bc[0],bPtr[i].bc[1]);
     }
     i++;
   }
