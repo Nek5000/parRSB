@@ -37,7 +37,7 @@ int transferBoundaryFaces(exaHandle h,Mesh mesh){
     offsetof(struct Boundary_private,proc),1,c);
 }
 
-int readCo2Header(exaHandle h,Mesh mesh,MPI_File file){
+int readRe2Header(exaHandle h,Mesh mesh,MPI_File file){
   char version[BUFSIZ];
   int nelgt,nDim,nelgv,err;
   MPI_Status st;
@@ -53,8 +53,9 @@ int readCo2Header(exaHandle h,Mesh mesh,MPI_File file){
   }
   MPI_Bcast(buf,GC_RE2_HEADER_LEN,MPI_BYTE,0,comm);
   sscanf(buf,"%5s %d %d %d",version,&nelgt,&nDim,&nelgv);
+  exaDebug(h,"header: %s\n",buf);
 
-  int nVertex=(int)(pow(2,nDim)+0.5);
+  int nVertex= (nDim==2)?4:8;
   int nelt=nelgt/size,nrem=nelgt-nelt*size;
   nelt+=(rank<nrem ? 1: 0);
 
@@ -66,12 +67,16 @@ int readCo2Header(exaHandle h,Mesh mesh,MPI_File file){
   mesh->nelgv=nelgv;
   mesh->nelt=nelt;
 
+  exaDebug(h,"ndim,nvertex,nneighbors,nelgt,nelt:%d %d %d %d "
+      "%d\n",mesh->nDim,mesh->nVertex,mesh->nNeighbors,\
+      mesh->nelgt,mesh->nelt);
+
   free(buf);
 
   return 0;
 }
 
-int readCo2Coordinates(exaHandle h,Mesh mesh,MPI_File file){
+int readRe2Coordinates(exaHandle h,Mesh mesh,MPI_File file){
   exaInt rank=exaRank(h);
   exaInt size=exaSize(h);
   MPI_Comm comm=exaGetMPIComm(h);
@@ -101,21 +106,24 @@ int readCo2Coordinates(exaHandle h,Mesh mesh,MPI_File file){
   if(rank==0) buf0+=headerSize;
 
   /* initialize array */
-  exaArrayInit(&(mesh->elements),struct Point_private,\
-      nelt*nVertex);
-  exaArraySetSize(mesh->elements,nelt*nVertex);
+  size_t nUnits=nelt*nVertex;
+  exaArrayInit(&mesh->elements,struct Point_private,nUnits);
+  exaArraySetSize(mesh->elements,nUnits);
   Point ptr=exaArrayGetPointer(mesh->elements);
 
   /* read elements for each rank */
-  double x[GC_MAX_VERTICES],y[GC_MAX_VERTICES],z[GC_MAX_VERTICES];
+  double x[GC_MAX_VERTICES],y[GC_MAX_VERTICES],\
+    z[GC_MAX_VERTICES];
   int i,j,k;
   for(i=0;i<nelt;i++){
     // skip group id
     buf0+=sizeof(double);
     readT(x,buf0,double,nVertex); buf0+=sizeof(double)*nVertex;
     readT(y,buf0,double,nVertex); buf0+=sizeof(double)*nVertex;
-    if(nDim==3)
-      readT(z,buf0,double,nVertex); buf0+=sizeof(double)*nVertex;
+    if(nDim==3){
+      readT(z,buf0,double,nVertex);
+      buf0+=sizeof(double)*nVertex;
+    }
 
     for(k=0;k<nVertex;k++){
       j=PRE_TO_SYM_VERTEX[k];
@@ -134,7 +142,7 @@ int readCo2Coordinates(exaHandle h,Mesh mesh,MPI_File file){
   return 0;
 }
 
-int readCo2Boundaries(exaHandle h,Mesh mesh,MPI_File file){
+int readRe2Boundaries(exaHandle h,Mesh mesh,MPI_File file){
   exaInt rank=exaRank(h);
   exaInt size=exaSize(h);
   MPI_Comm comm=exaGetMPIComm(h);
@@ -203,7 +211,6 @@ int readCo2Boundaries(exaHandle h,Mesh mesh,MPI_File file){
     cbc[3]='\0';
 
     if(strcmp(cbc,GC_PERIODIC)==0){
-      exaDebug(h,"Periodic face found.\n");
       boundary.bc[0]=(long)tmp[0]-1;
       boundary.bc[1]=PRE_TO_SYM_FACE[(long)tmp[1]-1];
       exaArrayAppend(mesh->boundary,&boundary);
@@ -232,13 +239,9 @@ int genConReadRe2File(exaHandle h,Mesh *mesh_,char *fileName){
   exaMalloc(1,mesh_);
   Mesh mesh=*mesh_;
 
-  readCo2Header(h,mesh,file);
-  exaDebug(h,"ndim,nvertex,nneighbors,nelgt,nelt:%d %d %d %d "
-      "%d\n",mesh->nDim,mesh->nVertex,mesh->nNeighbors,\
-      mesh->nelgt,mesh->nelt);
-
-  readCo2Coordinates(h,mesh,file);
-  readCo2Boundaries(h,mesh,file);
+  readRe2Header(h,mesh,file);
+  readRe2Coordinates(h,mesh,file);
+  readRe2Boundaries(h,mesh,file);
   transferBoundaryFaces(h,mesh);
 
   err=MPI_File_close(&file);
@@ -289,6 +292,8 @@ int genConWriteCo2File(exaHandle h,Mesh mesh,char *fileName){
   if(rank==0){
     sprintf(buf0,"%5s%12d%12d%12d",version,(int)nelgt,\
         (int)nelgv,nVertex);
+    exaDebug(h,"%5s%12d%12d%12d",version,(int)nelgt,\
+        (int)nelgv,nVertex);
     memset(buf0+strlen(buf0),' ',GC_CO2_HEADER_LEN-strlen(buf0));
     buf0[GC_CO2_HEADER_LEN]='\0';
     buf0+=GC_CO2_HEADER_LEN;
@@ -300,11 +305,14 @@ int genConWriteCo2File(exaHandle h,Mesh mesh,char *fileName){
   for(i=0;i<nelt;i++){
     temp=ptr->elementId+1;
     writeInt(buf0,temp); buf0+=sizeof(int);
+    exaDebug(h,"%lld",temp);
     for(k=0;k<nVertex;k++){
       temp=ptr->globalId+1;
       writeInt(buf0,temp); buf0+=sizeof(int);
+      exaDebug(h," %lld",temp);
       ptr++;
     }
+    exaDebug(h,"\n");
   }
 
   err=MPI_File_write_ordered(file,buf,writeSize,MPI_BYTE,&st);

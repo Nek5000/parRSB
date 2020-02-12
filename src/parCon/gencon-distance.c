@@ -12,23 +12,25 @@ int NEIGHBOR_MAP[GC_MAX_VERTICES][GC_MAX_NEIGHBORS]={
 };
 
 int findMinNeighborDistance(exaHandle h,Mesh mesh){
-  Element p=exaArrayGetPointer(mesh->elements),e;
-  e=p+mesh->nelt;
+  Point p=exaArrayGetPointer(mesh->elements),e;
+  e=p+mesh->nVertex*mesh->nelt;
 
   int nDim=mesh->nDim;
   int nVertex=mesh->nVertex;
-  int nNeighbors=mesh->nNeighbors;
 
+  exaInt i;
   int j,k,neighbor;
   exaScalar d;
-  for(; p!=e; p++){
-    for(j=0; j<nVertex; j++){
-      p->vertex[j].dx=exaScalarMAX;
-      for(k=0; k<nNeighbors; k++){
+  for(i=0;i<exaArrayGetSize(mesh->elements);i+=nVertex){
+    for(j=0;j<nVertex;j++){
+      p[i+j].dx=exaScalarMAX;
+      for(k=0;k<mesh->nNeighbors;k++){
         neighbor=NEIGHBOR_MAP[j][k];
-        if(nDim==3) d=distance3D(p->vertex[j],p->vertex[neighbor]);
-        else d=distance2D(p->vertex[j],p->vertex[neighbor]);
-        p->vertex[j].dx=min(p->vertex[j].dx,d);
+        if(nDim==3)
+          d=distance3D(p[i+j],p[i+neighbor]);
+        else
+          d=distance2D(p[i+j],p[i+neighbor]);
+        p[i+j].dx=min(p[i+j].dx,d);
       }
     }
   }
