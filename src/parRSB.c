@@ -155,10 +155,9 @@ int parRSB_findConnectivity(double *coord,int nel,int nDim,
   exaInit(&h,comm,"/host");
 
   Mesh mesh; exaMalloc(1,&mesh);
-
-  assert(nDim==2 || nDim==3);
+  assert(nDim==2||nDim==3);
   mesh->nDim=nDim;
-  mesh->nVertex=(nDim==2)?4:8;
+  int nVertex=mesh->nVertex=(nDim==2)?4:8;
   mesh->nNeighbors=nDim;
   mesh->nelt=nel;
 
@@ -169,37 +168,30 @@ int parRSB_findConnectivity(double *coord,int nel,int nDim,
   exaLong start=out[0][0];
   mesh->nelgt=mesh->nelgv=out[1][0];
 
-  /* initialize array */
-  exaArrayInit(&(mesh->elements),struct Point_private,\
-    mesh->nelt*mesh->nVertex);
+  exaArrayInit(&mesh->elements,struct Point_private,nel*nVertex);
   Point ptr=exaArrayGetPointer(mesh->elements);
 
   int rank=exaRank(h);
-  int i,j,cnt=0;
-  for(i=0;i<mesh->nelt;i++){
-    for(j=0;j<mesh->nVertex;j++){
-      ptr->x[0]=coord[cnt++];
-      ptr->x[1]=coord[cnt++];
-      ptr->x[2]=coord[cnt++];
+  int i,j,k,cnt=0;
+  for(i=0;i<nel;i++)
+    for(j=0;j<nVertex;j++,ptr++){
+      k=PRE_TO_SYM_VERTEX[j];
+      ptr->x[0]=coord[cnt++],ptr->x[1]=coord[cnt++];
+      if(nDim==3) ptr->x[2]=coord[cnt++];
       ptr->elementId=vertexId[i];
-      ptr->sequenceId=mesh->nVertex*(start+i)+j;
+      ptr->sequenceId=nVertex*(start+i)+k;
       ptr->origin=rank;
-      ptr++;
     }
-  }
 
   exaArrayInit(&mesh->boundary,struct Boundary_private,0);
   BoundaryFace bc; exaMalloc(1,&bc);
 
   cnt=0;
   for(i=0;i<nPeriodicFaces;i++){
-    //TODO: Fix this and simplify internal parCon logic
-    // we only need to represent periodic faces
-    //TODO: Is faceId in symmetric or pre-processor order?
     bc->elementId=periodicInfo[cnt++]-1;
-    bc->faceId   =periodicInfo[cnt++]-1;
+    bc->faceId=PRE_TO_SYM_FACE[periodicInfo[cnt++]-1];
     bc->bc[0]=periodicInfo[cnt++]-1;
-    bc->bc[1]=periodicInfo[cnt++]-1;
+    bc->bc[1]=PRE_TO_SYM_FACE[periodicInfo[cnt++]-1];
     exaArrayAppend(mesh->boundary,bc);
   }
 
@@ -213,13 +205,8 @@ int parRSB_findConnectivity(double *coord,int nel,int nDim,
 
   ptr=exaArrayGetPointer(mesh->elements);
 
-  cnt=0;
-  for(i=0;i<mesh->nelt;i++){
-    for(j=0;j<mesh->nVertex;j++){
-      vertexId[cnt++]=ptr->globalId+1;
-      ptr++;
-    }
-  }
+  for(i=0;i<nel*nVertex;i++,ptr++)
+    vertexId[i]=ptr->globalId+1;
 
   freeMesh(mesh);
   exaFinalize(h);
