@@ -29,8 +29,8 @@ PARRSBSRC=$(wildcard $(SRCDIR)/*.c)
 SRCOBJS =$(patsubst $(SRCDIR)/%.c,$(BUILDDIR)/%.o,$(PARRSBSRC))
 
 PARCONSRC=$(wildcard $(SRCDIR)/parCon/*.c)
-SRCOBJS +=$(patsubst $(SRCDIR)/parCon/%.c,$(BUILDDIR)/parCon/%.o,\
-  $(PARCONSRC))
+SRCOBJS +=$(patsubst $(SRCDIR)/parCon/%.c,\
+  $(BUILDDIR)/parCon/%.o,$(PARCONSRC))
 
 EXAMPLESRC=$(EXAMPLEDIR)/parRSB.c $(EXAMPLEDIR)/parCon.c
 EXAMPLEOBJ=$(patsubst $(EXAMPLEDIR)/%.c,$(BUILDDIR)/examples/%,\

@@ -11,7 +11,7 @@ fi
 
 set -x
 cd exaCore
-make -j4 GSDIR=${GSDIR} OCCA=0 PREFIX=build install
+make -j4 GS_DIR=${GSDIR} OCCA=0 PREFIX=build install
 
 cd ../exaSort
 make -j4 EXADIR=../exaCore/build PREFIX=build install

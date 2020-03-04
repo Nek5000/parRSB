@@ -16,7 +16,6 @@ addons:
 before_install:
   - test -n $CC && unset CC
   - test -n $CXX && unset CXX
-    # Install gslib
   - sh ./.travis.get_gslib.sh
   - export GSLIBPATH=`pwd`/gslib
 
