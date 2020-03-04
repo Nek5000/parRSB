@@ -5,7 +5,7 @@ CC ?= mpicc
 CFLAGS ?= -O2
 
 ### Dependencies
-GSDIR = $(GSLIBPATH)
+GS_DIR = $(GSLIBPATH)
 
 ### Meta info
 SRCROOT=${CURDIR}
@@ -18,10 +18,10 @@ EXADIR ?= $(BUILDDIR)/exaCore/build
 EXASORTDIR ?= $(BUILDDIR)/exaSort/build
 
 ### Flags
-INCFLAGS=-I$(SRCDIR) -I$(SRCDIR)/parCon -I$(GSDIR)/include\
+INCFLAGS=-I$(SRCDIR) -I$(SRCDIR)/parCon -I$(GS_DIR)/include\
   -I$(EXADIR)/include -I$(EXASORTDIR)/include
 
-LDFLAGS= -L$(GSDIR)/lib -lgs -lm
+LDFLAGS= -L$(GS_DIR)/lib -lgs -lm
 EXALDFLAGS= -L$(EXADIR)/lib -lexa
 EXASORTLDFLAGS= -L$(EXASORTDIR)/lib -lexaSort
 
@@ -56,7 +56,7 @@ ifneq ($(PAUL),0)
   PP += -DGENMAP_PAUL
 endif
 
-ifeq ($(GSDIR),)
+ifeq ($(GS_DIR),)
 	$(error Specify GSLIBPATH=<path to gslib>/build)
 endif
 
@@ -71,7 +71,7 @@ all: build-deps lib examples tests install
 .PHONY: build-deps
 build-deps:
 	@cp 3rd_party/exa.install $(BUILDDIR)/
-	@cd $(BUILDDIR) && GSDIR=$(GSDIR) ./exa.install
+	@cd $(BUILDDIR) && GS_DIR=$(GS_DIR) ./exa.install
 
 $(BUILDDIR)/%.o: $(SRCDIR)/%.c
 	$(CC) $(CFLAGS) $(PP) $(INCFLAGS) -c $< -o $@
