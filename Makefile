@@ -1,29 +1,30 @@
-### Build-time user configurations
+### Build-time user configurations ###
 DEBUG ?= 0
 PAUL ?= 1
 CC ?= mpicc
 CFLAGS ?= -O2
+BUILDDIR ?= $(CURDIR)/build
+DESTDIR ?=
 
-### Dependencies
+# Dependencies #
 GS_DIR = $(GSLIBPATH)
+EXA_DIR ?= $(BUILDDIR)/exaCore/build
+EXASORT_DIR ?= $(BUILDDIR)/exaSort/build
 
-### Meta info
-SRCROOT=${CURDIR}
+### Meta info ###
+SRCROOT=$(CURDIR)
 SRCDIR=$(SRCROOT)/src
 EXAMPLEDIR=$(SRCROOT)/examples
 TESTDIR=$(SRCROOT)/tests
 
-BUILDDIR ?=$(SRCROOT)/build
-EXADIR ?= $(BUILDDIR)/exaCore/build
-EXASORTDIR ?= $(BUILDDIR)/exaSort/build
-
-### Flags
+### Flags ###
 INCFLAGS=-I$(SRCDIR) -I$(SRCDIR)/parCon -I$(GS_DIR)/include\
-  -I$(EXADIR)/include -I$(EXASORTDIR)/include
+  -I$(EXA_DIR)/include -I$(EXASORT_DIR)/include
+LDFLAGS=-Wl,-rpath,$(GS_DIR) -L$(GS_DIR)/lib -lgs -lm
 
-LDFLAGS= -L$(GS_DIR)/lib -lgs -lm
-EXALDFLAGS= -L$(EXADIR)/lib -lexa
-EXASORTLDFLAGS= -L$(EXASORTDIR)/lib -lexaSort
+EXALDFLAGS=-Wl,-rpath,$(EXA_DIR) -L$(EXA_DIR)/lib -lexa
+EXASORTLDFLAGS=-Wl,-rpath,$(EXASORT_DIR)\
+  -L$(EXASORT_DIR)/lib -lexaSort
 
 PARRSBSRC=$(wildcard $(SRCDIR)/*.c)
 SRCOBJS =$(patsubst $(SRCDIR)/%.c,$(BUILDDIR)/%.o,$(PARRSBSRC))
@@ -35,8 +36,8 @@ SRCOBJS +=$(patsubst $(SRCDIR)/parCon/%.c,\
 EXAMPLESRC=$(EXAMPLEDIR)/parRSB.c $(EXAMPLEDIR)/parCon.c
 EXAMPLEOBJ=$(patsubst $(EXAMPLEDIR)/%.c,$(BUILDDIR)/examples/%,\
 	$(EXAMPLESRC))
-EXAMPLELDFLAGS=-L$(BUILDDIR) -lparRSB $(EXASORTLDFLAGS)\
-	$(EXALDFLAGS) $(LDFLAGS)
+EXAMPLELDFLAGS= -Wl,-rpath,$(BUILDDIR) -L$(BUILDDIR) -lparRSB\
+  $(EXASORTLDFLAGS) $(EXALDFLAGS) $(LDFLAGS)
 
 LIB=$(BUILDDIR)/libparRSB.so
 
@@ -102,9 +103,7 @@ $(BUILDDIR)/examples/%: $(EXAMPLEDIR)/%.c
 tests: examples
 	@cp -rf $(TESTDIR) $(BUILDDIR)/
 	@cd $(BUILDDIR)/tests && ./test.sh --get-deps
-	@cd $(BUILDDIR)/tests && EXADIR=$(EXADIR)\
-		EXASORTDIR=$(EXASORTDIR) BUILDDIR=$(BUILDDIR)\
-		./test.sh --run
+	@cd $(BUILDDIR)/tests && BUILDDIR=$(BUILDDIR) ./test.sh --run
 
 .PHONY: clean
 clean:

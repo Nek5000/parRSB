@@ -6,10 +6,6 @@ export VERBOSE=0
 export NEK_SOURCE_ROOT=`pwd`/Nek5000
 export PPLIST="PARRSB DPROCMAP"
 
-export LD_LIBRARY_PATH="${BUILDDIR}:${LD_LIBRARY_PATH}"
-export LD_LIBRARY_PATH="${EXADIR}/lib:${LD_LIBRARY_PATH}"
-export LD_LIBRARY_PATH="${EXASORTDIR}/lib:${LD_LIBRARY_PATH}"
-
 dir_resolve()
 {
   cd "$1" 2>/dev/null || return $?  # cd to desired directory;
