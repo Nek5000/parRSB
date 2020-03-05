@@ -5,8 +5,8 @@
 
 #include "parRSB.h"
 
-void fparRSB_partMesh(int *part, long long *vtx, int *nel, int *nve,
-                      int *options, int *comm, int *err)
+void fparRSB_partMesh(int *part,long long *vtx,int *nel,int *nve,
+  int *options,int *comm,int *err)
 {
   *err = 1;
 
@@ -145,6 +145,15 @@ int parRSB_partMesh(int *part, long long *vtx, int nel, int nve,\
   comm_free(&c);
 
   return 0;
+}
+
+void fparRSB_findConnectivity(double *coord,int *nel,int *nDim,
+  long long *periodicInfo,int *nPeriodicFaces,long long *vertexId,
+  double *tol,MPI_Fint *fcomm,int *err)
+{
+  MPI_Comm comm=MPI_Comm_f2c(*fcomm);
+  *err=parRSB_findConnectivity(coord,*nel,*nDim,periodicInfo,
+    *nPeriodicFaces,vertexId,*tol,comm);
 }
 
 int parRSB_findConnectivity(double *coord,int nel,int nDim,
