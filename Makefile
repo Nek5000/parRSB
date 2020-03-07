@@ -102,7 +102,6 @@ $(BUILDDIR)/examples/%: $(EXAMPLEDIR)/%.c
 .PHONY: tests
 tests: examples
 	@cp -rf $(TESTDIR) $(BUILDDIR)/
-	@cd $(BUILDDIR)/tests && ./test.sh --get-deps
 	@cd $(BUILDDIR)/tests && BUILDDIR=$(BUILDDIR) ./test.sh --run
 
 .PHONY: clean
