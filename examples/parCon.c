@@ -9,8 +9,8 @@ int main(int argc,char *argv[]){
   exaHandle h;
   exaInit(&h,MPI_COMM_WORLD,"/host");
 
-  if(argc!=2) {
-    if(exaRank(h)==0) printf("Usage: ./example foo.re2\n");
+  if(argc<2) {
+    if(exaRank(h)==0) printf("Usage: ./%s foo.re2 [tol]\n",argv[0]);
     exit(1);
   }
 
@@ -18,7 +18,11 @@ int main(int argc,char *argv[]){
   genConReadRe2File(h,&mesh,argv[1]);
 
   findMinNeighborDistance(h,mesh);
-  findSegments(h,mesh,1.e-2);
+
+  double tol=0.2;
+  if(argc==3) tol=atof(argv[2]);
+  findSegments(h,mesh,tol);
+
   setGlobalID(h,mesh);
   sendBack(h,mesh);
   matchPeriodicFaces(h,mesh);
