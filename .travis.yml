@@ -1,17 +1,44 @@
 language: c
-os: linux
 compiler: gcc
 
 cache:
   directories:
     - gslib
 
-addons:
-  apt:
-    packages:
-      - gfortran
-      - mpich
-      - libmpich-dev
+matrix:
+  include:
+    - os: linux
+      addons:
+        apt:
+          packages:
+            - gcc-4.8
+            - gfortran-4.8
+            - mpich
+            - libmpich-dev
+      env:
+        - MPICH_CC=gcc-4.8
+
+    - os: linux
+      addons:
+        apt:
+          packages:
+            - gcc-5
+            - gfortran-5
+            - mpich
+            - libmpich-dev
+      env:
+        - MPICH_CC=gcc-5
+
+    - os: linux
+      addons:
+        apt:
+          packages:
+            - gcc-6
+            - gfortran-6
+            - mpich
+            - libmpich-dev
+      env:
+        - MPICH_CC=gcc-6
 
 before_install:
   - test -n $CC && unset CC
