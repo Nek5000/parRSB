@@ -130,7 +130,6 @@ int readRe2Coordinates(exaHandle h,Mesh mesh,MPI_File file){
       ptr->x[0]=x[j],ptr->x[1]=y[j];
       if(nDim==3)
         ptr->x[2]=z[j];
-      exaDebug(h,"elem: %d (%lf,%lf)\n",i,ptr->x[0],ptr->x[1]);
       ptr->elementId =start+i;
       ptr->sequenceId=nVertex*(start+i)+k;
       ptr->origin    =rank;

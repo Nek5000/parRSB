@@ -5,9 +5,10 @@
 #include "exa-memory.h"
 #include "exasort.h"
 
-int mergeSegments(exaHandle h,Mesh mesh,int i,exaScalar tolSquared)
+int mergeSegments(exaHandle h,Mesh mesh,int i,
+  exaScalar tolSquared)
 {
-  exaComm c  =exaGetComm(h);
+  exaComm c=exaGetComm(h);
 
   Point points=exaArrayGetPointer(mesh->elements);
   exaInt nPoints=exaArrayGetSize(mesh->elements);
@@ -72,7 +73,7 @@ int findSegments(exaHandle h,Mesh mesh,exaScalar tol){
     exaScalar_t,offsetof(struct Point_private,x[0]),
     exaSortAlgoBinSort,0,exaGetComm(h));
 
-  Point   points=exaArrayGetPointer(mesh->elements);
+  Point points=exaArrayGetPointer(mesh->elements);
   exaInt nPoints=exaArrayGetSize(mesh->elements);
   exaInt i;
 
