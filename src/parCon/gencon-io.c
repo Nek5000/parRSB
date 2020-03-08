@@ -52,10 +52,10 @@ int readRe2Header(exaHandle h,Mesh mesh,MPI_File file){
     if(err) return 1;
   }
   MPI_Bcast(buf,GC_RE2_HEADER_LEN,MPI_BYTE,0,comm);
-  sscanf(buf,"%5s %d %d %d",version,&nelgt,&nDim,&nelgv);
   exaDebug(h,"header: %s\n",buf);
+  sscanf(buf,"%5s %d %d %d",version,&nelgt,&nDim,&nelgv);
 
-  int nVertex= (nDim==2)?4:8;
+  int nVertex=(nDim==2)?4:8;
   int nelt=nelgt/size,nrem=nelgt-nelt*size;
   nelt+=(rank<nrem ? 1: 0);
 
@@ -68,8 +68,8 @@ int readRe2Header(exaHandle h,Mesh mesh,MPI_File file){
   mesh->nelt=nelt;
 
   exaDebug(h,"ndim,nvertex,nneighbors,nelgt,nelt:%d %d %d %d "
-      "%d\n",mesh->nDim,mesh->nVertex,mesh->nNeighbors,\
-      mesh->nelgt,mesh->nelt);
+    "%d\n",mesh->nDim,mesh->nVertex,mesh->nNeighbors,\
+    mesh->nelgt,mesh->nelt);
 
   free(buf);
 
@@ -231,7 +231,9 @@ int genConReadRe2File(exaHandle h,Mesh *mesh_,char *fileName){
   int err=MPI_File_open(comm,fileName,MPI_MODE_RDONLY,\
     MPI_INFO_NULL,&file);
   if(err){
-    if(rank==0) printf("Error opening file: %s\n",fileName);
+    if(rank==0)
+      printf("%s:%d Error opening file: %s\n",
+        __FILE__,__LINE__,fileName);
     errs++;
     MPI_Abort(comm,911);
   }
@@ -273,7 +275,8 @@ int genConWriteCo2File(exaHandle h,Mesh mesh,char *fileName){
     MPI_MODE_CREATE|MPI_MODE_WRONLY,MPI_INFO_NULL,&file);
   if(err){
     if(rank==0)
-      printf("Error opening file: %s for writing.\n",fileName);
+      printf("%s:%d Error opening file: %s for writing.\n",
+        __FILE__,__LINE__,fileName);
     errs++;
     MPI_Abort(comm,911);
   }
