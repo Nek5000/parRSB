@@ -61,9 +61,9 @@ int compressPeriodicVertices(exaHandle h,Mesh mesh){
   for(i=0;i<nPoints;i++){
     eid=points[i].elementId;
     if(N==0) points[i].proc=eid/nelt;
-    else if(eid+1<=N) points[i].proc=ceil((eid+1.0)/(nelt+1.0))-1;
+    else if(eid+1<=N)
+      points[i].proc=ceil((eid+1.0)/(nelt+1.0))-1;
     else points[i].proc=ceil((eid+1.0-N)/nelt)-1+nrem;
-    exaDebug(h,"elem/proc: %lld/%d\n",eid+1,points[i].proc);
   }
 
   exaComm c=exaGetComm(h);
@@ -81,7 +81,7 @@ exaLong findMinBelowI(exaLong min,exaInt I,exaArray arr){
 }
 
 int renumberPeriodicVertices(exaHandle h,Mesh mesh,\
-    exaArray matched)
+  exaArray matched)
 {
   minPair ptr=exaArrayGetPointer(matched);
   exaInt size=exaArrayGetSize(matched);
@@ -92,8 +92,7 @@ int renumberPeriodicVertices(exaHandle h,Mesh mesh,\
   for(i=0;i<size;i++) ids[i]=ptr[i].orig;
 
   exaGS t;
-  //exaGSSetup(ids,size,exaGetComm(h),0,exaGetDebug(h)>0,&t);
-  exaGSSetup(ids,size,exaGetComm(h),0,0,&t);
+  exaGSSetup(ids,size,exaGetComm(h),0,exaGetDebug(h)>0,&t);
 
   exaBuffer buf; exaBufferCreate(&buf,1024);
   for(i=0;i<size;i++) ids[i]=ptr[i].min;
@@ -156,7 +155,7 @@ int renumberPeriodicVertices(exaHandle h,Mesh mesh,\
 }
 
 int findConnectedPeriodicPairs(exaHandle h,Mesh mesh,\
-    BoundaryFace f_,BoundaryFace g_,exaArray matched)
+  BoundaryFace f_,BoundaryFace g_,exaArray matched)
 {
   BoundaryFace f,g;
   exaMalloc(1,&f); exaMalloc(1,&g);
@@ -208,9 +207,9 @@ int findConnectedPeriodicPairs(exaHandle h,Mesh mesh,\
         g->faceId);
     exit(1);
   }
-  exaDebug(h,"Faces matched (elementId,faceId): "
-      "%lld %lld %lld %lld %lf\n",f->elementId,f->faceId,\
-      g->elementId,g->faceId,d2Min);
+  exaDebug(h,"Periodic face match (elementId,faceId): "\
+    "(%lld %lld) and (%lld %lld) %lf\n",\
+    f->elementId,f->faceId,g->elementId,g->faceId,d2Min);
 
   struct minPair_private m;
   for(i=0;i<nvf;i++){
@@ -221,11 +220,6 @@ int findConnectedPeriodicPairs(exaHandle h,Mesh mesh,\
     m.orig=max(f->face.vertex[i].globalId,\
         g->face.vertex[k].globalId);
     exaArrayAppend(matched,&m);
-    exaDebug(h,"faceId/globalId/sequenceId "
-      "%d/%lld/%lld %d/%lld/%lld\n",
-      i,f->face.vertex[i].globalId,f->face.vertex[i].sequenceId,\
-      k,g->face.vertex[k].globalId,g->face.vertex[k].sequenceId);
-    exaDebug(h,"globalId %lld replaced by %lld\n",m.orig,m.min);
   }
 
   exaFree(f); exaFree(g);
@@ -242,10 +236,6 @@ int findConnectedPeriodicFaces(exaHandle h,Mesh mesh,\
     for(j=i+1;j<bSize;j++)
       if(ptr[j].bc[0]==ptr[i].elementId &&\
           ptr[j].bc[1]==ptr[i].faceId){
-        exaDebug(h,"Matching (elementId,faceId): (%d %d)"
-           " (%d %d)\n",\
-          ptr[i].elementId,ptr[i].faceId,\
-          ptr[j].elementId,ptr[j].faceId);
         findConnectedPeriodicPairs(h,mesh,&ptr[i],&ptr[j],\
             matched);
       }
@@ -281,11 +271,6 @@ int gatherMatchingPeriodicFaces(exaHandle h,Mesh mesh){
 }
 
 int setPeriodicFaceCoordinates(exaHandle h,Mesh mesh){
-  BoundaryFace ptr=exaArrayGetPointer(mesh->boundary);
-  exaInt size=exaArrayGetSize(mesh->boundary);
-
-  exaComm c=exaGetComm(h);
-
   /* Need boundary array to be sorted by elementId */
   exaSortArray(mesh->boundary,exaLong_t,\
       offsetof(struct Boundary_private,elementId));

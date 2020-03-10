@@ -86,6 +86,7 @@ int findSegments(exaHandle h,Mesh mesh,exaScalar tol){
   in[0]=nPoints;
   exaCommScan(exaGetComm(h),out,in,buff,1,exaLong_t,exaAddOp);
   exaLong start=out[0][0];
+  exaLong nGlobalPoints=out[1][0];
 
   for(i=0;i<nPoints;i++) points[i].globalId=start+i;
 
@@ -95,19 +96,31 @@ int findSegments(exaHandle h,Mesh mesh,exaScalar tol){
 
   points=exaArrayGetPointer(mesh->elements);
   nPoints=exaArrayGetSize(mesh->elements);
-  exaDebug(h,"rank=%d load=%d\n",rank,nPoints);
 
-  for(i=0;i<nPoints;i++) points[i].ifSegment=0,points[i].proc=rank;
+  for(i=0;i<nPoints;i++)
+    points[i].ifSegment=0,points[i].proc=rank;
 
-  findLocalSegments(mesh,0,tolSquared);
-  mergeSegments  (h,mesh,0,tolSquared);
+  int ipass,dim;
+  for(ipass=0; ipass<nDim; ipass++){
+    for(dim=0;dim<nDim;dim++){
+      if(exaGetDebug(h)>0){
+        exaInt count=0;
+        for(i=0;i<nPoints;i++)
+          if(points[i].ifSegment>0)
+            count++;
 
-  int ipass;
-  for(ipass=0; ipass<nDim; ipass++)
-    for(i=0;i<nDim;i++){
-      findLocalSegments(mesh,i,tolSquared);
-      mergeSegments  (h,mesh,i,tolSquared);
+        exaLong in[1];
+        in[0]=count;
+        exaCommGop(exaGetComm(h),in,1,exaLong_t,exaAddOp);
+        if(exaRank(h)==0)
+          printf("locglob: %d %lld %lld\n",dim+1,in[0]+1,\
+            nGlobalPoints);
+      }
+
+      findLocalSegments(mesh,dim,tolSquared);
+      mergeSegments  (h,mesh,dim,tolSquared);
     }
+  }
 
   return 0;
 }

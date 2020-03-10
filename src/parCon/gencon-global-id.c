@@ -21,13 +21,6 @@ int setGlobalID(exaHandle h,Mesh mesh){
     for(i=0;i<nPoints;i++)
       if(points[i].ifSegment) count++;
 
-    //for(int i=0;i<size;i++){
-    //  exaCommBarrier(nonZeroRanks);
-    //  if(i==rank)
-    //    for(int j=0;j<nPoints;j++)
-    //      printf("rank=%d segment[%02d]=%d\n",i,j,points[j].ifSegment);
-    //}
-
     exaLong out[2][1],buff[2][1],in[1];
     in[0]=count+!rank;
     exaCommScan(nonZeroRanks,out,in,buff,1,exaLong_t,exaAddOp);
@@ -52,6 +45,8 @@ int sendBack(exaHandle h,Mesh mesh){
   exaInt size=exaCommSize(c);
 
   exaInt nPoints=exaArrayGetSize(mesh->elements);
-  exaArrayTransfer(mesh->elements,offsetof(struct Point_private,origin),1,c);
-  exaSortArray(mesh->elements,exaLong_t,offsetof(struct Point_private,sequenceId));
+  exaArrayTransfer(mesh->elements,offsetof(struct Point_private,
+    origin),1,c);
+  exaSortArray(mesh->elements,exaLong_t,
+    offsetof(struct Point_private,sequenceId));
 }
