@@ -50,7 +50,7 @@ function run_test(){
   # Set number of processors for the test
   if [ $# -gt 1 ]; then np=$2;
   else np=${i:(-3)}; fi
-  if [ ${np} -gt 8 ]; then np=7; fi
+  if [ ${np} -gt 7 ]; then np=7; fi
 
   cd ${test}
 
@@ -72,17 +72,20 @@ function run_test(){
   fi
 
   # run parCon to generate the .co2 file
-  mpirun -np ${np} ./parCon ./${test}.re2 >out 2>err
-  mv ${test}.co2 parCon.co2
-
   hash1=(`md5sum gencon.co2`)
-  hash2=(`md5sum parCon.co2`)
+  for ((n=1; n<=${np}; n++)); do
+    rm parCon.co2 2>/dev/null
+    mpirun -np ${n} ./parCon ./${test}.re2 >out 2>err
+    mv ${test}.co2 parCon.co2
 
-  if [ "${hash1}" = "${hash2}" ]; then
-    print_test_success "${test}"
-  else
-    print_test_err "${test}"
-  fi
+    hash2=(`md5sum parCon.co2`)
+
+    if [ "${hash1}" = "${hash2}" ]; then
+      print_test_success "${test}/np=${n}"
+    else
+      print_test_err "${test}/np=${n}"
+    fi
+  done
 
   cd - 2>&1 > /dev/null
 }
