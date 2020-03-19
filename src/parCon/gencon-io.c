@@ -67,9 +67,11 @@ int readRe2Header(exaHandle h,Mesh mesh,MPI_File file){
   mesh->nelgv=nelgv;
   mesh->nelt=nelt;
 
-  exaDebug(h,"ndim,nvertex,nneighbors,nelgt,nelt:%d %d %d %d "
-    "%d\n",mesh->nDim,mesh->nVertex,mesh->nNeighbors,\
-    mesh->nelgt,mesh->nelt);
+  if(rank==0){
+    exaDebug(h,"ndim,nvertex,nneighbors,nelgt,nelt:%d %d %d %d "
+      "%d\n",mesh->nDim,mesh->nVertex,mesh->nNeighbors,\
+      mesh->nelgt,mesh->nelt);
+  }
 
   free(buf);
 
