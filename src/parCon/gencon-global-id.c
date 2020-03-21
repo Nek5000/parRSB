@@ -13,7 +13,7 @@ int setGlobalID(exaHandle h,Mesh mesh){
   if(nPoints==0) bin=0;
   exaComm nonZeroRanks;
   exaCommDup(&nonZeroRanks,c);
-  exaCommSplit(&nonZeroRanks,bin);
+  exaCommSplit(&nonZeroRanks,bin,rank);
 
   if(bin==1){
     exaLong count=0;
