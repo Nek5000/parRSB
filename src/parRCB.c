@@ -57,7 +57,7 @@ int parRCB_partMesh(int *part,double *vtx,int nel,int ndim,
   exaArrayTransfer(eList,offsetof(elm_rcb,proc),1,exaGetComm(h));
   exaSortArray(eList,exaLong_t,offsetof(elm_rcb,id));
 
-  exaComm commRcb;
+  exaComm commRcb; exaCommDup(&commRcb,exaGetComm(h));
   nel=exaArrayGetSize(eList);
   exaCommSplit(&commRcb,nel>0,rank);
 
@@ -67,7 +67,7 @@ int parRCB_partMesh(int *part,double *vtx,int nel,int ndim,
     if(exaRank(h)==0)
       exaDebug(h,"\nfinished in %lfs\n",comm_time()-time0);
 
-    parRCB(h,eList);
+    parRCB(commRcb,eList,ndim);
 
     fflush(stdout);
   }
