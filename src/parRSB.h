@@ -17,8 +17,8 @@ typedef struct {
 #define MAXDIM 3
 typedef struct {
   int proc;
+  int orig;
   long long id;
-  int part;
   double coord[MAXDIM];
 } elm_rcb;
 

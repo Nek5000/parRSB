@@ -1,6 +1,8 @@
 #ifndef _GENMAP_H_
 #define _GENMAP_H_
 
+#include "exa-impl.h"
+
 #include "genmap-types.h"
 #include "genmap-gslib.h"
 #include <mpi.h>
@@ -124,4 +126,9 @@ void GenmapRSB(GenmapHandle h);
 
 double GenmapGetMaxRss();
 void GenmapPrintStack();
+//
+// parRCB
+//
+int parRCB(exaHandle h,exaArray eList);
+
 #endif

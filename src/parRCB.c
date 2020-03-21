@@ -4,6 +4,7 @@
 #include <time.h>
 
 #include "exa-impl.h"
+#include "exasort.h"
 #include "parRSB.h"
 
 void fparRCB_partMesh(int *part,double *vtx,int *nel,int *ndim,
