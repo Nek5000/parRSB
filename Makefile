@@ -33,7 +33,8 @@ PARCONSRC=$(wildcard $(SRCDIR)/parCon/*.c)
 SRCOBJS +=$(patsubst $(SRCDIR)/parCon/%.c,\
   $(BUILDDIR)/parCon/%.o,$(PARCONSRC))
 
-EXAMPLESRC=$(EXAMPLEDIR)/parRSB.c $(EXAMPLEDIR)/parCon.c
+EXAMPLESRC=$(EXAMPLEDIR)/parRSB.c $(EXAMPLEDIR)/parCon.c\
+  $(EXAMPLEDIR)/parRCB.c
 EXAMPLEOBJ=$(patsubst $(EXAMPLEDIR)/%.c,$(BUILDDIR)/examples/%,\
 	$(EXAMPLESRC))
 EXAMPLELDFLAGS= -Wl,-rpath,$(BUILDDIR) -L$(BUILDDIR) -lparRSB\

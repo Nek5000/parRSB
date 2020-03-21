@@ -45,6 +45,8 @@ int parRCB(exaComm comm,exaArray eList,int ndim){
     int axis=0,d;
     for(d=1;d<ndim;d++)
       if(length[2*axis]<length[2*d]) axis=d;
+    printf("size: %d x: %lf %f,y: %lf %lf,axis=",
+      size,length[0],length[1],length[2],length[3],axis);
 
     int nel=exaArrayGetSize(eList);
     elm_rcb *elems=exaArrayGetPointer(eList);
@@ -59,6 +61,9 @@ int parRCB(exaComm comm,exaArray eList,int ndim){
     exaCommScan(comm,out,in,buf,2,exaLong_t,exaAddOp);
     exaLong lowStart=out[0][0],nGlobalLow=out[1][0];
     exaLong highStart=out[0][1],nGlobalHigh=out[1][1];
+
+    printf("low=%d lowStarrt=%d high=%d highStart=%d\n",
+      low,lowStart,high,highStart);
 
     switch(axis){
       case 0:
