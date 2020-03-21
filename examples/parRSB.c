@@ -23,7 +23,7 @@ int main(int argc, char *argv[]) {
   struct comm comm;
   struct crystal cr;
   struct array eList;
-  elm_data *data;
+  elm_rsb *data;
 
   int ierr;
   int e, n, nel, nv;
@@ -65,7 +65,7 @@ int main(int argc, char *argv[]) {
   CHECK_ERR(ierr);
 
   /* redistribute data */
-  array_init(elm_data, &eList, nel), eList.n = nel;
+  array_init(elm_rsb, &eList, nel), eList.n = nel;
   for(data = eList.ptr, e = 0; e < nel; ++e) {
     data[e].proc = part[e];
     data[e].id   = con.el[e];
@@ -77,7 +77,7 @@ int main(int argc, char *argv[]) {
   conFree(&con);
 
   crystal_init(&cr, &comm);
-  sarray_transfer(elm_data, &eList, proc, 0, &cr);
+  sarray_transfer(elm_rsb, &eList, proc, 0, &cr);
   crystal_free(&cr);
   nel = eList.n;
 

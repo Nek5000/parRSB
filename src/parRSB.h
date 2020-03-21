@@ -12,7 +12,7 @@ typedef struct {
   long long id;
   int part;
   long long vtx[MAXNV];
-} elm_data;
+} elm_rsb;
 
 #define MAXDIM 3
 typedef struct {

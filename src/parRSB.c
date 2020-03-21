@@ -34,9 +34,9 @@ int parRSB_partMesh(int *part, long long *vtx, int nel, int nve,\
   nelg_start-=nel;
 
   struct array eList;
-  elm_data *data;
+  elm_rsb *data;
 
-  array_init(elm_data,&eList,nel), eList.n=nel;
+  array_init(elm_rsb,&eList,nel), eList.n=nel;
   int e, n;
   for(data=eList.ptr,e=0; e<nel; ++e) {
     data[e].id=nelg_start+(e+1);
@@ -54,11 +54,11 @@ int parRSB_partMesh(int *part, long long *vtx, int nel, int nve,\
   struct crystal cr; crystal_init(&cr,&c);
   buffer buf; buffer_init(&buf, 1024);
 
-  sarray_transfer(elm_data,&eList,proc,1,&cr);
+  sarray_transfer(elm_rsb,&eList,proc,1,&cr);
   data=eList.ptr;
   nel =eList.n;
 
-  sarray_sort(elm_data,data,(unsigned int)nel,id,TYPE_LONG,&buf);
+  sarray_sort(elm_rsb,data,(unsigned int)nel,id,TYPE_LONG,&buf);
 
   MPI_Comm commRSB;
   MPI_Comm_split(comm, nel>0, rank, &commRSB);
@@ -112,8 +112,8 @@ int parRSB_partMesh(int *part, long long *vtx, int nel, int nve,\
     assert(GenmapGetNLocalElements(h) == nel);
 
     e = GenmapGetElements(h);
-    sarray_sort(struct GenmapElement_private, e, (unsigned int)nel,\
-      globalId, TYPE_LONG, &buf);
+    sarray_sort(struct GenmapElement_private,e,(unsigned int)nel,\
+      globalId,TYPE_LONG,&buf);
 
     for(i = 0; i < nel; i++) {
       data[i].part = e[i].proc;
@@ -129,10 +129,10 @@ int parRSB_partMesh(int *part, long long *vtx, int nel, int nve,\
   MPI_Comm_free(&commRSB);
 
   /* restore original input */
-  sarray_transfer(elm_data,&eList,proc,0,&cr);
+  sarray_transfer(elm_rsb,&eList,proc,0,&cr);
   data=eList.ptr;
   nel =eList.n;
-  sarray_sort(elm_data,data,(unsigned int)nel,id,TYPE_LONG,&buf);
+  sarray_sort(elm_rsb,data,(unsigned int)nel,id,TYPE_LONG,&buf);
   MPI_Barrier(comm);
 
   for(e = 0; e < nel; e++) {
