@@ -1,15 +1,15 @@
 /*
 Parition mesh using Nek5000's geometry (re2) file.
 */
-
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+
 #include <mpi.h>
 
 #include "exa-impl.h"
 #include "gencon-impl.h"
 
-#include "quality.h"
 #include "parRSB.h"
 
 #define CHECK_ERR(ierr) do{\
@@ -37,49 +37,96 @@ int main(int argc, char *argv[]) {
   MPI_Comm commRead;
   MPI_Comm_split(MPI_COMM_WORLD,color,id,&commRead);
 
-  exaHandle h;
-  exaInit(&h,commRead,"/host");
+  if(color==1){
+    exaHandle h;
+    exaInit(&h,commRead,"/host");
 
-  int ierr=0;
-  Mesh mesh;
-  if(color==1)
-    ierr=genConReadRe2File(h,&mesh,reaFile);
-  CHECK_ERR(ierr);
+    Mesh mesh;
+    int ierr=genConReadRe2File(h,&mesh,reaFile);
+    CHECK_ERR(ierr);
 
-  int nelt=mesh->nelt;
-  int ndim=mesh->nDim;
-  int nv  =mesh->nVertex;
+    int nelt=mesh->nelt;
+    int ndim=mesh->nDim;
+    int nv  =mesh->nVertex;
 
-  int *part;   exaMalloc(nelt,&part);
-  double *vtx; exaCalloc(nelt*ndim,&vtx);
+    int *part;   exaMalloc(nelt,&part);
+    double *vtx; exaCalloc(nelt*ndim,&vtx);
 
-  Point points=exaArrayGetPointer(mesh->elements);
-  int e,n,d;
-  for(e=0;e<nelt;e++)
-    for(n=0;n<nv;n++)
-      for(d=0;d<ndim;d++)
-        vtx[e*ndim+d]+=points[e*nv+n].x[d];
+    Point points=exaArrayGetPointer(mesh->elements);
+    assert(exaArrayGetSize(mesh->elements)==nelt*nv);
 
-  int options[3];
-  options[0] = 1; /* use custom options */
-  options[1] = 3; /* debug level        */
-  options[2] = 0; /* not used           */
+    int e,n,d;
+    for(e=0;e<nelt;e++){
+      for(n=0;n<nv;n++){
+        for(d=0;d<ndim;d++)
+          vtx[e*ndim+d]+=points[e*nv+n].x[d];
+      }
+      for(d=0;d<ndim;d++) vtx[e*ndim+d]/=nv;
+    }
 
-  ierr=parRCB_partMesh(part,vtx,nelt,ndim,options,commRead);
-  CHECK_ERR(ierr);
+    int options[3];
+    options[0] = 1; /* use custom options */
+    options[1] = 3; /* debug level        */
+    options[2] = 0; /* not used           */
 
-  /* redistribute data */
-  for(e=0;e<nelt;e++)
-    for(n=0;n<nv;n++)
-      points[e*nv+n].proc=part[e];
+    ierr=parRCB_partMesh(part,vtx,nelt,ndim,options,commRead);
+    CHECK_ERR(ierr);
 
-  exaArrayTransfer(mesh->elements,
-    offsetof(struct Point_private,proc),0,exaGetComm(h));
-  exaSortArray(mesh->elements,exaLong_t,
-    offsetof(struct Point_private,sequenceId));
+    /* redistribute data */
+    for(e=0;e<nelt;e++)
+      for(n=0;n<nv;n++)
+        points[e*nv+n].proc=part[e];
 
-  exaFree(vtx);
-  exaFree(part);
+    exaArrayTransfer(mesh->elements,
+      offsetof(struct Point_private,proc),0,exaGetComm(h));
+    exaSortArray(mesh->elements,exaLong_t,
+      offsetof(struct Point_private,sequenceId));
+
+    /* Write output */
+    nelt=exaArrayGetSize(mesh->elements);
+    points=exaArrayGetPointer(mesh->elements);
+
+    MPI_File file;
+    int err=MPI_File_open(commRead,"parrcb.part",\
+      MPI_MODE_CREATE|MPI_MODE_WRONLY,MPI_INFO_NULL,&file);
+
+    int writeSize=nelt*nv*(ndim*sizeof(double)+sizeof(int));
+
+    char header[BUFSIZ];
+    sprintf(header,"%lld %d %d %d %d",mesh->nelgt,ndim,nv,
+      sizeof(double),sizeof(int));
+    int rank; MPI_Comm_rank(commRead,&rank);
+    if(rank==0) writeSize+=strlen(header);
+
+    char *buf,*bufPtr; exaCalloc(writeSize,&buf),bufPtr=buf;
+
+    if(rank==0){
+      strcpy(bufPtr,header);
+      memset(bufPtr+strlen(header),' ',128-strlen(header));
+      bufPtr+=128;
+    }
+
+    for(e=0;e<nelt;e++)
+      for(n=0;n<nv;n++){
+        memcpy(bufPtr,points[e*nv+n].x,sizeof(double)*ndim);
+        bufPtr+=ndim*sizeof(double);
+      }
+
+    MPI_Status st;
+    err|=MPI_File_write_ordered(file,buf,writeSize,MPI_BYTE,&st);
+    err|=MPI_File_close(&file);
+
+    MPI_Barrier(commRead);
+
+    assert(err==0);
+
+    exaFree(buf);
+    exaFree(vtx);
+    exaFree(part);
+    exaFinalize(h);
+  }
+
+  MPI_Finalize();
 
   return 0;
 }
