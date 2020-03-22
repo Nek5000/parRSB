@@ -222,7 +222,7 @@ int readRe2Boundaries(exaHandle h,Mesh mesh,MPI_File file){
 
 int genConReadRe2File(exaHandle h,Mesh *mesh_,char *fileName){
   int nelt,nDim,nVertex;
-  int errs;
+  int errs=0;
 
   exaInt rank=exaRank(h);
   exaInt size=exaSize(h);
