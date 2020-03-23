@@ -72,7 +72,7 @@ int main(int argc, char *argv[]) {
     ierr=parRCB_partMesh(part,vtx,nelt,ndim,options,commRead);
     CHECK_ERR(ierr);
 
-    /* redistribute data */
+    /* Redistribute data */
     for(e=0;e<nelt;e++)
       for(n=0;n<nv;n++)
         points[e*nv+n].proc=part[e];
