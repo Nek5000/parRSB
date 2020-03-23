@@ -86,7 +86,10 @@ int parRCB(exaComm comm,exaArray eList,int ndim){
         break;
     }
 
-    int p=size*nGlobalLow/(nGlobalLow+nGlobalHigh);
+    int p=(size*nGlobalLow)/(nGlobalLow+nGlobalHigh);
+    int p1=(size*nGlobalHigh)/(nGlobalLow+nGlobalHigh);
+    if(p==0 && nGlobalLow!=0) p=size-p1;
+
     for(d=0;d<low;d++){
       elems[d].proc=(lowStart+d)*p/nGlobalLow;
     }
