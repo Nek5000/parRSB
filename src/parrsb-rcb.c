@@ -101,8 +101,6 @@ int parRCB(exaComm comm,exaArray eList,int ndim){
 
     exaFree(length);
 
-    parRCB(comm,eList,ndim);
-
     rank=exaCommRank(comm);
     size=exaCommSize(comm);
   }
