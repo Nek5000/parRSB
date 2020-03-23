@@ -52,7 +52,7 @@ int readRe2Header(exaHandle h,Mesh mesh,MPI_File file){
     if(err) return 1;
   }
   MPI_Bcast(buf,GC_RE2_HEADER_LEN,MPI_BYTE,0,comm);
-  exaDebug(h,"header: %s\n",buf);
+  if(rank==0) exaDebug(h,"header: %s\n",buf);
   sscanf(buf,"%5s %d %d %d",version,&nelgt,&nDim,&nelgv);
 
   int nVertex=(nDim==2)?4:8;

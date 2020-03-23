@@ -83,20 +83,20 @@ int main(int argc, char *argv[]) {
       offsetof(struct Point_private,sequenceId));
 
     /* Write output */
-    nelt=exaArrayGetSize(mesh->elements);
+    int nPoints=exaArrayGetSize(mesh->elements);
     points=exaArrayGetPointer(mesh->elements);
 
     MPI_File file;
-    int err=MPI_File_open(commRead,"parrcb.part",\
+    int err=MPI_File_open(commRead,"out.part",\
       MPI_MODE_CREATE|MPI_MODE_WRONLY,MPI_INFO_NULL,&file);
 
-    int writeSize=nelt*nv*(ndim*sizeof(double)+sizeof(int));
+    int writeSize=nPoints*(ndim*sizeof(double)+sizeof(int));
 
     char header[BUFSIZ];
-    sprintf(header,"%lld %d %d %d %d",mesh->nelgt,ndim,nv,
+    sprintf(header,"%lld %d %d %ld %ld",mesh->nelgt,ndim,nv,
       sizeof(double),sizeof(int));
     int rank; MPI_Comm_rank(commRead,&rank);
-    if(rank==0) writeSize+=strlen(header);
+    if(rank==0) writeSize+=128;
 
     char *buf,*bufPtr; exaCalloc(writeSize,&buf),bufPtr=buf;
 
@@ -106,11 +106,12 @@ int main(int argc, char *argv[]) {
       bufPtr+=128;
     }
 
-    for(e=0;e<nelt;e++)
-      for(n=0;n<nv;n++){
-        memcpy(bufPtr,points[e*nv+n].x,sizeof(double)*ndim);
-        bufPtr+=ndim*sizeof(double);
-      }
+    for(e=0;e<nPoints;e++){
+      memcpy(bufPtr,points[e].x,sizeof(double)*ndim);
+      bufPtr+=ndim*sizeof(double);
+      memcpy(bufPtr,&part[e/nv],sizeof(int));
+      bufPtr+=sizeof(int);
+    }
 
     MPI_Status st;
     err|=MPI_File_write_ordered(file,buf,writeSize,MPI_BYTE,&st);

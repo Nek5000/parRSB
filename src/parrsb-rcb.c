@@ -32,7 +32,6 @@ void getAxisLength(exaScalar **length,exaArray eList,exaComm comm,
   for(i=0;i<ndim;i++){
     (*length)[2*i+0]=max[i]-min[i];
     (*length)[2*i+1]=0.5*(max[i]+min[i]);
-    //printf("length:%lf %lf\n",length[2*i],length[2*i+1]);
   }
 }
 
@@ -48,8 +47,9 @@ int parRCB(exaComm comm,exaArray eList,int ndim){
     for(d=1;d<ndim;d++)
       if(length[2*axis]<length[2*d]) axis=d;
 
-    //printf("size: %d x: %lf %f,y: %lf %lf,axis=%d",
-    //  size,length[0],length[1],length[2],length[3],axis);
+    if(rank==0)
+      printf("size: %d x: %lf %f,y: %lf %lf,axis=%d\n",
+        size,length[0],length[1],length[2],length[3],axis);
 
     int nel=exaArrayGetSize(eList);
     elm_rcb *elems=exaArrayGetPointer(eList);
@@ -65,8 +65,9 @@ int parRCB(exaComm comm,exaArray eList,int ndim){
     exaLong lowStart=out[0][0],nGlobalLow=out[1][0];
     exaLong highStart=out[0][1],nGlobalHigh=out[1][1];
 
-    //printf("low=%d lowStarrt=%d high=%d highStart=%d\n",
-    //  low,lowStart,high,highStart);
+    printf("low=%d lowStart=%lld lowGlobal=%lld "
+      "high=%d highStart=%lld highGloval=%lld\n",
+      low,lowStart,nGlobalLow,high,highStart,nGlobalHigh);
 
     switch(axis){
       case 0:
@@ -95,6 +96,7 @@ int parRCB(exaComm comm,exaArray eList,int ndim){
     exaArrayTransfer(eList,offsetof(elm_rcb,proc),0,comm);
 
     int bin=(rank>=p);
+    printf("bin:%d rank=%d\n",bin,rank);
     exaCommSplit(&comm,bin,rank);
 
     exaFree(length);

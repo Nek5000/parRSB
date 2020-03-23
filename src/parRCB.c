@@ -31,7 +31,8 @@ int parRCB_partMesh(int *part,double *vtx,int nel,int ndim,
   exaAllReduce(h,&nelg,&nell,1,exaLong_t,exaAddOp);
   exaLong nstar=nelg/size;
   if(nstar==0) nstar=1;
-  //printf("nelg: %lld nell: %lld nstar: %lld\n",nelg,nell,nstar);
+  if(rank==0)
+    printf("nelg: %lld nell: %lld nstar: %lld\n",nelg,nell,nstar);
 
   exaLong nelg_start,buf0;
   exaScan(h,&nelg_start,&nell,&buf0,1,exaLong_t,exaAddOp);
@@ -64,8 +65,8 @@ int parRCB_partMesh(int *part,double *vtx,int nel,int ndim,
   if(nel>0){
     double time0 = comm_time();
     if(options!=NULL) exaSetDebug(h,options[0]);
-    //if(exaRank(h)==0)
-    //  exaDebug(h,"\nfinished in %lfs\n",comm_time()-time0);
+    if(exaRank(h)==0)
+      exaDebug(h,"\nfinished in %lfs\n",comm_time()-time0);
 
     parRCB(commRcb,eList,ndim);
 
