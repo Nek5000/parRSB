@@ -31,8 +31,6 @@ int parRCB_partMesh(int *part,double *vtx,int nel,int ndim,
   exaAllReduce(h,&nelg,&nell,1,exaLong_t,exaAddOp);
   exaLong nstar=nelg/size;
   if(nstar==0) nstar=1;
-  if(rank==0)
-    printf("nelg: %lld nell: %lld nstar: %lld\n",nelg,nell,nstar);
 
   exaLong nelg_start,buf0;
   exaScan(h,&nelg_start,&nell,&buf0,1,exaLong_t,exaAddOp);

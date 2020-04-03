@@ -106,7 +106,6 @@ int main(int argc, char *argv[]) {
       bufPtr+=128;
     }
 
-    printf("rank=%d nelt=%d",rank,nPoints/nv);
     for(e=0;e<nPoints;e++){
       memcpy(bufPtr,points[e].x,sizeof(double)*ndim);
       bufPtr+=ndim*sizeof(double);

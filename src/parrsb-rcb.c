@@ -27,12 +27,10 @@ void getAxisLength(exaScalar **length,exaArray eList,exaComm comm,
   exaCommGop(comm,min,3,exaScalar_t,exaMinOp);
   exaCommGop(comm,max,3,exaScalar_t,exaMaxOp);
 
-  exaMalloc(2*MAXDIM,length);
+  exaMalloc(MAXDIM,length);
 
-  for(i=0;i<ndim;i++){
-    (*length)[2*i+0]=max[i]-min[i];
-    (*length)[2*i+1]=0.5*(max[i]+min[i]);
-  }
+  for(i=0;i<ndim;i++)
+    (*length)[i+0]=max[i]-min[i];
 }
 
 int parRCB(exaComm comm,exaArray eList,int ndim){
@@ -45,61 +43,27 @@ int parRCB(exaComm comm,exaArray eList,int ndim){
 
     int axis=0,d;
     for(d=1;d<ndim;d++)
-      if(length[2*axis]<length[2*d]) axis=d;
-
-    if(rank==0)
-      printf("size: %d x: %lf %f,y: %lf %lf,axis=%d\n",
-        size,length[0],length[1],length[2],length[3],axis);
-
-    int nel=exaArrayGetSize(eList);
-    elm_rcb *elems=exaArrayGetPointer(eList);
-
-    exaInt low=0,high=0;
-    for(d=0;d<nel;d++)
-      if(elems[d].coord[axis]<length[2*axis+1]) low++;
-      else high++;
-
-    exaLong in[2],out[2][2],buf[2][2];
-    in[0]=low,in[1]=high;
-    exaCommScan(comm,out,in,buf,2,exaLong_t,exaAddOp);
-    exaLong lowStart=out[0][0],nGlobalLow=out[1][0];
-    exaLong highStart=out[0][1],nGlobalHigh=out[1][1];
-
-    printf("low=%d lowStart=%lld lowGlobal=%lld "
-      "high=%d highStart=%lld highGloval=%lld\n",
-      low,lowStart,nGlobalLow,high,highStart,nGlobalHigh);
+      if(length[axis]<length[d]) axis=d;
 
     switch(axis){
       case 0:
-        exaSortArray(eList,exaScalar_t,
-          offsetof(elm_rcb,coord[0]));
+        exaSort(eList,exaScalar_t,offsetof(elm_rcb,coord[0]),
+          exaSortAlgoHyperCubeSort,1,comm);
         break;
       case 1:
-        exaSortArray(eList,exaScalar_t,
-          offsetof(elm_rcb,coord[1]));
+        exaSort(eList,exaScalar_t,offsetof(elm_rcb,coord[1]),
+          exaSortAlgoHyperCubeSort,1,comm);
         break;
       case 2:
-        exaSortArray(eList,exaScalar_t,
-          offsetof(elm_rcb,coord[2]));
+        exaSort(eList,exaScalar_t,offsetof(elm_rcb,coord[2]),
+          exaSortAlgoHyperCubeSort,1,comm);
         break;
       default:
         break;
     }
 
-    int p=(size*nGlobalLow)/(nGlobalLow+nGlobalHigh);
-    int p1=(size*nGlobalHigh)/(nGlobalLow+nGlobalHigh);
-    if(p==0 && nGlobalLow!=0) p=size-p1;
-
-    for(d=0;d<low;d++){
-      elems[d].proc=(lowStart+d)*p/nGlobalLow;
-    }
-    for(d=0;d<high;d++){
-      elems[d+low].proc=p+(highStart+d)*(size-p)/nGlobalHigh;
-    }
-    exaArrayTransfer(eList,offsetof(elm_rcb,proc),0,comm);
-
+    int p=(size+1)/2;
     int bin=(rank>=p);
-    printf("bin:%d rank=%d\n",bin,rank);
     exaCommSplit(&comm,bin,rank);
 
     exaFree(length);
