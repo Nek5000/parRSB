@@ -30,7 +30,7 @@ void getAxisLength(exaScalar **length,exaArray eList,exaComm comm,
   exaMalloc(MAXDIM,length);
 
   for(i=0;i<ndim;i++)
-    (*length)[i+0]=max[i]-min[i];
+    (*length)[i]=max[i]-min[i];
 }
 
 int parRCB(exaComm comm,exaArray eList,int ndim){
@@ -41,22 +41,25 @@ int parRCB(exaComm comm,exaArray eList,int ndim){
     exaScalar *length=NULL;
     getAxisLength(&length,eList,comm,ndim);
 
-    int axis=0,d;
-    for(d=1;d<ndim;d++)
-      if(length[axis]<length[d]) axis=d;
+    int axis1=0,axis3=0,d;
+    for(d=1;d<ndim;d++){
+      if(length[axis1]<length[d]) axis1=d;
+      if(length[axis3]>length[d]) axis3=d;
+    }
+    int axis2=0+1+2-axis1-axis2;
 
-    switch(axis){
+    switch(axis1){
       case 0:
         exaSort(eList,exaScalar_t,offsetof(elm_rcb,coord[0]),
-          exaSortAlgoHyperCubeSort,1,comm);
+          exaSortAlgoBinSort,1,comm);
         break;
       case 1:
         exaSort(eList,exaScalar_t,offsetof(elm_rcb,coord[1]),
-          exaSortAlgoHyperCubeSort,1,comm);
+          exaSortAlgoBinSort,1,comm);
         break;
       case 2:
         exaSort(eList,exaScalar_t,offsetof(elm_rcb,coord[2]),
-          exaSortAlgoHyperCubeSort,1,comm);
+          exaSortAlgoBinSort,1,comm);
         break;
       default:
         break;

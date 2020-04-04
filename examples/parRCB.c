@@ -19,13 +19,13 @@ Parition mesh using Nek5000's geometry (re2) file.
   }\
 } while(0);
 
-int main(int argc, char *argv[]) {
-  MPI_Init(&argc, &argv);
+int main(int argc,char *argv[]){
+  MPI_Init(&argc,&argv);
 
   int id; MPI_Comm_rank(MPI_COMM_WORLD,&id);
   int color=0;
 
-  if (argc!=3){
+  if(argc!=3){
     if(id==0) printf("usage: ./example <#nread> <re2 file>\n");
     return EXIT_FAILURE;
   } 
