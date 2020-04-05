@@ -8,8 +8,8 @@ DESTDIR ?=
 
 # Dependencies #
 GS_DIR = $(GSLIBPATH)
-EXA_DIR ?= $(BUILDDIR)/exaCore/build
-EXASORT_DIR ?= $(BUILDDIR)/exaSort/build
+EXA_DIR ?= $(PREFIX)
+EXASORT_DIR ?= $(PREFIX)
 
 ### Meta info ###
 SRCROOT=$(CURDIR)
@@ -45,9 +45,9 @@ LIB=$(BUILDDIR)/libparRSB.so
 PP=
 
 ifneq (,$(strip $(DESTDIR)))
-  INSTALL_ROOT = $(DESTDIR)
+  PREFIX = $(DESTDIR)
 else
-  INSTALL_ROOT = build
+  PREFIX = build
 endif
 
 ifneq ($(DEBUG),0)
@@ -74,7 +74,7 @@ all: build-deps lib examples tests install
 build-deps:
 	@cp 3rd_party/exa.install $(BUILDDIR)/
 	@cd $(BUILDDIR) && GS_DIR=$(GS_DIR)\
-		PREFIX=$(INSTALL_ROOT) ./exa.install
+		PREFIX=$(PREFIX) ./exa.install
 
 $(BUILDDIR)/%.o: $(SRCDIR)/%.c
 	$(CC) $(CFLAGS) $(PP) $(INCFLAGS) -c $< -o $@
@@ -89,11 +89,11 @@ lib: build-deps $(SRCOBJS)
 
 .PHONY: install
 install: lib
-	@mkdir -p $(INSTALL_ROOT)/lib 2>/dev/null
-	@cp $(LIB) $(INSTALL_ROOT)/lib/ 2>/dev/null
-	@mkdir -p $(INSTALL_ROOT)/include 2>/dev/null
+	@mkdir -p $(PREFIX)/lib 2>/dev/null
+	@cp $(LIB) $(PREFIX)/lib/ 2>/dev/null
+	@mkdir -p $(PREFIX)/include 2>/dev/null
 	@cp $(SRCDIR)/*.h $(SRCDIR)/parCon/*.h \
-		$(INSTALL_ROOT)/include/ 2>/dev/null
+		$(PREFIX)/include/ 2>/dev/null
 
 .PHONY: examples
 examples: lib $(EXAMPLEOBJ)
