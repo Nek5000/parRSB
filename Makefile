@@ -45,9 +45,9 @@ LIB=$(BUILDDIR)/libparRSB.so
 PP=
 
 ifneq (,$(strip $(DESTDIR)))
-  PREFIX = $(DESTDIR)
+  PREFIX=$(realpath $(DESTDIR))
 else
-  PREFIX = build
+  PREFIX=$(realpath ./build)
 endif
 
 ifneq ($(DEBUG),0)
