@@ -22,8 +22,8 @@ INCFLAGS=-I$(SRCDIR) -I$(SRCDIR)/parCon -I$(GS_DIR)/include\
   -I$(EXA_DIR)/include -I$(EXASORT_DIR)/include
 LDFLAGS=-Wl,-rpath,$(GS_DIR) -L$(GS_DIR)/lib -lgs -lm
 
-EXALDFLAGS=-Wl,-rpath,$(EXA_DIR) -L$(EXA_DIR)/lib -lexa
-EXASORTLDFLAGS=-Wl,-rpath,$(EXASORT_DIR)\
+EXALDFLAGS=-Wl,-rpath,$(EXA_DIR)/lib -L$(EXA_DIR)/lib -lexa
+EXASORTLDFLAGS=-Wl,-rpath,$(EXASORT_DIR)/lib\
   -L$(EXASORT_DIR)/lib -lexaSort
 
 PARRSBSRC=$(wildcard $(SRCDIR)/*.c)
