@@ -46,24 +46,12 @@ int parRCB(exaComm comm,exaArray eList,int ndim){
       if(length[axis1]<length[d]) axis1=d;
       if(length[axis3]>length[d]) axis3=d;
     }
-    int axis2=0+1+2-axis1-axis2;
 
-    switch(axis1){
-      case 0:
-        exaSort(eList,exaScalar_t,offsetof(elm_rcb,coord[0]),
-          exaSortAlgoBinSort,1,comm);
-        break;
-      case 1:
-        exaSort(eList,exaScalar_t,offsetof(elm_rcb,coord[1]),
-          exaSortAlgoBinSort,1,comm);
-        break;
-      case 2:
-        exaSort(eList,exaScalar_t,offsetof(elm_rcb,coord[2]),
-          exaSortAlgoBinSort,1,comm);
-        break;
-      default:
-        break;
-    }
+    exaUInt offsets[3]={offsetof(elm_rcb,coord[0]),
+      offsetof(elm_rcb,coord[1]),offsetof(elm_rcb,coord[2])};
+
+    exaSort2(eList,exaScalar_t,offsets[axis1],exaScalar_t,
+      offsets[axis3],exaSortAlgoBinSort,1,comm);
 
     int p=(size+1)/2;
     int bin=(rank>=p);

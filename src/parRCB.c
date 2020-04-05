@@ -24,7 +24,7 @@ int parRCB_partMesh(int *part,double *vtx,int nel,int ndim,
   exaInit(&h,comm,"/host");
 
   int rank=exaRank(h),size=exaSize(h);
-  if(rank==0) printf("Size in parRCB: %d\n",size);
+  if(rank==0) exaDebug(h,"Size in parRCB: %d\n",size);
 
   /* load balance input data */
   exaLong nelg=0;
@@ -52,9 +52,6 @@ int parRCB_partMesh(int *part,double *vtx,int nel,int ndim,
   exaComm commRcb; exaCommDup(&commRcb,exaGetComm(h));
   nel=exaArrayGetSize(eList);
   exaCommSplit(&commRcb,nel>0,rank);
-
-  rank=exaCommRank(commRcb); size=exaCommSize(commRcb);
-  if(rank==0) printf("Size in parRCB comm: %d\n",size);
 
   if(nel>0){
     double time0 = comm_time();
