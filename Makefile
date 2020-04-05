@@ -73,7 +73,8 @@ all: build-deps lib examples tests install
 .PHONY: build-deps
 build-deps:
 	@cp 3rd_party/exa.install $(BUILDDIR)/
-	@cd $(BUILDDIR) && GS_DIR=$(GS_DIR) ./exa.install
+	@cd $(BUILDDIR) && GS_DIR=$(GS_DIR)\
+		PREFIX=$(INSTALL_ROOT) ./exa.install
 
 $(BUILDDIR)/%.o: $(SRCDIR)/%.c
 	$(CC) $(CFLAGS) $(PP) $(INCFLAGS) -c $< -o $@

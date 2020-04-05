@@ -33,7 +33,7 @@ int parRSB_partMesh(int *part, long long *vtx, int nel, int nve,
 
 #define fparRCB_partMesh\
   FORTRAN_UNPREFIXED(fparrcb_partmesh,FPARRCB_PARTMESH)
-void fparRCB_partMesh(int *part,double *vtx,int *nel, int *ndim,
+void fparRCB_partMesh(int *part,double *coords,int *nel, int *ndim,
   int *options,int *comm,int *err);
 
 int parRCB_partMesh(int *part,double *vtx,int nel,int ndim,
