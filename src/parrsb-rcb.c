@@ -37,6 +37,9 @@ int parRCB(exaComm comm,exaArray eList,int ndim){
   exaInt rank=exaCommRank(comm);
   exaInt size=exaCommSize(comm);
 
+  exaUInt offsets[3]={offsetof(elm_rcb,coord[0]),
+    offsetof(elm_rcb,coord[1]),offsetof(elm_rcb,coord[2])};
+
   while(size>1){
     exaScalar *length=NULL;
     getAxisLength(&length,eList,comm,ndim);
@@ -47,11 +50,10 @@ int parRCB(exaComm comm,exaArray eList,int ndim){
       if(length[axis3]>length[d]) axis3=d;
     }
 
-    exaUInt offsets[3]={offsetof(elm_rcb,coord[0]),
-      offsetof(elm_rcb,coord[1]),offsetof(elm_rcb,coord[2])};
-
-    exaSort2(eList,exaScalar_t,offsets[axis1],exaScalar_t,
-      offsets[axis3],exaSortAlgoBinSort,1,comm);
+    //exaSort2(eList,exaScalar_t,offsets[axis1],exaScalar_t,
+    //  offsets[axis3],exaSortAlgoBinSort,1,comm);
+    exaSort(eList,exaScalar_t,offsets[axis1],
+      exaSortAlgoHyperCubeSort,1,comm);
 
     int p=(size+1)/2;
     int bin=(rank>=p);
