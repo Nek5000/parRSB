@@ -7,17 +7,17 @@
 #include "exasort.h"
 #include "parRSB.h"
 
-void fparRCB_partMesh(int *part,double *vtx,int *nel,int *ndim,
+void fparRCB_partMesh(int *part,double *vtx,int *nel,int *nv,
   int *options,int *comm,int *err)
 {
   *err = 1;
 
   exaCommExternal c;
   c = MPI_Comm_f2c(*comm);
-  *err=parRCB_partMesh(part,vtx,*nel,*ndim,options,c);
+  *err=parRCB_partMesh(part,vtx,*nel,*nv,options,c);
 }
 
-int parRCB_partMesh(int *part,double *vtx,int nel,int ndim,
+int parRCB_partMesh(int *part,double *vtx,int nel,int nv,
   int *options,MPI_Comm comm)
 {
   exaHandle h;
@@ -36,6 +36,8 @@ int parRCB_partMesh(int *part,double *vtx,int nel,int ndim,
 
   exaArray eList; exaArrayInit(&eList,elm_rcb,nel);
   elm_rcb *data=exaArrayGetPointer(eList);
+
+  int ndim=(nv==8)?3:2;
 
   int e, n;
   for(e=0;e<nel;++e){

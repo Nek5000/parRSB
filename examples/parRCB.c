@@ -69,7 +69,7 @@ int main(int argc,char *argv[]){
     options[1] = 3; /* debug level        */
     options[2] = 0; /* not used           */
 
-    ierr=parRCB_partMesh(part,vtx,nelt,ndim,options,commRead);
+    ierr=parRCB_partMesh(part,vtx,nelt,nv,options,commRead);
     CHECK_ERR(ierr);
 
     /* Redistribute data */
