@@ -24,7 +24,6 @@ int parRCB_partMesh(int *part,double *vtx,int nel,int nv,
   exaInit(&h,comm,"/host");
 
   int rank=exaRank(h),size=exaSize(h);
-  if(rank==0) exaDebug(h,"Size in parRCB: %d\n",size);
 
   /* load balance input data */
   exaLong nelg=0;
@@ -60,7 +59,6 @@ int parRCB_partMesh(int *part,double *vtx,int nel,int nv,
 
     parRCB(commRcb,eList,ndim);
 
-    if(options!=NULL) exaSetDebug(h,options[0]);
     if(exaRank(h)==0)
       exaDebug(h,"\nfinished in %lfs\n",comm_time()-time0);
 
