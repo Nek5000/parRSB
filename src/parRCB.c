@@ -60,7 +60,7 @@ int parRCB_partMesh(int *part,double *vtx,int nel,int nv,
     parRCB(commRcb,eList,ndim);
 
     if(exaRank(h)==0)
-      exaDebug(h,"\nfinished in %lfs\n",comm_time()-time0);
+      printf("\nparRCB finished in %lfs\n",comm_time()-time0);
 
     fflush(stdout);
   }
