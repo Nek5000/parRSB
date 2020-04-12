@@ -53,7 +53,7 @@ int parRCB(exaComm comm,exaArray eList,int ndim){
     //exaSort2(eList,exaScalar_t,offsets[axis1],exaScalar_t,
     //  offsets[axis3],exaSortAlgoBinSort,1,comm);
     exaSort(eList,exaScalar_t,offsets[axis1],
-      exaSortAlgoHyperCubeSort,1,comm);
+      exaSortAlgoBinSort,1,comm);
 
     int p=(size+1)/2;
     int bin=(rank>=p);
