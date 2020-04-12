@@ -45,9 +45,9 @@ int parRCB_partMesh(int *part,double *vtx,int nel,int nv,
     for(int n=0;n<ndim;n++)
       data[e].coord[n]=vtx[e*ndim+n];
   }
+
   exaArraySetSize(eList,nel);
 
-  buffer buf; buffer_init(&buf,1024);
   exaLoadBalance(eList,exaGetComm(h));
 
   exaComm commRcb; exaCommDup(&commRcb,exaGetComm(h));
@@ -73,13 +73,13 @@ int parRCB_partMesh(int *part,double *vtx,int nel,int nv,
 
   data=exaArrayGetPointer(eList);
   nel=exaArrayGetSize(eList);
-  for(e=0;e<nel;e++) {
+
+  for(int e=0;e<nel;e++) {
     part[e]=data[e].orig;
   }
 
-  buffer_free(&buf);
-
   exaArrayFree(eList);
+
   exaFinalize(h);
 
   return 0;
