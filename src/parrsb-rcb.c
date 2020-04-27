@@ -33,7 +33,9 @@ void getAxisLength(exaScalar **length,exaArray eList,exaComm comm,
     (*length)[i]=max[i]-min[i];
 }
 
-int parRCB(exaComm comm,exaArray eList,int ndim){
+int parRCB(exaComm comm_,exaArray eList,int ndim){
+  exaComm comm,newComm;
+  exaCommDup(&comm,comm_);
   exaInt rank=exaCommRank(comm);
   exaInt size=exaCommSize(comm);
 
@@ -57,13 +59,19 @@ int parRCB(exaComm comm,exaArray eList,int ndim){
 
     int p=(size+1)/2;
     int bin=(rank>=p);
-    exaCommSplit(&comm,bin,rank);
+
+    exaCommSplit(comm,bin,rank,&newComm);
+    exaCommDestroy(comm);
+    exaCommDup(&comm,newComm);
+    exaDestroy(newComm);
 
     exaFree(length);
 
     rank=exaCommRank(comm);
     size=exaCommSize(comm);
   }
+
+  exaDestroy(comm);
 
   return 0;
 }

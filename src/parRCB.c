@@ -50,9 +50,9 @@ int parRCB_partMesh(int *part,double *vtx,int nel,int nv,
 
   exaLoadBalance(eList,exaGetComm(h));
 
-  exaComm commRcb; exaCommDup(&commRcb,exaGetComm(h));
   nel=exaArrayGetSize(eList);
-  exaCommSplit(&commRcb,nel>0,rank);
+  exaComm commRcb;
+  exaCommSplit(exaGetComm(h),nel>0,rank,&commRcb);
 
   if(nel>0){
     double time0 = comm_time();

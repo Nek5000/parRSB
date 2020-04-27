@@ -64,8 +64,7 @@ int mergeSegments(exaHandle h,Mesh mesh,int i,
   exaInt bin=1;
   if(nPoints==0) bin=0;
   exaComm nonZeroRanks;
-  exaCommDup(&nonZeroRanks,c);
-  exaCommSplit(&nonZeroRanks,bin,exaRank(h));
+  exaCommSplit(c,bin,exaRank(h),&nonZeroRanks);
   exaInt rank=exaCommRank(nonZeroRanks);
   exaInt size=exaCommSize(nonZeroRanks);
 
