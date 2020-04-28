@@ -161,29 +161,19 @@ void GenmapRSB(GenmapHandle h) {
   }
 
   if(GenmapCommRank(GenmapGetGlobalComm(h)) == 0 && h->dbgLevel > 0)
-    printf("running RSB "), fflush(stdout);
+    printf("running RSB ...\n"), fflush(stdout);
 
   crystal_init(&(h->cr), &(h->local->gsComm));
   buffer buf0 = null_buffer;
 
-  while(GenmapCommSize(GenmapGetLocalComm(h)) > 1) {
-    if(GenmapCommRank(GenmapGetGlobalComm(h)) == 0
-        && h->dbgLevel > 1) printf("."), fflush(stdout);
+  int level=0;
 
+  while(GenmapCommSize(GenmapGetLocalComm(h)) > 1) {
 #if defined(GENMAP_PAUL)
     int global = 1;
-/*
-    int global = (GenmapCommSize(GenmapGetLocalComm(h)) == GenmapCommSize(
-                  GenmapGetGlobalComm(h)));
-    GenmapElements e = GenmapGetElements(h);
-    GenmapScan(h, GenmapGetLocalComm(h));
-    for(i = 0; i < GenmapGetNLocalElements(h); i++) {
-      e[i].globalId0 = GenmapGetLocalStartIndex(h) + i + 1;
-    }
-*/
 #else
-    int global = (GenmapCommSize(GenmapGetLocalComm(h)) == GenmapCommSize(
-                    GenmapGetGlobalComm(h)));
+    int global=(GenmapCommSize(GenmapGetLocalComm(h))== \
+        GenmapCommSize(GenmapGetGlobalComm(h)));
 #endif
 
     int ipass = 0;
@@ -194,25 +184,13 @@ void GenmapRSB(GenmapHandle h) {
       global = 0;
     } while(ipass < npass && iter == maxIter);
 
+    if(GenmapCommRank(GenmapGetGlobalComm(h))==0 && h->dbgLevel>1){
+      printf("level %02d: %5d iterations\n",level,(ipass-1)*maxIter+iter);
+      fflush(stdout);
+    }
+
     GenmapBinSort(h, GENMAP_FIEDLER, &buf0);
-#if defined(GENMAP_DEBUG)
-    e = GenmapGetElements(h);
-    if(GenmapCommRank(GenmapGetGlobalComm(h)) == 0) {
-      for(int i = 0; i < GenmapGetNLocalElements(h); i++) {
-        printf("\nglobalId="GenmapLongFormat",Fiedler(%d):"GenmapScalarFormat,
-               e[i].globalId, i, e[i].fiedler);
-        fflush(stdout);
-      }
-    }
-    MPI_Barrier(GenmapGetGlobalComm(h)->gsComm.c);
-    if(GenmapCommRank(GenmapGetGlobalComm(h)) == 1) {
-      for(int i = 0; i < GenmapGetNLocalElements(h); i++) {
-        printf("\nglobalId="GenmapLongFormat",Fiedler(%d):"GenmapScalarFormat,
-               e[i].globalId, i, e[i].fiedler);
-        fflush(stdout);
-      }
-    }
-#endif
+
     int bin;
     GenmapInt np = GenmapCommSize(GenmapGetLocalComm(h));
     GenmapInt id = GenmapCommRank(GenmapGetLocalComm(h));
@@ -226,6 +204,7 @@ void GenmapRSB(GenmapHandle h) {
 #if defined(GENMAP_PAUL)
     GenmapBinSort(h, GENMAP_GLOBALID, &buf0);
 #endif
+    level++;
   }
 
   crystal_free(&(h->cr));
