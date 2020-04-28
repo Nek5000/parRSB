@@ -78,6 +78,7 @@ int parRCB_partMesh(int *part,double *vtx,int nel,int nv,
     part[e]=data[e].orig;
   }
 
+  exaCommDestroy(commRcb);
   exaArrayFree(eList);
 
   exaFinalize(h);
