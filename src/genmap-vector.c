@@ -161,54 +161,6 @@ GenmapScalar GenmapDotVector(GenmapVector y, GenmapVector x) {
   return result;
 }
 
-GenmapScalar GenmapAbsMaxVector(GenmapVector x) {
-  GenmapScalar result = 0.0;
-  GenmapInt i;
-  for(i = 0; i < x->size; i++) {
-    if(fabs(x->data[i]) > result) {
-      result = fabs(x->data[i]);
-    }
-  }
-
-  return result;
-}
-
-GenmapScalar GenmapMaxVector(GenmapVector x) {
-  GenmapScalar result = -DBL_MAX;
-  GenmapInt i;
-  for(i = 0; i < x->size; i++) {
-    if(x->data[i] > result) {
-      result = x->data[i];
-    }
-  }
-
-  return result;
-}
-
-GenmapScalar GenmapAbsMinVector(GenmapVector x) {
-  GenmapScalar result = DBL_MAX;
-  GenmapInt i;
-  for(i = 0; i < x->size; i++) {
-    if(fabs(x->data[i]) < result) {
-      result = fabs(x->data[i]);
-    }
-  }
-
-  return result;
-}
-
-GenmapScalar GenmapMinVector(GenmapVector x) {
-  GenmapScalar result = DBL_MAX;
-  GenmapInt i;
-  for(i = 0; i < x->size; i++) {
-    if(x->data[i] < result) {
-      result = x->data[i];
-    }
-  }
-
-  return result;
-}
-
 int GenmapAxpbyVector(GenmapVector z, GenmapVector x,
                       GenmapScalar alpha,
                       GenmapVector y, GenmapScalar beta) {
