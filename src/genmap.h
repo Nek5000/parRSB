@@ -121,7 +121,7 @@ int GenmapLanczos(GenmapHandle h, GenmapComm c, GenmapVector init,
                   GenmapInt iter, GenmapVector **q, GenmapVector alpha,
                   GenmapVector beta);
 
-int GenmapFiedler(GenmapHandle h, GenmapComm c, int maxIter, int global);
+int GenmapFiedlerLanczos(GenmapHandle h, GenmapComm c, int maxIter, int global);
 void GenmapRSB(GenmapHandle h);
 
 double GenmapGetMaxRss();

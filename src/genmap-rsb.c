@@ -5,7 +5,10 @@
 #include <time.h>
 #include <limits.h>
 
-int GenmapFiedler(GenmapHandle h, GenmapComm c, int maxIter, int global) {
+/* find the fiedler vector using Lanczos */
+int GenmapFiedlerLanczos(GenmapHandle h, GenmapComm c, int maxIter,
+                         int global)
+{
   GenmapInt lelt = GenmapGetNLocalElements(h);
   GenmapVector initVec, alphaVec, betaVec;
 
@@ -16,12 +19,6 @@ int GenmapFiedler(GenmapHandle h, GenmapComm c, int maxIter, int global) {
 #if defined(GENMAP_PAUL)
   if(global > 0) {
     for(i = 0;  i < lelt; i++) {
-/*
-      if(GenmapGetLocalStartIndex(h) + i + 1  < GenmapGetNGlobalElements(h) / 2)
-        initVec->data[i] = GenmapGetLocalStartIndex(h) + i + 1 + 1000. *
-                           GenmapGetNGlobalElements(h);
-      else
-*/
       initVec->data[i] = GenmapGetLocalStartIndex(h) + i + 1;
     }
   } else {
@@ -101,13 +98,11 @@ int GenmapFiedler(GenmapHandle h, GenmapComm c, int maxIter, int global) {
     }
   }
 #if defined(GENMAP_DEBUG)
-#if 0
   if(GenmapCommRank(GenmapGetGlobalComm(h)) == 0) {
     for(int i = 0; i < evLanczos->size; i++) {
       printf("evLanczos:"GenmapScalarFormat"\n", evLanczos->data[i]);
     }
   }
-#endif
 #endif
 
   GenmapScalar lNorm = 0;
@@ -156,7 +151,7 @@ void GenmapRSB(GenmapHandle h) {
   GenmapElements e = GenmapGetElements(h);
   GenmapScan(h, GenmapGetLocalComm(h));
   for(i = 0; i < GenmapGetNLocalElements(h); i++) {
-    e[i].globalId = GenmapGetLocalStartIndex(h) + i + 1;
+    e[i].globalId  = GenmapGetLocalStartIndex(h) + i + 1;
     e[i].globalId0 = GenmapGetLocalStartIndex(h) + i + 1;
   }
 
@@ -179,7 +174,8 @@ void GenmapRSB(GenmapHandle h) {
     int ipass = 0;
     int iter;
     do {
-      iter = GenmapFiedler(h, GenmapGetLocalComm(h), maxIter, global);
+      iter = GenmapFiedlerLanczos(h, GenmapGetLocalComm(h), maxIter,
+          global);
       ipass++;
       global = 0;
     } while(ipass < npass && iter == maxIter);
