@@ -190,12 +190,16 @@ void GenmapRSB(GenmapHandle h) {
         GenmapCommSize(GenmapGetGlobalComm(h)));
 #endif
 
+    GenmapVector initVec;
+    GenmapComm c=GenmapGetLocalComm(h);
     int ipass = 0;
     int iter;
     do {
-      iter = GenmapFiedler(h, GenmapGetLocalComm(h), maxIter, global);
+      GenmapGetInitVector(h,c,global,&initVec);
+      iter = GenmapFiedlerLanczos(h,c,initVec,maxIter,global);
       ipass++;
       global = 0;
+      GenmapDestroyVector(initVec);
     } while(ipass < npass && iter == maxIter);
 
     if(GenmapCommRank(GenmapGetGlobalComm(h))==0 && h->dbgLevel>1){
@@ -211,7 +215,7 @@ void GenmapRSB(GenmapHandle h) {
     if(id < (np + 1) / 2) bin = 0;
     else bin = 1;
 
-    GenmapComm c = GenmapGetLocalComm(h);
+    c = GenmapGetLocalComm(h);
     GenmapSplitComm(h, &c, bin);
     GenmapSetLocalComm(h, c);
 
