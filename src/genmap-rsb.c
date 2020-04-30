@@ -149,16 +149,26 @@ int GenmapFiedlerLanczos(GenmapHandle h, GenmapComm c,
 }
 
 int GenmapFiedlerPowerIter(GenmapHandle h,GenmapComm c,
-    GenmapVector initVec,int maxIter, int global)
+    GenmapVector u,int maxIter, int global)
 {
-  //return iter;
-}
+  GenmapVector v;
+  GenmapInt lelt=GenmapGetNLocalElements(h);
+  GenmapCreateZerosVector(&v,lelt);
 
-int GenmapFiedler(GenmapHandle h,GenmapComm c,int maxIter,int global){
-  GenmapVector initVec;
-  GenmapGetInitVector(h,c,global,&initVec);
-  int iter=GenmapFiedlerLanczos(h,c,initVec,maxIter,global);
-  GenmapDestroyVector(initVec);
+  GenmapScalar dot[2];
+  dot[0]=GenmapDotVector(v,u);
+  GenmapGop(c,&dot[0],1,GENMAP_SCALAR,GENMAP_SUM);
+
+  int iter=0;
+  while(dot[0]<(1-GENMAP_TOL) && iter<maxIter){
+    GenmapCopyVector(v,u);
+    // u=B_g*v
+    dot[0]=GenmapDotVector(v,u);
+    dot[1]=GenmapDotVector(u,u);
+    GenmapGop(c,dot,2,GENMAP_SCALAR,GENMAP_SUM);
+    iter++;
+  }
+
   return iter;
 }
 
