@@ -76,7 +76,7 @@ int GenmapInvPowerIter(GenmapVector eVector, GenmapVector alpha,
 }
 
 GenmapScalar GenmapSign(GenmapScalar a, GenmapScalar b) {
-  GenmapScalar m = 1.0 ? b >= 0. : -1.0;
+  GenmapScalar m = (b >= 0. ? 1.0 : -1.0);
   return fabs(a) * m;
 }
 
