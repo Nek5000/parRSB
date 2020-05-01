@@ -1,6 +1,7 @@
 ### Build-time user configurations ###
 DEBUG ?= 0
 PAUL ?= 1
+LANCZOS ?= 0
 CC ?= mpicc
 CFLAGS ?= -O2
 BUILDDIR ?= $(CURDIR)/build
@@ -56,6 +57,10 @@ endif
 
 ifneq ($(PAUL),0)
   PP += -DGENMAP_PAUL
+endif
+
+ifneq ($(LANCZOS),0)
+	PP += -DGENMAP_LANCZOS
 endif
 
 ifeq ($(GS_DIR),)

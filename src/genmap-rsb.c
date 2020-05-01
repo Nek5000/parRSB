@@ -155,27 +155,46 @@ int GenmapFiedlerPowerIter(GenmapHandle h,GenmapComm c,
   GenmapInt lelt=GenmapGetNLocalElements(h);
   GenmapCreateZerosVector(&v,lelt);
 
-  GenmapScalar dot[2];
-  dot[0]=GenmapDotVector(v,u);
-  GenmapGop(c,&dot[0],1,GENMAP_SCALAR,GENMAP_SUM);
-
   int iter=0;
-  while(dot[0]<(1-GENMAP_TOL) && iter<maxIter){
+  GenmapScalar dot;
+  dot=GenmapDotVector(v,u);
+  GenmapGop(c,&dot,1,GENMAP_SCALAR,GENMAP_SUM);
+
+  GenmapVector weights;
+  GenmapCreateVector(&weights,lelt);
+  GenmapInitLaplacian(h,c,weights);
+
+  while(fabs(dot-1)>1e-8 && iter<maxIter){
     GenmapCopyVector(v,u);
     // u=B_g*v
-    dot[0]=GenmapDotVector(v,u);
-    dot[1]=GenmapDotVector(u,u);
-    GenmapGop(c,dot,2,GENMAP_SCALAR,GENMAP_SUM);
+    GenmapLaplacian(h,c,v,weights,u);
+
+    dot=GenmapDotVector(u,u);
+    GenmapGop(c,&dot,1,GENMAP_SCALAR,GENMAP_SUM);
+    GenmapScaleVector(u,u,1.0/sqrt(dot));
+
+    dot=GenmapDotVector(v,u);
+    GenmapGop(c,&dot,1,GENMAP_SCALAR,GENMAP_SUM);
     iter++;
+#if 0
+    if(GenmapCommRank(c)==0)
+      printf("iter=%03d dot=%lf\n",iter,dot);
+#endif
   }
+
+  GenmapInt i;
+  GenmapElements e=GenmapGetElements(h);
+  for(i=0;i<lelt;i++){
+    e[i].fiedler=u->data[i];
+  }
+
+  GenmapDestroyVector(weights);
+  GenmapDestroyVector(v);
 
   return iter;
 }
 
 void GenmapRSB(GenmapHandle h) {
-  int maxIter = 50;
-  int npass = 50;
-
   GenmapInt i;
   GenmapElements e = GenmapGetElements(h);
   GenmapScan(h, GenmapGetLocalComm(h));
@@ -202,18 +221,32 @@ void GenmapRSB(GenmapHandle h) {
 
     GenmapVector initVec;
     GenmapComm c=GenmapGetLocalComm(h);
-    int ipass = 0;
+
     int iter;
+    int totalIter;
+
+    int ipass = 0;
+    int npass = 50;
+    int maxIter = 50;
+#if defined(GENMAP_LANCZOS)
     do {
       GenmapGetInitVector(h,c,global,&initVec);
-      iter = GenmapFiedlerLanczos(h,c,initVec,maxIter,global);
+      iter = GenmapFiedlerLanczos  (h,c,initVec,maxIter,global);
       ipass++;
       global = 0;
       GenmapDestroyVector(initVec);
     } while(ipass < npass && iter == maxIter);
 
+    totalIter=(ipass-1)*maxIter+iter;
+#else
+    maxIter=1000;
+    GenmapGetInitVector(h,c,global,&initVec);
+    totalIter=GenmapFiedlerPowerIter(h,c,initVec,maxIter,global);
+    GenmapDestroyVector(initVec);
+#endif
+
     if(GenmapCommRank(GenmapGetGlobalComm(h))==0 && h->dbgLevel>1){
-      printf("level %02d: %5d iterations\n",level,(ipass-1)*maxIter+iter);
+      printf("level %02d: %5d iterations\n",level,totalIter);
       fflush(stdout);
     }
 
