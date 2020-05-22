@@ -6,6 +6,7 @@ CC ?= mpicc
 CFLAGS ?= -O2
 BUILDDIR ?= $(CURDIR)/build
 DESTDIR ?=
+MPI ?= 1
 
 # Dependencies #
 GS_DIR = $(GSLIBPATH)

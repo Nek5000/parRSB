@@ -12,7 +12,7 @@ void fparRCB_partMesh(int *part,double *vtx,int *nel,int *nv,
 {
   *err = 1;
 
-  exaCommExternal c;
+  exaExternalComm c;
   c = MPI_Comm_f2c(*comm);
   *err=parRCB_partMesh(part,vtx,*nel,*nv,options,c);
 }
