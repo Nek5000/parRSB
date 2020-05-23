@@ -44,7 +44,7 @@ int readRe2Header(exaHandle h,Mesh mesh,MPI_File file){
 
   exaInt rank=exaRank(h);
   exaInt size=exaSize(h);
-  MPI_Comm comm=exaGetMPIComm(h);
+  exaExternalComm comm=exaGetExternalComm(h);
 
   char *buf=(char *)calloc(GC_RE2_HEADER_LEN+1,sizeof(char));
   if(rank==0){
@@ -81,7 +81,7 @@ int readRe2Header(exaHandle h,Mesh mesh,MPI_File file){
 int readRe2Coordinates(exaHandle h,Mesh mesh,MPI_File file){
   exaInt rank=exaRank(h);
   exaInt size=exaSize(h);
-  MPI_Comm comm=exaGetMPIComm(h);
+  exaExternalComm comm=exaGetExternalComm(h);
 
   int nelt=mesh->nelt;
   int nelgt=mesh->nelgt;
@@ -149,7 +149,7 @@ int readRe2Coordinates(exaHandle h,Mesh mesh,MPI_File file){
 int readRe2Boundaries(exaHandle h,Mesh mesh,MPI_File file){
   exaInt rank=exaRank(h);
   exaInt size=exaSize(h);
-  MPI_Comm comm=exaGetMPIComm(h);
+  exaExternalComm comm=exaGetExternalComm(h);
 
   int nelt=mesh->nelt;
   int nelgt=mesh->nelgt;
@@ -229,7 +229,7 @@ int genConReadRe2File(exaHandle h,Mesh *mesh_,char *fileName){
 
   exaInt rank=exaRank(h);
   exaInt size=exaSize(h);
-  MPI_Comm comm=exaGetMPIComm(h);
+  exaExternalComm comm=exaGetExternalComm(h);
 
   MPI_File file;
   int err=MPI_File_open(comm,fileName,MPI_MODE_RDONLY,\
@@ -264,7 +264,7 @@ int genConWriteCo2File(exaHandle h,Mesh mesh,char *fileName){
 
   exaInt rank=exaRank(h);
   exaInt size=exaSize(h);
-  MPI_Comm comm=exaGetMPIComm(h);
+  exaExternalComm comm=exaGetExternalComm(h);
 
   int nVertex=mesh->nVertex;
   int nDim=mesh->nDim;
