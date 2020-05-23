@@ -13,6 +13,7 @@ GS_DIR = $(GSLIBPATH)
 EXA_DIR ?= $(PREFIX)
 EXASORT_DIR ?= $(PREFIX)
 
+##### Don't touch what follows #####
 ### Meta info ###
 SRCROOT=$(CURDIR)
 SRCDIR=$(SRCROOT)/src
@@ -58,6 +59,10 @@ endif
 
 ifneq ($(PAUL),0)
   PP += -DGENMAP_PAUL
+endif
+
+ifneq ($(MPI),0)
+  PP += -DEXA_MPI
 endif
 
 ifneq ($(LANCZOS),0)
