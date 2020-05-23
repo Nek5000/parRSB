@@ -2,7 +2,7 @@
 #define _GENCON_H_
 
 #include "exa.h"
-#include "exa-impl.h"
+#include "exasort.h"
 
 /* Upper bound for number of dimensions */
 #define GC_MAX_DIM 3

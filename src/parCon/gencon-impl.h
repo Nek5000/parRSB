@@ -2,7 +2,6 @@
 #define _GENCON_IMPL_H_
 
 #include "gencon.h"
-#include "exasort.h"
 
 #define sqrDiff(x,y) (((x)-(y))*((x)-(y)))
 #define distance2D(a,b)\
