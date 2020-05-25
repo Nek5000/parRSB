@@ -13,10 +13,10 @@ GS_DIR = $(GSLIBPATH)
 
 ##### Don't touch what follows #####
 ### Some pre-processing ###
-ifneq (,$(strip $(DESTDIR)))
-  PREFIX=$(realpath $(DESTDIR))
+ifneq ($(strip $(DESTDIR)),)
+  PREFIX=$(abspath $(DESTDIR))
 else
-  PREFIX=$(realpath ./build)
+  PREFIX=$(abspath ./build)
 endif
 
 ifneq ($(DEBUG),0)
