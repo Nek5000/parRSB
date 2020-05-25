@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -e -x
 
 if [ ! -d exaCore ]; then
   git clone https://github.com/exaAlgo/exaCore.git
@@ -9,11 +9,10 @@ if [ ! -d exaSort ]; then
   git clone https://github.com/exaAlgo/exaSort.git
 fi
 
-set -x
 cd exaCore
-make -j4 GS_DIR=${GS_DIR} OCCA=0 PREFIX=${PREFIX} install
+make MPI="${MPI}" GS_DIR="${GS_DIR}" OCCA=0 PREFIX="${PREFIX}" install
 
 cd ../exaSort
-make -j4 GS_DIR=${GS_DIR} EXA_DIR=${PREFIX}\
-  PREFIX=${PREFIX} install
+make MPI="${MPI}" GS_DIR="${GS_DIR}" EXA_DIR="${PREFIX}" PREFIX="${PREFIX}" install
+
 set +x
