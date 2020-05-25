@@ -59,6 +59,7 @@ int GenmapFiedlerLanczos(GenmapHandle h, GenmapComm c,
   GenmapVector evLanczos, evTriDiag;
   GenmapCreateVector(&evTriDiag, iter);
 
+  GenmapInt i;
 #if defined(GENMAP_PAUL)
   /* Use TQLI and find the minimum eigenvalue and associated vector */
   GenmapVector *eVectors, eValues;
@@ -66,7 +67,6 @@ int GenmapFiedlerLanczos(GenmapHandle h, GenmapComm c,
 
   GenmapScalar eValMin = fabs(eValues->data[0]);
   GenmapInt eValMinI = 0;
-  GenmapInt i;
   for(i = 1; i < iter; i++) {
     if(fabs(eValues->data[i]) < eValMin) {
       eValMin = fabs(eValues->data[i]);
@@ -83,11 +83,11 @@ int GenmapFiedlerLanczos(GenmapHandle h, GenmapComm c,
 #else
   GenmapVector init;
   GenmapCreateVector(&init, iter);
-  for(int i = 0; i < iter; i++) {
+  for(i = 0; i < iter; i++) {
     init->data[i] = i + 1.0;
   }
   GenmapScalar avg = 0.5 * iter * (1.0 + iter) / iter;
-  for(int i = 0; i < iter; i++) {
+  for(i = 0; i < iter; i++) {
     init->data[i] -= avg;
   }
   GenmapInvPowerIter(evTriDiag, alphaVec, betaVec, init, 100);
@@ -104,7 +104,7 @@ int GenmapFiedlerLanczos(GenmapHandle h, GenmapComm c,
   }
 #if defined(GENMAP_DEBUG)
   if(GenmapCommRank(GenmapGetGlobalComm(h)) == 0) {
-    for(int i = 0; i < evLanczos->size; i++) {
+    for(i = 0; i < evLanczos->size; i++) {
       printf("evLanczos:"GenmapScalarFormat"\n", evLanczos->data[i]);
     }
   }
