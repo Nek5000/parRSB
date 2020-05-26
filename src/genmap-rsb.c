@@ -222,9 +222,9 @@ void GenmapRSB(GenmapHandle h) {
     GenmapVector initVec;
     GenmapComm c=GenmapGetLocalComm(h);
 
-    int iter;
-    int totalIter;
+    GenmapInt totalIter;
 
+    int iter;
     int ipass = 0;
     int npass = 50;
     int maxIter = 50;
@@ -245,8 +245,15 @@ void GenmapRSB(GenmapHandle h) {
     GenmapDestroyVector(initVec);
 #endif
 
+    GenmapInt iterMax,iterMin,iterSum;
+    GenmapComm globalComm=GenmapGetGlobalComm(h);
+    GenmapReduce(globalComm,&iterMax,&totalIter,1,GENMAP_INT,GENMAP_MAX);
+    GenmapReduce(globalComm,&iterMin,&totalIter,1,GENMAP_INT,GENMAP_MIN);
+    GenmapReduce(globalComm,&iterSum,&totalIter,1,GENMAP_INT,GENMAP_SUM);
+
     if(GenmapCommRank(GenmapGetGlobalComm(h))==0 && h->dbgLevel>1){
-      printf("level %02d: %5d iterations\n",level,totalIter);
+      printf("level %02d: %5d,%5d,%5d (min,mean,max) iterations\n",
+          level,iterMax,iterSum/GenmapCommSize(globalComm),iterMin);
       fflush(stdout);
     }
 
