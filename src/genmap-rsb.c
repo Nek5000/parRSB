@@ -15,7 +15,7 @@ int GenmapGetInitVector(GenmapHandle h,GenmapComm c,int global,
   GenmapInt i;
   GenmapElements elements = GenmapGetElements(h);
   if(global > 0) {
-#if defined(GENMAP_PAUL)
+#if defined(GENMAP_TQLI)
     for(i = 0;  i < lelt; i++) {
       initVec->data[i] = GenmapGetLocalStartIndex(h) + i + 1;
     }
@@ -49,7 +49,7 @@ int GenmapFiedlerLanczos(GenmapHandle h, GenmapComm c,
   GenmapCreateVector(&betaVec, maxIter - 1);
   GenmapVector *q = NULL;
 
-#if defined(GENMAP_PAUL)
+#if defined(GENMAP_TQLI)
   int iter = GenmapLanczosLegendary(h, c, initVec, maxIter, &q, alphaVec,
                                     betaVec);
 #else
@@ -60,7 +60,7 @@ int GenmapFiedlerLanczos(GenmapHandle h, GenmapComm c,
   GenmapCreateVector(&evTriDiag, iter);
 
   GenmapInt i;
-#if defined(GENMAP_PAUL)
+#if defined(GENMAP_TQLI)
   /* Use TQLI and find the minimum eigenvalue and associated vector */
   GenmapVector *eVectors, eValues;
   GenmapTQLI(h, alphaVec, betaVec, &eVectors, &eValues);
@@ -74,12 +74,6 @@ int GenmapFiedlerLanczos(GenmapHandle h, GenmapComm c,
     }
   }
   GenmapCopyVector(evTriDiag, eVectors[eValMinI]);
-#if defined(GENMAP_DEBUG)
-  if(GenmapCommRank(GenmapGetGlobalComm(h)) == 0) {
-    printf("evTriDiag:\n");
-    GenmapPrintVector(evTriDiag);
-  }
-#endif
 #else
   GenmapVector init;
   GenmapCreateVector(&init, iter);
@@ -126,7 +120,7 @@ int GenmapFiedlerLanczos(GenmapHandle h, GenmapComm c,
   GenmapDestroyVector(betaVec);
   GenmapDestroyVector(evLanczos);
   GenmapDestroyVector(evTriDiag);
-#if defined(GENMAP_PAUL)
+#if defined(GENMAP_TQLI)
   GenmapDestroyVector(eValues);
   for(i = 0; i < iter; i++) {
     GenmapDestroyVector(eVectors[i]);
@@ -134,7 +128,7 @@ int GenmapFiedlerLanczos(GenmapHandle h, GenmapComm c,
   GenmapFree(eVectors);
 #endif
 
-#if defined(GENMAP_PAUL)
+#if defined(GENMAP_TQLI)
   for(i = 0; i < iter + 1; i++) {
     GenmapDestroyVector(q[i]);
   }
@@ -212,7 +206,7 @@ void GenmapRSB(GenmapHandle h) {
   int level=0;
 
   while(GenmapCommSize(GenmapGetLocalComm(h)) > 1) {
-#if defined(GENMAP_PAUL)
+#if defined(GENMAP_TQLI)
     int global = 1;
 #else
     int global=(GenmapCommSize(GenmapGetLocalComm(h))== \
@@ -269,7 +263,7 @@ void GenmapRSB(GenmapHandle h) {
     GenmapSplitComm(h, &c, bin);
     GenmapSetLocalComm(h, c);
 
-#if defined(GENMAP_PAUL)
+#if defined(GENMAP_TQLI)
     GenmapBinSort(h, GENMAP_GLOBALID, &buf0);
 #endif
     level++;

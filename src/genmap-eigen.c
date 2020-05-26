@@ -131,7 +131,7 @@ int GenmapTQLI(GenmapHandle h, GenmapVector diagonal, GenmapVector upper,
         for(i = m - 1; i >= l; i--) {
           GenmapScalar f = s * e->data[i];
           GenmapScalar b = c * e->data[i];
-#if defined(GENMAP_PAUL)
+#if defined(GENMAP_TQLI)
           if(fabs(f) >= fabs(g)) {
             c = g / f;
             r = sqrt(c * c + 1.0);

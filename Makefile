@@ -1,6 +1,6 @@
 ### Build-time user configurations ###
 DEBUG ?= 0
-PAUL ?= 1
+TQLI ?= 1
 LANCZOS ?= 0
 CC ?= mpicc
 CFLAGS ?= -O2
@@ -23,8 +23,8 @@ ifneq ($(DEBUG),0)
   PP += -g -DGENMAP_DEBUG
 endif
 
-ifneq ($(PAUL),0)
-  PP += -DGENMAP_PAUL
+ifneq ($(TQLI),0)
+  PP += -DGENMAP_TQLI
 endif
 
 ifneq ($(MPI),0)
