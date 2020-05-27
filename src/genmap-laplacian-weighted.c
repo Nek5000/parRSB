@@ -1,6 +1,6 @@
 #include <genmap-impl.h>
 
-int GenmapInitLaplacian(GenmapHandle h, GenmapComm c, GenmapVector weights) {
+int GenmapInitLaplacianWeighted(GenmapHandle h, GenmapComm c, GenmapVector weights) {
   GenmapInt lelt = GenmapGetNLocalElements(h);
   GenmapInt nv = GenmapGetNVertices(h);
   GenmapUInt numPoints = (GenmapUInt) nv * lelt;

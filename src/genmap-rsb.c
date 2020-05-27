@@ -156,7 +156,7 @@ int GenmapFiedlerPowerIter(GenmapHandle h,GenmapComm c,
 
   GenmapVector weights;
   GenmapCreateVector(&weights,lelt);
-  GenmapInitLaplacian(h,c,weights);
+  GenmapInitLaplacianWeighted(h,c,weights);
 
   while(fabs(dot-1)>1e-8 && iter<maxIter){
     GenmapCopyVector(v,u);

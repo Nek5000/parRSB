@@ -47,7 +47,7 @@ int GenmapLanczosLegendary(GenmapHandle h, GenmapComm c, GenmapVector f,
   GenmapCreateVector(&weights, lelt);
   GenmapCreateZerosVector(&p, lelt);
   GenmapCreateVector(&w, lelt);
-  GenmapInitLaplacian(h, c, weights);
+  GenmapInitLaplacianWeighted(h, c, weights);
 
   GenmapCreateVector(&r, lelt);
   GenmapCopyVector(r, f);
@@ -168,7 +168,7 @@ int GenmapLanczos(GenmapHandle h, GenmapComm c, GenmapVector init,
 
   GenmapVector weights;
   GenmapCreateVector(&weights, lelt);
-  GenmapInitLaplacian(h, c, weights);
+  GenmapInitLaplacianWeighted(h, c, weights);
 
   int k;
   for(k = 0; k < iter; k++) {

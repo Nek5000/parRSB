@@ -104,7 +104,7 @@ int GenmapPrintVector(GenmapVector x);
 int GenmapDestroyVector(GenmapVector x);
 
 /* Laplacian and Eigen values */
-int GenmapInitLaplacian(GenmapHandle h, GenmapComm c,
+int GenmapInitLaplacianWeighted(GenmapHandle h, GenmapComm c,
                         GenmapVector weights);
 int GenmapLaplacianWeighted(GenmapHandle h, GenmapComm c, GenmapVector u,
                     GenmapVector weights, GenmapVector v);
