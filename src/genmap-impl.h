@@ -19,7 +19,7 @@
 
 struct GenmapComm_private {
   struct comm gsComm;
-  struct gs_data *verticesHandle;
+  struct gs_data *laplacianHandle;
   GenmapScalar *laplacianWeights;
   buffer buf;
 };
