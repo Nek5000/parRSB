@@ -161,7 +161,7 @@ int GenmapFiedlerPowerIter(GenmapHandle h,GenmapComm c,
   while(fabs(dot-1)>1e-8 && iter<maxIter){
     GenmapCopyVector(v,u);
     // u=B_g*v
-    GenmapLaplacian(h,c,v,weights,u);
+    GenmapLaplacianWeighted(h,c,v,weights,u);
 
     dot=GenmapDotVector(u,u);
     GenmapGop(c,&dot,1,GENMAP_SCALAR,GENMAP_SUM);

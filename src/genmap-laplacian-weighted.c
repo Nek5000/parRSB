@@ -75,7 +75,7 @@ int GenmapInitLaplacian(GenmapHandle h, GenmapComm c, GenmapVector weights) {
   return 0;
 }
 
-int GenmapLaplacian(GenmapHandle h, GenmapComm c, GenmapVector u,
+int GenmapLaplacianWeighted(GenmapHandle h, GenmapComm c, GenmapVector u,
                     GenmapVector weights, GenmapVector v) {
   assert(u->size == v->size);
   assert(u->size == GenmapGetNLocalElements(h));

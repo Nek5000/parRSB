@@ -106,7 +106,7 @@ int GenmapDestroyVector(GenmapVector x);
 /* Laplacian and Eigen values */
 int GenmapInitLaplacian(GenmapHandle h, GenmapComm c,
                         GenmapVector weights);
-int GenmapLaplacian(GenmapHandle h, GenmapComm c, GenmapVector u,
+int GenmapLaplacianWeighted(GenmapHandle h, GenmapComm c, GenmapVector u,
                     GenmapVector weights, GenmapVector v);
 
 int GenmapLanczosLegendary(GenmapHandle h, GenmapComm c, GenmapVector f,
