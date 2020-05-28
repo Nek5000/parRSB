@@ -1,11 +1,16 @@
 #ifndef _GENMAP_H_
 #define _GENMAP_H_
 
-#include "exa-impl.h"
+#include "exa.h"
+#include "exasort.h"
 
 #include "genmap-types.h"
 #include "genmap-gslib.h"
 #include <mpi.h>
+
+#define GENMAP_MAX_VERTICES 8
+#define GENMAP_MAX_DIM 3
+#define GENMAP_MAX_NEIGHBORS 8
 
 #define GENMAP_SUM 0
 #define GENMAP_MAX 1
