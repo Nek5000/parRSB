@@ -4,8 +4,8 @@
 #include "exa.h"
 #include "exasort.h"
 
-#include "genmap-types.h"
-#include "genmap-gslib.h"
+#include <genmap-types.h>
+#include <genmap-gslib.h>
 #include <mpi.h>
 
 #define GENMAP_MAX_VERTICES 8

@@ -42,7 +42,7 @@ int main(int argc,char *argv[]){
     exaInit(&h,commRead,"/host");
 
     Mesh mesh;
-    int ierr=genConReadRe2File(h,&mesh,reaFile);
+    int ierr=readRe2File(h,&mesh,reaFile);
     CHECK_ERR(ierr);
 
     int nelt=mesh->nelt;

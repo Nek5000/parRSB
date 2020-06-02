@@ -12,6 +12,10 @@
   memcpy(dest,&(val),sizeof(int));\
 } while(0)
 
+#define readInt(dest,src) do{\
+  memcpy((dest),src,sizeof(int));\
+} while(0)
+
 int PRE_TO_SYM_VERTEX[GC_MAX_VERTICES]={0,1,3,2,4,5,7,6};
 int PRE_TO_SYM_FACE[GC_MAX_FACES]={2,1,3,0,4,5};
 
@@ -37,7 +41,7 @@ int transferBoundaryFaces(exaHandle h,Mesh mesh){
     offsetof(struct Boundary_private,proc),1,c);
 }
 
-int readRe2Header(exaHandle h,Mesh mesh,MPI_File file){
+int readRe2Header(exaHandle h,Mesh *mesh_,MPI_File file){
   char version[BUFSIZ];
   int nelgt,nDim,nelgv,err;
   MPI_Status st;
@@ -58,6 +62,9 @@ int readRe2Header(exaHandle h,Mesh mesh,MPI_File file){
   int nVertex=(nDim==2)?4:8;
   int nelt=nelgt/size,nrem=nelgt-nelt*size;
   nelt+=(rank<nrem ? 1: 0);
+
+  exaMalloc(1,mesh_);
+  Mesh mesh=*mesh_;
 
   // Initialize the mesh structure
   mesh->nDim=nDim;
@@ -197,8 +204,6 @@ int readRe2Boundaries(exaHandle h,Mesh mesh,MPI_File file){
   char *buf=calloc(readSize,sizeof(char)),*buf0=buf;
   MPI_File_read_at_all(file,offset,buf,readSize,MPI_BYTE,&st);
 
-  exaArrayInit(&mesh->boundary,struct Boundary_private,0);
-
   double tmp[5];
   char cbc[4];
   struct Boundary_private boundary;
@@ -223,7 +228,7 @@ int readRe2Boundaries(exaHandle h,Mesh mesh,MPI_File file){
   free(buf);
 }
 
-int genConReadRe2File(exaHandle h,Mesh *mesh_,char *fileName){
+int readRe2File(exaHandle h,Mesh *mesh_,char *fileName){
   int nelt,nDim,nVertex;
   int errs=0;
 
@@ -242,10 +247,8 @@ int genConReadRe2File(exaHandle h,Mesh *mesh_,char *fileName){
     MPI_Abort(comm,911);
   }
 
-  exaMalloc(1,mesh_);
+  readRe2Header(h,mesh_,file);
   Mesh mesh=*mesh_;
-
-  readRe2Header(h,mesh,file);
   readRe2Coordinates(h,mesh,file);
   readRe2Boundaries(h,mesh,file);
   transferBoundaryFaces(h,mesh);
@@ -258,7 +261,7 @@ int genConReadRe2File(exaHandle h,Mesh *mesh_,char *fileName){
   return errs;
 }
 
-int genConWriteCo2File(exaHandle h,Mesh mesh,char *fileName){
+int writeCo2File(exaHandle h,Mesh mesh,char *fileName){
   const char version[5]="#v001";
   const float test=6.54321;
 
@@ -333,6 +336,84 @@ int genConWriteCo2File(exaHandle h,Mesh mesh,char *fileName){
 
   return errs;
 }
+
+int readCo2File(exaHandle h,Mesh *mesh_,char *fileName){
+  exaExternalComm comm=exaGetExternalComm(h);
+  MPI_File file;
+  int err=MPI_File_open(comm,fileName,MPI_MODE_RDONLY,MPI_INFO_NULL,&file);
+
+  exaInt rank=exaRank(h);
+  if(err){
+    if(rank==0)
+      printf("%s:%d Error opening file: %s for reading.\n",
+        __FILE__,__LINE__,fileName);
+    MPI_Abort(comm,911);
+  }
+
+  char *buf=(char*)calloc(GC_CO2_HEADER_LEN,sizeof(char));
+  MPI_Status st;
+
+  if(rank==0){
+    err=MPI_File_read(file,buf,GC_CO2_HEADER_LEN,MPI_BYTE,&st);
+    if(err) return 1;
+  }
+
+  MPI_Bcast(buf,GC_RE2_HEADER_LEN,MPI_BYTE,0,comm);
+
+  int nelgt,nelgv,nVertex;
+  char version[6];
+  sscanf(buf,"%5s%12d%12d%12d",version,&nelgt,&nelgv,&nVertex);
+  if(rank==0)
+    exaDebug(h,"%5s%12d%12d%12d\n",version,nelgt,nelgv,nVertex);
+
+  // Assert version
+
+  exaInt size=exaSize(h);
+  int nelt=nelgt/size,nrem=nelgt-nelt*size;
+  nelt+=(rank<nrem ? 1: 0);
+
+  int nDim=(nVertex==8)?3:2;
+
+  MeshInit(mesh_,nelt,nDim);
+  Mesh mesh=*mesh_;
+
+  // Initialize the mesh structure
+  mesh->nDim=nDim;
+  mesh->nVertex=nVertex;
+  mesh->nNeighbors=nDim;
+  mesh->nelgt=nelgt;
+  mesh->nelgv=nelgv;
+  mesh->nelt=nelt;
+
+  exaLong out[2][1],buff[2][1],in[1];
+  in[0]=nelt;
+  exaScan(h,out,in,buff,1,exaLong_t,exaAddOp);
+  exaLong start=out[0][0];
+
+  int readSize=nelt*(nVertex+1)*sizeof(int);
+  int headerSize=GC_CO2_HEADER_LEN+sizeof(float);
+  if(rank==0) readSize+=headerSize;
+
+  buf=(char*)realloc(buf,readSize*sizeof(char));
+  err=MPI_File_write_ordered(file,buf,readSize,MPI_BYTE,&st);
+  err=MPI_File_close(&file);
+
+  char *buf0=buf;
+  if(rank==0) buf0+=headerSize;
+
+  Element ptr=exaArrayGetPointer(mesh->elements);
+  int i,j,tmp1,tmp2;
+  for(i=0;i<nelt;i++){
+    readInt(&tmp1,buf0); buf0+=sizeof(int);
+    for(j=0;j<nVertex;j++){
+      ptr[i].vertex[j].elementId=tmp1;
+      readInt(&tmp2,buf0); buf0+=sizeof(int);
+      ptr[i].vertex[j].globalId =tmp2;
+    }
+  }
+
+  return 0;
+};
 
 #undef readT
 #undef writeInt

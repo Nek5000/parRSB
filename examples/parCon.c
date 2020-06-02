@@ -15,7 +15,7 @@ int main(int argc,char *argv[]){
   }
 
   Mesh mesh;
-  genConReadRe2File(h,&mesh,argv[1]);
+  readRe2File(h,&mesh,argv[1]);
 
   findMinNeighborDistance(h,mesh);
 
@@ -31,9 +31,9 @@ int main(int argc,char *argv[]){
   int len=strlen(co2FileName); assert(len>4);
   co2FileName[len-2]='o',co2FileName[len-3]='c';
 
-  genConWriteCo2File(h,mesh,co2FileName);
+  writeCo2File(h,mesh,co2FileName);
 
-  freeMesh(mesh);
+  MeshFree(mesh);
 
   exaFinalize(h);
 

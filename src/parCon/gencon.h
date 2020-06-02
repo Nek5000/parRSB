@@ -31,13 +31,18 @@ extern int NEIGHBOR_MAP[GC_MAX_VERTICES][GC_MAX_NEIGHBORS];
 extern int PRE_TO_SYM_VERTEX[GC_MAX_VERTICES];
 extern int PRE_TO_SYM_FACE[GC_MAX_FACES];
 
-int genConReadRe2File(exaHandle h,Mesh *mesh,char *fileName);
+/* Mesh */
+int MeshInit(Mesh *m_,int nel,int nDim);
+Element MeshGetElements(Mesh m);
+int MeshFree(Mesh m);
+
+int readRe2File(exaHandle h,Mesh *mesh,char *fileName);
+int readCo2File(exaHandle h,Mesh *mesh,char *fileName);
 int findMinNeighborDistance(exaHandle h,Mesh mesh);
 int findSegments(exaHandle h,Mesh mesh,exaScalar tol);
 int setGlobalID(exaHandle h,Mesh mesh);
 int sendBack(exaHandle h,Mesh mesh);
 int matchPeriodicFaces(exaHandle h,Mesh mesh);
-int genConWriteCo2File(exaHandle h,Mesh mesh,char *fileName);
-int freeMesh(Mesh mesh);
+int writeCo2File(exaHandle h,Mesh mesh,char *fileName);
 
 #endif

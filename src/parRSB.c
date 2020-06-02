@@ -217,7 +217,7 @@ int parRSB_findConnectivity(double *coord,int nel,int nDim,
   for(i=0;i<nel*nVertex;i++,ptr++)
     vertexId[i]=ptr->globalId+1;
 
-  freeMesh(mesh);
+  MeshFree(mesh);
   exaFinalize(h);
 
   return 0;

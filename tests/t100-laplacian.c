@@ -2,14 +2,17 @@
 #include <stdlib.h>
 
 #include <mpi.h>
+#include <exa.h>
 
-#include "genmap-impl.h"
-#include "conReader.h"
+#include <genmap-impl.h>
+#include <gencon-impl.h>
 
 int main(int argc,char *argv[]){
   MPI_Init(&argc,&argv);
-  int rank; MPI_Comm_rank(MPI_COMM_WORLD,&rank);
-  int size; MPI_Comm_size(MPI_COMM_WORLD,&size);
+
+  exaHandle h; exaInit(&h,MPI_COMM_WORLD,"/host");
+  int rank=exaRank(h);
+  int size=exaSize(h);
 
   if(argc!=2){
     if(rank==0) printf("Usage: ./%s <co2 file>\n",argv[0]);
@@ -17,38 +20,36 @@ int main(int argc,char *argv[]){
     exit(1);
   }
 
-  char *conFile=argv[1];
-  struct con con;
-  conRead(conFile,&con,MPI_COMM_WORLD);
+  Mesh mesh;
+  readCo2File(h,&mesh,argv[1]);
 
-  GenmapInt nel=con.nel;
-  int nv=con.nv;
+  GenmapHandle gh; GenmapInit(&gh,MPI_COMM_WORLD);
+  GenmapSetNLocalElements(gh,mesh->nelt);
+  GenmapScan(gh,GenmapGetGlobalComm(gh));
+  GenmapSetNVertices(gh,mesh->nVertex);
 
-  GenmapHandle h; GenmapInit(&h,MPI_COMM_WORLD);
-  GenmapSetNLocalElements(h,nel);
-  GenmapScan(h,GenmapGetGlobalComm(h));
-  GenmapSetNVertices(h,nv);
+  GenmapElements e=GenmapGetElements(gh);
+  GenmapLong start=GenmapGetLocalStartIndex(gh);
+  GenmapInt id=GenmapCommRank(GenmapGetGlobalComm(gh));
 
-  GenmapElements e=GenmapGetElements(h);
-  GenmapLong start=GenmapGetLocalStartIndex(h);
-  GenmapInt id=GenmapCommRank(GenmapGetGlobalComm(h));
-
+#if 0
+  Element elements=MeshGetElements(m);
   GenmapInt i,j;
-  for(i=0;i<nel;i++){
-    e[i].origin=id;
+  for(i=0;i<nelt;i++){
     for(j=0;j<nv;j++)
-      e[i].vertices[j]=con.vl[i*nv+j];
+      e[i].vertices[j]=elements[count].globalId;
   }
+  MeshFree(m);
+#endif
 
-  GenmapVector weights; GenmapCreateVector(&weights,nel);
+  GenmapVector weights; GenmapCreateVector(&weights,mesh->nelt);
 
-  GenmapInitLaplacian(h,GenmapGetGlobalComm(h),weights);
+  GenmapInitLaplacian(gh,GenmapGetGlobalComm(gh),weights);
 
   GenmapDestroyVector(weights);
-  GenmapFinalize(h);
+  GenmapFinalize(gh);
 
-  conFree(&con);
-
+  exaFinalize(h);
   MPI_Finalize();
 
   return 0;
