@@ -1,9 +1,9 @@
 ### Build-time user configurations ###
-DEBUG ?= 0
+DEBUG ?= 1
 TQLI ?= 1
 LANCZOS ?= 0
 CC ?= mpicc
-CFLAGS ?= -O2
+CFLAGS ?= -O0
 BUILDDIR ?= $(CURDIR)/build
 DESTDIR ?=
 MPI ?= 1
@@ -52,11 +52,11 @@ LIB=$(BUILDDIR)/libparRSB.so
 PP=
 
 ### Flags ###
-INCFLAGS=-I$(SRCDIR) -I$(SRCDIR)/parCon -I$(GS_DIR)/include\
-  -I$(EXA_DIR)/include -I$(EXASORT_DIR)/include
-LDFLAGS=-Wl,-rpath,$(GS_DIR) -L$(GS_DIR)/lib -lgs -lm
+INCFLAGS=-I$(SRCDIR) -I$(EXAMPLEDIR) -I$(SRCDIR)/parCon \
+  -I$(GS_DIR)/include -I$(EXA_DIR)/include -I$(EXASORT_DIR)/include
 CFLAGS += -fPIC
 
+LDFLAGS=-Wl,-rpath,$(GS_DIR) -L$(GS_DIR)/lib -lgs -lm
 EXALDFLAGS=-Wl,-rpath,$(EXA_DIR)/lib -L$(EXA_DIR)/lib -lexa
 EXASORTLDFLAGS=-Wl,-rpath,$(EXASORT_DIR)/lib\
   -L$(EXASORT_DIR)/lib -lexaSort
@@ -73,6 +73,11 @@ EXAMPLESRC=$(EXAMPLEDIR)/parRSB.c $(EXAMPLEDIR)/parCon.c\
 EXAMPLEOBJ=$(patsubst $(EXAMPLEDIR)/%.c,$(BUILDDIR)/examples/%,\
 	$(EXAMPLESRC))
 EXAMPLELDFLAGS= -Wl,-rpath,$(BUILDDIR) -L$(BUILDDIR) -lparRSB\
+  $(EXASORTLDFLAGS) $(EXALDFLAGS) $(LDFLAGS)
+
+TESTSRC=$(wildcard $(TESTDIR)/*.c)
+TESTOBJ=$(patsubst $(TESTDIR)/%.c,$(BUILDDIR)/tests/%,$(TESTSRC))
+TESTLDFLAGS= -Wl,-rpath,$(BUILDDIR) -L$(BUILDDIR) -lparRSB\
   $(EXASORTLDFLAGS) $(EXALDFLAGS) $(LDFLAGS)
 
 .PHONY: default
@@ -111,9 +116,10 @@ $(BUILDDIR)/examples/%: $(EXAMPLEDIR)/%.c
 	$(CC) $(CFLAGS) $(PP) $(INCFLAGS) $< -o $@ $(EXAMPLELDFLAGS)
 
 .PHONY: tests
-tests: examples
-	@cp -rf $(TESTDIR) $(BUILDDIR)/
-	@cd $(BUILDDIR)/tests && BUILDDIR=$(BUILDDIR) ./test.sh --run
+tests: lib $(TESTOBJ)
+
+$(BUILDDIR)/tests/%: $(TESTDIR)/%.c
+	$(CC) $(CFLAGS) $(PP) $(INCFLAGS) $< -o $@ $(TESTLDFLAGS)
 
 .PHONY: clean
 clean:
@@ -130,3 +136,4 @@ print-%:
 $(shell mkdir -p $(BUILDDIR)/src)
 $(shell mkdir -p $(BUILDDIR)/src/parCon)
 $(shell mkdir -p $(BUILDDIR)/examples)
+$(shell mkdir -p $(BUILDDIR)/tests)
