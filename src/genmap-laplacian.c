@@ -1,6 +1,8 @@
 #include <genmap-impl.h>
 #include <exa-memory.h>
 
+#define min(a,b) ((b)<(a)?(b):(a))
+
 typedef struct{
   GenmapLong sequenceId;
   GenmapLong elementId;
@@ -55,11 +57,12 @@ int GenmapInitLaplacian(GenmapHandle h,GenmapComm c,GenmapVector weights)
   //TODO: Assumes quads or hexes
   exaInt s=0,e;
   while(s<size){
-    for(e=s+1; e<size && vPtr[e].vertexId==vPtr[s].vertexId; e++);
-    vPtr[s].nNeighbors=e-s;
-    for(i=s;i<e && e<size;i++,vPtr[i].nNeighbors=e-s){
-      for(j=0;j<vPtr[s].nNeighbors;j++)
+    for(e=s+1; e<size && vPtr[s].vertexId==vPtr[e].vertexId; e++);
+    int nNeighbors=min(e,size)-s;
+    for(i=s;i<min(e,size);i++){
+      for(j=0;j<nNeighbors;j++)
         vPtr[i].neighbors[j]=vPtr[s+j].elementId;
+      vPtr[i].nNeighbors=nNeighbors;
     }
     s=e;
   }
@@ -70,8 +73,10 @@ int GenmapInitLaplacian(GenmapHandle h,GenmapComm c,GenmapVector weights)
   vPtr=exaArrayGetPointer(vertices);
   size=exaArrayGetSize(vertices); assert(size==lelt*nv); // sanity check
 
+#if defined(GENMAP_DEBUG)
   for(i=0;i<size;i++)
     printf("vid=%lld neighbors=%d\n",vPtr[i].vertexId,vPtr[i].nNeighbors);
+#endif
 
   exaArray neighbors;
   exaArrayInit(&neighbors,element,\
@@ -111,3 +116,5 @@ int GenmapInitLaplacian(GenmapHandle h,GenmapComm c,GenmapVector weights)
   exaFree(elementIds);
   exaCommDestroy(comm);
 }
+
+#undef min
