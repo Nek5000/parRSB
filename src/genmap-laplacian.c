@@ -95,7 +95,7 @@ int GenmapInitLaplacian(GenmapHandle h,GenmapComm c,GenmapVector weights)
       for(k=0;k<v.nNeighbors;k++)
         e.elementId=v.neighbors[k],exaArrayAppend(neighbors,(void*)&e);
     }
-    size=exaArrayGetSize(neighbors); assert(size>0);
+    size=exaArrayGetSize(neighbors);
 
     exaSortArray(neighbors,exaLong_t,offsetof(element,elementId));
 

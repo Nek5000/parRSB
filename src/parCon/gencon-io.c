@@ -5,15 +5,11 @@
 #include "exa-memory.h"
 
 #define readT(coords,buf,T,nVertex) do{\
-  memcpy(coords,buf,sizeof(T)*nVertex);\
+  memcpy((coords),buf,sizeof(T)*nVertex);\
 } while(0)
 
 #define writeInt(dest,val) do{\
   memcpy(dest,&(val),sizeof(int));\
-} while(0)
-
-#define readInt(dest,src) do{\
-  memcpy((dest),src,sizeof(int));\
 } while(0)
 
 int PRE_TO_SYM_VERTEX[GC_MAX_VERTICES]={0,1,3,2,4,5,7,6};
@@ -241,7 +237,7 @@ int readRe2File(exaHandle h,Mesh *mesh_,char *fileName){
     MPI_INFO_NULL,&file);
   if(err){
     if(rank==0)
-      printf("%s:%d Error opening file: %s\n",
+      fprintf(stderr,"%s:%d Error opening file: %s\n",
         __FILE__,__LINE__,fileName);
     errs++;
     MPI_Abort(comm,911);
@@ -282,7 +278,7 @@ int writeCo2File(exaHandle h,Mesh mesh,char *fileName){
     MPI_MODE_CREATE|MPI_MODE_WRONLY,MPI_INFO_NULL,&file);
   if(err){
     if(rank==0)
-      printf("%s:%d Error opening file: %s for writing.\n",
+      fprintf(stderr,"%s:%d Error opening file: %s for writing.\n",
         __FILE__,__LINE__,fileName);
     errs++;
     MPI_Abort(comm,911);
@@ -345,12 +341,12 @@ int readCo2File(exaHandle h,Mesh *mesh_,char *fileName){
   exaInt rank=exaRank(h);
   if(err){
     if(rank==0)
-      printf("%s:%d Error opening file: %s for reading.\n",
+      fprintf(stderr,"%s:%d Error opening file: %s for reading.\n",
         __FILE__,__LINE__,fileName);
     MPI_Abort(comm,911);
   }
 
-  char *buf=(char*)calloc(GC_CO2_HEADER_LEN,sizeof(char));
+  char *buf=(char*)calloc(GC_CO2_HEADER_LEN+1,sizeof(char));
   MPI_Status st;
 
   if(rank==0){
@@ -358,15 +354,15 @@ int readCo2File(exaHandle h,Mesh *mesh_,char *fileName){
     if(err) return 1;
   }
 
-  MPI_Bcast(buf,GC_RE2_HEADER_LEN,MPI_BYTE,0,comm);
+  MPI_Bcast(buf,GC_CO2_HEADER_LEN,MPI_BYTE,0,comm);
 
   int nelgt,nelgv,nVertex;
   char version[6];
   sscanf(buf,"%5s%12d%12d%12d",version,&nelgt,&nelgv,&nVertex);
   if(rank==0)
-    exaDebug(h,"%5s%12d%12d%12d\n",version,nelgt,nelgv,nVertex);
+    exaDebug(h,"%s %d %d %d\n",version,nelgt,nelgv,nVertex);
 
-  // Assert version
+  //TODO: Assert version
 
   exaInt size=exaSize(h);
   int nelt=nelgt/size,nrem=nelgt-nelt*size;
@@ -385,6 +381,10 @@ int readCo2File(exaHandle h,Mesh *mesh_,char *fileName){
   mesh->nelgv=nelgv;
   mesh->nelt=nelt;
 
+  if(rank==0)
+    exaDebug(h,"ndim/nvertex/nelgt/nelgv/nelt: %d/%d/%d/%d/%d\n",
+      nDim,nVertex,nelgt,nelgv,nelt);
+
   exaLong out[2][1],buff[2][1],in[1];
   in[0]=nelt;
   exaScan(h,out,in,buff,1,exaLong_t,exaAddOp);
@@ -392,25 +392,33 @@ int readCo2File(exaHandle h,Mesh *mesh_,char *fileName){
 
   int readSize=nelt*(nVertex+1)*sizeof(int);
   int headerSize=GC_CO2_HEADER_LEN+sizeof(float);
-  if(rank==0) readSize+=headerSize;
+  if(rank==0)
+    readSize+=headerSize;
 
   buf=(char*)realloc(buf,readSize*sizeof(char));
-  err=MPI_File_write_ordered(file,buf,readSize,MPI_BYTE,&st);
+  err=MPI_File_read_ordered(file,buf,readSize,MPI_BYTE,&st);
   err=MPI_File_close(&file);
 
   char *buf0=buf;
   if(rank==0) buf0+=headerSize;
 
+  assert(exaArrayGetMaxSize(mesh->elements)==nelt);
+
   Element ptr=exaArrayGetPointer(mesh->elements);
   int i,j,tmp1,tmp2;
   for(i=0;i<nelt;i++){
-    readInt(&tmp1,buf0); buf0+=sizeof(int);
+    readT(&tmp1,buf0,int,1); buf0+=sizeof(int);
+    exaDebug(h,"%d ",tmp1);
     for(j=0;j<nVertex;j++){
       ptr[i].vertex[j].elementId=tmp1;
-      readInt(&tmp2,buf0); buf0+=sizeof(int);
+      readT(&tmp2,buf0,int,1); buf0+=sizeof(int);
       ptr[i].vertex[j].globalId =tmp2;
+      exaDebug(h,"%d ",tmp2);
     }
+    exaDebug(h,"\n");
   }
+
+  free(buf);
 
   return 0;
 };

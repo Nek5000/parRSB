@@ -13,7 +13,7 @@ int MeshInit(Mesh *m_,int nel,int nDim){
   m->nVertex=(nDim==2)?4:8;
 
   exaArrayInit(&m->elements,struct Element_private ,nel);
-  exaArrayInit(&m->elements,struct Boundary_private,  0);
+  exaArrayInit(&m->boundary,struct Boundary_private,  0);
 
   return 0;
 }

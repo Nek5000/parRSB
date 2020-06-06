@@ -24,23 +24,18 @@ int main(int argc,char *argv[]){
   readCo2File(h,&mesh,argv[1]);
 
   GenmapHandle gh; GenmapInit(&gh,MPI_COMM_WORLD);
+
   GenmapSetNLocalElements(gh,mesh->nelt);
   GenmapScan(gh,GenmapGetGlobalComm(gh));
   GenmapSetNVertices(gh,mesh->nVertex);
 
   GenmapElements e=GenmapGetElements(gh);
-  GenmapLong start=GenmapGetLocalStartIndex(gh);
-  GenmapInt id=GenmapCommRank(GenmapGetGlobalComm(gh));
-
-#if 0
-  Element elements=MeshGetElements(m);
+  Element elements=MeshGetElements(mesh);
   GenmapInt i,j;
-  for(i=0;i<nelt;i++){
-    for(j=0;j<nv;j++)
-      e[i].vertices[j]=elements[count].globalId;
+  for(i=0;i<mesh->nelt;i++){
+    for(j=0;j<mesh->nVertex;j++)
+      e[i].vertices[j]=elements[i].vertex[j].globalId;
   }
-  MeshFree(m);
-#endif
 
   GenmapVector weights; GenmapCreateVector(&weights,mesh->nelt);
 
@@ -48,6 +43,8 @@ int main(int argc,char *argv[]){
 
   GenmapDestroyVector(weights);
   GenmapFinalize(gh);
+
+  MeshFree(mesh);
 
   exaFinalize(h);
   MPI_Finalize();
