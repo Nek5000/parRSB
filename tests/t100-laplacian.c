@@ -41,6 +41,12 @@ int main(int argc,char *argv[]){
 
   GenmapInitLaplacian(gh,GenmapGetGlobalComm(gh),weights);
 
+  exaDebug(h,"weights: ");
+  for(i=0;i<mesh->nelt;i++){
+    exaDebug(h," %lf",weights->data[i]);
+  }
+  exaDebug(h,"\n");
+
   GenmapDestroyVector(weights);
   GenmapFinalize(gh);
 
