@@ -26,27 +26,18 @@ int main(int argc,char *argv[]){
   GenmapHandle gh; GenmapInit(&gh,MPI_COMM_WORLD);
 
   GenmapSetNLocalElements(gh,mesh->nelt);
-  GenmapScan(gh,GenmapGetGlobalComm(gh));
   GenmapSetNVertices(gh,mesh->nVertex);
 
   GenmapElements e=GenmapGetElements(gh);
-  Element elements=MeshGetElements(mesh);
+  Element me      =MeshGetElements(mesh);
   GenmapInt i,j;
   for(i=0;i<mesh->nelt;i++){
     for(j=0;j<mesh->nVertex;j++)
-      e[i].vertices[j]=elements[i].vertex[j].globalId;
+      e[i].vertices[j]=me[i].vertex[j].globalId;
   }
 
   GenmapVector weights; GenmapCreateVector(&weights,mesh->nelt);
-
   GenmapInitLaplacian(gh,GenmapGetGlobalComm(gh),weights);
-
-  exaDebug(h,"weights: ");
-  for(i=0;i<mesh->nelt;i++){
-    exaDebug(h," %lf",weights->data[i]);
-  }
-  exaDebug(h,"\n");
-
   GenmapDestroyVector(weights);
   GenmapFinalize(gh);
 

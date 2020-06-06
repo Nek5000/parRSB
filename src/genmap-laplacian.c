@@ -21,15 +21,18 @@ int GenmapInitLaplacian(GenmapHandle h,GenmapComm c,GenmapVector weights)
   GenmapInt lelt=GenmapGetNLocalElements(h);
   GenmapInt nv  =GenmapGetNVertices(h);
 
-  int np=GenmapCommSize(c);
   GenmapScan(h,c);
   GenmapLong elementId =GenmapGetLocalStartIndex(h);
   GenmapLong sequenceId=elementId*nv;
 
+#if defined(GENMAP_DEBUG)
+  printf("nid=%d startId=%lld\n",GenmapCommRank(c),elementId);
+#endif
+
   size_t size=lelt*nv;
   exaArray vertices; exaArrayInit(&vertices,vertex,size);
 
-  GenmapElements elems =GenmapGetElements(h);
+  GenmapElements elems=GenmapGetElements(h);
   GenmapInt i; int j;
   for(i=0;i<lelt;i++){
     for(j=0;j<nv;j++){
@@ -37,8 +40,11 @@ int GenmapInitLaplacian(GenmapHandle h,GenmapComm c,GenmapVector weights)
         .elementId =elementId,
         .sequenceId=sequenceId,
         .vertexId  =elems[i].vertices[j],
-        .workProc  =elems[i].vertices[j]%np
+        .workProc  =elems[i].vertices[j]%GenmapCommSize(c)
       };
+#if defined(GENMAP_DEBUG)
+      printf("vid=%lld workProc=%d\n",t.vertexId,t.workProc);
+#endif
       exaArrayAppend(vertices,(void*)&t);
       sequenceId++;
     }
@@ -53,6 +59,12 @@ int GenmapInitLaplacian(GenmapHandle h,GenmapComm c,GenmapVector weights)
 
   size=exaArrayGetSize(vertices);
   vertex* vPtr=exaArrayGetPointer(vertices);
+#if defined(GENMAP_DEBUG)
+  printf("nid=%d lelt=%lu ",exaCommRank(comm),size);
+  for(i=0;i<size;i++)
+    printf("%lld ",vPtr[i].vertexId);
+  printf("\n");
+#endif
 
   //TODO: Assumes quads or hexes
   exaInt s=0,e;
@@ -68,8 +80,8 @@ int GenmapInitLaplacian(GenmapHandle h,GenmapComm c,GenmapVector weights)
   }
 
   exaArrayTransfer(vertices,offsetof(vertex,workProc),0,comm);
-  exaSortArray(vertices,exaLong_t,offsetof(vertex,sequenceId));
 
+  exaSortArray(vertices,exaLong_t,offsetof(vertex,sequenceId));
   vPtr=exaArrayGetPointer(vertices);
   size=exaArrayGetSize(vertices); assert(size==lelt*nv); // sanity check
 
@@ -107,6 +119,14 @@ int GenmapInitLaplacian(GenmapHandle h,GenmapComm c,GenmapVector weights)
       if(elementIds[count-1]!=ePtr[j].elementId)
         elementIds[count]=ePtr[j].elementId,weights->data[i]+=1.0,count++;
   }
+#if defined(GENMAP_DEBUG)
+  printf("weights: ");
+  for(i=0;i<lelt;i++){
+    printf(" (%lld,%lf)",vPtr[i*nv].elementId,weights->data[i]);
+  }
+  printf("\n");
+#endif
+
   exaDestroy(neighbors);
   exaDestroy(vertices );
 
