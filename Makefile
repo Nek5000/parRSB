@@ -12,7 +12,9 @@ MPI ?= 1
 GS_DIR = $(GSLIBPATH)
 
 ##### Don't touch what follows #####
-### Some pre-processing ###
+
+PP=
+
 ifneq ($(strip $(DESTDIR)),)
   PREFIX=$(abspath $(DESTDIR))
 else
@@ -49,7 +51,6 @@ EXA_DIR=$(PREFIX)
 EXASORT_DIR=$(PREFIX)
 
 LIB=$(BUILDDIR)/libparRSB.so
-PP=
 
 ### Flags ###
 INCFLAGS=-I$(SRCDIR) -I$(EXAMPLEDIR) -I$(SRCDIR)/parCon \
@@ -117,6 +118,8 @@ $(BUILDDIR)/examples/%: $(EXAMPLEDIR)/%.c
 
 .PHONY: tests
 tests: lib $(TESTOBJ)
+	cp -r $(TESTDIR)/[wp][23]d* $(TESTDIR)/*.sh $(BUILDDIR)/tests/
+	cd $(BUILDDIR)/tests && ./test.sh --run
 
 $(BUILDDIR)/tests/%: $(TESTDIR)/%.c
 	$(CC) $(CFLAGS) $(PP) $(INCFLAGS) $< -o $@ $(TESTLDFLAGS)

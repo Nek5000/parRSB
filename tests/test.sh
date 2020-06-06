@@ -2,12 +2,16 @@
 
 export VERBOSE=0
 
-function print_test_err(){
-  echo "Test: $1, not ok."
+function print_test_failure(){
+  local RED='\033[0;31m'
+  local NC='\033[0m'
+  echo -e "${RED} $1 ${NC}"
 }
 
 function print_test_success(){
-  echo "Test: $1, ok."
+  local GREEN='\033[0;92m'
+  local NC='\033[0m'
+  echo -e "${GREEN} $1 ${NC}"
 }
 
 function exit_err(){
@@ -26,75 +30,53 @@ function setup_nek5000(){
   cd - 2>/dev/null 1>&2
 }
 
-function gen_box(){
+function gen_mesh(){
   local test=$1
-
-  ${NEK_SOURCE_ROOT}/bin/genbox >log << EOF
-genbox.in
-EOF
-}
-
-function gen_con(){
-  local rea=$1
-
-  ${NEK_SOURCE_ROOT}/bin/gencon >log << EOF
-${rea}
-0.01
-EOF
-}
-
-function run_test(){
-  local test=$1
-  local np=1
-
-  # Set number of processors for the test
-  if [ $# -gt 1 ]; then np=$2;
-  else np=${i:(-3)}; fi
-  if [ ${np} -gt 7 ]; then np=7; fi
-
-  cd ${test}
 
   # clean .co2 or .re2 files if present
   rm *.co2 *.re2 2>/dev/null
 
   # generate the geometry
-  gen_box ${test}
+  ${NEK_SOURCE_ROOT}/bin/genbox >log << EOF
+genbox.in
+EOF
   mv box.re2 ${test}.re2
 
   #generate the .co2 file by gencon (Remove this at some point)
-  gen_con ${test}
-  mv ${test}.co2 gencon.co2
+  ${NEK_SOURCE_ROOT}/bin/gencon >log << EOF
+${test}
+0.01
+EOF
 
-  # copy parCOn
-  cp ${BUILDDIR}/examples/parCon . 2>/dev/null
-  if [ ! -f ./parCon ]; then
-    exit_err "Error copying parCon."
-  fi
-
-  # run parCon to generate the .co2 file
-  hash1=(`md5sum gencon.co2`)
-  for ((n=1; n<=${np}; n++)); do
-    rm parCon.co2 2>/dev/null
-    mpirun -np ${n} ./parCon ./${test}.re2 >out 2>err
-    mv ${test}.co2 parCon.co2
-
-    hash2=(`md5sum parCon.co2`)
-
-    if [ "${hash1}" = "${hash2}" ]; then
-      print_test_success "${test}/np=${n}"
-    else
-      print_test_err "${test}/np=${n}"
-    fi
-  done
-
-  cd - 2>&1 > /dev/null
 }
 
 function run_test_suite(){
   setup_nek5000
 
-  for i in [wp]*; do
-    run_test ${i}
+  tests=(`ls t[0-9][0-9][0-9]*`)
+  meshes=(`ls -d [w][2]d_001`)
+
+  echo "${tests[@]}"
+  echo "${meshes[@]}"
+
+  for m in "${meshes[@]}"; do
+    cd ${m}
+    gen_mesh ${m}
+    cd - 2>&1 >/dev/null
+  done
+
+  for t in "${tests[@]}"; do
+    for m in "${meshes[@]}"; do
+      cd ${m}
+      mpirun -np 1 ../${t} "`pwd`/${m}.co2" >out.log 2>err.log
+      wait $!
+      if [ ! -s err.log ]; then
+        print_test_success "Test: ${t} ${b} ok."
+      else
+        print_test_failure "Test: ${t} ${b} not ok."
+      fi
+      cd - 2>&1 >/dev/null
+    done
   done
 }
 
