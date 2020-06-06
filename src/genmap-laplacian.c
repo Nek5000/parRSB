@@ -56,13 +56,10 @@ int GenmapInitLaplacian(GenmapHandle h,GenmapComm c,GenmapVector weights)
   exaInt s=0,e;
   while(s<size){
     for(e=s+1; e<size && vPtr[e].vertexId==vPtr[s].vertexId; e++);
-    exaInt nNeighbors=e-s; assert(nNeighbors<=GENMAP_MAX_NEIGHBORS);
-    if(e<size){
-      for(i=s;i<e;i++){
-        for(j=0;j<nNeighbors;j++)
-          vPtr[i].neighbors[j]=vPtr[s+j].elementId;
-        vPtr[i].nNeighbors=nNeighbors;
-      }
+    vPtr[s].nNeighbors=e-s;
+    for(i=s;i<e && e<size;i++,vPtr[i].nNeighbors=e-s){
+      for(j=0;j<vPtr[s].nNeighbors;j++)
+        vPtr[i].neighbors[j]=vPtr[s+j].elementId;
     }
     s=e;
   }
@@ -73,6 +70,9 @@ int GenmapInitLaplacian(GenmapHandle h,GenmapComm c,GenmapVector weights)
   vPtr=exaArrayGetPointer(vertices);
   size=exaArrayGetSize(vertices); assert(size==lelt*nv); // sanity check
 
+  for(i=0;i<size;i++)
+    printf("vid=%lld neighbors=%d\n",vPtr[i].vertexId,vPtr[i].nNeighbors);
+
   exaArray neighbors;
   exaArrayInit(&neighbors,element,\
     GENMAP_MAX_VERTICES*GENMAP_MAX_NEIGHBORS);
@@ -82,20 +82,22 @@ int GenmapInitLaplacian(GenmapHandle h,GenmapComm c,GenmapVector weights)
   exaInt count=0; int k;
   for(i=0;i<lelt;i++){
     weights->data[i]=0.0;
+
     exaArraySetSize(neighbors,0);
-    element e;
     for(j=0;j<nv;j++){
       vertex v=vPtr[i*nv+j];
-      for(k=0;k<v.nNeighbors;k++)
+      element e;
+      for(k=0;k<v.nNeighbors;k++){
         e.elementId=v.neighbors[k];
         exaArrayAppend(neighbors,(void*)&e);
+      }
     }
 
     exaSortArray(neighbors,exaLong_t,offsetof(element,elementId));
     size=exaArrayGetSize(neighbors); assert(size>0);
 
     element *ePtr=exaArrayGetPointer(neighbors);
-    elementIds[0]=ePtr[0].elementId,count++;
+    elementIds[count]=ePtr[0].elementId,count++;
     for(j=1;j<size;j++)
       if(elementIds[count-1]!=ePtr[j].elementId)
         elementIds[count]=ePtr[j].elementId,weights->data[i]+=1.0,count++;
