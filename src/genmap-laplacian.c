@@ -162,8 +162,8 @@ int GenmapLaplacian(GenmapHandle h,GenmapComm c,GenmapVector u,
   assert(u->size==lelt   );
 
   GenmapInt i,cnt; int j;
-  for(i=0,cnt=0; i<lelt; i++,cnt+=weights->data[i])
-    c->laplacianBuf[cnt]=u->data[i];
+  for(i=0,cnt=0; i<lelt; cnt+=weights->data[i],i++)
+    c->laplacianBuf[cnt++]=u->data[i];
 
   gs(c->laplacianBuf,genmap_gs_scalar,gs_add,0,c->laplacianHandle,
     &c->buf);
@@ -171,8 +171,9 @@ int GenmapLaplacian(GenmapHandle h,GenmapComm c,GenmapVector u,
   for(cnt=0,i=0; i<lelt; i++){
     int nbrs=weights->data[i];
     v->data[i]=c->laplacianBuf[cnt++]*nbrs;
-    for(j=0; j<nbrs; j++)
+    for(j=0; j<nbrs; j++){
       v->data[i]-=c->laplacianBuf[cnt++];
+    }
   }
 
   return 0;

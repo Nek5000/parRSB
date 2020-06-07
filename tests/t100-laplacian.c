@@ -36,14 +36,30 @@ int main(int argc,char *argv[]){
       e[i].vertices[j]=me[i].vertex[j].globalId;
   }
 
-  GenmapVector weights; GenmapCreateVector(&weights,mesh->nelt);
+  GenmapVector weights,u,v;
+  GenmapCreateVector(&weights,mesh->nelt);
+  GenmapCreateVector(&u      ,mesh->nelt);
+  GenmapCreateVector(&v      ,mesh->nelt);
+
+  for(i=0;i<mesh->nelt;i++)
+    u->data[i]=1.0;
+
   GenmapInitLaplacian(gh,GenmapGetGlobalComm(gh),weights);
+  GenmapLaplacian(gh,GenmapGetGlobalComm(gh),u,weights,v);
+
+  printf("v: ");
+  for(i=0;i<mesh->nelt;i++)
+    printf(" %lf",v->data[i]);
+  printf("\n");
+
   GenmapDestroyVector(weights);
+  GenmapDestroyVector(v      );
+  GenmapDestroyVector(u      );
+
   GenmapFinalize(gh);
-
   MeshFree(mesh);
-
   exaFinalize(h);
+
   MPI_Finalize();
 
   return 0;
