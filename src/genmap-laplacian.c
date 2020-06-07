@@ -22,7 +22,7 @@ int GenmapInitLaplacian(GenmapHandle h,GenmapComm c,GenmapVector weights)
   GenmapInt nv  =GenmapGetNVertices(h);
 
   GenmapScan(h,c);
-  GenmapLong elementId =GenmapGetLocalStartIndex(h);
+  GenmapLong elementId =GenmapGetLocalStartIndex(h)+1;
   GenmapLong sequenceId=elementId*nv;
 
 #if defined(GENMAP_DEBUG)
@@ -119,16 +119,24 @@ int GenmapInitLaplacian(GenmapHandle h,GenmapComm c,GenmapVector weights)
       if(eIds[cnt-1]!=ePtr[j].elementId)
         eIds[cnt]=ePtr[j].elementId,weights->data[i]+=1.0,cnt++;
   }
+
 //#if defined(GENMAP_DEBUG)
   printf("weights: ");
   for(i=0;i<lelt;i++){
     printf(" (%lld,%lf)",vPtr[i*nv].elementId,weights->data[i]);
   }
   printf("\n");
+  cnt=0;
+  for(i=0;i<lelt;i++){
+    printf("%lld:",vPtr[i*nv].elementId);
+    for(int j=0;j<weights->data[i];j++)
+      printf(" %lld",eIds[cnt++]);
+    printf("\n");
+  }
+  printf("\n");
 //#endif
 
-  c->laplacianHandle=gs_setup(eIds,cnt,&c->gsComm,0,
-    gs_crystal_router,0);
+  c->laplacianHandle=gs_setup(eIds,cnt,&c->gsComm,0,gs_crystal_router,0);
 
   GenmapMalloc(cnt,&c->laplacianBuf);
 
