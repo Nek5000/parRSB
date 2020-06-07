@@ -112,10 +112,12 @@ int GenmapInitLaplacian(GenmapHandle h,GenmapComm c,GenmapVector weights)
     element *ePtr=exaArrayGetPointer(nbrs);
     size=exaArrayGetSize(nbrs);
 
+#if defined(GENMAP_DEBUG)
     printf("neighbors: ");
     for(k=0;k<size;k++)
       printf("%lld ",ePtr[k].elementId);
     printf("\n");
+#endif
 
     for(eIds[cnt++]=curId,j=0; j<size; j++)
       if(eIds[cnt-1]!=-ePtr[j].elementId)
@@ -160,20 +162,17 @@ int GenmapLaplacian(GenmapHandle h,GenmapComm c,GenmapVector u,
   assert(u->size==lelt   );
 
   GenmapInt i,cnt; int j;
-  for(i=0,cnt=0; i<lelt; i++){
+  for(i=0,cnt=0; i<lelt; i++,cnt+=weights->data[i])
     c->laplacianBuf[cnt]=u->data[i];
-    cnt+=(int)weights->data[i];
-  }
 
   gs(c->laplacianBuf,genmap_gs_scalar,gs_add,0,c->laplacianHandle,
     &c->buf);
 
-  for(cnt=1,i=0; i<lelt; i++){
-    int nbrs=weights->data[i]-1;
-    v->data[i]=u->data[i]*nbrs;
+  for(cnt=0,i=0; i<lelt; i++){
+    int nbrs=weights->data[i];
+    v->data[i]=c->laplacianBuf[cnt++]*nbrs;
     for(j=0; j<nbrs; j++)
-      v->data[i]-=c->laplacianBuf[cnt+j];
-    cnt+=nbrs+1;
+      v->data[i]-=c->laplacianBuf[cnt++];
   }
 
   return 0;
