@@ -124,7 +124,7 @@ int GenmapInitLaplacian(GenmapHandle h,GenmapComm c,GenmapVector weights)
         eIds[cnt++]=-ePtr[j].elementId,weights->data[i]+=1.0;
   }
 
-//#if defined(GENMAP_DEBUG)
+#if defined(GENMAP_DEBUG)
   printf("weights: ");
   for(i=0;i<lelt;i++){
     printf(" (%lld,%lf)",vPtr[i*nv].elementId,weights->data[i]);
@@ -138,7 +138,7 @@ int GenmapInitLaplacian(GenmapHandle h,GenmapComm c,GenmapVector weights)
     printf("\n");
   }
   printf("\n");
-//#endif
+#endif
 
   c->laplacianHandle=gs_setup(eIds,cnt,&c->gsComm,0,gs_crystal_router,0);
 
@@ -171,9 +171,8 @@ int GenmapLaplacian(GenmapHandle h,GenmapComm c,GenmapVector u,
   for(cnt=0,i=0; i<lelt; i++){
     int nbrs=weights->data[i];
     v->data[i]=c->laplacianBuf[cnt++]*nbrs;
-    for(j=0; j<nbrs; j++){
+    for(j=0; j<nbrs; j++)
       v->data[i]-=c->laplacianBuf[cnt++];
-    }
   }
 
   return 0;
