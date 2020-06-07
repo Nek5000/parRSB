@@ -90,50 +90,50 @@ int GenmapInitLaplacian(GenmapHandle h,GenmapComm c,GenmapVector weights)
     printf("vid=%lld neighbors=%d\n",vPtr[i].vertexId,vPtr[i].nNeighbors);
 #endif
 
-  exaArray neighbors;
-  exaArrayInit(&neighbors,element,\
-    GENMAP_MAX_VERTICES*GENMAP_MAX_NEIGHBORS);
+  exaArray nbrs;
+  exaArrayInit(&nbrs,element,GENMAP_MAX_VERTICES*GENMAP_MAX_NEIGHBORS);
 
-  exaLong *elementIds; exaMalloc(lelt*27,&elementIds);
+  exaLong *eIds; exaMalloc(lelt*27,&eIds);
 
-  exaInt count=0; int k;
+  exaInt cnt=0; int k;
   for(i=0;i<lelt;i++){
-    weights->data[i]=0.0;
-
+    exaArraySetSize(nbrs,0);
     element e;
-    exaArraySetSize(neighbors,0);
+
+    GenmapLong curId=e.elementId=vPtr[i*nv].elementId;
+    exaArrayAppend(nbrs,(void*)&e); weights->data[i]=1.0;
+
     for(j=0;j<nv;j++){
       vertex v=vPtr[i*nv+j];
-      for(k=0;k<v.nNeighbors;k++){
-        e.elementId=v.neighbors[k];
-        exaArrayAppend(neighbors,(void*)&e);
-      }
+      for(k=0;k<v.nNeighbors;k++)
+        if((e.elementId=-v.neighbors[k])!=-curId)
+          exaArrayAppend(nbrs,(void*)&e);
     }
 
-    exaSortArray(neighbors,exaLong_t,offsetof(element,elementId));
-    size=exaArrayGetSize(neighbors); assert(size>0);
+    exaSortArray(nbrs,exaLong_t,offsetof(element,elementId));
+    size=exaArrayGetSize(nbrs); assert(size>0);
 
-    element *ePtr=exaArrayGetPointer(neighbors);
-    elementIds[count++]=ePtr[0].elementId;
+    element *ePtr=exaArrayGetPointer(nbrs);
+    eIds[cnt++]=ePtr[0].elementId;
     for(j=1; j<size; j++)
-      if(elementIds[count-1]!=ePtr[j].elementId)
-        elementIds[count]=ePtr[j].elementId,weights->data[i]+=1.0,count++;
+      if(eIds[cnt-1]!=ePtr[j].elementId)
+        eIds[cnt]=ePtr[j].elementId,weights->data[i]+=1.0,cnt++;
   }
-#if defined(GENMAP_DEBUG)
+//#if defined(GENMAP_DEBUG)
   printf("weights: ");
   for(i=0;i<lelt;i++){
     printf(" (%lld,%lf)",vPtr[i*nv].elementId,weights->data[i]);
   }
   printf("\n");
-#endif
+//#endif
 
-  c->laplacianHandle=gs_setup(elementIds,count,&c->gsComm,0,
+  c->laplacianHandle=gs_setup(eIds,cnt,&c->gsComm,0,
     gs_crystal_router,0);
 
-  GenmapMalloc(count,&c->laplacianBuf);
+  GenmapMalloc(cnt,&c->laplacianBuf);
 
-  exaFree(elementIds);
-  exaDestroy(neighbors);
+  exaFree(eIds);
+  exaDestroy(nbrs);
   exaDestroy(vertices);
   exaCommDestroy(comm);
 
