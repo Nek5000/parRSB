@@ -66,7 +66,7 @@ int GenmapInitLaplacian(GenmapHandle h,GenmapComm c,GenmapVector weights)
   printf("\n");
 #endif
 
-  //TODO: Assumes quads or hexes
+  //FIXME: Assumes quads or hexes
   exaInt s=0,e;
   while(s<size){
     for(e=s+1; e<size && vPtr[s].vertexId==vPtr[e].vertexId; e++);
@@ -100,10 +100,10 @@ int GenmapInitLaplacian(GenmapHandle h,GenmapComm c,GenmapVector weights)
   for(i=0;i<lelt;i++){
     weights->data[i]=0.0;
 
+    element e;
     exaArraySetSize(neighbors,0);
     for(j=0;j<nv;j++){
       vertex v=vPtr[i*nv+j];
-      element e;
       for(k=0;k<v.nNeighbors;k++){
         e.elementId=v.neighbors[k];
         exaArrayAppend(neighbors,(void*)&e);
@@ -114,8 +114,8 @@ int GenmapInitLaplacian(GenmapHandle h,GenmapComm c,GenmapVector weights)
     size=exaArrayGetSize(neighbors); assert(size>0);
 
     element *ePtr=exaArrayGetPointer(neighbors);
-    elementIds[count]=ePtr[0].elementId,count++;
-    for(j=1;j<size;j++)
+    elementIds[count++]=ePtr[0].elementId;
+    for(j=1; j<size; j++)
       if(elementIds[count-1]!=ePtr[j].elementId)
         elementIds[count]=ePtr[j].elementId,weights->data[i]+=1.0,count++;
   }
@@ -127,14 +127,34 @@ int GenmapInitLaplacian(GenmapHandle h,GenmapComm c,GenmapVector weights)
   printf("\n");
 #endif
 
-  exaDestroy(neighbors);
-  exaDestroy(vertices );
-
   c->laplacianHandle=gs_setup(elementIds,count,&c->gsComm,0,
     gs_crystal_router,0);
 
+  GenmapMalloc(count,&c->laplacianBuf);
+
   exaFree(elementIds);
+  exaDestroy(neighbors);
+  exaDestroy(vertices);
   exaCommDestroy(comm);
+
+  return 0;
+}
+
+int GenmapLaplacian(GenmapHandle h,GenmapComm c,GenmapVector u,
+  GenmapVector weights,GenmapVector v)
+{
+  GenmapInt lelt=GenmapGetNLocalElements(h);
+  GenmapInt nv  =GenmapGetNVertices(h);
+
+  assert(u->size==v->size);
+  assert(u->size==lelt   );
+
+  GenmapInt i,cnt=0; int j;
+  for(i=0;i<lelt;i++)
+    for(j=0;j<(int)weights->data[i];j++)
+      c->laplacianBuf[cnt++]=weights->data[i];
+
+  return 0;
 }
 
 #undef min

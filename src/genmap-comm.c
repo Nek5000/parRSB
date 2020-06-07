@@ -3,9 +3,9 @@
 int GenmapCreateComm(GenmapComm *c, GenmapCommExternal ce) {
   GenmapMalloc(1, c);
   comm_init(&(*c)->gsComm, ce);
-  (*c)->laplacianHandle = NULL;
-  (*c)->laplacianWeights = NULL;
-  buffer_init(&(*c)->buf, 1024);
+  (*c)->laplacianHandle=NULL;
+  (*c)->laplacianBuf=NULL;
+  buffer_init(&(*c)->buf,1024);
   return 0;
 }
 
@@ -13,8 +13,8 @@ int GenmapDestroyComm(GenmapComm c) {
   buffer_free(&c->buf);
   if(c->laplacianHandle)
     gs_free(c->laplacianHandle);
-  if(c->laplacianWeights)
-    GenmapFree(c->laplacianWeights);
+  if(c->laplacianBuf)
+    GenmapFree(c->laplacianBuf);
   comm_free(&c->gsComm);
   GenmapFree(c);
 
