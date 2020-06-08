@@ -16,8 +16,8 @@ int GenmapInitLaplacianWeighted(GenmapHandle h, GenmapComm c, GenmapVector weigh
     }
   }
 
-  if(c->laplacianHandle)
-    gs_free(c->laplacianHandle);
+  if(c->gsh)
+    gs_free(c->gsh);
 
 #if defined(GENMAP_DEBUG)
   double t1 = GenmapGetMaxRss();
@@ -25,7 +25,7 @@ int GenmapInitLaplacianWeighted(GenmapHandle h, GenmapComm c, GenmapVector weigh
     printf("RSS before gs_setup: %lf\n", t1);
 #endif
 
-  c->laplacianHandle = gs_setup(vertices, numPoints, &c->gsComm, 0,
+  c->gsh = gs_setup(vertices, numPoints, &c->gsc, 0,
                                gs_crystal_router, 0);
 #if defined(GENMAP_DEBUG)
   t1 = GenmapGetMaxRss();
@@ -40,7 +40,7 @@ int GenmapInitLaplacianWeighted(GenmapHandle h, GenmapComm c, GenmapVector weigh
     for(j = 0; j < nv; j++)
       u[nv * i + j] = 1.;
 
-  gs(u, genmap_gs_scalar, gs_add, 0, c->laplacianHandle, &c->buf);
+  gs(u, genmap_gs_scalar, gs_add, 0, c->gsh, &c->buf);
 
   assert(weights->size == lelt);
 
@@ -91,7 +91,7 @@ int GenmapLaplacianWeighted(GenmapHandle h, GenmapComm c, GenmapVector u,
     for(j = 0; j < nv; j++)
       ucv[nv * i + j] = u->data[i];
 
-  gs(ucv, genmap_gs_scalar, gs_add, 0, c->laplacianHandle, &c->buf);
+  gs(ucv, genmap_gs_scalar, gs_add, 0, c->gsh, &c->buf);
 
   for(i = 0; i < lelt; i++) {
     v->data[i] = weights->data[i] * u->data[i];

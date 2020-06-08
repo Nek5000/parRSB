@@ -2,8 +2,8 @@
 
 int GenmapCreateComm(GenmapComm *c, GenmapCommExternal ce) {
   GenmapMalloc(1, c);
-  comm_init(&(*c)->gsComm, ce);
-  (*c)->laplacianHandle=NULL;
+  comm_init(&(*c)->gsc, ce);
+  (*c)->gsh=NULL;
   (*c)->laplacianBuf=NULL;
   buffer_init(&(*c)->buf,1024);
   return 0;
@@ -11,22 +11,22 @@ int GenmapCreateComm(GenmapComm *c, GenmapCommExternal ce) {
 
 int GenmapDestroyComm(GenmapComm c) {
   buffer_free(&c->buf);
-  if(c->laplacianHandle)
-    gs_free(c->laplacianHandle);
+  if(c->gsh)
+    gs_free(c->gsh);
   if(c->laplacianBuf)
     GenmapFree(c->laplacianBuf);
-  comm_free(&c->gsComm);
+  comm_free(&c->gsc);
   GenmapFree(c);
 
   return 0;
 }
 
 int GenmapCommSize(GenmapComm c) {
-  return (int) c->gsComm.np;
+  return (int) c->gsc.np;
 }
 
 int GenmapCommRank(GenmapComm c) {
-  return (int) c->gsComm.id;
+  return (int) c->gsc.id;
 }
 
 GenmapComm GenmapGetLocalComm(GenmapHandle h) {
@@ -48,11 +48,11 @@ void GenmapSetGlobalComm(GenmapHandle h, GenmapComm c) {
 int GenmapGop(GenmapComm c, void *v, GenmapInt size,
               GenmapDataType type, GenmapInt op) {
   if(op == GENMAP_SUM) {
-    MPI_Allreduce(MPI_IN_PLACE, v, size, type, MPI_SUM, c->gsComm.c);
+    MPI_Allreduce(MPI_IN_PLACE, v, size, type, MPI_SUM, c->gsc.c);
   } else if(op == GENMAP_MAX) {
-    MPI_Allreduce(MPI_IN_PLACE, v, size, type, MPI_MAX, c->gsComm.c);
+    MPI_Allreduce(MPI_IN_PLACE, v, size, type, MPI_MAX, c->gsc.c);
   } else if(op == GENMAP_MIN) {
-    MPI_Allreduce(MPI_IN_PLACE, v, size, type, MPI_MIN, c->gsComm.c);
+    MPI_Allreduce(MPI_IN_PLACE, v, size, type, MPI_MIN, c->gsc.c);
   }
   return 0;
 }
@@ -60,23 +60,23 @@ int GenmapGop(GenmapComm c, void *v, GenmapInt size,
 int GenmapReduce(GenmapComm c, void *out, void *in, GenmapInt size,
                  GenmapDataType type, GenmapInt op) {
   if(op == GENMAP_SUM) {
-    MPI_Reduce(in, out, size, type, MPI_SUM, 0, c->gsComm.c);
+    MPI_Reduce(in, out, size, type, MPI_SUM, 0, c->gsc.c);
   } else if(op == GENMAP_MAX) {
-    MPI_Reduce(in, out, size, type, MPI_MAX, 0, c->gsComm.c);
+    MPI_Reduce(in, out, size, type, MPI_MAX, 0, c->gsc.c);
   } else if(op == GENMAP_MIN) {
-    MPI_Reduce(in, out, size, type, MPI_MIN, 0, c->gsComm.c);
+    MPI_Reduce(in, out, size, type, MPI_MIN, 0, c->gsc.c);
   }
   return 0;
 }
 
 int GenmapBcast(GenmapComm c, void *in, GenmapInt count, GenmapDataType type) {
-  return MPI_Bcast(in, count, type, 0, c->gsComm.c);
+  return MPI_Bcast(in, count, type, 0, c->gsc.c);
 }
 
 void GenmapSplitComm(GenmapHandle h, GenmapComm *c, int bin) {
   GenmapCommExternal local;
   int id = GenmapCommRank(*c);
-  MPI_Comm_split((*c)->gsComm.c, bin, id, &local);
+  MPI_Comm_split((*c)->gsc.c, bin, id, &local);
   GenmapCrystalFinalize(h);
   GenmapDestroyComm(*c);
   GenmapCreateComm(c, local);
@@ -85,7 +85,7 @@ void GenmapSplitComm(GenmapHandle h, GenmapComm *c, int bin) {
 }
 
 int GenmapCrystalInit(GenmapHandle h, GenmapComm c) {
-  crystal_init(&(h->cr), &(c->gsComm));
+  crystal_init(&(h->cr), &(c->gsc));
   return 0;
 }
 

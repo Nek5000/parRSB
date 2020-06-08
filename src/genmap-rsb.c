@@ -200,7 +200,7 @@ void GenmapRSB(GenmapHandle h) {
   if(GenmapCommRank(GenmapGetGlobalComm(h)) == 0 && h->dbgLevel > 0)
     printf("running RSB ...\n"), fflush(stdout);
 
-  crystal_init(&(h->cr), &(h->local->gsComm));
+  crystal_init(&(h->cr), &(h->local->gsc));
   buffer buf0 = null_buffer;
 
   int level=0;

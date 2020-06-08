@@ -51,7 +51,7 @@ int GenmapInitLaplacian(GenmapHandle h,GenmapComm c,GenmapVector weights)
     elementId++;
   }
 
-  exaComm comm; exaCommCreate(&comm,c->gsComm.c);
+  exaComm comm; exaCommCreate(&comm,c->gsc.c);
   exaArrayTransfer(vertices,offsetof(vertex,workProc),1,comm);
 
   assert(sizeof(GenmapLong)==sizeof(exaLong));
@@ -140,7 +140,7 @@ int GenmapInitLaplacian(GenmapHandle h,GenmapComm c,GenmapVector weights)
   printf("\n");
 #endif
 
-  c->laplacianHandle=gs_setup(eIds,cnt,&c->gsComm,0,gs_crystal_router,0);
+  c->gsh=gs_setup(eIds,cnt,&c->gsc,0,gs_crystal_router,0);
 
   GenmapMalloc(cnt,&c->laplacianBuf);
 
@@ -165,7 +165,7 @@ int GenmapLaplacian(GenmapHandle h,GenmapComm c,GenmapVector u,
   for(i=0,cnt=0; i<lelt; cnt+=weights->data[i],i++)
     c->laplacianBuf[cnt++]=u->data[i];
 
-  gs(c->laplacianBuf,genmap_gs_scalar,gs_add,0,c->laplacianHandle,
+  gs(c->laplacianBuf,genmap_gs_scalar,gs_add,0,c->gsh,
     &c->buf);
 
   for(cnt=0,i=0; i<lelt; i++){

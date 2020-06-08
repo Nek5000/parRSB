@@ -18,8 +18,8 @@
 #define GENMAP_ORIGIN 3
 
 struct GenmapComm_private {
-  struct comm gsComm;
-  struct gs_data *laplacianHandle;
+  struct comm gsc;
+  struct gs_data *gsh;
   GenmapScalar *laplacianBuf;
   buffer buf;
 };
