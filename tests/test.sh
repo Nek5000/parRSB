@@ -54,7 +54,7 @@ function run_test_suite(){
   setup_nek5000
 
   tests=(`ls t[0-9][0-9][0-9]*`)
-  meshes=(`ls -d [w][2]d_001`)
+  meshes=(`ls -d w[23]d_*`)
 
   echo "${tests[@]}"
   echo "${meshes[@]}"
