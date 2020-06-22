@@ -126,7 +126,7 @@ int GenmapFindNeighbors(GenmapHandle h,GenmapComm c,GenmapLong **eIds_,
     offsets[i]=0;
     for(eIds[cnt++]=curId,j=0; j<size; j++)
       if(eIds[cnt-1]!=-ePtr[j].elementId)
-        eIds[cnt++]=-ePtr[j].elementId,eIds[i]+=1.0;
+        eIds[cnt++]=-ePtr[j].elementId,offsets[i]+=1;
     offsets[lelt]+=offsets[i];
   }
 

@@ -109,6 +109,9 @@ int GenmapPrintVector(GenmapVector x);
 int GenmapDestroyVector(GenmapVector x);
 
 /* Laplacian and Eigen values */
+int GenmapFindNeighbors(GenmapHandle h,GenmapComm c,GenmapLong **eIds_,
+                        GenmapInt **offsets_);
+
 int GenmapInitLaplacianWeighted(GenmapHandle h, GenmapComm c,
                         GenmapVector weights);
 int GenmapInitLaplacian(GenmapHandle h, GenmapComm c,GenmapVector weights);
