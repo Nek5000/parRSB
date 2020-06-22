@@ -16,7 +16,8 @@ typedef struct{
   GenmapULong elementId;
 } element;
 
-int GenmapInitLaplacian(GenmapHandle h,GenmapComm c,GenmapVector weights)
+int GenmapFindNeighbors(GenmapHandle h,GenmapComm c,GenmapLong **eIds_,
+    GenmapInt **offsets_)
 {
   GenmapInt lelt=GenmapGetNLocalElements(h);
   GenmapInt nv  =GenmapGetNVertices(h);
@@ -55,6 +56,8 @@ int GenmapInitLaplacian(GenmapHandle h,GenmapComm c,GenmapVector weights)
   exaArrayTransfer(vertices,offsetof(vertex,workProc),1,comm);
 
   assert(sizeof(GenmapLong)==sizeof(exaLong));
+  assert(sizeof(GenmapInt)==sizeof(exaInt));
+
   exaSortArray(vertices,exaLong_t,offsetof(vertex,vertexId));
 
   size=exaArrayGetSize(vertices);
@@ -93,9 +96,10 @@ int GenmapInitLaplacian(GenmapHandle h,GenmapComm c,GenmapVector weights)
   exaArray nbrs;
   exaArrayInit(&nbrs,element,GENMAP_MAX_VERTICES*GENMAP_MAX_NEIGHBORS);
 
-  exaLong *eIds; exaMalloc(lelt*27,&eIds);
+  exaMalloc(lelt*27,eIds_   ); exaLong *eIds   =*eIds_;
+  exaMalloc(lelt+ 1,offsets_); exaInt  *offsets=*offsets_;
 
-  exaInt cnt=0; int k;
+  exaInt cnt=0; int k; offsets[lelt]=0;
   for(i=0;i<lelt;i++){
     exaArraySetSize(nbrs,0);
 
@@ -119,10 +123,29 @@ int GenmapInitLaplacian(GenmapHandle h,GenmapComm c,GenmapVector weights)
     printf("\n");
 #endif
 
+    offsets[i]=0;
     for(eIds[cnt++]=curId,j=0; j<size; j++)
       if(eIds[cnt-1]!=-ePtr[j].elementId)
-        eIds[cnt++]=-ePtr[j].elementId,weights->data[i]+=1.0;
+        eIds[cnt++]=-ePtr[j].elementId,eIds[i]+=1.0;
+    offsets[lelt]+=offsets[i];
   }
+
+  exaDestroy(nbrs);
+  exaDestroy(vertices);
+  exaCommDestroy(comm);
+}
+
+int GenmapInitLaplacian(GenmapHandle h,GenmapComm c,GenmapVector weights)
+{
+  GenmapLong *eIds; GenmapInt *offsets;
+  GenmapFindNeighbors(h,c,&eIds,&offsets);
+
+  GenmapInt lelt=GenmapGetNLocalElements(h);
+  GenmapInt nv  =GenmapGetNVertices(h);
+
+  GenmapInt i;
+  for(i=0;i<lelt;i++)
+    weights->data[i]=offsets[i];
 
 #if defined(GENMAP_DEBUG)
   printf("weights: ");
@@ -140,14 +163,11 @@ int GenmapInitLaplacian(GenmapHandle h,GenmapComm c,GenmapVector weights)
   printf("\n");
 #endif
 
-  c->gsh=gs_setup(eIds,cnt,&c->gsc,0,gs_crystal_router,0);
-
-  GenmapMalloc(cnt,&c->laplacianBuf);
+  c->gsh=gs_setup(eIds,offsets[lelt],&c->gsc,0,gs_crystal_router,0);
+  GenmapMalloc(offsets[lelt],&c->laplacianBuf);
 
   exaFree(eIds);
-  exaDestroy(nbrs);
-  exaDestroy(vertices);
-  exaCommDestroy(comm);
+  exaFree(offsets);
 
   return 0;
 }
