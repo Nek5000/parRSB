@@ -71,9 +71,9 @@ function run_test_suite(){
       mpirun -np 1 ../${t} "`pwd`/${m}.co2" >out.log 2>err.log
       wait $!
       if [ ! -s err.log ]; then
-        print_test_success "Test: ${t} ${b} ok."
+        print_test_success "Test: ${t} ${m} ok."
       else
-        print_test_failure "Test: ${t} ${b} not ok."
+        print_test_failure "Test: ${t} ${m} not ok."
       fi
       cd - 2>&1 >/dev/null
     done

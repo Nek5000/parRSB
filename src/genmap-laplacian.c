@@ -127,8 +127,24 @@ int GenmapFindNeighbors(GenmapHandle h,GenmapComm c,GenmapLong **eIds_,
     for(eIds[cnt++]=curId,j=0; j<size; j++)
       if(eIds[cnt-1]!=-ePtr[j].elementId)
         eIds[cnt++]=-ePtr[j].elementId,offsets[i]+=1;
-    offsets[lelt]+=offsets[i];
+    offsets[lelt]+=offsets[i]+1;
   }
+
+#if defined(GENMAP_DEBUG)
+  printf("weights: ");
+  for(i=0;i<lelt;i++){
+    printf(" (%lld,%d)",vPtr[i*nv].elementId,offsets[i]);
+  }
+  printf("\n");
+  int cnt1=0;
+  for(i=0;i<lelt;i++){
+    printf("%lld:",vPtr[i*nv].elementId);
+    for(int j=0;j<offsets[i]+1;j++)
+      printf(" %lld",eIds[cnt1++]);
+    printf("\n");
+  }
+  printf("\n");
+#endif
 
   exaDestroy(nbrs);
   exaDestroy(vertices);
@@ -146,22 +162,6 @@ int GenmapInitLaplacian(GenmapHandle h,GenmapComm c,GenmapVector weights)
   GenmapInt i;
   for(i=0;i<lelt;i++)
     weights->data[i]=offsets[i];
-
-#if defined(GENMAP_DEBUG)
-  printf("weights: ");
-  for(i=0;i<lelt;i++){
-    printf(" (%lld,%lf)",vPtr[i*nv].elementId,weights->data[i]);
-  }
-  printf("\n");
-  int cnt1=0;
-  for(i=0;i<lelt;i++){
-    printf("%lld:",vPtr[i*nv].elementId);
-    for(int j=0;j<weights->data[i]+1;j++)
-      printf(" %lld",eIds[cnt1++]);
-    printf("\n");
-  }
-  printf("\n");
-#endif
 
   c->gsh=gs_setup(eIds,offsets[lelt],&c->gsc,0,gs_crystal_router,0);
   GenmapMalloc(offsets[lelt],&c->laplacianBuf);

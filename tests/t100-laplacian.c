@@ -31,10 +31,9 @@ int main(int argc,char *argv[]){
   GenmapElements e=GenmapGetElements(gh);
   Element me      =MeshGetElements(mesh);
   GenmapInt i,j;
-  for(i=0;i<mesh->nelt;i++){
+  for(i=0;i<mesh->nelt;i++)
     for(j=0;j<mesh->nVertex;j++)
       e[i].vertices[j]=me[i].vertex[j].globalId;
-  }
 
   GenmapVector weights,u,v;
   GenmapCreateVector(&weights,mesh->nelt);
@@ -49,8 +48,7 @@ int main(int argc,char *argv[]){
 
   printf("v: ");
   for(i=0;i<mesh->nelt;i++)
-    printf(" %lf",v->data[i]);
-  printf("\n");
+    assert(fabs(v->data[i])<GENMAP_TOL);
 
   GenmapDestroyVector(weights);
   GenmapDestroyVector(v      );
