@@ -5,7 +5,8 @@
 #include <time.h>
 #include <limits.h>
 
-void GenmapFiedlerMinMax(GenmapHandle h, GenmapScalar *min, GenmapScalar *max) {
+void GenmapFiedlerMinMax(GenmapHandle h, GenmapScalar *min,
+    GenmapScalar *max) {
   *min = 1; *max = -1;
 
   GenmapElements e = GenmapGetElements(h);

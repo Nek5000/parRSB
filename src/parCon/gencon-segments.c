@@ -148,12 +148,6 @@ int findSegments(exaHandle h,Mesh mesh,exaScalar tol){
     }
   }
 
-  //for(i=0;i<nPoints;i++){
-  //  printf("rank=%d i=%02d %d %lf %lf %lf\n",rank,
-  //    i+1,points[i].ifSegment,points[i].x[0],points[i].x[1],
-  //    points[i].x[2]);
-  //}
-
   return 0;
 }
 
