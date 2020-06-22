@@ -68,12 +68,15 @@ function run_test_suite(){
   for t in "${tests[@]}"; do
     for m in "${meshes[@]}"; do
       cd ${m}
-      mpirun -np 1 ../${t} "`pwd`/${m}.co2" >out.log 2>err.log
+      np=${m: -3}
+      np=$(echo $np | sed 's/^0*//')
+      np=$(( np>4?4:np ))
+      mpirun --use-hwthread-cpus -np ${np} ../${t} "`pwd`/${m}.co2" >out.log 2>err.log
       wait $!
       if [ ! -s err.log ]; then
-        print_test_success "Test: ${t} ${m} ok."
+        print_test_success "Test: ${t}, np: ${np} ${m} ok."
       else
-        print_test_failure "Test: ${t} ${m} not ok."
+        print_test_failure "Test: ${t}  np: ${np} ${m} not ok."
       fi
       cd - 2>&1 >/dev/null
     done
