@@ -17,7 +17,7 @@ typedef struct{
 } element;
 
 int GenmapFindNeighbors(GenmapHandle h,GenmapComm c,GenmapLong **eIds_,
-    GenmapInt **offsets_)
+    GenmapInt **neighbors_)
 {
   GenmapInt lelt=GenmapGetNLocalElements(h);
   GenmapInt nv  =GenmapGetNVertices(h);
@@ -97,9 +97,9 @@ int GenmapFindNeighbors(GenmapHandle h,GenmapComm c,GenmapLong **eIds_,
   exaArrayInit(&nbrs,element,GENMAP_MAX_VERTICES*GENMAP_MAX_NEIGHBORS);
 
   exaMalloc(lelt*27,eIds_   ); exaLong *eIds   =*eIds_;
-  exaMalloc(lelt+ 1,offsets_); exaInt  *offsets=*offsets_;
+  exaMalloc(lelt+ 1,neighbors_); exaInt  *neighbors=*neighbors_;
 
-  exaInt cnt=0; int k; offsets[lelt]=0;
+  exaInt cnt=0; int k; neighbors[lelt]=0;
   for(i=0;i<lelt;i++){
     exaArraySetSize(nbrs,0);
 
@@ -123,23 +123,23 @@ int GenmapFindNeighbors(GenmapHandle h,GenmapComm c,GenmapLong **eIds_,
     printf("\n");
 #endif
 
-    offsets[i]=0;
+    neighbors[i]=0;
     for(eIds[cnt++]=curId,j=0; j<size; j++)
       if(eIds[cnt-1]!=-ePtr[j].elementId)
-        eIds[cnt++]=-ePtr[j].elementId,offsets[i]+=1;
-    offsets[lelt]+=offsets[i]+1;
+        eIds[cnt++]=-ePtr[j].elementId,neighbors[i]+=1;
+    neighbors[lelt]+=neighbors[i]+1;
   }
 
 #if defined(GENMAP_DEBUG)
   printf("weights: ");
   for(i=0;i<lelt;i++){
-    printf(" (%lld,%d)",vPtr[i*nv].elementId,offsets[i]);
+    printf(" (%lld,%d)",vPtr[i*nv].elementId,neighbors[i]);
   }
   printf("\n");
   int cnt1=0;
   for(i=0;i<lelt;i++){
     printf("%lld:",vPtr[i*nv].elementId);
-    for(int j=0;j<offsets[i]+1;j++)
+    for(int j=0;j<neighbors[i]+1;j++)
       printf(" %lld",eIds[cnt1++]);
     printf("\n");
   }
@@ -153,21 +153,21 @@ int GenmapFindNeighbors(GenmapHandle h,GenmapComm c,GenmapLong **eIds_,
 
 int GenmapInitLaplacian(GenmapHandle h,GenmapComm c,GenmapVector weights)
 {
-  GenmapLong *eIds; GenmapInt *offsets;
-  GenmapFindNeighbors(h,c,&eIds,&offsets);
+  GenmapLong *eIds; GenmapInt *neighbors;
+  GenmapFindNeighbors(h,c,&eIds,&neighbors);
 
   GenmapInt lelt=GenmapGetNLocalElements(h);
   GenmapInt nv  =GenmapGetNVertices(h);
 
   GenmapInt i;
   for(i=0;i<lelt;i++)
-    weights->data[i]=offsets[i];
+    weights->data[i]=neighbors[i];
 
-  c->gsh=gs_setup(eIds,offsets[lelt],&c->gsc,0,gs_crystal_router,0);
-  GenmapMalloc(offsets[lelt],&c->laplacianBuf);
+  c->gsh=gs_setup(eIds,neighbors[lelt],&c->gsc,0,gs_crystal_router,0);
+  GenmapMalloc(neighbors[lelt],&c->laplacianBuf);
 
   exaFree(eIds);
-  exaFree(offsets);
+  exaFree(neighbors);
 
   return 0;
 }

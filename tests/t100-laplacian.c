@@ -28,6 +28,7 @@ int main(int argc,char *argv[]){
   GenmapSetNLocalElements(gh,mesh->nelt);
   GenmapSetNVertices(gh,mesh->nVertex);
 
+  /* Test GenmapLaplacian based on gather-scatter */
   GenmapElements e=GenmapGetElements(gh);
   Element me      =MeshGetElements(mesh);
   GenmapInt i,j;
@@ -43,16 +44,32 @@ int main(int argc,char *argv[]){
   for(i=0;i<mesh->nelt;i++)
     u->data[i]=1.0;
 
-  GenmapInitLaplacian(gh,GenmapGetGlobalComm(gh),weights);
-  GenmapLaplacian(gh,GenmapGetGlobalComm(gh),u,weights,v);
+  GenmapComm c=GenmapGetGlobalComm(gh);
+  GenmapInitLaplacian(gh,c,weights);
+  GenmapLaplacian(gh,c,u,weights,v);
 
-  printf("v: ");
   for(i=0;i<mesh->nelt;i++)
     assert(fabs(v->data[i])<GENMAP_TOL);
 
   GenmapDestroyVector(weights);
-  GenmapDestroyVector(v      );
-  GenmapDestroyVector(u      );
+
+  for(i=0;i<mesh->nelt;i++)
+    v->data[i]=100; // Random number to reset v for next test
+
+  /* Test Laplacian based on CSR representation */
+  parMat M;
+  parMatSetup(gh,c,&M);
+  parMatPrint(M);
+  parMatApply(u,M,v);
+  printf("v: ");
+  for(i=0;i<mesh->nelt;i++){
+    printf("%lf ",v->data[i]);
+    assert(fabs(v->data[i])<GENMAP_TOL);
+  }
+
+  parMatFree(M);
+  GenmapDestroyVector(v);
+  GenmapDestroyVector(u);
 
   GenmapFinalize(gh);
   MeshFree(mesh);

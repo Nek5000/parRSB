@@ -6,13 +6,29 @@ typedef struct mgData_  *mgData;
 typedef struct mgLevel_ *mgLevel;
 
 struct parMat_{
-  GenmapUInt rn,*rowOffsets,*colIdx;
+  GenmapUInt rn;
   GenmapULong cn;
-  GenmapScalar *v;
+
+  GenmapULong rowStart;
+  GenmapInt rank;
+
+  GenmapUInt *rowOffsets;
+  GenmapULong *colIdx;
+
+  GenmapInt *owner;
+  GenmapScalar *v,*x;
+
   struct gs_data *gsh;
+  GenmapComm c;
+  GenmapHandle h;
+
+  buffer buf;
 };
-void applyMat(GenmapVector x,parMat M,GenmapVector y);
-int  freeMat(parMat M);
+
+void parMatSetup(GenmapHandle h,GenmapComm c,parMat *M);
+void parMatApply(GenmapVector x,parMat M,GenmapVector y);
+void parMatPrint(parMat M);
+int parMatFree(parMat M);
 
 struct mgData_{
   int nLevels;

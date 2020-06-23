@@ -11,6 +11,7 @@
 #endif
 
 #include "genmap.h"
+#include "genmap-multigrid-precon.h"
 
 #define GENMAP_FIEDLER 0
 #define GENMAP_GLOBALID 1
@@ -68,15 +69,18 @@ struct GenmapVector_private {
 #define GenmapCalloc(n, p) GenmapCallocArray ((n), sizeof(**(p)), p)
 #define GenmapRealloc(n, p) GenmapReallocArray((n), sizeof(**(p)), p)
 
-void GenmapFiedlerMinMax(GenmapHandle h, GenmapScalar *min, GenmapScalar *max);
-void GenmapGlobalIdMinMax(GenmapHandle h, GenmapLong *min, GenmapLong *max);
+void GenmapFiedlerMinMax(GenmapHandle h, GenmapScalar *min,
+    GenmapScalar *max);
+void GenmapGlobalIdMinMax(GenmapHandle h, GenmapLong *min,
+    GenmapLong *max);
 GenmapInt GenmapSetFiedlerBin(GenmapHandle h);
 GenmapInt GenmapSetGlobalIdBin(GenmapHandle h);
 void GenmapAssignBins(GenmapHandle h, int field, buffer *buf0);
 void GenmapTransferToBins(GenmapHandle h, int field, buffer *buf0);
 void GenmapBinSort(GenmapHandle h, int field, buffer *buf0);
 
-void parRSBHistogramSort(GenmapHandle h,GenmapComm c,int field,buffer *buf0);
+void parRSBHistogramSort(GenmapHandle h,GenmapComm c,int field,
+    buffer *buf0);
 
 struct parRSBHistogram_private {
   GenmapLong *count;
