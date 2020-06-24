@@ -26,10 +26,6 @@ int GenmapFindNeighbors(GenmapHandle h,GenmapComm c,GenmapLong **eIds_,
   GenmapLong elementId =GenmapGetLocalStartIndex(h)+1;
   GenmapLong sequenceId=elementId*nv;
 
-#if defined(GENMAP_DEBUG)
-  printf("nid=%d startId=%lld\n",GenmapCommRank(c),elementId);
-#endif
-
   size_t size=lelt*nv;
   exaArray vertices; exaArrayInit(&vertices,vertex,size);
 
@@ -43,9 +39,6 @@ int GenmapFindNeighbors(GenmapHandle h,GenmapComm c,GenmapLong **eIds_,
         .vertexId  =elems[i].vertices[j],
         .workProc  =elems[i].vertices[j]%GenmapCommSize(c)
       };
-#if defined(GENMAP_DEBUG)
-      printf("vid=%lld workProc=%d\n",t.vertexId,t.workProc);
-#endif
       exaArrayAppend(vertices,(void*)&t);
       sequenceId++;
     }
@@ -63,7 +56,7 @@ int GenmapFindNeighbors(GenmapHandle h,GenmapComm c,GenmapLong **eIds_,
   size=exaArrayGetSize(vertices);
   vertex* vPtr=exaArrayGetPointer(vertices);
 #if defined(GENMAP_DEBUG)
-  printf("nid=%d lelt=%lu ",exaCommRank(comm),size);
+  printf("nid=%d size=%lu ",exaCommRank(comm),size);
   for(i=0;i<size;i++)
     printf("%lld ",vPtr[i].vertexId);
   printf("\n");
@@ -87,11 +80,6 @@ int GenmapFindNeighbors(GenmapHandle h,GenmapComm c,GenmapLong **eIds_,
   exaSortArray(vertices,exaLong_t,offsetof(vertex,sequenceId));
   vPtr=exaArrayGetPointer(vertices);
   size=exaArrayGetSize(vertices); assert(size==lelt*nv); // sanity check
-
-#if defined(GENMAP_DEBUG)
-  for(i=0;i<size;i++)
-    printf("vid=%lld neighbors=%d\n",vPtr[i].vertexId,vPtr[i].nNeighbors);
-#endif
 
   exaArray nbrs;
   exaArrayInit(&nbrs,element,GENMAP_MAX_VERTICES*GENMAP_MAX_NEIGHBORS);

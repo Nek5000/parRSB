@@ -8,13 +8,12 @@
 typedef struct {
   GenmapULong r,c; /* 1-index */
   GenmapInt owner; /* 0-index */
-  GenmapInt dest; /* 0-index */
   GenmapScalar v;
 } entry;
 
 #define GETPTR(ptr,i,offset) ((char*)(ptr)+offset+i*sizeof(entry))
 
-void setDestination(struct array *entries,size_t inOffset,
+void setOwner(struct array *entries,size_t inOffset,
   size_t outOffset,GenmapHandle h,GenmapComm c){
   GenmapScan(h,c);
   GenmapLong lelg=GenmapGetNGlobalElements(h);
@@ -30,8 +29,13 @@ void setDestination(struct array *entries,size_t inOffset,
     inPtr =(GenmapULong*)GETPTR(entries->ptr,i,inOffset );
     outPtr=(GenmapInt  *)GETPTR(entries->ptr,i,outOffset);
     row   =*inPtr-1;
+#if 0
     if(row<lelt*(np-nrem)) *outPtr=(GenmapInt) row/lelt;
     else *outPtr=np-nrem+(GenmapInt) (row-lelt*(np-nrem))/(lelt+1);
+#else
+    if(row<(lelt+1)*nrem) *outPtr=(GenmapInt) row/(lelt+1);
+    else *outPtr=nrem+(GenmapInt) (row-(lelt+1)*nrem)/lelt;
+#endif
   }
 }
 
@@ -60,18 +64,12 @@ void parMatSetup(GenmapHandle h,GenmapComm c,parMat *M_)
     }
   GenmapFree(offsets);
 
-  setDestination(&entries,offsetof(entry,r),offsetof(entry,dest ),h,c);
-  setDestination(&entries,offsetof(entry,c),offsetof(entry,owner),h,c);
+  setOwner(&entries,offsetof(entry,c),offsetof(entry,owner),h,c);
 
 #if defined(EXA_DEBUG)
   for(i=0; i<entries.n; i++)
-    printf("elem: (%lld,%lld,%d,%d)\n",ptr[i].r,ptr[i].c,ptr[i].dest,
-        ptr[i].owner);
+    printf("elem: (%lld,%lld,%d)\n",ptr[i].r,ptr[i].c,ptr[i].owner);
 #endif
-
-  struct crystal cr; crystal_init(&cr,&c->gsc);
-  sarray_transfer(entry,&entries,dest,1,&cr);
-  crystal_free(&cr);
 
   buffer buf; buffer_init(&buf,1024);
   ptr=entries.ptr;
