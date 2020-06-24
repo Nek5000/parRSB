@@ -59,13 +59,9 @@ int main(int argc,char *argv[]){
   /* Test Laplacian based on CSR representation */
   parMat M;
   parMatSetup(gh,c,&M);
-  parMatPrint(M);
   parMatApply(u,M,v);
-  printf("v: ");
-  for(i=0;i<mesh->nelt;i++){
-    printf("%lf ",v->data[i]);
+  for(i=0;i<mesh->nelt;i++)
     assert(fabs(v->data[i])<GENMAP_TOL);
-  }
 
   parMatFree(M);
   GenmapDestroyVector(v);

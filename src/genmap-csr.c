@@ -25,17 +25,13 @@ void setDestination(struct array *entries,size_t inOffset,
 
   GenmapULong *inPtr;
   GenmapInt  *outPtr;
-  GenmapInt i;
+  GenmapInt i; GenmapLong row;
   for(i=0; i<entries->n; i++){
     inPtr =(GenmapULong*)GETPTR(entries->ptr,i,inOffset );
     outPtr=(GenmapInt  *)GETPTR(entries->ptr,i,outOffset);
-
-    GenmapLong row=*inPtr-1;
-    printf("row=%lld\n",row);
-    if(row<lelt*(np-nrem))
-      *outPtr=(GenmapInt) row/lelt;
-    else
-      *outPtr=np-nrem+(GenmapInt) (row-lelt*(np-nrem))/(lelt+1);
+    row   =*inPtr-1;
+    if(row<lelt*(np-nrem)) *outPtr=(GenmapInt) row/lelt;
+    else *outPtr=np-nrem+(GenmapInt) (row-lelt*(np-nrem))/(lelt+1);
   }
 }
 
@@ -67,9 +63,11 @@ void parMatSetup(GenmapHandle h,GenmapComm c,parMat *M_)
   setDestination(&entries,offsetof(entry,r),offsetof(entry,dest ),h,c);
   setDestination(&entries,offsetof(entry,c),offsetof(entry,owner),h,c);
 
+#if defined(EXA_DEBUG)
   for(i=0; i<entries.n; i++)
     printf("elem: (%lld,%lld,%d,%d)\n",ptr[i].r,ptr[i].c,ptr[i].dest,
         ptr[i].owner);
+#endif
 
   struct crystal cr; crystal_init(&cr,&c->gsc);
   sarray_transfer(entry,&entries,dest,1,&cr);
@@ -82,18 +80,6 @@ void parMatSetup(GenmapHandle h,GenmapComm c,parMat *M_)
 
   GenmapMalloc(1,M_); parMat M=*M_;
 
-  if(entries.n==0){
-    M->rn=M->cn=0;
-    M->rowOffsets=NULL;
-    M->colIdx=NULL;
-    M->v=NULL;
-    M->gsh=NULL;
-    M->buf.ptr=NULL;
-    M->owner=NULL;
-    M->x=NULL;
-    return;
-  }
-
   i=0,n=0;
   while(i<entries.n){
     j=i+1;
@@ -102,31 +88,38 @@ void parMatSetup(GenmapHandle h,GenmapComm c,parMat *M_)
   }
 
   M->rn=n,M->cn=GenmapGetNGlobalElements(h);
-
   M->rank=GenmapCommRank(c);
+
   GenmapScan(h,c);
   M->rowStart=GenmapGetLocalStartIndex(h)+1;
 
-  GenmapMalloc(M->rn+1  ,&M->rowOffsets);
-  GenmapMalloc(entries.n,&M->colIdx    );
-  GenmapMalloc(entries.n,&M->v         );
-  GenmapMalloc(entries.n,&M->x         );
-  GenmapMalloc(entries.n,&M->owner     );
+  GenmapMalloc(M->rn+1,&M->rowOffsets);
+
+  if(n==0) M->colIdx=NULL,M->v=NULL,M->x=NULL,M->owner=NULL;
+  else{
+    GenmapMalloc(entries.n,&M->colIdx);
+    GenmapMalloc(entries.n,&M->v     );
+    GenmapMalloc(entries.n,&M->x     );
+    GenmapMalloc(entries.n,&M->owner );
+  }
 
   ptr=entries.ptr;
   for(i=0; i<entries.n; i++)
     M->colIdx[i]=ptr[i].c,M->v[i]=ptr[i].v,M->owner[i]=ptr[i].owner;
 
-  M->rowOffsets[0]=0,j=1;
-  for(i=1; i<entries.n; i++)
-    if(ptr[i-1].r!=ptr[i].r)
-      M->rowOffsets[j++]=i;
-  assert(j==n);
-  M->rowOffsets[n]=entries.n;
+  M->rowOffsets[0]=0,i=0; GenmapInt nn=0;
+  while(i<entries.n){
+    j=i+1;
+    while(j<entries.n && ptr[i].r==ptr[j].r) j++;
+    i=M->rowOffsets[++nn]=j;
+  }
+  assert(n==nn);
+  assert(M->rowOffsets[n]=entries.n);
+
+  if(entries.n>0) GenmapRealloc(entries.n,&eIds);
 
   for(i=0; i<entries.n; i++)
-    if(ptr[i].r==ptr[i].c && ptr[i].owner==M->rank)
-      eIds[i]=ptr[i].c;
+    if(ptr[i].r==ptr[i].c && ptr[i].owner==M->rank) eIds[i]=ptr[i].c;
     else eIds[i]=-ptr[i].c;
 
   M->gsh=gs_setup(eIds,M->rowOffsets[n],&c->gsc,0,gs_crystal_router,0);
@@ -151,17 +144,21 @@ void parMatApply(GenmapVector x,parMat M,GenmapVector y){
     for(j=M->rowOffsets[i]; j<M->rowOffsets[i+1]; j++)
       if(M->owner[j]==M->rank && M->colIdx[j]==s+i) xx[j]=xd[i];
 
+#if defined(EXA_DEBUG)
   printf("xx(before): ");
   for(i=0;i<M->rowOffsets[rn];i++)
     printf("%lf ",xx[i]);
   printf("\n");
+#endif
 
   gs(xx,genmap_gs_scalar,gs_add,0,M->gsh,&M->buf);
 
+#if defined(EXA_DEBUG)
   printf("xx(after): ");
   for(i=0;i<M->rowOffsets[rn];i++)
     printf("%lf ",xx[i]);
   printf("\n");
+#endif
 
   GenmapUInt je;
   for(i=0;i<rn;i++){
