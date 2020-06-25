@@ -29,6 +29,7 @@ void setOwner(struct array *entries,size_t inOffset,
     inPtr =(GenmapULong*)GETPTR(entries->ptr,i,inOffset );
     outPtr=(GenmapInt  *)GETPTR(entries->ptr,i,outOffset);
     row   =*inPtr-1;
+    //FIXME: Assumes the 'reverse-Nek' element distribution
 #if 0
     if(row<lelt*(np-nrem)) *outPtr=(GenmapInt) row/lelt;
     else *outPtr=np-nrem+(GenmapInt) (row-lelt*(np-nrem))/(lelt+1);

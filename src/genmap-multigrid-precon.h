@@ -19,31 +19,32 @@ struct parMat_{
   GenmapScalar *v,*x;
 
   struct gs_data *gsh;
-  GenmapComm c;
-  GenmapHandle h;
-
   buffer buf;
 };
 
 void parMatSetup(GenmapHandle h,GenmapComm c,parMat *M);
 void parMatApply(GenmapVector x,parMat M,GenmapVector y);
 void parMatPrint(parMat M);
-int parMatFree(parMat M);
+int  parMatFree(parMat M);
+
+struct mgLevel_{
+  int nSmooth;
+  GenmapScalar sigma;
+  struct comm c;
+  parMat M;
+};
 
 struct mgData_{
-  int nLevels;
+  GenmapInt nLevels;
   mgLevel *levels;
   GenmapUInt *levelOffsets;
   GenmapScalar *x,*b;
 };
 
-struct mgLevel_{
-  mgData data;
-  int nSmooth;
-  GenmapUInt nLocal;
-  GenmapScalar sigma;
-  GenmapComm comm;
-  parMat M;
-};
+void mgSetup(GenmapComm c,parMat M,mgData *d);
+void mgLevelSetup(mgLevel l0,mgLevel *l1_);
+void mgFree(mgData d);
+
+int log2i(GenmapInt i);
 
 #endif

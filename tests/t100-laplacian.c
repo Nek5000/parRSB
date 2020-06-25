@@ -6,6 +6,7 @@
 
 #include <genmap-impl.h>
 #include <gencon-impl.h>
+#include <genmap-multigrid-precon.h>
 
 int main(int argc,char *argv[]){
   MPI_Init(&argc,&argv);
@@ -55,8 +56,6 @@ int main(int argc,char *argv[]){
 
   for(i=0;i<mesh->nelt;i++)
     v->data[i]=100; // Random number to reset v for next test
-
-  printf("nid=%d lelt=%d\n",rank,mesh->nelt);
 
   /* Test Laplacian based on CSR representation */
   parMat M;
