@@ -13,21 +13,18 @@ typedef struct {
 
 #define GETPTR(ptr,i,offset) ((char*)(ptr)+offset+i*sizeof(entry))
 
-void setOwner(struct array *entries,size_t inOffset,
-  size_t outOffset,GenmapHandle h,GenmapComm c){
-  GenmapScan(h,c);
-  GenmapLong lelg=GenmapGetNGlobalElements(h);
-  GenmapInt np=GenmapCommSize(c);
-
+void setOwner(char *ptr,GenmapInt n,size_t inOffset,size_t outOffset,
+  GenmapLong lelg,GenmapInt np)
+{
   GenmapInt lelt=lelg/np;
   GenmapInt nrem=lelg%np;
 
   GenmapULong *inPtr;
   GenmapInt  *outPtr;
   GenmapInt i; GenmapLong row;
-  for(i=0; i<entries->n; i++){
-    inPtr =(GenmapULong*)GETPTR(entries->ptr,i,inOffset );
-    outPtr=(GenmapInt  *)GETPTR(entries->ptr,i,outOffset);
+  for(i=0; i<n; i++){
+    inPtr =(GenmapULong*)GETPTR(ptr,i,inOffset );
+    outPtr=(GenmapInt  *)GETPTR(ptr,i,outOffset);
     row   =*inPtr-1;
     //FIXME: Assumes the 'reverse-Nek' element distribution
 #if 0
@@ -65,7 +62,11 @@ void parMatSetup(GenmapHandle h,GenmapComm c,parMat *M_)
     }
   GenmapFree(offsets);
 
-  setOwner(&entries,offsetof(entry,c),offsetof(entry,owner),h,c);
+  GenmapScan(h,c);
+  GenmapLong ng=GenmapGetNGlobalElements(h);
+  GenmapInt np =GenmapCommSize(c);
+  setOwner(entries.ptr,entries.n,offsetof(entry,c),
+    offsetof(entry,owner),ng,np);
 
 #if defined(EXA_DEBUG)
   for(i=0; i<entries.n; i++)

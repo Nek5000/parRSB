@@ -28,13 +28,14 @@ void parMatPrint(parMat M);
 int  parMatFree(parMat M);
 
 struct mgLevel_{
+  mgData data;
   int nSmooth;
   GenmapScalar sigma;
-  struct comm c;
   parMat M;
 };
 
 struct mgData_{
+  struct comm c;
   GenmapInt nLevels;
   mgLevel *levels;
   GenmapUInt *levelOffsets;
@@ -46,5 +47,8 @@ void mgLevelSetup(mgLevel l0,mgLevel *l1_);
 void mgFree(mgData d);
 
 int log2i(GenmapInt i);
+
+void setOwner(char *ptr,GenmapInt n,size_t inOffset,size_t outOffset,
+  GenmapLong lelg,GenmapInt np);
 
 #endif
