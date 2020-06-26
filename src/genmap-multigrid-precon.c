@@ -80,10 +80,11 @@ void mgLevelSetup(mgLevel l0,mgLevel *l1_)
     i=j,nn++;
   }
 
-  GenmapLong cn=nn; comm_reduce_slong(&data->c,gs_add,&cn,1);
-  M1->rn=nn,M1->cn=cn;
+  GenmapLong cn=nn;
+  comm_scan(out,&data->c,gs_long,gs_add,&nn,1,bf);
+  M1->rn=nn,M1->cn=out[1][0];
   M1->rank=data->c.id;
-  //TODO: set rowOffsets
+  M1->rowStart=out[0][0]+1;
 
   GenmapMalloc(M1->rn+1,&M1->rowOffsets);
 
@@ -91,13 +92,27 @@ void mgLevelSetup(mgLevel l0,mgLevel *l1_)
     while(j<entries.n && ptr[j].r==ptr[i].r && ptr[j].c==ptr[i].c) j++;
     i=j,nnz++;
   }
-  if(nnz==0) M1->colIdx=NULL,M1->v=NULL,M1->x=NULL,M1->owner=NULL;
-  else{
-    GenmapMalloc(nnz,&M1->colIdx);
-    GenmapMalloc(nnz,&M1->v     );
-    GenmapMalloc(nnz,&M1->x     );
-    GenmapMalloc(nnz,&M1->owner );
+
+  if(nnz==0)
+    M1->colIdx=NULL,M1->v=NULL,M1->owner=NULL;
+  else
+    GenmapMalloc(nnz,&M1->colIdx),GenmapMalloc(nnz,&M1->v),\
+      GenmapMalloc(nnz,&M1->owner);
+
+  GenmapScalar v;
+  GenmapInt nr;
+  i=j=nn=nr=0; ptr=entries.ptr; while(i<entries.n){
+    v=0.0,M1->rowOffsets[nr++]=i;
+    while(j<entries.n && ptr[j].r==ptr[i].r && ptr[j].c==ptr[i].c)
+      v+=ptr[j].v,j++;
+    M1->colIdx[nn]=ptr[i].c,M1->v[nn]=v,M1->owner[nn]=ptr[i].p,nn++;
+
+    if(j<entries.n && ptr[j].r!=ptr[i].r) M1->rowOffsets[nr++]=j;
+    i=j;
   }
+  assert(nn==nnz); //sanity check
+  assert(nr==M1->rn); //sanity check
+  M1->rowOffsets[nr]=nnz;
 
   buffer_free(&buf);
   crystal_free(&cr);
@@ -119,12 +134,16 @@ void mgSetup(GenmapComm c,parMat M,mgData *d_){
   d->levels[0]->M=M; comm_dup(&d->c,&c->gsc);
   //TODO: set sigma, nSmooth
 
+  GenmapMalloc(d->nLevels,&d->levelOffsets);
+  d->levelOffsets[0]=0;
+
   GenmapInt i;
   for(i=1;i<d->nLevels;i++){
-    mgLevelSetup(d->levels[i-1],&d->levels[i]);
+    mgLevel l0=d->levels[i-1];
+    d->levelOffsets[i]=d->levelOffsets[i-1]+l0->M->rowOffsets[l0->M->rn];
+    mgLevelSetup(l0,&d->levels[i]);
     // set level offsets
   }
-  // allocate d->x and d->b
 }
 
 #undef GETPTR

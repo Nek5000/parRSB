@@ -16,14 +16,15 @@ struct parMat_{
   GenmapULong *colIdx;
 
   GenmapInt *owner;
-  GenmapScalar *v,*x;
+  GenmapScalar *v;
 
   struct gs_data *gsh;
   buffer buf;
 };
 
 void parMatSetup(GenmapHandle h,GenmapComm c,parMat *M);
-void parMatApply(GenmapVector x,parMat M,GenmapVector y);
+void parMatApply(GenmapScalar *y,parMat M,GenmapScalar *x,
+  GenmapScalar *buf);
 void parMatPrint(parMat M);
 int  parMatFree(parMat M);
 

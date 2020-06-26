@@ -58,15 +58,23 @@ int main(int argc,char *argv[]){
     v->data[i]=100; // Random number to reset v for next test
 
   /* Test Laplacian based on CSR representation */
-  parMat M;
-  parMatSetup(gh,c,&M);
-  parMatApply(u,M,v);
+  parMat M; parMatSetup(gh,c,&M);
+
+  GenmapScalar *x,*y,*buf;
+  GenmapMalloc(mesh->nelt,&x); GenmapMalloc(mesh->nelt,&y);
+  GenmapUInt nnz=M->rowOffsets[M->rn]; GenmapMalloc(nnz,&buf);
+
+  for(i=0; i<mesh->nelt; i++) x[i]=1.0;
+
+  parMatApply(y,M,x,buf);
   for(i=0;i<mesh->nelt;i++)
-    assert(fabs(v->data[i])<GENMAP_TOL);
+    assert(fabs(y[i])<GENMAP_TOL);
 
   parMatFree(M);
-  GenmapDestroyVector(v);
-  GenmapDestroyVector(u);
+
+  GenmapFree(buf); GenmapFree(x); GenmapFree(y);
+
+  GenmapDestroyVector(v); GenmapDestroyVector(u);
 
   GenmapFinalize(gh);
   MeshFree(mesh);

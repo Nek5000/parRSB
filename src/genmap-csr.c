@@ -95,13 +95,11 @@ void parMatSetup(GenmapHandle h,GenmapComm c,parMat *M_)
 
   GenmapMalloc(M->rn+1,&M->rowOffsets);
 
-  if(n==0) M->colIdx=NULL,M->v=NULL,M->x=NULL,M->owner=NULL;
-  else{
-    GenmapMalloc(entries.n,&M->colIdx);
-    GenmapMalloc(entries.n,&M->v     );
-    GenmapMalloc(entries.n,&M->x     );
-    GenmapMalloc(entries.n,&M->owner );
-  }
+  if(n==0)
+    M->colIdx=NULL,M->v=NULL,M->owner=NULL;
+  else
+    GenmapMalloc(entries.n,&M->colIdx),GenmapMalloc(entries.n,&M->v),\
+      GenmapMalloc(entries.n,&M->owner );
 
   ptr=entries.ptr;
   for(i=0; i<entries.n; i++)
@@ -129,41 +127,39 @@ void parMatSetup(GenmapHandle h,GenmapComm c,parMat *M_)
   array_free(&entries);
 }
 
-void parMatApply(GenmapVector x,parMat M,GenmapVector y){
+void parMatApply(GenmapScalar *y,parMat M,GenmapScalar *x,
+  GenmapScalar *buf)
+{
   const GenmapUInt rn=M->rn,cn=M->cn;
   const GenmapUInt *offsets=M->rowOffsets;
   const GenmapScalar *v=M->v;
-  GenmapScalar *xx=M->x;
-
-  GenmapScalar *xd=x->data;
-  GenmapScalar *yd=y->data;
 
   GenmapLong s=M->rowStart;
   GenmapInt i,j;
   for(i=0;i<M->rn;i++)
     for(j=M->rowOffsets[i]; j<M->rowOffsets[i+1]; j++)
-      if(M->owner[j]==M->rank && M->colIdx[j]==s+i) xx[j]=xd[i];
+      if(M->owner[j]==M->rank && M->colIdx[j]==s+i) buf[j]=x[i];
 
 #if defined(EXA_DEBUG)
-  printf("xx(before): ");
+  printf("buf(before): ");
   for(i=0;i<M->rowOffsets[rn];i++)
-    printf("%lf ",xx[i]);
+    printf("%lf ",buf[i]);
   printf("\n");
 #endif
 
-  gs(xx,genmap_gs_scalar,gs_add,0,M->gsh,&M->buf);
+  gs(buf,genmap_gs_scalar,gs_add,0,M->gsh,&M->buf);
 
 #if defined(EXA_DEBUG)
-  printf("xx(after): ");
+  printf("buf(after): ");
   for(i=0;i<M->rowOffsets[rn];i++)
-    printf("%lf ",xx[i]);
+    printf("%lf ",buf[i]);
   printf("\n");
 #endif
 
   GenmapUInt je;
   for(i=0;i<rn;i++){
-    for(yd[i]=0.0,j=offsets[i],je=offsets[i+1]; j<je; j++)
-      yd[i]+=(*v++)*(*xx++);
+    for(y[i]=0.0,j=offsets[i],je=offsets[i+1]; j<je; j++)
+      y[i]+=(*v++)*(*buf++);
   }
 }
 
@@ -186,7 +182,6 @@ void parMatPrint(parMat M){
 int parMatFree(parMat M){
   if(M->colIdx) GenmapFree(M->colIdx);
   if(M->v) GenmapFree(M->v);
-  if(M->x) GenmapFree(M->x);
   if(M->rowOffsets) GenmapFree(M->rowOffsets);
   if(M->owner) GenmapFree(M->owner);
   if(M->gsh) gs_free(M->gsh);
