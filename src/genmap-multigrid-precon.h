@@ -49,6 +49,18 @@ void mgFree(mgData d);
 
 int log2i(GenmapInt i);
 
+typedef struct{
+  GenmapULong r,c,rn,cn;
+  GenmapInt owner; /* 0-index */
+  GenmapInt p;
+  GenmapScalar v;
+} entry;
+
+#define GETLNG(ptr,i,offset)\
+  (*((GenmapULong*)((char*)(ptr)+offset+(i)*sizeof(entry))))
+
+#define GETPTR(ptr,i,offset) ((char*)(ptr)+offset+i*sizeof(entry))
+
 void setOwner(char *ptr,GenmapInt n,size_t inOffset,size_t outOffset,
   GenmapLong lelg,GenmapInt np);
 

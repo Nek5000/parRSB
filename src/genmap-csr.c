@@ -5,14 +5,6 @@
 
 #define ABS(i) ((i<0)?-i:i)
 
-typedef struct {
-  GenmapULong r,c; /* 1-index */
-  GenmapInt owner; /* 0-index */
-  GenmapScalar v;
-} entry;
-
-#define GETPTR(ptr,i,offset) ((char*)(ptr)+offset+i*sizeof(entry))
-
 void setOwner(char *ptr,GenmapInt n,size_t inOffset,size_t outOffset,
   GenmapLong lelg,GenmapInt np)
 {
@@ -31,7 +23,8 @@ void setOwner(char *ptr,GenmapInt n,size_t inOffset,size_t outOffset,
     if(row<lelt*(np-nrem)) *outPtr=(GenmapInt) row/lelt;
     else *outPtr=np-nrem+(GenmapInt) (row-lelt*(np-nrem))/(lelt+1);
 #else
-    if(row<(lelt+1)*nrem) *outPtr=(GenmapInt) row/(lelt+1);
+    if(nrem==0) *outPtr=(GenmapInt) row/lelt;
+    else if(row<(lelt+1)*nrem) *outPtr=(GenmapInt) row/(lelt+1);
     else *outPtr=nrem+(GenmapInt) (row-(lelt+1)*nrem)/lelt;
 #endif
   }
