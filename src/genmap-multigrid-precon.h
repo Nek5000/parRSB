@@ -32,6 +32,7 @@ struct mgLevel_{
   mgData data;
   int nSmooth;
   GenmapScalar sigma;
+  struct gs_data *J; // interpolation from level i to i+1
   parMat M;
 };
 

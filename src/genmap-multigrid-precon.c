@@ -23,10 +23,10 @@ void compressMat(struct array *entries,size_t off){
 void mgLevelSetup(mgLevel l0,mgLevel *l1_)
 {
   parMat M0=l0->M; mgData data=l0->data;
-  GenmapUInt rn=M0->rn,nnz0=M0->rowOffsets[rn];
+  GenmapUInt rn0=M0->rn,nnz0=M0->rowOffsets[rn0];
 
-  GenmapLong out[2][1],bf[2][1];
-  comm_scan(out,&data->c,gs_long,gs_add,&rn,1,bf);
+  GenmapLong out[2][1],bf[2][1],in=rn0;
+  comm_scan(out,&data->c,gs_long,gs_add,&in,1,bf);
   GenmapLong ng=out[1][0];
 
   sint np=data->c.np;
@@ -40,7 +40,7 @@ void mgLevelSetup(mgLevel l0,mgLevel *l1_)
 
   GenmapUInt i,j,nn=0;
   entry *ptr=entries.ptr;
-  for(i=0; i<rn; i++)
+  for(i=0; i<rn0; i++)
     for(j=M0->rowOffsets[i]; j<M0->rowOffsets[i+1]; j++){
       ptr[nn].r=ptr[nn].rn=i+M0->rowStart ;
       ptr[nn].c=ptr[nn].cn=  M0->colIdx[j];
@@ -70,39 +70,37 @@ void mgLevelSetup(mgLevel l0,mgLevel *l1_)
 
   /* setup gs ids */
   ptr=entries.ptr;
-  GenmapLong *ids; GenmapMalloc(nnz0,&ids);
-  for(i=0; i<nnz0; i++){
-    ids[i]=-ptr[i].cn;
-    printf("nid=%d nnz=%u cn=%lld\n",data->c.id,nnz0,ptr[i].cn);
-  }
+  GenmapLong *ids; GenmapMalloc(rn0,&ids);
+  for(i=j=0; i<nnz0; i++)
+    if(ptr[i].r==ptr[i].c) ids[j++]=-ptr[i].cn;
+  assert(j==rn0);
 
   /* coarsen the rows */
   setOwner(entries.ptr,nnz0,offsetof(entry,r),offsetof(entry,p),ng,np);
   sarray_transfer(entry,&entries,p,1,&cr);
 
   if(entries.n){
-    sarray_sort_2(entry,entries.ptr,entries.n,r,1,c,1,&buf);
+    sarray_sort_2(entry,entries.ptr,entries.n,r,1,cn,1,&buf);
     compressMat(&entries,offsetof(entry,rn));
   }
   ptr=entries.ptr;
 
 #define TMPDBG 0
 #if TMPDBG
-  sarray_transfer(entry,&entries,p,0,&cr);
-  ptr=entries.ptr;
+  sarray_transfer(entry,&entries,p,0,&cr); ptr=entries.ptr;
   for(i=0; i<nnz0; i++)
     printf("nid=%d nnz=%d rn=%lld\n",data->c.id,nnz0,ptr[i].cn);
 #endif
-
-  /* create the matrix */
-  GenmapMalloc(1,l1_   ); mgLevel l1=*l1_; l1->data=data;
-  GenmapMalloc(1,&l1->M); parMat M1 =l1->M; M1->rank=data->c.id;
 
   sarray_sort_2(entry,ptr,entries.n,rn,1,cn,1,&buf);
   i=j=nn=0; ptr=entries.ptr; while(i<entries.n){
     while(j<entries.n && ptr[j].rn==ptr[i].rn) j++;
     i=j,nn++;
   }
+
+  /* create the matrix */
+  GenmapMalloc(1,l1_   ); mgLevel l1=*l1_ ; l1->data=data;
+  GenmapMalloc(1,&l1->M); parMat M1 =l1->M; M1->rank=data->c.id;
   M1->rn=nn;
 
   GenmapLong cn=nn; comm_scan(out,&data->c,gs_long,gs_add,&cn,1,bf);
@@ -134,20 +132,19 @@ void mgLevelSetup(mgLevel l0,mgLevel *l1_)
     //TODO: set owner -- M1->owner[nn]=ptr[i].p,
 
     if((j<entries.n && ptr[j].rn!=ptr[i].rn) || j>=entries.n)
-      M1->rowOffsets[nr++]=nn;
+      M1->rowOffsets[++nr]=nn;
     i=j;
   }
   assert(nn==nnz1); //sanity check
   assert(nr==M1->rn); //sanity check
 
-  GenmapRealloc(nnz0+nnz1,&ids);
-  for(i=nnz0; i<nnz0+nnz1; i++)
-    if(M1->owner[i]!=M1->rank)
-      ids[i]=-M1->colIdx[i-nnz0];
-    else
-      ids[i]=M1->colIdx[i-nnz0];
+  GenmapRealloc(rn0+M1->rn,&ids);
+  for(i=nn=0; i<M1->rn; i++)
+    for(j=M1->rowOffsets[i]; j<M1->rowOffsets[i+1]; j++)
+      if(M1->rowStart+i==M1->colIdx[j]) ids[rn0+nn]=M1->colIdx[j],nn++;
+  assert(nn==M1->rn);
 
-  M1->gsh=gs_setup(ids,nnz0+nnz1,&data->c,0,gs_crystal_router,0);
+  l1->J=gs_setup(ids,rn0+M1->rn,&data->c,0,gs_crystal_router,0);
 
   GenmapFree(ids);
   buffer_free(&buf);

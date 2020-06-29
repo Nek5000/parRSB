@@ -109,9 +109,10 @@ void parMatSetup(GenmapHandle h,GenmapComm c,parMat *M_)
 
   if(entries.n>0) GenmapRealloc(entries.n,&eIds);
 
-  for(i=0; i<entries.n; i++)
-    if(ptr[i].r==ptr[i].c && ptr[i].owner==M->rank) eIds[i]=ptr[i].c;
-    else eIds[i]=-ptr[i].c;
+  for(i=0; i<M->rn; i++)
+    for(j=M->rowOffsets[i]; j<M->rowOffsets[i+1]; j++)
+      if(M->rowStart+i==M->colIdx[j]) eIds[j]=M->colIdx[j];
+      else eIds[j]=-M->colIdx[j];
 
   M->gsh=gs_setup(eIds,M->rowOffsets[n],&c->gsc,0,gs_crystal_router,0);
   buffer_init(&M->buf,1024);
