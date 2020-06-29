@@ -63,7 +63,7 @@ int main(int argc,char *argv[]){
 
   GenmapScalar *x,*y,*buf;
   GenmapMalloc(mesh->nelt,&x); GenmapMalloc(mesh->nelt,&y);
-  GenmapUInt nnz=M->rowOffsets[M->rn]; GenmapMalloc(nnz,&buf);
+  GenmapUInt nnz=M->row_off[M->rn]; GenmapMalloc(nnz,&buf);
 
   for(i=0; i<mesh->nelt; i++) x[i]=1.0;
 

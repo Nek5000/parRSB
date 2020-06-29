@@ -5,40 +5,40 @@
 
 #define ABS(i) ((i<0)?-i:i)
 
-void setOwner(char *ptr,GenmapInt n,size_t inOffset,size_t outOffset,
-  GenmapLong lelg,GenmapInt np)
+void setOwner(char *ptr,sint n,size_t inOffset,size_t outOffset,
+  slong lelg,sint np)
 {
-  GenmapInt lelt=lelg/np;
-  GenmapInt nrem=lelg%np;
+  sint lelt=lelg/np;
+  sint nrem=lelg%np;
 
-  GenmapULong *inPtr;
-  GenmapInt  *outPtr;
-  GenmapInt i; GenmapLong row;
+  ulong *inPtr;
+  sint  *outPtr;
+  sint i; slong row;
   for(i=0; i<n; i++){
-    inPtr =(GenmapULong*)GETPTR(ptr,i,inOffset );
-    outPtr=(GenmapInt  *)GETPTR(ptr,i,outOffset);
+    inPtr =(ulong*)GETPTR(ptr,i,inOffset );
+    outPtr=(sint  *)GETPTR(ptr,i,outOffset);
     row   =*inPtr-1;
     //FIXME: Assumes the 'reverse-Nek' element distribution
 #if 0
-    if(row<lelt*(np-nrem)) *outPtr=(GenmapInt) row/lelt;
-    else *outPtr=np-nrem+(GenmapInt) (row-lelt*(np-nrem))/(lelt+1);
+    if(row<lelt*(np-nrem)) *outPtr=(sint) row/lelt;
+    else *outPtr=np-nrem+(sint) (row-lelt*(np-nrem))/(lelt+1);
 #else
-    if(nrem==0) *outPtr=(GenmapInt) row/lelt;
-    else if(row<(lelt+1)*nrem) *outPtr=(GenmapInt) row/(lelt+1);
-    else *outPtr=nrem+(GenmapInt) (row-(lelt+1)*nrem)/lelt;
+    if(nrem==0) *outPtr=(sint) row/lelt;
+    else if(row<(lelt+1)*nrem) *outPtr=(sint) row/(lelt+1);
+    else *outPtr=nrem+(sint) (row-(lelt+1)*nrem)/lelt;
 #endif
   }
 }
 
 void parMatSetup(GenmapHandle h,GenmapComm c,parMat *M_)
 {
-  GenmapInt lelt=GenmapGetNLocalElements(h);
-  GenmapInt nv  =GenmapGetNVertices(h);
+  sint lelt=GenmapGetNLocalElements(h);
+  sint nv  =GenmapGetNVertices(h);
 
   GenmapScan(h,c);
-  GenmapLong s=GenmapGetLocalStartIndex(h)+1;
+  slong s=GenmapGetLocalStartIndex(h)+1;
 
-  GenmapLong *eIds; GenmapInt *offsets;
+  slong *eIds; sint *offsets;
   GenmapFindNeighbors(h,c,&eIds,&offsets);
 
   struct array entries=null_array;
@@ -46,7 +46,7 @@ void parMatSetup(GenmapHandle h,GenmapComm c,parMat *M_)
   entries.n=offsets[lelt];
 
   entry *ptr=entries.ptr;
-  GenmapInt i,j,n=0;
+  sint i,j,n=0;
   for(i=0;i<lelt;i++)
     for(j=0;j<offsets[i]+1;j++){
       ptr[n].r=s+i,ptr[n].c=ABS(eIds[n]),ptr[n].v=-1.0;
@@ -56,8 +56,8 @@ void parMatSetup(GenmapHandle h,GenmapComm c,parMat *M_)
   GenmapFree(offsets);
 
   GenmapScan(h,c);
-  GenmapLong ng=GenmapGetNGlobalElements(h);
-  GenmapInt np =GenmapCommSize(c);
+  slong ng=GenmapGetNGlobalElements(h);
+  sint np =GenmapCommSize(c);
   setOwner(entries.ptr,entries.n,offsetof(entry,c),
     offsetof(entry,owner),ng,np);
 
@@ -82,36 +82,36 @@ void parMatSetup(GenmapHandle h,GenmapComm c,parMat *M_)
 
   M->rn=n;
   GenmapScan(h,c);
-  M->rowStart=GenmapGetLocalStartIndex(h)+1;
+  M->row_start=GenmapGetLocalStartIndex(h)+1;
 
-  GenmapMalloc(M->rn+1,&M->rowOffsets);
+  GenmapMalloc(M->rn+1,&M->row_off);
 
   if(n==0)
-    M->colIdx=NULL,M->v=NULL;
+    M->col=NULL,M->v=NULL;
   else
-    GenmapMalloc(entries.n,&M->colIdx),GenmapMalloc(entries.n,&M->v);
+    GenmapMalloc(entries.n,&M->col),GenmapMalloc(entries.n,&M->v);
 
   ptr=entries.ptr;
   for(i=0; i<entries.n; i++)
-    M->colIdx[i]=ptr[i].c,M->v[i]=ptr[i].v;
+    M->col[i]=ptr[i].c,M->v[i]=ptr[i].v;
 
-  M->rowOffsets[0]=0,i=0; GenmapInt nn=0;
+  M->row_off[0]=0,i=0; sint nn=0;
   while(i<entries.n){
     j=i+1;
     while(j<entries.n && ptr[i].r==ptr[j].r) j++;
-    i=M->rowOffsets[++nn]=j;
+    i=M->row_off[++nn]=j;
   }
   assert(n==nn);
-  assert(M->rowOffsets[n]=entries.n);
+  assert(M->row_off[n]=entries.n);
 
   if(entries.n>0) GenmapRealloc(entries.n,&eIds);
 
   for(i=0; i<M->rn; i++)
-    for(j=M->rowOffsets[i]; j<M->rowOffsets[i+1]; j++)
-      if(M->rowStart+i==M->colIdx[j]) eIds[j]=M->colIdx[j];
-      else eIds[j]=-M->colIdx[j];
+    for(j=M->row_off[i]; j<M->row_off[i+1]; j++)
+      if(M->row_start+i==M->col[j]) eIds[j]=M->col[j];
+      else eIds[j]=-M->col[j];
 
-  M->gsh=gs_setup(eIds,M->rowOffsets[n],&c->gsc,0,gs_crystal_router,0);
+  M->gsh=gs_setup(eIds,M->row_off[n],&c->gsc,0,gs_crystal_router,0);
   buffer_init(&M->buf,1024);
 
   GenmapFree(eIds);
@@ -121,19 +121,19 @@ void parMatSetup(GenmapHandle h,GenmapComm c,parMat *M_)
 void parMatApply(GenmapScalar *y,parMat M,GenmapScalar *x,
   GenmapScalar *buf)
 {
-  const GenmapUInt rn=M->rn;
-  const GenmapUInt *offsets=M->rowOffsets;
+  const uint rn=M->rn;
+  const uint *offsets=M->row_off;
   const GenmapScalar *v=M->v;
 
-  GenmapLong s=M->rowStart;
-  GenmapInt i,j;
+  ulong s=M->row_start;
+  sint i,j;
   for(i=0;i<M->rn;i++)
-    for(j=M->rowOffsets[i]; j<M->rowOffsets[i+1]; j++)
-      if(M->colIdx[j]==s+i) buf[j]=x[i];
+    for(j=M->row_off[i]; j<M->row_off[i+1]; j++)
+      if(M->col[j]==s+i) buf[j]=x[i];
 
 #if defined(EXA_DEBUG)
   printf("buf(before): ");
-  for(i=0;i<M->rowOffsets[rn];i++)
+  for(i=0;i<M->row_off[rn];i++)
     printf("%lf ",buf[i]);
   printf("\n");
 #endif
@@ -142,12 +142,12 @@ void parMatApply(GenmapScalar *y,parMat M,GenmapScalar *x,
 
 #if defined(EXA_DEBUG)
   printf("buf(after): ");
-  for(i=0;i<M->rowOffsets[rn];i++)
+  for(i=0;i<M->row_off[rn];i++)
     printf("%lf ",buf[i]);
   printf("\n");
 #endif
 
-  GenmapUInt je;
+  uint je;
   for(i=0;i<rn;i++){
     for(y[i]=0.0,j=offsets[i],je=offsets[i+1]; j<je; j++)
       y[i]+=(*v++)*(*buf++);
@@ -155,13 +155,13 @@ void parMatApply(GenmapScalar *y,parMat M,GenmapScalar *x,
 }
 
 void parMatPrint(parMat M){
-  const GenmapInt rn=M->rn;
-  const GenmapUInt *offsets=M->rowOffsets;
+  const sint rn=M->rn;
+  const uint *offsets=M->row_off;
   const GenmapScalar *v=M->v;
-  const GenmapULong *col=M->colIdx;
+  const ulong *col=M->col;
 
   printf("rn=%d\n",M->rn);
-  GenmapInt i,j;
+  sint i,j;
   for(i=0; i<rn; i++){
     printf("row %d: ",i+1);
     for(j=offsets[i]; j<offsets[i+1]; j++)
@@ -171,9 +171,9 @@ void parMatPrint(parMat M){
 }
 
 int parMatFree(parMat M){
-  if(M->colIdx) GenmapFree(M->colIdx);
+  if(M->col) GenmapFree(M->col);
   if(M->v) GenmapFree(M->v);
-  if(M->rowOffsets) GenmapFree(M->rowOffsets);
+  if(M->row_off) GenmapFree(M->row_off);
   if(M->gsh) gs_free(M->gsh);
   if(M->buf.ptr) buffer_free(&M->buf);
   GenmapFree(M);
