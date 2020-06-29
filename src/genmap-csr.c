@@ -81,22 +81,19 @@ void parMatSetup(GenmapHandle h,GenmapComm c,parMat *M_)
   }
 
   M->rn=n,M->cn=GenmapGetNGlobalElements(h);
-  M->rank=GenmapCommRank(c);
-
   GenmapScan(h,c);
   M->rowStart=GenmapGetLocalStartIndex(h)+1;
 
   GenmapMalloc(M->rn+1,&M->rowOffsets);
 
   if(n==0)
-    M->colIdx=NULL,M->v=NULL,M->owner=NULL;
+    M->colIdx=NULL,M->v=NULL;
   else
-    GenmapMalloc(entries.n,&M->colIdx),GenmapMalloc(entries.n,&M->v),\
-      GenmapMalloc(entries.n,&M->owner );
+    GenmapMalloc(entries.n,&M->colIdx),GenmapMalloc(entries.n,&M->v);
 
   ptr=entries.ptr;
   for(i=0; i<entries.n; i++)
-    M->colIdx[i]=ptr[i].c,M->v[i]=ptr[i].v,M->owner[i]=ptr[i].owner;
+    M->colIdx[i]=ptr[i].c,M->v[i]=ptr[i].v;
 
   M->rowOffsets[0]=0,i=0; GenmapInt nn=0;
   while(i<entries.n){
@@ -132,7 +129,7 @@ void parMatApply(GenmapScalar *y,parMat M,GenmapScalar *x,
   GenmapInt i,j;
   for(i=0;i<M->rn;i++)
     for(j=M->rowOffsets[i]; j<M->rowOffsets[i+1]; j++)
-      if(M->owner[j]==M->rank && M->colIdx[j]==s+i) buf[j]=x[i];
+      if(M->colIdx[j]==s+i) buf[j]=x[i];
 
 #if defined(EXA_DEBUG)
   printf("buf(before): ");
@@ -177,7 +174,6 @@ int parMatFree(parMat M){
   if(M->colIdx) GenmapFree(M->colIdx);
   if(M->v) GenmapFree(M->v);
   if(M->rowOffsets) GenmapFree(M->rowOffsets);
-  if(M->owner) GenmapFree(M->owner);
   if(M->gsh) gs_free(M->gsh);
   if(M->buf.ptr) buffer_free(&M->buf);
   GenmapFree(M);

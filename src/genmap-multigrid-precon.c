@@ -44,7 +44,7 @@ void mgLevelSetup(mgLevel l0,mgLevel *l1_)
     for(j=M0->rowOffsets[i]; j<M0->rowOffsets[i+1]; j++){
       ptr[nn].r=ptr[nn].rn=i+M0->rowStart ;
       ptr[nn].c=ptr[nn].cn=  M0->colIdx[j];
-      ptr[nn].v=M0->v[j],ptr[nn].p=M0->owner[j];
+      ptr[nn].v=M0->v[j];
       nn++;
     }
   assert(nn==nnz0);
@@ -100,7 +100,7 @@ void mgLevelSetup(mgLevel l0,mgLevel *l1_)
 
   /* create the matrix */
   GenmapMalloc(1,l1_   ); mgLevel l1=*l1_ ; l1->data=data;
-  GenmapMalloc(1,&l1->M); parMat M1 =l1->M; M1->rank=data->c.id;
+  GenmapMalloc(1,&l1->M); parMat M1 =l1->M;
   M1->rn=nn;
 
   GenmapLong cn=nn; comm_scan(out,&data->c,gs_long,gs_add,&cn,1,bf);
@@ -117,10 +117,9 @@ void mgLevelSetup(mgLevel l0,mgLevel *l1_)
 
   GenmapMalloc(M1->rn+1,&M1->rowOffsets);
   if(nnz1==0)
-    M1->colIdx=NULL,M1->v=NULL,M1->owner=NULL;
+    M1->colIdx=NULL,M1->v=NULL;
   else
-    GenmapMalloc(nnz1,&M1->colIdx),GenmapMalloc(nnz1,&M1->v),\
-      GenmapMalloc(nnz1,&M1->owner);
+    GenmapMalloc(nnz1,&M1->colIdx),GenmapMalloc(nnz1,&M1->v);
 
   GenmapScalar v;
   sint nr=0; M1->rowOffsets[nr]=0;
@@ -129,7 +128,6 @@ void mgLevelSetup(mgLevel l0,mgLevel *l1_)
     while(j<entries.n && ptr[j].rn==ptr[i].rn && ptr[j].cn==ptr[i].cn)
       v+=ptr[j].v,j++;
     M1->colIdx[nn]=ptr[i].cn,M1->v[nn]=v,nn++;
-    //TODO: set owner -- M1->owner[nn]=ptr[i].p,
 
     if((j<entries.n && ptr[j].rn!=ptr[i].rn) || j>=entries.n)
       M1->rowOffsets[++nr]=nn;

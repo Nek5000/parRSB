@@ -8,14 +8,10 @@ typedef struct mgLevel_ *mgLevel;
 struct parMat_{
   GenmapUInt rn;
   GenmapULong cn;
-
   GenmapULong rowStart;
-  sint rank;
 
   GenmapUInt *rowOffsets;
   GenmapULong *colIdx;
-
-  sint *owner;
   GenmapScalar *v;
 
   struct gs_data *gsh;
