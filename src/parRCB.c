@@ -48,7 +48,8 @@ int parRCB_partMesh(int *part,double *vtx,int nel,int nv,
 
   exaArraySetSize(eList,nel);
 
-  exaLoadBalance(eList,exaGetComm(h));
+  //TODO: FIXME
+  //exaLoadBalance(eList,exaGetComm(h));
 
   nel=exaArrayGetSize(eList);
   exaComm commRcb;

@@ -10,12 +10,12 @@ struct parMat_{
   GenmapULong cn;
 
   GenmapULong rowStart;
-  GenmapInt rank;
+  sint rank;
 
   GenmapUInt *rowOffsets;
   GenmapULong *colIdx;
 
-  GenmapInt *owner;
+  sint *owner;
   GenmapScalar *v;
 
   struct gs_data *gsh;
@@ -37,7 +37,7 @@ struct mgLevel_{
 
 struct mgData_{
   struct comm c;
-  GenmapInt nLevels;
+  sint nLevels;
   mgLevel *levels;
   GenmapUInt *levelOffsets;
   GenmapScalar *x,*b,*buf;
@@ -47,12 +47,12 @@ void mgSetup(GenmapComm c,parMat M,mgData *d);
 void mgLevelSetup(mgLevel l0,mgLevel *l1_);
 void mgFree(mgData d);
 
-int log2i(GenmapInt i);
+int log2i(sint i);
 
 typedef struct{
   GenmapULong r,c,rn,cn;
-  GenmapInt owner; /* 0-index */
-  GenmapInt p;
+  sint owner; /* 0-index */
+  sint p;
   GenmapScalar v;
 } entry;
 
@@ -61,7 +61,7 @@ typedef struct{
 
 #define GETPTR(ptr,i,offset) ((char*)(ptr)+offset+i*sizeof(entry))
 
-void setOwner(char *ptr,GenmapInt n,size_t inOffset,size_t outOffset,
-  GenmapLong lelg,GenmapInt np);
+void setOwner(char *ptr,sint n,size_t inOffset,size_t outOffset,
+  GenmapLong lelg,sint np);
 
 #endif
