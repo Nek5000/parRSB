@@ -40,7 +40,7 @@ struct mgData_{
 };
 
 void mgSetup(GenmapComm c,parMat M,mgData *d);
-void mgLevelSetup(mgLevel l0,mgLevel *l1_);
+void mgLevelSetup(parMat M,mgData data,mgLevel *l);
 void mgFree(mgData d);
 
 int log2i(sint i);
