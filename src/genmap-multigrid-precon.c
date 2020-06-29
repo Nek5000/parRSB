@@ -160,20 +160,20 @@ void mgSetup(GenmapComm c,parMat M,mgData *d_){
   GenmapMalloc(1,&d->levels[0]); d->levels[0]->M=M; d->levels[0]->data=d;
   //TODO: set sigma, nSmooth
 
-  GenmapMalloc(d->nLevels,&d->levelOffsets);
-  d->levelOffsets[0]=0;
+  GenmapMalloc(d->nLevels,&d->level_off);
+  d->level_off[0]=0;
 
   sint i; mgLevel l0;
   for(i=1;i<d->nLevels;i++){
     l0=d->levels[i-1];
-    d->levelOffsets[i]=d->levelOffsets[i-1]+l0->M->row_off[l0->M->rn];
+    d->level_off[i]=d->level_off[i-1]+l0->M->row_off[l0->M->rn];
     mgLevelSetup(l0,&d->levels[i]);
     //TODO: set sigma, nSmooth
   }
   //l0=d->levels[i-1];
-  //d->levelOffsets[i]=d->levelOffsets[i-1]+l0->M->row_off[l0->M->rn];
+  //d->level_off[i]=d->level_off[i-1]+l0->M->row_off[l0->M->rn];
 
-  //GenmapMalloc(d->levelOffsets[i],&d->x  );
-  //GenmapMalloc(d->levelOffsets[i],&d->b  );
-  //GenmapMalloc(d->levelOffsets[i],&d->buf);
+  //GenmapMalloc(d->level_off[i],&d->x  );
+  //GenmapMalloc(d->level_off[i],&d->b  );
+  //GenmapMalloc(d->level_off[i],&d->buf);
 }

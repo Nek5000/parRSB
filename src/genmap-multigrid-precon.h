@@ -35,7 +35,7 @@ struct mgData_{
   struct comm c;
   sint nLevels;
   mgLevel *levels;
-  uint *levelOffsets;
+  uint *level_off;
   GenmapScalar *x,*b,*buf;
 };
 
