@@ -80,7 +80,7 @@ void parMatSetup(GenmapHandle h,GenmapComm c,parMat *M_)
     i=j,n++;
   }
 
-  M->rn=n,M->cn=GenmapGetNGlobalElements(h);
+  M->rn=n;
   GenmapScan(h,c);
   M->rowStart=GenmapGetLocalStartIndex(h)+1;
 
@@ -121,7 +121,7 @@ void parMatSetup(GenmapHandle h,GenmapComm c,parMat *M_)
 void parMatApply(GenmapScalar *y,parMat M,GenmapScalar *x,
   GenmapScalar *buf)
 {
-  const GenmapUInt rn=M->rn,cn=M->cn;
+  const GenmapUInt rn=M->rn;
   const GenmapUInt *offsets=M->rowOffsets;
   const GenmapScalar *v=M->v;
 

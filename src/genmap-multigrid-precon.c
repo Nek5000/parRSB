@@ -85,13 +85,6 @@ void mgLevelSetup(mgLevel l0,mgLevel *l1_)
   }
   ptr=entries.ptr;
 
-#define TMPDBG 0
-#if TMPDBG
-  sarray_transfer(entry,&entries,p,0,&cr); ptr=entries.ptr;
-  for(i=0; i<nnz0; i++)
-    printf("nid=%d nnz=%d rn=%lld\n",data->c.id,nnz0,ptr[i].cn);
-#endif
-
   sarray_sort_2(entry,ptr,entries.n,rn,1,cn,1,&buf);
   i=j=nn=0; ptr=entries.ptr; while(i<entries.n){
     while(j<entries.n && ptr[j].rn==ptr[i].rn) j++;
@@ -104,7 +97,6 @@ void mgLevelSetup(mgLevel l0,mgLevel *l1_)
   M1->rn=nn;
 
   GenmapLong cn=nn; comm_scan(out,&data->c,gs_long,gs_add,&cn,1,bf);
-  M1->cn=out[1][0];
   M1->rowStart=out[0][0]+1;
 
   GenmapUInt nnz1=0;

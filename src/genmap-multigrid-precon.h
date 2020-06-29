@@ -7,7 +7,6 @@ typedef struct mgLevel_ *mgLevel;
 
 struct parMat_{
   GenmapUInt rn;
-  GenmapULong cn;
   GenmapULong rowStart;
 
   GenmapUInt *rowOffsets;

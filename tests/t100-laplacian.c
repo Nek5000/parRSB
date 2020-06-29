@@ -57,7 +57,7 @@ int main(int argc,char *argv[]){
   for(i=0;i<mesh->nelt;i++)
     v->data[i]=100; // Random number to reset v for next test
 
-#if 0
+#if 1
   /* Test Laplacian based on CSR representation */
   parMat M; parMatSetup(gh,c,&M);
 
