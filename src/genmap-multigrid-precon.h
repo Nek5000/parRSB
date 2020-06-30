@@ -20,7 +20,7 @@ struct parMat_{
 void parMatSetup(GenmapHandle h,GenmapComm c,parMat *M);
 void parMatApply(GenmapScalar *y,parMat M,GenmapScalar *x,
   GenmapScalar *buf);
-void parMatPrint(parMat M);
+void parMatPrint(parMat M,struct comm *c);
 int  parMatFree(parMat M);
 
 struct mgLevel_{

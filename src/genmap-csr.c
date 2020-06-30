@@ -154,19 +154,23 @@ void parMatApply(GenmapScalar *y,parMat M,GenmapScalar *x,
   }
 }
 
-void parMatPrint(parMat M){
+void parMatPrint(parMat M,struct comm *c){
   const sint rn=M->rn;
   const uint *offsets=M->row_off;
   const GenmapScalar *v=M->v;
   const ulong *col=M->col;
 
-  printf("rn=%d\n",M->rn);
-  sint i,j;
-  for(i=0; i<rn; i++){
-    printf("row %d: ",i+1);
-    for(j=offsets[i]; j<offsets[i+1]; j++)
-      printf("(%lld,%lf)",col[j],v[j]);
-    printf("\n");
+  uint i,j,k;
+
+  for(k=0; k<c->np; k++){
+    comm_barrier(c);
+    if(c->id==k)
+      for(i=0; i<rn; i++){
+        printf("r%2lld: ",M->row_start+i);
+        for(j=offsets[i]; j<offsets[i+1]; j++)
+          printf("(%2lld,%.2lf)",col[j],v[j]);
+        printf("\n");
+      }
   }
 }
 

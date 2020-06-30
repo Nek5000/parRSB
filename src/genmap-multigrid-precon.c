@@ -1,6 +1,8 @@
 #include <genmap-impl.h>
 #include <genmap-multigrid-precon.h>
 
+#define DBG 0
+
 int log2i(sint i){
   sint k=1,l=0;
   while(k<=i) k*=2,l++;
@@ -56,7 +58,10 @@ void mgLevelSetup(parMat M0,mgData data,mgLevel *l_)
       nn++;
     }
   assert(nn==nnz0);
+
+#if DBG
   printf("A: nid=%d nnz=%zu\n",data->c.id,entries.n);
+#endif
 
   slong out[2][1],bf[2][1],in=rn0;
   comm_scan(out,&data->c,gs_long,gs_add,&in,1,bf);
@@ -76,8 +81,10 @@ void mgLevelSetup(parMat M0,mgData data,mgLevel *l_)
 
   if(ngc<npc) npc=ngc;
 
+#if DBG
   printf("id=%u ng=%lld ng_c=%lld np=%d np_c=%d\n",data->c.id,ng,ngc,
       data->c.np,npc);
+#endif
 
   struct crystal cr;
   crystal_init(&cr,&data->c);
@@ -86,7 +93,9 @@ void mgLevelSetup(parMat M0,mgData data,mgLevel *l_)
   setOwner(entries.ptr,nnz0,offsetof(entry,cn),offsetof(entry,p),ngc,npc);
   sarray_transfer(entry,&entries,p,1,&cr);
 
+#if DBG
   printf("B: nid=%d nnz=%zu\n",data->c.id,entries.n);
+#endif
 
   buffer buf; buffer_init(&buf,1024);
   if(entries.n){
@@ -108,7 +117,9 @@ void mgLevelSetup(parMat M0,mgData data,mgLevel *l_)
   setOwner(entries.ptr,nnz0,offsetof(entry,rn),offsetof(entry,p),ngc,npc);
   sarray_transfer(entry,&entries,p,1,&cr);
 
+#if DBG
   printf("C: nid=%d nnz=%zu\n",data->c.id,entries.n);
+#endif
 
   if(entries.n){
     sarray_sort_2(entry,entries.ptr,entries.n,c ,1,rn,1,&buf);
@@ -121,7 +132,9 @@ void mgLevelSetup(parMat M0,mgData data,mgLevel *l_)
     i=j,nn++;
   }
 
+#if DBG
   printf("D: nid=%d rn=%d\n",data->c.id,nn);
+#endif
 
   /* create the matrix */
   GenmapMalloc(1,l_   ); mgLevel l=*l_ ; l->data=data;
@@ -138,7 +151,9 @@ void mgLevelSetup(parMat M0,mgData data,mgLevel *l_)
     i=j,nnz1++;
   }
 
+#if DBG
   printf("C: nid=%d rn=%d nnz0=%u nnz1=%d\n",data->c.id,nn,nnz0,nnz1);
+#endif
 
   if(nnz1==0)
     M1->col=NULL,M1->v=NULL;
@@ -183,18 +198,24 @@ void mgSetup(GenmapComm c,parMat M,mgData *d_){
   slong rg=out[1][0];
 
   d->nLevels=log2i(rg); // Ignoring L_0
+#if DBG
   printf("A: nid=%d nLevel=%d\n",d->c.id,d->nLevels);
+#endif
   if(d->nLevels==0) return;
 
   GenmapMalloc(d->nLevels  ,&d->levels   );
   GenmapMalloc(d->nLevels+1,&d->level_off);
   d->level_off[0]=M->rn;
 
-  uint i; parMat prev=M;
+  fflush(stdout);
+  uint i; parMat prev=M; parMatPrint(prev,&c->gsc);
   for(i=0;i<d->nLevels;i++){
     mgLevelSetup(prev,d,&d->levels[i]);
-    //prev=d->levels[i]->M;
-    //d->level_off[i+1]=d->level_off[i]+prev->rn;
+    prev=d->levels[i]->M;
+    fflush(stdout);
+    comm_barrier(&c->gsc);
+    parMatPrint(prev,&c->gsc);
+    d->level_off[i+1]=d->level_off[i]+prev->rn;
     //TODO: set sigma, nSmooth
   }
   //l0=d->levels[i-1];
