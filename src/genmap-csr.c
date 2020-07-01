@@ -166,7 +166,7 @@ void parMatPrint(parMat M,struct comm *c){
     comm_barrier(c);
     if(c->id==k)
       for(i=0; i<rn; i++){
-        printf("r%2lld: ",M->row_start+i);
+        printf("%02u: r%02lld: ",c->id,M->row_start+i);
         for(j=offsets[i]; j<offsets[i+1]; j++)
           printf("(%2lld,%.2lf)",col[j],v[j]);
         printf("\n");

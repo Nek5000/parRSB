@@ -106,7 +106,7 @@ void mgLevelSetup(parMat M0,mgData data,mgLevel *l_)
   sarray_transfer(entry,&entries,p,1,&cr);
   assert(entries.n==nnz0);
 
-  /* setup gs ids */
+  /* setup gs ids for fine level (rhs interpolation) */
   ptr=entries.ptr;
   slong *ids; GenmapMalloc(rn0,&ids);
   for(i=j=0; i<nnz0; i++)
@@ -174,6 +174,7 @@ void mgLevelSetup(parMat M0,mgData data,mgLevel *l_)
   assert(nn==nnz1); //sanity check
   assert(rn1==M1->rn); //sanity check
 
+  /* setup gs ids for coarse level (rhs interpolation ) */
   GenmapRealloc(rn0+rn1,&ids);
   for(i=nn=0; i<rn1; i++)
     for(j=M1->row_off[i]; j<M1->row_off[i+1]; j++)
@@ -181,6 +182,15 @@ void mgLevelSetup(parMat M0,mgData data,mgLevel *l_)
   assert(nn==M1->rn);
 
   l->J=gs_setup(ids,rn0+M1->rn,&data->c,0,gs_crystal_router,0);
+
+  /* setup gs handle for the mat-vec */
+  GenmapRealloc(nnz1,&ids);
+  for(i=0; i<M1->rn; i++)
+    for(j=M1->row_off[i]; j<M1->row_off[i+1]; j++)
+      if(M1->row_start+i==M1->col[j]) ids[j]=M1->col[j];
+      else ids[j]=-M1->col[j];
+
+  M1->gsh=gs_setup(ids,nnz1,&data->c,0,gs_crystal_router,0);
 
   GenmapFree(ids);
   buffer_free(&buf);
@@ -207,21 +217,20 @@ void mgSetup(GenmapComm c,parMat M,mgData *d_){
   GenmapMalloc(d->nLevels+1,&d->level_off);
   d->level_off[0]=M->rn;
 
-  fflush(stdout);
-  uint i; parMat prev=M; parMatPrint(prev,&c->gsc);
+  uint i; parMat prev=M;
+#if DBG
+  fflush(stdout); comm_barrier(&c->gsc); parMatPrint(prev,&c->gsc);
+#endif
   for(i=0;i<d->nLevels;i++){
-    mgLevelSetup(prev,d,&d->levels[i]);
-    prev=d->levels[i]->M;
-    fflush(stdout);
-    comm_barrier(&c->gsc);
-    parMatPrint(prev,&c->gsc);
+    mgLevelSetup(prev,d,&d->levels[i]); prev=d->levels[i]->M;
+#if DBG
+    fflush(stdout); comm_barrier(&c->gsc); parMatPrint(prev,&c->gsc);
+#endif
     d->level_off[i+1]=d->level_off[i]+prev->rn;
     //TODO: set sigma, nSmooth
   }
-  //l0=d->levels[i-1];
-  //d->level_off[i]=d->level_off[i-1]+l0->M->row_off[l0->M->rn];
 
-  //GenmapMalloc(d->level_off[i],&d->x  );
-  //GenmapMalloc(d->level_off[i],&d->b  );
-  //GenmapMalloc(d->level_off[i],&d->buf);
+  GenmapMalloc(d->level_off[d->nLevels],&d->x  );
+  GenmapMalloc(d->level_off[d->nLevels],&d->b  );
+  GenmapMalloc(d->level_off[d->nLevels],&d->buf);
 }
