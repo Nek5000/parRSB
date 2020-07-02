@@ -11,30 +11,30 @@ int log2i(sint i){
 
 // Following two functions can be combined
 void compress_col(struct array *entries){
-  GenmapScalar v; sint i,j,je;
+  GenmapScalar v; sint i,j;
 
   i=j=0; entry *ptr=entries->ptr; while(i<entries->n){
     v=0.0;
     while(j<entries->n && ptr[j].r==ptr[i].r && ptr[j].cn==ptr[i].cn)
       v+=ptr[j].v,j++;
-    je=j,j=j-1;
-    while(j>=0 && ptr[j].r==ptr[i].r && ptr[j].cn==ptr[i].cn)
-      ptr[j].v=v,j--;
-    i=j=je;
+    j=i;
+    while(j<entries->n && ptr[j].r==ptr[i].r && ptr[j].cn==ptr[i].cn)
+      ptr[j].v=v,j++;
+    i=j;
   }
 }
 
 void compress_row(struct array *entries){
-  GenmapScalar v; sint i,j,je;
+  GenmapScalar v; sint i,j;
 
   i=j=0; entry *ptr=entries->ptr; while(i<entries->n){
     v=0.0;
     while(j<entries->n && ptr[j].rn==ptr[i].rn && ptr[j].c==ptr[i].c)
       v+=ptr[j].v,j++;
-    je=j,j=j-1;
-    while(j>=0 && ptr[j].rn==ptr[i].rn && ptr[j].c==ptr[i].c)
-      ptr[j].v=v,j--;
-    i=j=je;
+    j=i;
+    while(j<entries->n && ptr[j].rn==ptr[i].rn && ptr[j].c==ptr[i].c)
+      ptr[j].v=v,j++;
+    i=j;
   }
 }
 
@@ -76,10 +76,9 @@ void mgLevelSetup(parMat M0,mgData data,mgLevel *l_)
       if(ptr[j].r==ng) ptr[j].rn-=1;
     }
 
-  uint np=data->c.np;
-  uint npc=(np/2>0)?(np/2):1;
-
-  if(ngc<npc) npc=ngc;
+  uint np =data->c.np;
+  uint npc=np;
+  if(ngc<np) npc=ngc;
 
 #if DBG
   printf("id=%u ng=%lld ng_c=%lld np=%d np_c=%d\n",data->c.id,ng,ngc,

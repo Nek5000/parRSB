@@ -70,11 +70,7 @@ int main(int argc,char *argv[]){
   for(i=0;i<mesh->nelt;i++)
     assert(fabs(y[i])<GENMAP_TOL);
 
-  mgData d;
-  mgSetup(c,M,&d);
-  parMatFree(M);
   GenmapFree(buf); GenmapFree(x); GenmapFree(y);
-
   GenmapDestroyVector(v); GenmapDestroyVector(u);
 
   GenmapFinalize(gh);
