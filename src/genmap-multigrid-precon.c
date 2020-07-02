@@ -13,13 +13,14 @@ int log2i(sint i){
 void compress_col(struct array *entries){
   GenmapScalar v; sint i,j;
 
-  i=j=0; entry *ptr=entries->ptr; while(i<entries->n){
-    v=0.0;
+  i=0; entry *ptr=entries->ptr; while(i<entries->n){
+    v=ptr[i].v,j=i+1;
     while(j<entries->n && ptr[j].r==ptr[i].r && ptr[j].cn==ptr[i].cn)
-      v+=ptr[j].v,j++;
-    j=i;
-    while(j<entries->n && ptr[j].r==ptr[i].r && ptr[j].cn==ptr[i].cn)
-      ptr[j].v=v,j++;
+      v+=ptr[j].v,ptr[j].c=0,j++;
+    ptr[i].v=v;
+//    j=i;
+//    while(j<entries->n && ptr[j].r==ptr[i].r && ptr[j].cn==ptr[i].cn)
+//      ptr[j].v=v,j++;
     i=j;
   }
 }
@@ -27,13 +28,14 @@ void compress_col(struct array *entries){
 void compress_row(struct array *entries){
   GenmapScalar v; sint i,j;
 
-  i=j=0; entry *ptr=entries->ptr; while(i<entries->n){
-    v=0.0;
+  i=0; entry *ptr=entries->ptr; while(i<entries->n){
+    v=ptr[i].v,j=i+1;
     while(j<entries->n && ptr[j].rn==ptr[i].rn && ptr[j].c==ptr[i].c)
-      v+=ptr[j].v,j++;
-    j=i;
-    while(j<entries->n && ptr[j].rn==ptr[i].rn && ptr[j].c==ptr[i].c)
-      ptr[j].v=v,j++;
+      v+=ptr[j].v,ptr[j].r*=-1,j++;
+    ptr[i].v=v;
+//    j=i;
+//    while(j<entries->n && ptr[j].rn==ptr[i].rn && ptr[j].c==ptr[i].c)
+//      ptr[j].v=v,j++;
     i=j;
   }
 }
@@ -85,32 +87,22 @@ void mgLevelSetup(parMat M0,mgData data,mgLevel *l_)
       data->c.np,npc);
 #endif
 
-  struct crystal cr;
-  crystal_init(&cr,&data->c);
-
-  /* coarsen the columns  */
-  setOwner(entries.ptr,nnz0,offsetof(entry,cn),offsetof(entry,p),ngc,npc);
-  sarray_transfer(entry,&entries,p,1,&cr);
-
-#if DBG
-  printf("B: nid=%d nnz=%zu\n",data->c.id,entries.n);
-#endif
-
-  buffer buf; buffer_init(&buf,1024);
-  if(entries.n){
-    sarray_sort_2(entry,entries.ptr,entries.n,r,1,cn,1,&buf);
-    compress_col(&entries);
-  }
-
-  sarray_transfer(entry,&entries,p,1,&cr);
-  assert(entries.n==nnz0);
-
   /* setup gs ids for fine level (rhs interpolation) */
   ptr=entries.ptr;
   slong *ids; GenmapMalloc(rn0,&ids);
   for(i=j=0; i<nnz0; i++)
     if(ptr[i].r==ptr[i].c) ids[j++]=-ptr[i].cn;
   assert(j==rn0);
+
+  /* coarsen the cols */
+  buffer buf; buffer_init(&buf,1024);
+  if(entries.n){
+    sarray_sort_2(entry,entries.ptr,entries.n,r,1,cn,1,&buf);
+    compress_col(&entries);
+  }
+
+  struct crystal cr;
+  crystal_init(&cr,&data->c);
 
   /* coarsen the rows */
   setOwner(entries.ptr,nnz0,offsetof(entry,rn),offsetof(entry,p),ngc,npc);
@@ -120,11 +112,8 @@ void mgLevelSetup(parMat M0,mgData data,mgLevel *l_)
   printf("C: nid=%d nnz=%zu\n",data->c.id,entries.n);
 #endif
 
-  if(entries.n){
-    sarray_sort_2(entry,entries.ptr,entries.n,c ,1,rn,1,&buf);
-    compress_row(&entries);
-    sarray_sort_2(entry,entries.ptr,entries.n,rn,1,cn,1,&buf);
-  }
+  // sort by rn and cn
+  sarray_sort_2(entry,entries.ptr,entries.n,rn,1,cn,1,&buf);
 
   i=j=nn=0; ptr=entries.ptr; while(i<entries.n){
     while(j<entries.n && ptr[j].rn==ptr[i].rn) j++;
@@ -162,9 +151,14 @@ void mgLevelSetup(parMat M0,mgData data,mgLevel *l_)
   uint rn1; GenmapScalar v;
   M1->row_off[0]=i=j=nn=rn1=0; ptr=entries.ptr; while(i<entries.n){
     v=0.0;
-    while(j<entries.n && ptr[j].rn==ptr[i].rn && ptr[j].cn==ptr[i].cn)
+    while(j<entries.n && ptr[j].rn==ptr[i].rn && ptr[j].cn==ptr[i].cn){
+      if(ptr[j].c>0){
+        printf("(%lld,%lld,%lf)\n",ptr[j].r,ptr[j].c,ptr[j].v);
+        v+=ptr[j].v;
+      }
       j++;
-    M1->col[nn]=ptr[i].cn,M1->v[nn]=ptr[i].v,nn++;
+    }
+    M1->col[nn]=ptr[i].cn,M1->v[nn]=v,nn++;
 
     if((j<entries.n && ptr[j].rn!=ptr[i].rn) || j>=entries.n)
       M1->row_off[++rn1]=nn;

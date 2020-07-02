@@ -51,7 +51,7 @@ int main(int argc,char *argv[]){
   GenmapScalar *x=d->x,*y=d->y,*buf=d->buf;
 
   for(i=0; i<d->level_off[nlevels]; i++)
-    x[i]=1.0;
+    y[i]=10.,x[i]=1.0;
 
   for(i=0; i<nlevels; i++)
     parMatApply(y+d->level_off[i],d->levels[i]->M,x+d->level_off[i],buf);
