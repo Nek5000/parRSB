@@ -53,11 +53,11 @@ int main(int argc,char *argv[]){
   for(i=0; i<d->level_off[nlevels]; i++)
     x[i]=1.0;
 
-  for(i=0; i<1; i++)
+  for(i=0; i<nlevels; i++)
     parMatApply(y+d->level_off[i],d->levels[i]->M,x+d->level_off[i],buf);
 
-  for(i=0; i<M->row_off[M->rn]; i++)
-    assert(fabs(y[i])<GENMAP_TOL);
+  for(j=0; j<d->level_off[i]; j++)
+    assert(fabs(y[j])<GENMAP_TOL);
 
   parMatFree(M);
 
