@@ -18,24 +18,6 @@ void compress_col(struct array *entries){
     while(j<entries->n && ptr[j].r==ptr[i].r && ptr[j].cn==ptr[i].cn)
       v+=ptr[j].v,ptr[j].c=0,j++;
     ptr[i].v=v;
-//    j=i;
-//    while(j<entries->n && ptr[j].r==ptr[i].r && ptr[j].cn==ptr[i].cn)
-//      ptr[j].v=v,j++;
-    i=j;
-  }
-}
-
-void compress_row(struct array *entries){
-  GenmapScalar v; sint i,j;
-
-  i=0; entry *ptr=entries->ptr; while(i<entries->n){
-    v=ptr[i].v,j=i+1;
-    while(j<entries->n && ptr[j].rn==ptr[i].rn && ptr[j].c==ptr[i].c)
-      v+=ptr[j].v,ptr[j].r*=-1,j++;
-    ptr[i].v=v;
-//    j=i;
-//    while(j<entries->n && ptr[j].rn==ptr[i].rn && ptr[j].c==ptr[i].c)
-//      ptr[j].v=v,j++;
     i=j;
   }
 }
@@ -152,10 +134,7 @@ void mgLevelSetup(parMat M0,mgData data,mgLevel *l_)
   M1->row_off[0]=i=j=nn=rn1=0; ptr=entries.ptr; while(i<entries.n){
     v=0.0;
     while(j<entries.n && ptr[j].rn==ptr[i].rn && ptr[j].cn==ptr[i].cn){
-      if(ptr[j].c>0){
-        printf("(%lld,%lld,%lf)\n",ptr[j].r,ptr[j].c,ptr[j].v);
-        v+=ptr[j].v;
-      }
+      if(ptr[j].c>0) v+=ptr[j].v;
       j++;
     }
     M1->col[nn]=ptr[i].cn,M1->v[nn]=v,nn++;
@@ -218,10 +197,6 @@ void mgSetup(GenmapComm c,parMat M,mgData *d_){
     mgLevelSetup(d->levels[i-1]->M,d,&d->levels[i]);
     if(d->levels[i]->M->row_off[d->levels[i]->M->rn]>nnz)
       nnz=d->levels[i]->M->row_off[d->levels[i]->M->rn];
-#if 0
-    fflush(stdout); comm_barrier(&c->gsc);
-    parMatPrint(d->levels[i]->M,&c->gsc);
-#endif
     d->level_off[i+1]=d->level_off[i]+d->levels[i]->M->rn;
     //TODO: set sigma, nSmooth
   }
