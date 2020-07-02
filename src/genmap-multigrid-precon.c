@@ -190,6 +190,7 @@ void mgLevelSetup(parMat M0,mgData data,mgLevel *l_)
       else ids[j]=-M1->col[j];
 
   M1->gsh=gs_setup(ids,nnz1,&data->c,0,gs_crystal_router,0);
+  buffer_init(&M1->buf,nnz1);
 
   GenmapFree(ids);
   buffer_free(&buf);
