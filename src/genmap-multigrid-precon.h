@@ -36,7 +36,7 @@ struct mgData_{
   sint nLevels;
   mgLevel *levels;
   uint *level_off;
-  GenmapScalar *x,*b,*buf;
+  GenmapScalar *y,*x,*b,*buf;
 };
 
 void mgSetup(GenmapComm c,parMat M,mgData *d);

@@ -44,24 +44,26 @@ int main(int argc,char *argv[]){
   /* Setup MG levels */
   mgData d; mgSetup(c,M,&d); uint nlevels=d->nLevels;
 
-  GenmapScalar *x,*y,*buf;
-  GenmapMalloc(d->level_off[nlevels],&x  );
-  GenmapMalloc(d->level_off[nlevels],&y  );
-  GenmapMalloc(d->level_off[nlevels],&buf);
+  for(i=0; i<nlevels+1; i++){
+    printf("id=%d lvl=%d off=%d\n",GenmapCommRank(c),i,d->level_off[i]);
+  }
+
+  GenmapScalar *x=d->x,*y=d->y,*buf=d->buf;
 
   for(i=0; i<d->level_off[nlevels]; i++)
     x[i]=1.0;
 
-  for(i=0; i<nlevels; i++)
-    parMatApply(y+d->level_off[i],M,x+d->level_off[i],buf);
+  for(i=0; i<1; i++)
+    parMatApply(y+d->level_off[i],d->levels[i]->M,x+d->level_off[i],buf);
 
-  for(i=0; i<nlevels; i++)
+  for(i=0; i<M->row_off[M->rn]; i++)
     assert(fabs(y[i])<GENMAP_TOL);
 
-  GenmapFree(buf); GenmapFree(x); GenmapFree(y);
+  parMatFree(M);
 
   GenmapFinalize(gh);
   MeshFree(mesh);
+
   exaFinalize(h);
 
   MPI_Finalize();

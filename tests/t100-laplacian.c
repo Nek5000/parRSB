@@ -72,9 +72,7 @@ int main(int argc,char *argv[]){
 
   mgData d;
   mgSetup(c,M,&d);
-
   parMatFree(M);
-
   GenmapFree(buf); GenmapFree(x); GenmapFree(y);
 
   GenmapDestroyVector(v); GenmapDestroyVector(u);
