@@ -29,7 +29,6 @@ SRCS=$(wildcard $(SRCDIR)/*.c)
 OBJS=$(SRCS:.c=.o)
 SORTSRCS=$(wildcard $(SORTDIR)/*.c)
 SORTOBJS=$(SORTSRCS:.c=.o)
-
 SRCOBJS=$(OBJS) $(SORTOBJS)
 
 PP=
