@@ -4,11 +4,11 @@
 #define min(a,b) ((b)<(a)?(b):(a))
 
 typedef struct{
-  GenmapLong sequenceId;
+  GenmapULong sequenceId;
   GenmapLong elementId;
   GenmapLong neighbors[8];
   int nNeighbors;
-  GenmapLong vertexId;
+  GenmapULong vertexId;
   int workProc;
 } vertex;
 
@@ -51,7 +51,7 @@ int GenmapFindNeighbors(GenmapHandle h,GenmapComm c,GenmapLong **eIds_,
   assert(sizeof(GenmapLong)==sizeof(exaLong));
   assert(sizeof(GenmapInt)==sizeof(exaInt));
 
-  exaSortArray(vertices,exaLong_t,offsetof(vertex,vertexId));
+  exaSortArray(vertices,exaULong_t,offsetof(vertex,vertexId));
 
   size=exaArrayGetSize(vertices);
   vertex* vPtr=exaArrayGetPointer(vertices);
@@ -77,7 +77,7 @@ int GenmapFindNeighbors(GenmapHandle h,GenmapComm c,GenmapLong **eIds_,
 
   exaArrayTransfer(vertices,offsetof(vertex,workProc),0,comm);
 
-  exaSortArray(vertices,exaLong_t,offsetof(vertex,sequenceId));
+  exaSortArray(vertices,exaULong_t,offsetof(vertex,sequenceId));
   vPtr=exaArrayGetPointer(vertices);
   size=exaArrayGetSize(vertices); assert(size==lelt*nv); // sanity check
 
