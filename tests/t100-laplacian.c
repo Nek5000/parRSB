@@ -71,9 +71,11 @@ int main(int argc,char *argv[]){
     assert(fabs(y[i])<GENMAP_TOL);
 
   GenmapFree(buf); GenmapFree(x); GenmapFree(y);
-  GenmapDestroyVector(v); GenmapDestroyVector(u);
+  parMatFree(M);
 
+  GenmapDestroyVector(v); GenmapDestroyVector(u);
   GenmapFinalize(gh);
+
   MeshFree(mesh);
   exaFinalize(h);
 

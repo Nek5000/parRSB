@@ -42,18 +42,38 @@ int main(int argc,char *argv[]){
   parMat M; parMatSetup(gh,c,&M);
 
   /* Setup MG levels */
-  mgData d; mgSetup(c,M,&d); uint nlevels=d->nLevels;
+  mgData d; mgSetup(c,M,&d);
 
-  GenmapScalar *x=d->x,*y=d->y,*buf=d->buf;
+  uint nlevels=d->nLevels; mgLevel *l=d->levels;
+  uint *lvl_off=d->level_off; GenmapScalar *x=d->x;
 
-  for(i=0; i<d->level_off[nlevels]; i++)
-    y[i]=10.,x[i]=1.0;
+  for(i=lvl_off[0]; i<lvl_off[1]; i++)
+    x[i]=1.0;
 
-  for(i=0; i<nlevels; i++)
-    parMatApply(y+d->level_off[i],d->levels[i]->M,x+d->level_off[i],buf);
+  buffer buf; buffer_init(&buf,1024);
+  GenmapScalar v; GenmapULong rn=M->rn;
+  for(i=0; i<nlevels-1; i++){
+    if(lvl_off[i]==lvl_off[i+1])
+      continue;
 
-  for(j=0; j<d->level_off[nlevels]; j++)
-    assert(fabs(y[j])<GENMAP_TOL);
+    gs(x+lvl_off[i],gs_double,gs_add,1,l[i]->J,&buf);
+
+    v=0.0;
+    for(j=lvl_off[i+1]; j<lvl_off[i+2]; j++)
+      v+=x[j];
+
+    printf("x: ");
+    for(j=lvl_off[i]; j<lvl_off[i+2]; j++)
+      printf(" %lf",x[j]);
+    printf("\nv=%lf rn=%d\n",v,rn);
+
+    assert(fabs(v-rn)<GENMAP_TOL);
+
+    for(j=lvl_off[i+1]; j<lvl_off[i+2]; j++)
+      x[j]=1.0;
+  }
+
+  buffer_free(&buf);
 
   mgFree(d);
 

@@ -155,7 +155,8 @@ void mgLevelSetup(mgData d,uint lvl)
       if(M1->row_start+i==M1->col[j]) ids[rn0+nn]=M1->col[j],nn++;
   assert(nn==M1->rn);
 
-  l->J=gs_setup(ids,rn0+M1->rn,&d->c,0,gs_crystal_router,0);
+  d->levels[lvl-1]->J=gs_setup(ids,rn0+M1->rn,&d->c,0,
+      gs_crystal_router,0);
 
   /* setup gs handle for the mat-vec */
   GenmapRealloc(nnz1,&ids);
@@ -212,9 +213,10 @@ void mgFree(mgData d){
   uint i,nlevels=d->nLevels;
   for(i=0; i<nlevels-1; i++)
     gs_free(l[i]->J),parMatFree(l[i]->M),GenmapFree(l[i]);
-  parMatFree(l[nlevels]->M); GenmapFree(l[nlevels]);
+  parMatFree(l[i]->M); GenmapFree(l[i]);
 
   GenmapFree(l);
   GenmapFree(d->level_off);
-  GenmapFree(d->y); GenmapFree(d->x); GenmapFree(d->b); GenmapFree(d->buf);
+  GenmapFree(d->y); GenmapFree(d->x); GenmapFree(d->b);
+  GenmapFree(d->buf);
 }
