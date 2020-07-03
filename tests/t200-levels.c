@@ -44,10 +44,6 @@ int main(int argc,char *argv[]){
   /* Setup MG levels */
   mgData d; mgSetup(c,M,&d); uint nlevels=d->nLevels;
 
-  for(i=0; i<nlevels+1; i++){
-    printf("id=%d lvl=%d off=%d\n",GenmapCommRank(c),i,d->level_off[i]);
-  }
-
   GenmapScalar *x=d->x,*y=d->y,*buf=d->buf;
 
   for(i=0; i<d->level_off[nlevels]; i++)
@@ -56,7 +52,7 @@ int main(int argc,char *argv[]){
   for(i=0; i<nlevels; i++)
     parMatApply(y+d->level_off[i],d->levels[i]->M,x+d->level_off[i],buf);
 
-  for(j=0; j<d->level_off[i]; j++)
+  for(j=0; j<d->level_off[nlevels]; j++)
     assert(fabs(y[j])<GENMAP_TOL);
 
   parMatFree(M);

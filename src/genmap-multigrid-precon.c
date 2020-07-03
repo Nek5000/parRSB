@@ -22,8 +22,9 @@ void compress_col(struct array *entries){
   }
 }
 
-void mgLevelSetup(parMat M0,mgData data,mgLevel *l_)
+void mgLevelSetup(mgData d,uint lvl)
 {
+  assert(lvl>0); parMat M0=d->levels[lvl-1]->M;
   uint rn0=M0->rn,nnz0=M0->row_off[rn0];
 
   struct array entries=null_array;
@@ -44,11 +45,11 @@ void mgLevelSetup(parMat M0,mgData data,mgLevel *l_)
   assert(nn==nnz0);
 
 #if DBG
-  printf("A: nid=%d nnz=%zu\n",data->c.id,entries.n);
+  printf("A: nid=%d nnz=%zu\n",d->c.id,entries.n);
 #endif
 
   slong out[2][1],bf[2][1],in=rn0;
-  comm_scan(out,&data->c,gs_long,gs_add,&in,1,bf);
+  comm_scan(out,&d->c,gs_long,gs_add,&in,1,bf);
   slong ng=out[1][0];
 
   ulong ngc=ng/2;
@@ -60,13 +61,13 @@ void mgLevelSetup(parMat M0,mgData data,mgLevel *l_)
       if(ptr[j].r==ng) ptr[j].rn-=1;
     }
 
-  uint np =data->c.np;
+  uint np =d->c.np;
   uint npc=np;
   if(ngc<np) npc=ngc;
 
 #if DBG
-  printf("id=%u ng=%lld ng_c=%lld np=%d np_c=%d\n",data->c.id,ng,ngc,
-      data->c.np,npc);
+  printf("id=%u ng=%lld ng_c=%lld np=%d np_c=%d\n",d->c.id,ng,ngc,
+      d->c.np,npc);
 #endif
 
   /* setup gs ids for fine level (rhs interpolation) */
@@ -84,14 +85,14 @@ void mgLevelSetup(parMat M0,mgData data,mgLevel *l_)
   }
 
   struct crystal cr;
-  crystal_init(&cr,&data->c);
+  crystal_init(&cr,&d->c);
 
   /* coarsen the rows */
   setOwner(entries.ptr,nnz0,offsetof(entry,rn),offsetof(entry,p),ngc,npc);
   sarray_transfer(entry,&entries,p,1,&cr);
 
 #if DBG
-  printf("C: nid=%d nnz=%zu\n",data->c.id,entries.n);
+  printf("C: nid=%d nnz=%zu\n",d->c.id,entries.n);
 #endif
 
   // sort by rn and cn
@@ -103,15 +104,16 @@ void mgLevelSetup(parMat M0,mgData data,mgLevel *l_)
   }
 
 #if DBG
-  printf("D: nid=%d rn=%d\n",data->c.id,nn);
+  printf("D: nid=%d rn=%d\n",d->c.id,nn);
 #endif
 
   /* create the matrix */
-  GenmapMalloc(1,l_   ); mgLevel l=*l_ ; l->data=data;
-  GenmapMalloc(1,&l->M); parMat M1 =l->M;
-  M1->rn=nn; GenmapMalloc(M1->rn+1,&M1->row_off);
+  GenmapMalloc(1,&d->levels[lvl]); mgLevel l=d->levels[lvl];l->data=d;
 
-  slong cn=nn; comm_scan(out,&data->c,gs_long,gs_add,&cn,1,bf);
+  GenmapMalloc(1,&l->M); parMat M1 =l->M; M1->rn=nn;
+  GenmapMalloc(M1->rn+1,&M1->row_off);
+
+  slong cn=nn; comm_scan(out,&d->c,gs_long,gs_add,&cn,1,bf);
   M1->row_start=out[0][0]+1;
 
   uint nnz1=0;
@@ -122,7 +124,7 @@ void mgLevelSetup(parMat M0,mgData data,mgLevel *l_)
   }
 
 #if DBG
-  printf("C: nid=%d rn=%d nnz0=%u nnz1=%d\n",data->c.id,nn,nnz0,nnz1);
+  printf("C: nid=%d rn=%d nnz0=%u nnz1=%d\n",d->c.id,nn,nnz0,nnz1);
 #endif
 
   if(nnz1==0)
@@ -153,7 +155,7 @@ void mgLevelSetup(parMat M0,mgData data,mgLevel *l_)
       if(M1->row_start+i==M1->col[j]) ids[rn0+nn]=M1->col[j],nn++;
   assert(nn==M1->rn);
 
-  l->J=gs_setup(ids,rn0+M1->rn,&data->c,0,gs_crystal_router,0);
+  l->J=gs_setup(ids,rn0+M1->rn,&d->c,0,gs_crystal_router,0);
 
   /* setup gs handle for the mat-vec */
   GenmapRealloc(nnz1,&ids);
@@ -162,7 +164,7 @@ void mgLevelSetup(parMat M0,mgData data,mgLevel *l_)
       if(M1->row_start+i==M1->col[j]) ids[j]=M1->col[j];
       else ids[j]=-M1->col[j];
 
-  M1->gsh=gs_setup(ids,nnz1,&data->c,0,gs_crystal_router,0);
+  M1->gsh=gs_setup(ids,nnz1,&d->c,0,gs_crystal_router,0);
   buffer_init(&M1->buf,nnz1);
 
   GenmapFree(ids);
@@ -184,20 +186,18 @@ void mgSetup(GenmapComm c,parMat M,mgData *d_){
 #if DBG
   printf("A: nid=%d nLevel=%d\n",d->c.id,d->nLevels);
 #endif
-  if(d->nLevels==0) return;
-
   GenmapMalloc(d->nLevels  ,&d->levels   );
   GenmapMalloc(d->nLevels+1,&d->level_off);
 
   GenmapMalloc(1,&d->levels[0]);
   d->levels[0]->M=M; d->level_off[0]=0; d->level_off[1]=M->rn;
 
-  int i; uint nnz=M->row_off[M->rn];
+  uint i; uint nnz=M->row_off[M->rn];
   for(i=1;i<d->nLevels;i++){
-    mgLevelSetup(d->levels[i-1]->M,d,&d->levels[i]);
-    if(d->levels[i]->M->row_off[d->levels[i]->M->rn]>nnz)
-      nnz=d->levels[i]->M->row_off[d->levels[i]->M->rn];
-    d->level_off[i+1]=d->level_off[i]+d->levels[i]->M->rn;
+    mgLevelSetup(d,i); parMat Mi=d->levels[i]->M;
+    if(Mi->row_off[Mi->rn]>nnz)
+      nnz=Mi->row_off[Mi->rn];
+    d->level_off[i+1]=d->level_off[i]+Mi->rn;
     //TODO: set sigma, nSmooth
   }
 
@@ -205,4 +205,16 @@ void mgSetup(GenmapComm c,parMat M,mgData *d_){
   GenmapMalloc(d->level_off[d->nLevels],&d->y  );
   GenmapMalloc(d->level_off[d->nLevels],&d->b  );
   GenmapMalloc(nnz                     ,&d->buf);
+}
+
+void mgFree(mgData d){
+  mgLevel *l=d->levels;
+  uint i,nlevels=d->nLevels;
+  for(i=0; i<nlevels-1; i++)
+    gs_free(l[i]->J),parMatFree(l[i]->M),GenmapFree(l[i]);
+  parMatFree(l[nlevels]->M); GenmapFree(l[nlevels]);
+
+  GenmapFree(l);
+  GenmapFree(d->level_off);
+  GenmapFree(d->y); GenmapFree(d->x); GenmapFree(d->b); GenmapFree(d->buf);
 }
