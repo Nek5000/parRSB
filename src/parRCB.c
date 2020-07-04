@@ -66,7 +66,7 @@ int parRCB_partMesh(int *part,double *vtx,int nel,int nv,
     comm_barrier(&rcb);
     double time=comm_time();
 
-    parRCB(&rcb,eList,ndim);
+    parRCB(&rcb,a,ndim);
 
     comm_barrier(&rcb);
     time=comm_time()-time;
@@ -75,24 +75,25 @@ int parRCB_partMesh(int *part,double *vtx,int nel,int nv,
       printf("\nparRCB finished in %lfs\n",time);
     fflush(stdout);
   }
+  comm_free(&rcb);
 
   /* restore original input */
-  exaArrayTransfer(eList,offsetof(elm_rcb,orig),1,exaGetComm(h));
-  exaSortArray(eList,exaULong_t,offsetof(elm_rcb,id));
+  struct crystal cr; crystal_init(&cr,&c);
+  sarray_transfer(elm_rcb,a,orig,1,&cr);
+  crystal_free(&cr);
 
-  comm_barrier(&c);
+  comm_free(&c);
 
-  data=exaArrayGetPointer(eList);
-  nel=exaArrayGetSize(eList);
+  assert(a->n==nel);
 
-  for(int e=0;e<nel;e++) {
-    part[e]=data[e].orig;
-  }
+  buffer b; buffer_init(&b,1024);
+  sarray_sort(elm_rcb,a->ptr,a->n,id,1,&b);
+  buffer_free(&b);
 
-  comm_free(&rcb);
+  data=a->ptr;
+  for(int e=0;e<nel;e++) part[e]=data[e].orig;
+
   exaArrayFree(eList);
-
-  exaFinalize(h);
 
   return 0;
 }

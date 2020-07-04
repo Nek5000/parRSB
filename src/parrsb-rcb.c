@@ -29,8 +29,7 @@ void get_axis_len(double *length,struct array *a,struct comm *c,int ndim)
     length[i]=max[i]-min[i];
 }
 
-int parRCB(struct comm *ci,exaArray eList,int ndim){
-  struct array *a=&eList->arr;
+int parRCB(struct comm *ci,struct array *a,int ndim){
   struct comm c; comm_dup(&c,ci);
 
   uint offsets[3]={offsetof(elm_rcb,coord[0]),
