@@ -66,8 +66,9 @@ struct GenmapVector_private {
 #define GenmapCalloc(n, p) GenmapCallocArray ((n), sizeof(**(p)), p)
 #define GenmapRealloc(n, p) GenmapReallocArray((n), sizeof(**(p)), p)
 
-void GenmapFiedlerMinMax(GenmapHandle h, GenmapScalar *min, GenmapScalar *max);
-void GenmapGlobalIdMinMax(GenmapHandle h, GenmapLong *min, GenmapLong *max);
+void GenmapFiedlerMinMax(GenmapHandle h,GenmapScalar *min,
+    GenmapScalar *max);
+void GenmapGlobalIdMinMax(GenmapHandle h,GenmapLong *min,GenmapLong *max);
 GenmapInt GenmapSetFiedlerBin(GenmapHandle h);
 GenmapInt GenmapSetGlobalIdBin(GenmapHandle h);
 void GenmapAssignBins(GenmapHandle h, int field, buffer *buf0);

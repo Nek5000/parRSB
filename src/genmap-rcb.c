@@ -1,14 +1,6 @@
-#include "sort.h"
-#include "parRSB.h"
-#include "float.h"
-
-#define MAXDIM 3
-typedef struct {
-  int proc;
-  int orig;
-  unsigned long long id;
-  double coord[MAXDIM];
-} elm_rcb;
+#include <sort.h>
+#include <float.h>
+#include <parRSB.h>
 
 void get_axis_len(double *length,struct array *a,struct comm *c,int ndim)
 {
