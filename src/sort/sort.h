@@ -52,4 +52,20 @@ typedef struct{
 typedef hypercube_sort_data_private* hypercube_sort_data;
 
 int exaHyperCubeSort(hypercube_sort_data data,struct comm *c);
+
+#define parallel_sort(T,A,off,type,c) do {\
+  sort_data_private sd;\
+  sd.unit_size=sizeof(T);\
+  sd.align=ALIGNOF(T);\
+  sd.nfields=1;\
+  sd.t[0]=type;\
+  sd.offset[0]=off;\
+  sd.a=A;\
+  sd.algo=exaSortAlgoBinSort;\
+  sd.balance=1;\
+  buffer_init(&sd.buf,1024);\
+  sort_private(&sd,c);\
+  buffer_free(&sd.buf);\
+} while (0)
+
 #endif // exasort-impl
