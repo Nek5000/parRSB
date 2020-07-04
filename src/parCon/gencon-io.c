@@ -200,6 +200,8 @@ int readRe2Boundaries(exaHandle h,Mesh mesh,MPI_File file){
   char *buf=calloc(readSize,sizeof(char)),*buf0=buf;
   MPI_File_read_at_all(file,offset,buf,readSize,MPI_BYTE,&st);
 
+  exaArrayInit(&mesh->boundary,struct Boundary_private,10);
+
   double tmp[5];
   char cbc[4];
   struct Boundary_private boundary;

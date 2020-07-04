@@ -60,6 +60,7 @@ int parRCB_partMesh(int *part,double *vtx,int nel,int nv,
 
     parRCB(commRcb,eList,ndim);
 
+    exaCommBarrier(commRcb);
     if(exaRank(h)==0)
       printf("\nparRCB finished in %lfs\n",comm_time()-time0);
 
@@ -68,7 +69,7 @@ int parRCB_partMesh(int *part,double *vtx,int nel,int nv,
 
   /* restore original input */
   exaArrayTransfer(eList,offsetof(elm_rcb,orig),1,exaGetComm(h));
-  exaSortArray(eList,exaLong_t,offsetof(elm_rcb,id));
+  exaSortArray(eList,exaULong_t,offsetof(elm_rcb,id));
 
   exaBarrier(h);
 

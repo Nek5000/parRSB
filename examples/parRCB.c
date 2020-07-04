@@ -79,7 +79,7 @@ int main(int argc,char *argv[]){
 
     exaArrayTransfer(mesh->elements,
       offsetof(struct Point_private,proc),0,exaGetComm(h));
-    exaSortArray(mesh->elements,exaLong_t,
+    exaSortArray(mesh->elements,exaULong_t,
       offsetof(struct Point_private,sequenceId));
 
     /* Write output */
@@ -95,6 +95,7 @@ int main(int argc,char *argv[]){
     char header[BUFSIZ];
     sprintf(header,"%lld %d %d %ld %ld",mesh->nelgt,ndim,nv,
       sizeof(double),sizeof(int));
+
     int rank; MPI_Comm_rank(commRead,&rank);
     if(rank==0) writeSize+=128;
 
@@ -120,6 +121,8 @@ int main(int argc,char *argv[]){
     MPI_Barrier(commRead);
 
     assert(err==0);
+
+    MeshFree(mesh);
 
     exaFree(buf);
     exaFree(vtx);

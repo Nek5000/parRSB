@@ -1,17 +1,17 @@
 #include "exa-impl.h"
 #include "exa-types.h"
 #include "exasort.h"
+#include "exasort-impl.h"
 #include "parRSB.h"
 
-void getAxisLength(exaScalar **length,exaArray eList,exaComm comm,
-  int ndim)
+void get_axis_len(double *length,struct array *a,struct comm *c,int ndim)
 {
-  exaScalar min[MAXDIM],max[MAXDIM];
+  double min[MAXDIM],max[MAXDIM];
   exaInt i;
-  for(i=0;i<ndim;i++) min[i]=exaScalarMAX,max[i]=exaScalarMIN;
+  for(i=0;i<ndim;i++) min[i]=DBL_MAX,max[i]=-DBL_MAX;
 
-  exaInt nel=exaArrayGetSize(eList);
-  elm_rcb* elems=exaArrayGetPointer(eList);
+  exaInt nel=a->n;
+  elm_rcb* elems=a->ptr;
   for(i=0;i<nel;i++){
     if(elems[i].coord[0]<min[0]) min[0]=elems[i].coord[0];
     if(elems[i].coord[1]<min[1]) min[1]=elems[i].coord[1];
@@ -24,54 +24,52 @@ void getAxisLength(exaScalar **length,exaArray eList,exaComm comm,
       if(elems[i].coord[2]>max[2]) max[2]=elems[i].coord[2];
   }
 
-  exaCommGop(comm,min,3,exaScalar_t,exaMinOp);
-  exaCommGop(comm,max,3,exaScalar_t,exaMaxOp);
-
-  exaMalloc(MAXDIM,length);
+  double buf[MAXDIM];
+  comm_allreduce(c,gs_double,gs_min,min,MAXDIM,buf);
+  comm_allreduce(c,gs_double,gs_max,max,MAXDIM,buf);
 
   for(i=0;i<ndim;i++)
-    (*length)[i]=max[i]-min[i];
+    length[i]=max[i]-min[i];
 }
 
-int parRCB(exaComm comm_,exaArray eList,int ndim){
-  exaComm comm,newComm;
-  exaCommDup(&comm,comm_);
-  exaInt rank=exaCommRank(comm);
-  exaInt size=exaCommSize(comm);
+int parRCB(exaComm comm,exaArray eList,int ndim){
+  struct array *a=&eList->arr;
+  struct comm c; comm_dup(&c,&comm->gsComm);
 
-  exaUInt offsets[3]={offsetof(elm_rcb,coord[0]),
+  uint offsets[3]={offsetof(elm_rcb,coord[0]),
     offsetof(elm_rcb,coord[1]),offsetof(elm_rcb,coord[2])};
 
+  double length[MAXDIM];
+
+  exaInt rank=c.id;
+  exaInt size=c.np;
+
   while(size>1){
-    exaScalar *length=NULL;
-    getAxisLength(&length,eList,comm,ndim);
+    get_axis_len(length,a,&c,ndim);
 
-    int axis1=0,axis3=0,d;
-    for(d=1;d<ndim;d++){
-      if(length[axis1]<length[d]) axis1=d;
-      if(length[axis3]>length[d]) axis3=d;
-    }
+    int axis1=0,d;
+    for(d=1;d<ndim;d++)
+      if(length[d]>length[axis1]) axis1=d;
+    int axis2=(axis1+1)%2;
+    for(d=0;d<ndim;d++)
+      if(length[d]>length[axis2] && d!=axis1) axis2=d;
 
-    //exaSort2(eList,exaScalar_t,offsets[axis1],exaScalar_t,
-    //  offsets[axis3],exaSortAlgoBinSort,1,comm);
-    exaSort(eList,exaScalar_t,offsets[axis1],
-      exaSortAlgoBinSort,1,comm);
+    uint off=offsets[axis1];
+    parallel_sort(elm_rcb,a,off,gs_double,&c);
 
     int p=(size+1)/2;
     int bin=(rank>=p);
 
-    exaCommSplit(comm,bin,rank,&newComm);
-    exaCommDestroy(comm);
-    exaCommDup(&comm,newComm);
-    exaDestroy(newComm);
-
-    exaFree(length);
-
-    rank=exaCommRank(comm);
-    size=exaCommSize(comm);
+    comm_ext old=c.c;
+#ifdef MPI
+    MPI_Comm new; MPI_Comm_split(old,bin,rank,&new);
+    comm_free(&c); comm_init(&c,new);
+    MPI_Comm_free(&new);
+#endif
+    rank=c.id;
+    size=c.np;
   }
 
-  exaDestroy(comm);
-
+  comm_free(&c);
   return 0;
 }

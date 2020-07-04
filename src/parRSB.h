@@ -9,7 +9,7 @@
 #define MAXNV 8 /* maximum number of vertices per element */
 typedef struct {
   int proc;
-  long long id;
+  unsigned long long id;
   int part;
   long long vtx[MAXNV];
 } elm_rsb;
