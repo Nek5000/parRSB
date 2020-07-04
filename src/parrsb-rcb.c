@@ -1,16 +1,13 @@
-#include "exa-impl.h"
-#include "exa-types.h"
-#include "exasort.h"
 #include "exasort-impl.h"
 #include "parRSB.h"
 
 void get_axis_len(double *length,struct array *a,struct comm *c,int ndim)
 {
   double min[MAXDIM],max[MAXDIM];
-  exaInt i;
+  sint i;
   for(i=0;i<ndim;i++) min[i]=DBL_MAX,max[i]=-DBL_MAX;
 
-  exaInt nel=a->n;
+  sint nel=a->n;
   elm_rcb* elems=a->ptr;
   for(i=0;i<nel;i++){
     if(elems[i].coord[0]<min[0]) min[0]=elems[i].coord[0];
@@ -32,17 +29,17 @@ void get_axis_len(double *length,struct array *a,struct comm *c,int ndim)
     length[i]=max[i]-min[i];
 }
 
-int parRCB(exaComm comm,exaArray eList,int ndim){
+int parRCB(struct comm *ci,exaArray eList,int ndim){
   struct array *a=&eList->arr;
-  struct comm c; comm_dup(&c,&comm->gsComm);
+  struct comm c; comm_dup(&c,ci);
 
   uint offsets[3]={offsetof(elm_rcb,coord[0]),
     offsetof(elm_rcb,coord[1]),offsetof(elm_rcb,coord[2])};
 
   double length[MAXDIM];
 
-  exaInt rank=c.id;
-  exaInt size=c.np;
+  sint rank=c.id;
+  sint size=c.np;
 
   while(size>1){
     get_axis_len(length,a,&c,ndim);

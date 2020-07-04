@@ -142,6 +142,6 @@ void GenmapPrintStack();
 //
 // parRCB
 //
-int parRCB(exaComm comm,exaArray eList,int ndim);
+int parRCB(struct comm *c,exaArray eList,int ndim);
 
 #endif

@@ -20,21 +20,23 @@ void fparRCB_partMesh(int *part,double *vtx,int *nel,int *nv,
 int parRCB_partMesh(int *part,double *vtx,int nel,int nv,
   int *options,MPI_Comm comm)
 {
+  struct comm c; comm_init(&c,comm);
+
   exaHandle h;
   exaInit(&h,comm,"/host");
 
-  int rank=exaRank(h),size=exaSize(h);
+  int rank=c.id,size=c.np;
 
   /* load balance input data */
-  exaLong nelg=0;
-  exaLong nell=nel;
-  exaAllReduce(h,&nelg,&nell,1,exaLong_t,exaAddOp);
-
-  exaLong nelg_start,buf0;
-  exaScan(h,&nelg_start,&nell,&buf0,1,exaLong_t,exaAddOp);
+  slong out[2][1],buf[2][1];
+  slong nell=nel;
+  comm_scan(out,&c,gs_long,gs_add,&nell,1,&buf);
+  slong nelg_start=out[0][0];
+  slong nelg      =out[1][0];
 
   exaArray eList; exaArrayInit(&eList,elm_rcb,nel);
-  elm_rcb *data=exaArrayGetPointer(eList);
+  struct array *a=&eList->arr;
+  elm_rcb *data=a->ptr;
 
   int ndim=(nv==8)?3:2;
 
@@ -45,25 +47,32 @@ int parRCB_partMesh(int *part,double *vtx,int nel,int nv,
     for(int n=0;n<ndim;n++)
       data[e].coord[n]=vtx[e*ndim+n];
   }
-
-  exaArraySetSize(eList,nel);
+  a->n=nel;
 
   //TODO: FIXME
   //exaLoadBalance(eList,exaGetComm(h));
+  //nel=exaArrayGetSize(eList);
 
-  nel=exaArrayGetSize(eList);
-  exaComm commRcb;
-  exaCommSplit(exaGetComm(h),nel>0,rank,&commRcb);
+  struct comm rcb;
+  comm_ext old=c.c;
+#ifdef MPI
+  MPI_Comm new; MPI_Comm_split(old,nel>0,rank,&new);
+  comm_init(&rcb,new); MPI_Comm_free(&new);
+#else
+  comm_init(&rcb,1);
+#endif
 
   if(nel>0){
-    double time0 = comm_time();
+    comm_barrier(&rcb);
+    double time=comm_time();
 
-    parRCB(commRcb,eList,ndim);
+    parRCB(&rcb,eList,ndim);
 
-    exaCommBarrier(commRcb);
-    if(exaRank(h)==0)
-      printf("\nparRCB finished in %lfs\n",comm_time()-time0);
+    comm_barrier(&rcb);
+    time=comm_time()-time;
 
+    if(c.id==0)
+      printf("\nparRCB finished in %lfs\n",time);
     fflush(stdout);
   }
 
@@ -71,7 +80,7 @@ int parRCB_partMesh(int *part,double *vtx,int nel,int nv,
   exaArrayTransfer(eList,offsetof(elm_rcb,orig),1,exaGetComm(h));
   exaSortArray(eList,exaULong_t,offsetof(elm_rcb,id));
 
-  exaBarrier(h);
+  comm_barrier(&c);
 
   data=exaArrayGetPointer(eList);
   nel=exaArrayGetSize(eList);
@@ -80,7 +89,7 @@ int parRCB_partMesh(int *part,double *vtx,int nel,int nv,
     part[e]=data[e].orig;
   }
 
-  exaCommDestroy(commRcb);
+  comm_free(&rcb);
   exaArrayFree(eList);
 
   exaFinalize(h);
