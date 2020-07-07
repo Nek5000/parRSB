@@ -1,4 +1,4 @@
-#include <sort.h>
+#include <sort-impl.h>
 
 int sort_field(struct array *arr,size_t usize,gs_dom t,uint off,
     buffer *buf,int keep)

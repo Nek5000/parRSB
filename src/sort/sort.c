@@ -1,4 +1,4 @@
-#include <sort.h>
+#include <sort-impl.h>
 #include <float.h>
 
 int set_dest(uint *proc,uint np,ulong start,uint size,ulong nelem)
@@ -95,7 +95,7 @@ void get_extrema(void *extrema_,sort_data data,uint field,struct comm* c)
   extrema[0]*=-1;
 }
 
-int sort_private(sort_data data,struct comm *c){
+int parallel_sort_private(sort_data data,struct comm *c){
   struct comm dup; comm_dup(&dup,c);
 
   int balance =data->balance;

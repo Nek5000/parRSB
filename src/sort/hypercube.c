@@ -1,4 +1,4 @@
-#include <sort.h>
+#include <sort-impl.h>
 #include <math.h>
 
 int init_probes(hypercube_sort_data data,struct comm *c)

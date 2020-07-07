@@ -1,4 +1,4 @@
-#include <sort.h>
+#include <sort-impl.h>
 
 /* assumes array is locally sorted */
 int set_bin(uint **proc_,sort_data data,uint field,struct comm *c)

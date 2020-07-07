@@ -1,18 +1,15 @@
-#ifndef _SORT_IMPL_H_
-#define _SORT_IMPL_H_
+#ifndef _SORT_H_
+#define _SORT_H_
 
 #include <genmap-impl.h>
 
-#define min(a,b) ((a)<(b) ? (a) : (b))
-#define max(a,b) ((a)>(b) ? (a) : (b))
-//
-// exaSort: general functions
-//
 typedef enum{
   exaSortAlgoBinSort      =0,
   exaSortAlgoHyperCubeSort=1
 } exaSortAlgo;
-
+//
+// parallel_bin_sort
+//
 typedef struct{
   int nfields;
   gs_dom t[3];
@@ -28,17 +25,7 @@ typedef struct{
 } sort_data_private;
 typedef sort_data_private* sort_data;
 
-double get_scalar(struct array *a,uint i,uint offset,uint usize,
-    gs_dom type);
-void get_extrema(void *extrema_,sort_data data,uint field,struct comm *c);
-int  set_dest(uint *proc,uint np,ulong start,uint size,ulong nelem);
-int  load_balance(struct array *a,size_t size,struct comm *c,
-  struct crystal *cr);
-int  sort_local(sort_data data);
-int  sort_private(sort_data data,struct comm *c);
-//
-// parallel_bin_sort
-//
+int parallel_sort_private(sort_data data,struct comm *c);
 int parallel_bin_sort(sort_data data,struct comm *c);
 //
 // parallel_hypercube_sort
@@ -52,7 +39,9 @@ typedef struct{
 typedef hypercube_sort_data_private* hypercube_sort_data;
 
 int parallel_hypercube_sort(hypercube_sort_data data,struct comm *c);
-
+//
+// Uniform parallel sort
+//
 #define parallel_sort(T,A,off,type,c) do {\
   sort_data_private sd;\
   sd.unit_size=sizeof(T);\
@@ -64,7 +53,7 @@ int parallel_hypercube_sort(hypercube_sort_data data,struct comm *c);
   sd.algo=exaSortAlgoBinSort;\
   sd.balance=1;\
   buffer_init(&sd.buf,1024);\
-  sort_private(&sd,c);\
+  parallel_sort_private(&sd,c);\
   buffer_free(&sd.buf);\
 } while (0)
 
@@ -81,8 +70,8 @@ int parallel_hypercube_sort(hypercube_sort_data data,struct comm *c);
   sd.algo=exaSortAlgoBinSort;\
   sd.balance=1;\
   buffer_init(&sd.buf,1024);\
-  sort_private(&sd,c);\
+  parallel_sort_private(&sd,c);\
   buffer_free(&sd.buf);\
 } while (0)
 
-#endif // exasort-impl
+#endif
