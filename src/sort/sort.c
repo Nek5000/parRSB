@@ -108,7 +108,7 @@ int sort_private(sort_data data,struct comm *c){
 
   switch(algo){
     case exaSortAlgoBinSort:
-      exaBinSort(data,c);
+      parallel_binsort(data,c);
       break;
     case exaSortAlgoHyperCubeSort:
       GenmapMalloc(1,&hdata);

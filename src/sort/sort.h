@@ -29,7 +29,7 @@ typedef struct{
 typedef sort_data_private* sort_data;
 
 double get_scalar(struct array *a,uint i,uint offset,uint usize,
-  gs_dom type);
+    gs_dom type);
 void get_extrema(void *extrema_,sort_data data,uint field,struct comm *c);
 int  set_dest(uint *proc,uint np,ulong start,uint size,ulong nelem);
 int  load_balance(struct array *a,size_t size,struct comm *c,
@@ -37,9 +37,9 @@ int  load_balance(struct array *a,size_t size,struct comm *c,
 int  sort_local(sort_data data);
 int  sort_private(sort_data data,struct comm *c);
 //
-// exaBinSort
+// parallel_binsort
 //
-int exaBinSort(sort_data data,struct comm *c);
+int parallel_binsort(sort_data data,struct comm *c);
 //
 // exaHyperCubeSort
 //
@@ -60,6 +60,23 @@ int exaHyperCubeSort(hypercube_sort_data data,struct comm *c);
   sd.nfields=1;\
   sd.t[0]=type;\
   sd.offset[0]=off;\
+  sd.a=A;\
+  sd.algo=exaSortAlgoBinSort;\
+  sd.balance=1;\
+  buffer_init(&sd.buf,1024);\
+  sort_private(&sd,c);\
+  buffer_free(&sd.buf);\
+} while (0)
+
+#define parallel_sort_2(T,A,off1,t1,off2,t2,c) do {\
+  sort_data_private sd;\
+  sd.unit_size=sizeof(T);\
+  sd.align=ALIGNOF(T);\
+  sd.nfields=2;\
+  sd.t[0]=t1;\
+  sd.offset[0]=off1;\
+  sd.t[1]=t2;\
+  sd.offset[1]=off2;\
   sd.a=A;\
   sd.algo=exaSortAlgoBinSort;\
   sd.balance=1;\

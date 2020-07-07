@@ -2,7 +2,7 @@
 #include <time.h>
 
 typedef struct{
-  exaScalar ds;
+  double ds;
   slong dl;
   sint proc;
 } Data;
