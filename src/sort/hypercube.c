@@ -104,7 +104,7 @@ int transfer_elem(hypercube_sort_data data,struct comm *c)
   return 0;
 }
 
-int exaHyperCubeSort(hypercube_sort_data data,struct comm *c)
+int parallel_hypercube_sort(hypercube_sort_data data,struct comm *c)
 {
   sort_data input=data->data;
   struct array *a=input->a;
@@ -146,7 +146,7 @@ int exaHyperCubeSort(hypercube_sort_data data,struct comm *c)
 #endif
 
   // TODO: Keep load balancing after each split
-  exaHyperCubeSort(data,&nc);
+  parallel_hypercube_sort(data,&nc);
   comm_free(&nc);
 
   return 0;

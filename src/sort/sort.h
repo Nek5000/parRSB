@@ -37,11 +37,11 @@ int  load_balance(struct array *a,size_t size,struct comm *c,
 int  sort_local(sort_data data);
 int  sort_private(sort_data data,struct comm *c);
 //
-// parallel_binsort
+// parallel_bin_sort
 //
-int parallel_binsort(sort_data data,struct comm *c);
+int parallel_bin_sort(sort_data data,struct comm *c);
 //
-// exaHyperCubeSort
+// parallel_hypercube_sort
 //
 typedef struct{
   sort_data data;
@@ -51,7 +51,7 @@ typedef struct{
 } hypercube_sort_data_private;
 typedef hypercube_sort_data_private* hypercube_sort_data;
 
-int exaHyperCubeSort(hypercube_sort_data data,struct comm *c);
+int parallel_hypercube_sort(hypercube_sort_data data,struct comm *c);
 
 #define parallel_sort(T,A,off,type,c) do {\
   sort_data_private sd;\

@@ -30,7 +30,7 @@ int set_bin(uint **proc_,sort_data data,uint field,struct comm *c)
     proc[index]=np-1;
 }
 
-int parallel_binsort(sort_data data,struct comm *c)
+int parallel_bin_sort(sort_data data,struct comm *c)
 {
   // Local sort
   sort_local(data);

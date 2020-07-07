@@ -3,7 +3,9 @@ PAUL ?= 1
 CC ?= mpicc
 CFLAGS ?= -O2
 
-SRCROOT=.
+MKFILEPATH = $(abspath $(lastword $(MAKEFILE_LIST)))
+SRCROOT ?= $(patsubst %/,%,$(dir $(MKFILEPATH)))
+
 GSLIBDIR=$(GSLIBPATH)
 
 SRCDIR  =$(SRCROOT)/src
@@ -16,8 +18,7 @@ TESTS=$(TESTDIR)/example
 LIB=src/lib$(TARGET).a
 
 INCFLAGS=-I$(SRCDIR) -I$(SORTDIR) -I$(GSLIBDIR)/include
-
-TESTLDFLAGS:=-L$(BUILDDIR)/lib -l$(TARGET) -L $(GSLIBDIR)/lib -lgs -lm $(LDFLAGS)
+LDFLAGS:=-L$(BUILDDIR)/lib -l$(TARGET) -L $(GSLIBDIR)/lib -lgs -lm
 
 ifneq (,$(strip $(DESTDIR)))
   INSTALL_ROOT=$(DESTDIR)
@@ -26,10 +27,10 @@ else
 endif
 
 SRCS=$(wildcard $(SRCDIR)/*.c)
-OBJS=$(SRCS:.c=.o)
 SORTSRCS=$(wildcard $(SORTDIR)/*.c)
-SORTOBJS=$(SORTSRCS:.c=.o)
-SRCOBJS=$(OBJS) $(SORTOBJS)
+
+SRCOBJS =$(patsubst $(SRCROOT)/%.c,$(BUILDDIR)/%.o,$(SRCS))
+SRCOBJS+=$(patsubst $(SRCROOT)/%.c,$(BUILDDIR)/%.o,$(SORTSRCS))
 
 PP=
 
@@ -66,18 +67,18 @@ ifeq ($(GSLIBPATH),)
 	$(error Specify GSLIBPATH=<path to gslib>/build)
 endif
 
-$(SRCOBJS): %.o: %.c
+$(BUILDDIR)/%.o: $(SRCROOT)/%.c
 	$(CC) $(CFLAGS) $(PP) $(INCFLAGS) -c $< -o $@
 
 .PHONY: tests
 tests: $(TESTS)
 
 $(TESTS): lib install
-	$(CC) $(CFLAGS) -I$(GSLIBDIR)/include -I$(BUILDDIR)/include $@.c -o $@ $(TESTLDFLAGS)
+	$(CC) $(CFLAGS) -I$(GSLIBDIR)/include -I$(BUILDDIR)/include $@.c -o $@ $(LDFLAGS)
 
 .PHONY: clean
 clean:
-	@rm -f $(SRCOBJS) $(LIB) $(TESTS) $(TESTS).o
+	@rm -f $(BUILDDIR) $(LIB) $(TESTS) $(TESTS).o
 
 print-%:
 	$(info [ variable name]: $*)
@@ -86,3 +87,5 @@ print-%:
 	$(info [expanded value]: $($*))
 	$(info)
 	@true
+
+$(shell mkdir -p $(BUILDDIR)/src/sort)
