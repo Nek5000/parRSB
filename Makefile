@@ -8,13 +8,14 @@ SRCROOT ?= $(patsubst %/,%,$(dir $(MKFILEPATH)))
 
 GSLIBDIR=$(GSLIBPATH)
 
-SRCDIR  =$(SRCROOT)/src
-SORTDIR =$(SRCROOT)/src/sort
-BUILDDIR=$(SRCROOT)/build
-TESTDIR =$(SRCROOT)/example
+SRCDIR    =$(SRCROOT)/src
+SORTDIR   =$(SRCROOT)/src/sort
+BUILDDIR  =$(SRCROOT)/build
+EXAMPLEDIR=$(SRCROOT)/example
+TESTDIR   =$(SRCROOT)/tests
 
 TARGET=parRSB
-TESTS=$(TESTDIR)/example
+EXAMPLE=$(EXAMPLEDIR)/example
 LIB=src/lib$(TARGET).a
 
 INCFLAGS=-I$(SRCDIR) -I$(SORTDIR) -I$(GSLIBDIR)/include
@@ -26,11 +27,13 @@ else
   INSTALL_ROOT=$(SRCROOT)/build
 endif
 
-SRCS=$(wildcard $(SRCDIR)/*.c)
+SRCS    =$(wildcard $(SRCDIR)/*.c)
 SORTSRCS=$(wildcard $(SORTDIR)/*.c)
+TESTSRCS=$(wildcard $(TESTDIR)/*.c)
 
 SRCOBJS =$(patsubst $(SRCROOT)/%.c,$(BUILDDIR)/%.o,$(SRCS))
 SRCOBJS+=$(patsubst $(SRCROOT)/%.c,$(BUILDDIR)/%.o,$(SORTSRCS))
+TESTOBJS=$(patsubst $(SRCROOT)/%.c,$(BUILDDIR)/%,$(TESTSRCS))
 
 PP=
 
@@ -46,14 +49,14 @@ endif
 default: check lib install
 
 .PHONY: all
-all: check lib tests install
+all: check lib tests example install
 
 .PHONY: install
 install: lib
 	@mkdir -p $(INSTALL_ROOT)/lib 2>/dev/null
 	@cp -v $(LIB) $(INSTALL_ROOT)/lib 2>/dev/null
 	@mkdir -p $(INSTALL_ROOT)/include 2>/dev/null
-	@cp $(SRCDIR)/parRSB.h $(INSTALL_ROOT)/include 2>/dev/null
+	@cp $(SRCDIR)/*.h $(SORTDIR)/*.h $(INSTALL_ROOT)/include 2>/dev/null
 
 
 .PHONY: $(TARGET)
@@ -67,18 +70,24 @@ ifeq ($(GSLIBPATH),)
 	$(error Specify GSLIBPATH=<path to gslib>/build)
 endif
 
-$(BUILDDIR)/%.o: $(SRCROOT)/%.c
+$(BUILDDIR)/src/%.o: $(SRCROOT)/src/%.c
 	$(CC) $(CFLAGS) $(PP) $(INCFLAGS) -c $< -o $@
 
-.PHONY: tests
-tests: $(TESTS)
+.PHONY: example
+example: $(EXAMPLE)
 
-$(TESTS): lib install
+$(EXAMPLE): install
 	$(CC) $(CFLAGS) -I$(GSLIBDIR)/include -I$(BUILDDIR)/include $@.c -o $@ $(LDFLAGS)
+
+.PHONY: tests
+tests: install $(TESTOBJS)
+
+$(BUILDDIR)/tests/%: $(SRCROOT)/tests/%.c
+	$(CC) $(CFLAGS) -I$(GSLIBDIR)/include -I$(BUILDDIR)/include $< -o $@ $(LDFLAGS)
 
 .PHONY: clean
 clean:
-	@rm -f $(BUILDDIR) $(LIB) $(TESTS) $(TESTS).o
+	@rm -f $(BUILDDIR) $(LIB) $(EXAMPLE) $(EXAMPLE).o
 
 print-%:
 	$(info [ variable name]: $*)
@@ -89,3 +98,4 @@ print-%:
 	@true
 
 $(shell mkdir -p $(BUILDDIR)/src/sort)
+$(shell mkdir -p $(BUILDDIR)/tests)
