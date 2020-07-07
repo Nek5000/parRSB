@@ -61,13 +61,11 @@ void mgLevelSetup(mgData d,uint lvl)
       if(ptr[j].r==ng) ptr[j].rn-=1;
     }
 
-  uint np =d->c.np;
-  uint npc=np;
-  if(ngc<np) npc=ngc;
+  uint npc=d->c.np;
+  if(ngc<npc) npc=ngc;
 
 #if DBG
-  printf("id=%u ng=%lld ng_c=%lld np=%d np_c=%d\n",d->c.id,ng,ngc,
-      d->c.np,npc);
+  printf("id=%u ng=%lld ng_c=%lld np_c=%d\n",d->c.id,ng,ngc,npc);
 #endif
 
   /* setup gs ids for fine level (rhs interpolation) */
@@ -155,8 +153,20 @@ void mgLevelSetup(mgData d,uint lvl)
       if(M1->row_start+i==M1->col[j]) ids[rn0+nn]=M1->col[j],nn++;
   assert(nn==M1->rn);
 
-  d->levels[lvl-1]->J=gs_setup(ids,rn0+M1->rn,&d->c,0,
-      gs_crystal_router,0);
+#if defined(GENMAP_DEBUG)
+  for(i=0; i<d->c.np; i++){
+    comm_barrier(&d->c);
+    if(i==d->c.id){
+      printf("rank=%d lvl=%d:",d->c.id,lvl);
+      for(j=0; j<rn0+rn1; j++)
+        printf(" %lld",ids[j]);
+      printf("\n");
+    }
+    fflush(stdout);
+  }
+#endif
+
+  d->levels[lvl-1]->J=gs_setup(ids,rn0+M1->rn,&d->c,0,gs_auto,0);
 
   /* setup gs handle for the mat-vec */
   GenmapRealloc(nnz1,&ids);
@@ -165,7 +175,7 @@ void mgLevelSetup(mgData d,uint lvl)
       if(M1->row_start+i==M1->col[j]) ids[j]=M1->col[j];
       else ids[j]=-M1->col[j];
 
-  M1->gsh=gs_setup(ids,nnz1,&d->c,0,gs_crystal_router,0);
+  M1->gsh=gs_setup(ids,nnz1,&d->c,0,gs_auto,0);
   buffer_init(&M1->buf,nnz1);
 
   GenmapFree(ids);
