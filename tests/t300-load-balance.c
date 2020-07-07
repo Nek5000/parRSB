@@ -1,9 +1,9 @@
-#include <exasort.h>
-#include <exa-memory.h>
+#include <genmap-impl.h>
+#include <sort-impl.h>
 #include <time.h>
 
 typedef struct{
-  exaScalar ds;
+  double ds;
   uint proc;
 } Data;
 
@@ -11,25 +11,25 @@ typedef struct{
 
 int main(int argc,char *argv[]){
   MPI_Init(&argc,&argv);
-
-  exaHandle h;
-  exaInit(&h,MPI_COMM_WORLD,"/host");
+  struct comm c; comm_init(&c,MPI_COMM_WORLD);
 
   srand(time(0));
 
-  exaArray arr; exaArrayInit(&arr,Data,N);
+  struct array arr; array_init(Data,&arr,N);
 
-  int i; Data d;
-  for(i=0; i<N; i++)
-      d.ds=(rand()%100)/100.0,exaArrayAppend(arr,&d);
+  int i,cnt; Data d; Data *ptr=arr.ptr;
+  for(i=cnt=0; i<N; i++)
+      d.ds=(rand()%100)/100.0,ptr[cnt++]=d;
 
+#if 0
   exaSort(arr,exaScalar_t,offsetof(Data,ds),exaSortAlgoBinSort,1,
       exaGetComm(h));
-
   assert(exaArrayGetSize(arr)==N);
+#endif
 
-  exaDestroy(arr);
-  exaFinalize(h);
+  array_free(&arr);
+
+  comm_free(&c);
   MPI_Finalize();
 
   return 0;

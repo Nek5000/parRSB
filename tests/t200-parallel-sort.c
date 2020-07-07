@@ -1,21 +1,20 @@
-#include <exasort.h>
-#include <exa-memory.h>
+#include <genmap-impl.h>
+#include <sort-impl.h>
 #include <time.h>
 
 typedef struct{
-  exaScalar ds;
+  double ds;
   slong dl;
   uint proc;
 } Data;
 
 #define N 10
 
-void check(exaArray arr,exaHandle h){
-  uint size=exaSize(h);
-  uint rank=exaRank(h);
+void check(struct array *arr,struct comm *c){
+  uint size=c->np,rank=c->id;
 
-  Data *ptr=exaArrayGetPointer(arr);
-  uint n=exaArrayGetSize(arr),i;
+  Data *ptr=arr->ptr;
+  uint n=arr->n,i;
   for(i=0; i<n-1; i++){
     assert(ptr[i].ds<=ptr[i+1].ds && "Field ds is not sorted");
     if(i%2==0)
@@ -30,8 +29,7 @@ void check(exaArray arr,exaHandle h){
   p[0].dl  =2*rank,p[1].dl  =2*rank+1;
   a.n=2;
 
-  struct comm c; comm_init(&c,MPI_COMM_WORLD);
-  struct crystal cr; crystal_init(&cr,&c);
+  struct crystal cr; crystal_init(&cr,c);
 
   sarray_transfer(Data,&a,proc,0,&cr);
   if(rank==root)
@@ -47,44 +45,46 @@ void check(exaArray arr,exaHandle h){
       assert(ptr[i].ds<=ptr[i+1].ds && "Field ds is not sorted globally");
 
   crystal_free(&cr);
-  comm_free(&c);
   array_free(&a);
 }
 
 int main(int argc,char *argv[]){
   MPI_Init(&argc,&argv);
+  struct comm c; comm_init(&c,MPI_COMM_WORLD);
 
-  exaHandle h;
-  exaInit(&h,MPI_COMM_WORLD,"/host");
+  struct array arr; array_init(Data,&arr,N);
 
   srand(time(0));
 
-  exaArray arr; exaArrayInit(&arr,Data,N);
-
-  int i; Data d;
-  for(i=0; i<N/2; i++){
-      d.dl=rand()%100,d.ds=(rand()%100)/100.0,exaArrayAppend(arr,&d);
-      d.dl=rand()%100,exaArrayAppend(arr,&d);
+  int i,cnt; Data d; Data *ptr=arr.ptr;
+  for(i=cnt=0; i<N/2; i++){
+      d.dl=rand()%100,d.ds=(rand()%100)/100.0,ptr[cnt++]=d;
+      d.dl=rand()%100,ptr[cnt++]=d;
   }
 
+#if 0
   exaSort2(arr,exaScalar_t,offsetof(Data,ds),
     exaLong_t,offsetof(Data,dl),
     exaSortAlgoBinSort,1,exaGetComm(h));
-  check(arr,h);
+#endif
+  check(&arr,&c);
 
-  exaArraySetSize(arr,0);
-  for(i=0; i<N/2; i++){
-      d.dl=rand()%100,d.ds=(rand()%100)/100.0,exaArrayAppend(arr,&d);
-      d.dl=rand()%100,exaArrayAppend(arr,&d);
+  ptr=arr.ptr;
+  for(i=cnt=0; i<N/2; i++){
+      d.dl=rand()%100,d.ds=(rand()%100)/100.0,ptr[cnt++]=d;
+      d.dl=rand()%100,ptr[cnt++]=d;
   }
 
+#if 0
   exaSort2(arr,exaScalar_t,offsetof(Data,ds),
     exaLong_t,offsetof(Data,dl),
     exaSortAlgoHyperCubeSort,1,exaGetComm(h));
-  check(arr,h);
+#endif
+  check(&arr,&c);
 
-  exaDestroy(arr);
-  exaFinalize(h);
+  array_free(&arr);
+
+  comm_free(&c);
   MPI_Finalize();
 
   return 0;

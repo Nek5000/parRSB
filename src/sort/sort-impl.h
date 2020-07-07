@@ -1,7 +1,10 @@
 #ifndef _SORT_IMPL_H_
 #define _SORT_IMPL_H_
 
-#include <sort.h>
+#include "sort.h"
+#ifndef _SORT_H_
+#error "sort.h not included"
+#endif
 
 #define min(a,b) ((a)<(b) ? (a) : (b))
 #define max(a,b) ((a)>(b) ? (a) : (b))
