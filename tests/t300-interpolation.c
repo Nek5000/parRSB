@@ -1,19 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <mpi.h>
-#include <exa.h>
-
 #include <genmap-impl.h>
 #include <gencon-impl.h>
 #include <genmap-multigrid-precon.h>
 
 int main(int argc,char *argv[]){
   MPI_Init(&argc,&argv);
-
-  exaHandle h; exaInit(&h,MPI_COMM_WORLD,"/host");
-  int rank=exaRank(h);
-  int size=exaSize(h);
+  struct comm comm; comm_init(&comm,MPI_COMM_WORLD);
+  int rank=comm.id,size=comm.np;
 
   if(argc!=2){
     if(rank==0) printf("Usage: ./%s <co2 file>\n",argv[0]);
@@ -22,7 +17,7 @@ int main(int argc,char *argv[]){
   }
 
   Mesh mesh;
-  readCo2File(h,&mesh,argv[1]);
+  readCo2File(&mesh,argv[1],&comm);
 
   GenmapHandle gh; GenmapInit(&gh,MPI_COMM_WORLD);
 
@@ -41,6 +36,10 @@ int main(int argc,char *argv[]){
   GenmapComm c=GenmapGetGlobalComm(gh);
   parMat M; parMatSetup(gh,c,&M);
 
+  slong out[2][1],bf[2][1],in=M->rn;
+  comm_scan(out,&comm,gs_long,gs_add,&in,1,bf);
+  slong rg=out[1][0];
+
   /* Setup MG levels */
   mgData d; mgSetup(c,M,&d);
 
@@ -53,35 +52,19 @@ int main(int argc,char *argv[]){
   buffer buf; buffer_init(&buf,1024);
   GenmapScalar v; GenmapULong rn=M->rn;
   for(i=0; i<nlevels-1; i++){
-    if(lvl_off[i]==lvl_off[i+1])
-      continue;
-
     gs(x+lvl_off[i],gs_double,gs_add,1,l[i]->J,&buf);
-
-    v=0.0;
-    for(j=lvl_off[i+1]; j<lvl_off[i+2]; j++)
-      v+=x[j];
-
-    printf("x: ");
-    for(j=lvl_off[i]; j<lvl_off[i+2]; j++)
-      printf(" %lf",x[j]);
-    printf("\nv=%lf rn=%d\n",v,rn);
-
-    assert(fabs(v-rn)<GENMAP_TOL);
-
-    for(j=lvl_off[i+1]; j<lvl_off[i+2]; j++)
-      x[j]=1.0;
   }
-
   buffer_free(&buf);
+
+  if(lvl_off[nlevels-1]<lvl_off[nlevels])
+    assert(fabs(x[lvl_off[nlevels]-1]-rg)<GENMAP_TOL);
 
   mgFree(d);
 
   GenmapFinalize(gh);
-
   MeshFree(mesh);
-  exaFinalize(h);
 
+  comm_free(&comm);
   MPI_Finalize();
 
   return 0;

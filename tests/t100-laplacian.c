@@ -10,10 +10,8 @@
 
 int main(int argc,char *argv[]){
   MPI_Init(&argc,&argv);
-
-  exaHandle h; exaInit(&h,MPI_COMM_WORLD,"/host");
-  int rank=exaRank(h);
-  int size=exaSize(h);
+  struct comm comm; comm_init(&comm,MPI_COMM_WORLD);
+  int rank=comm.id,size=comm.np;
 
   if(argc!=2){
     if(rank==0) printf("Usage: ./%s <co2 file>\n",argv[0]);
@@ -22,7 +20,7 @@ int main(int argc,char *argv[]){
   }
 
   Mesh mesh;
-  readCo2File(h,&mesh,argv[1]);
+  readCo2File(&mesh,argv[1],&comm);
 
   GenmapHandle gh; GenmapInit(&gh,MPI_COMM_WORLD);
 
@@ -74,11 +72,11 @@ int main(int argc,char *argv[]){
   parMatFree(M);
 
   GenmapDestroyVector(v); GenmapDestroyVector(u);
+
   GenmapFinalize(gh);
-
   MeshFree(mesh);
-  exaFinalize(h);
 
+  comm_free(&comm);
   MPI_Finalize();
 
   return 0;

@@ -335,12 +335,12 @@ int writeCo2File(exaHandle h,Mesh mesh,char *fileName){
   return errs;
 }
 
-int readCo2File(exaHandle h,Mesh *mesh_,char *fileName){
-  exaExternalComm comm=exaGetExternalComm(h);
+int readCo2File(Mesh *mesh_,char *fileName,struct comm *c){
+  comm_ext comm=c->c;
   MPI_File file;
   int err=MPI_File_open(comm,fileName,MPI_MODE_RDONLY,MPI_INFO_NULL,&file);
 
-  exaInt rank=exaRank(h);
+  int rank=c->id;
   if(err){
     if(rank==0)
       fprintf(stderr,"%s:%d Error opening file: %s for reading.\n",
@@ -361,12 +361,15 @@ int readCo2File(exaHandle h,Mesh *mesh_,char *fileName){
   int nelgt,nelgv,nVertex;
   char version[6];
   sscanf(buf,"%5s%12d%12d%12d",version,&nelgt,&nelgv,&nVertex);
+
+#if defined(GENMPA_DEBUG)
   if(rank==0)
-    exaDebug(h,"%s %d %d %d\n",version,nelgt,nelgv,nVertex);
+    printf("%s %d %d %d\n",version,nelgt,nelgv,nVertex);
+#endif
 
   //TODO: Assert version
 
-  exaInt size=exaSize(h);
+  int size=c->np;
   int nelt=nelgt/size,nrem=nelgt-nelt*size;
   nelt+=(rank<nrem ? 1: 0);
 
@@ -383,14 +386,16 @@ int readCo2File(exaHandle h,Mesh *mesh_,char *fileName){
   mesh->nelgv=nelgv;
   mesh->nelt=nelt;
 
+#if defined(GENMPA_DEBUG)
   if(rank==0)
-    exaDebug(h,"ndim/nvertex/nelgt/nelgv/nelt: %d/%d/%d/%d/%d\n",
+    printf("ndim/nvertex/nelgt/nelgv/nelt: %d/%d/%d/%d/%d\n",
       nDim,nVertex,nelgt,nelgv,nelt);
+#endif
 
-  exaLong out[2][1],buff[2][1],in[1];
+  slong out[2][1],buff[2][1],in[1];
   in[0]=nelt;
-  exaScan(h,out,in,buff,1,exaLong_t,exaAddOp);
-  exaLong start=out[0][0];
+  comm_scan(out,c,gs_long,gs_add,&in,1,buff);
+  slong start=out[0][0];
 
   int readSize=nelt*(nVertex+1)*sizeof(int);
   int headerSize=GC_CO2_HEADER_LEN+sizeof(float);
@@ -410,14 +415,11 @@ int readCo2File(exaHandle h,Mesh *mesh_,char *fileName){
   int i,j,tmp1,tmp2;
   for(i=0;i<nelt;i++){
     readT(&tmp1,buf0,int,1); buf0+=sizeof(int);
-    exaDebug(h,"%d ",tmp1);
     for(j=0;j<nVertex;j++){
       ptr[i].vertex[j].elementId=tmp1;
       readT(&tmp2,buf0,int,1); buf0+=sizeof(int);
       ptr[i].vertex[j].globalId =tmp2;
-      exaDebug(h,"%d ",tmp2);
     }
-    exaDebug(h,"\n");
   }
 
   free(buf);

@@ -51,7 +51,9 @@ int parRCB(struct comm *ci,struct array *a,int ndim){
       if(length[d]>length[axis2] && d!=axis1) axis2=d;
 
     uint off=offsets[axis1];
+#if 0
     parallel_sort(elm_rcb,a,off,gs_double,&c);
+#endif
 
     int p=(size+1)/2;
     int bin=(rank>=p);
