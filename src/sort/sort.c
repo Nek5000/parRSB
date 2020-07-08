@@ -99,7 +99,7 @@ int parallel_sort_private(sort_data data,struct comm *c){
   struct comm dup; comm_dup(&dup,c);
 
   int balance =data->balance;
-  exaSortAlgo algo=data->algo;
+  sort_algo algo=data->algo;
 
   struct array *a=data->a;
   size_t usize   =data->unit_size;
@@ -107,10 +107,10 @@ int parallel_sort_private(sort_data data,struct comm *c){
   hypercube_sort_data hdata;
 
   switch(algo){
-    case exaSortAlgoBinSort:
+    case bin_sort:
       parallel_bin_sort(data,c);
       break;
-    case exaSortAlgoHyperCubeSort:
+    case hypercube_sort:
       GenmapMalloc(1,&hdata);
       hdata->data=data; hdata->probes=NULL; hdata->probe_cnt=NULL;
       parallel_hypercube_sort(hdata,&dup);

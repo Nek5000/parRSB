@@ -81,6 +81,8 @@ $(EXAMPLE): install
 
 .PHONY: tests
 tests: install $(TESTOBJS)
+	@cp $(TESTDIR)/run-tests.sh $(BUILDDIR)/tests/
+	@cd $(BUILDDIR)/tests && ./run-tests.sh
 
 $(BUILDDIR)/tests/%: $(SRCROOT)/tests/%.c
 	$(CC) $(CFLAGS) -I$(GSLIBDIR)/include -I$(BUILDDIR)/include $< -o $@ $(LDFLAGS)

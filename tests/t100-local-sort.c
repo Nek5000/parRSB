@@ -4,7 +4,7 @@
 
 typedef struct{
   double ds;
-  slong dl;
+  ulong dl;
   sint proc;
 } Data;
 
@@ -20,11 +20,19 @@ int main(int argc,char *argv[]){
       d.dl=rand()%100,d.ds=(rand()%100)/100.0,ptr[cnt++]=d;
       d.dl=rand()%100,ptr[cnt++]=d;
   }
+  arr.n=N;
 
-#if 0
-  exaSortArray2(arr,exaScalar_t,offsetof(Data,ds),
-    exaLong_t,offsetof(Data,dl));
-#endif
+  sort_data_private sd;
+  sd.align=ALIGNOF(Data),sd.unit_size=sizeof(Data);
+  sd.nfields=2;
+  sd.offset[0]=offsetof(Data,ds),sd.t[0]=gs_double;
+  sd.offset[1]=offsetof(Data,dl),sd.t[1]=gs_long;
+  sd.a=&arr; sd.balance=1; sd.algo=bin_sort;
+  buffer_init(&sd.buf,1024);
+
+  sort_local(&sd);
+
+  buffer_free(&sd.buf);
 
   ptr=arr.ptr;
   for(i=0; i<N-1; i++){

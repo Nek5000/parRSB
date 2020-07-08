@@ -22,7 +22,7 @@ int main(int argc,char *argv[]){
       d.ds=(rand()%100)/100.0,ptr[cnt++]=d;
 
 #if 0
-  exaSort(arr,exaScalar_t,offsetof(Data,ds),exaSortAlgoBinSort,1,
+  exaSort(arr,exaScalar_t,offsetof(Data,ds),bin_sort,1,
       exaGetComm(h));
   assert(exaArrayGetSize(arr)==N);
 #endif

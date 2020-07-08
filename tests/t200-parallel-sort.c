@@ -61,26 +61,13 @@ int main(int argc,char *argv[]){
       d.dl=rand()%100,d.ds=(rand()%100)/100.0,ptr[cnt++]=d;
       d.dl=rand()%100,ptr[cnt++]=d;
   }
+  arr.n=N;
 
-#if 0
-  exaSort2(arr,exaScalar_t,offsetof(Data,ds),
-    exaLong_t,offsetof(Data,dl),
-    exaSortAlgoBinSort,1,exaGetComm(h));
-#endif
+  parallel_sort_2(Data,&arr,offsetof(Data,ds),gs_double,
+      offsetof(Data,dl),gs_long,&c);
   check(&arr,&c);
 
-  ptr=arr.ptr;
-  for(i=cnt=0; i<N/2; i++){
-      d.dl=rand()%100,d.ds=(rand()%100)/100.0,ptr[cnt++]=d;
-      d.dl=rand()%100,ptr[cnt++]=d;
-  }
-
-#if 0
-  exaSort2(arr,exaScalar_t,offsetof(Data,ds),
-    exaLong_t,offsetof(Data,dl),
-    exaSortAlgoHyperCubeSort,1,exaGetComm(h));
-#endif
-  check(&arr,&c);
+  //TODO: Test hypercube sort
 
   array_free(&arr);
 
