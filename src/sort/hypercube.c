@@ -7,7 +7,7 @@ int init_probes(hypercube_sort_data data,struct comm *c)
   sort_data input=data->data;
 
   /* Allocate space for probes and counts */
-  int nprobes=data->nProbes=3;
+  int nprobes=data->nprobes=3;
   if(!data->probes   ) GenmapMalloc(nprobes,&data->probes   );
   if(!data->probe_cnt) GenmapMalloc(nprobes,&data->probe_cnt);
 
@@ -29,7 +29,7 @@ int update_probe_counts(hypercube_sort_data data,struct comm *c)
   uint offset  =input->offset[0];
   gs_dom t=input->t[0];
 
-  uint nprobes =data->nProbes;
+  uint nprobes =data->nprobes;
 
   uint i;
   for(i=0;i<nprobes;i++) data->probe_cnt[i]=0;
@@ -52,8 +52,7 @@ int update_probes(slong nelem,double *probes,ulong *probe_cnt,
     uint threshold)
 {
   slong expected=nelem/2;
-
-  if(abs(probe_cnt[1]-expected)<threshold) return 0;
+  if(llabs(expected-probe_cnt[1])<threshold) return 0;
 
   if(probe_cnt[1]<expected) probes[0]=probes[1];
   else probes[2]=probes[1];
@@ -128,7 +127,7 @@ int parallel_hypercube_sort(hypercube_sort_data data,struct comm *c)
   update_probe_counts(data,c);
 
   int max_iter=log2((data->probes[2]-data->probes[0])/GENMAP_TOL),iter=0;
-  while(abs(nelem/2-data->probe_cnt[1])>threshold && iter++<max_iter){
+  while(llabs(nelem/2-data->probe_cnt[1])>threshold && iter++<max_iter){
     update_probes(nelem,data->probes,data->probe_cnt,threshold);
     update_probe_counts(data,c);
   }

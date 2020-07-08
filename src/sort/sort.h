@@ -32,9 +32,9 @@ int parallel_bin_sort(sort_data data,struct comm *c);
 //
 typedef struct{
   sort_data data;
-  int nProbes;
+  int nprobes;
   double *probes;
-  slong *probe_cnt;
+  ulong *probe_cnt;
 } hypercube_sort_data_private;
 typedef hypercube_sort_data_private* hypercube_sort_data;
 

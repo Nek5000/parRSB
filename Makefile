@@ -73,11 +73,11 @@ endif
 $(BUILDDIR)/src/%.o: $(SRCROOT)/src/%.c
 	$(CC) $(CFLAGS) $(PP) $(INCFLAGS) -c $< -o $@
 
-.PHONY: example
-example: $(EXAMPLE)
+.PHONY: examples
+examples: $(EXAMPLE)
 
 $(EXAMPLE): install
-	$(CC) $(CFLAGS) -I$(GSLIBDIR)/include -I$(BUILDDIR)/include $@.c -o $@ $(LDFLAGS)
+	$(CC) $(CFLAGS) -I$(GSLIBDIR)/include -I$(INSTALL_ROOT)/include $@.c -o $@ $(LDFLAGS)
 
 .PHONY: tests
 tests: install $(TESTOBJS)
