@@ -15,8 +15,8 @@ EXAMPLEDIR=$(SRCROOT)/example
 TESTDIR   =$(SRCROOT)/tests
 
 TARGET=parRSB
+LIB=$(BUILDDIR)/lib/lib$(TARGET).a
 EXAMPLE=$(EXAMPLEDIR)/example
-LIB=src/lib$(TARGET).a
 
 INCFLAGS=-I$(SRCDIR) -I$(SORTDIR) -I$(GSLIBDIR)/include
 LDFLAGS:=-L$(BUILDDIR)/lib -l$(TARGET) -L $(GSLIBDIR)/lib -lgs -lm
@@ -59,8 +59,9 @@ install: lib
 	@cp $(SRCDIR)/*.h $(SORTDIR)/*.h $(INSTALL_ROOT)/include 2>/dev/null
 
 
-.PHONY: $(TARGET)
+.PHONY: lib
 lib: $(SRCOBJS)
+	@mkdir $(BUILDDIR)/lib
 	@$(AR) cr $(LIB) $(SRCOBJS)
 	@ranlib $(LIB)
 
