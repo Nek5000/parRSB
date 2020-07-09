@@ -9,6 +9,31 @@ int log2i(sint i){
   return l-1;
 }
 
+void setOwner(char *ptr,sint n,size_t inOffset,size_t outOffset,
+  slong lelg,sint np)
+{
+  sint lelt=lelg/np;
+  sint nrem=lelg%np;
+
+  ulong *inPtr;
+  sint  *outPtr;
+  sint i; slong row;
+  for(i=0; i<n; i++){
+    inPtr =(ulong*)GETPTR(ptr,i,inOffset );
+    outPtr=(sint  *)GETPTR(ptr,i,outOffset);
+    row   =*inPtr-1;
+    //FIXME: Assumes the 'reverse-Nek' element distribution
+#if 0
+    if(row<lelt*(np-nrem)) *outPtr=(sint) row/lelt;
+    else *outPtr=np-nrem+(sint) (row-lelt*(np-nrem))/(lelt+1);
+#else
+    if(nrem==0) *outPtr=(sint) row/lelt;
+    else if(row<(lelt+1)*nrem) *outPtr=(sint) row/(lelt+1);
+    else *outPtr=nrem+(sint) (row-(lelt+1)*nrem)/lelt;
+#endif
+  }
+}
+
 // Following two functions can be combined
 void compress_col(struct array *entries){
   GenmapScalar v; sint i,j;

@@ -48,8 +48,7 @@ int log2i(sint i);
 
 typedef struct{
   ulong r,c,rn,cn;
-  sint owner; /* 0-index */
-  sint p;
+  uint p;
   GenmapScalar v;
 } entry;
 

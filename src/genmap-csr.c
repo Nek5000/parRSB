@@ -5,31 +5,6 @@
 
 #define ABS(i) ((i<0)?-i:i)
 
-void setOwner(char *ptr,sint n,size_t inOffset,size_t outOffset,
-  slong lelg,sint np)
-{
-  sint lelt=lelg/np;
-  sint nrem=lelg%np;
-
-  ulong *inPtr;
-  sint  *outPtr;
-  sint i; slong row;
-  for(i=0; i<n; i++){
-    inPtr =(ulong*)GETPTR(ptr,i,inOffset );
-    outPtr=(sint  *)GETPTR(ptr,i,outOffset);
-    row   =*inPtr-1;
-    //FIXME: Assumes the 'reverse-Nek' element distribution
-#if 0
-    if(row<lelt*(np-nrem)) *outPtr=(sint) row/lelt;
-    else *outPtr=np-nrem+(sint) (row-lelt*(np-nrem))/(lelt+1);
-#else
-    if(nrem==0) *outPtr=(sint) row/lelt;
-    else if(row<(lelt+1)*nrem) *outPtr=(sint) row/(lelt+1);
-    else *outPtr=nrem+(sint) (row-(lelt+1)*nrem)/lelt;
-#endif
-  }
-}
-
 void parMatSetup(GenmapHandle h,GenmapComm c,parMat *M_)
 {
   sint lelt=GenmapGetNLocalElements(h);
@@ -54,16 +29,8 @@ void parMatSetup(GenmapHandle h,GenmapComm c,parMat *M_)
     }
   GenmapFree(offsets);
 
-  GenmapScan(h,c);
-  slong ng=GenmapGetNGlobalElements(h);
-  sint  np=GenmapCommSize(c);
-  setOwner(entries.ptr,entries.n,offsetof(entry,c),
-    offsetof(entry,owner),ng,np);
-
-#if defined(EXA_DEBUG)
-  for(i=0; i<entries.n; i++)
-    printf("elem: (%lld,%lld,%d)\n",ptr[i].r,ptr[i].c,ptr[i].owner);
-#endif
+  GenmapScan(h,c); slong ng=GenmapGetNGlobalElements(h);
+  sint np=GenmapCommSize(c);
 
   buffer buf; buffer_init(&buf,1024);
   ptr=entries.ptr;
