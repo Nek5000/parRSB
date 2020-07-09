@@ -41,4 +41,6 @@ int sort_local(sort_data sd)
     sort_field(a,usize,sd->t[i],sd->offset[i],buf,1),i--;
 
   sarray_permute_buf_(sd->align,usize,a->ptr,a->n,buf);
+
+  return 0;
 }
