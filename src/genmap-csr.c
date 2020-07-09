@@ -52,9 +52,11 @@ void parMatSetup(GenmapHandle h,GenmapComm c,parMat *M_)
   GenmapMalloc(M->rn+1,&M->row_off);
 
   if(n==0)
-    M->col=NULL,M->v=NULL;
-  else
+    M->col=NULL,M->v=NULL,M->diag=NULL;
+  else{
     GenmapMalloc(entries.n,&M->col),GenmapMalloc(entries.n,&M->v);
+    GenmapMalloc(M->rn,&M->diag);
+  }
 
   ptr=entries.ptr;
   for(i=0; i<entries.n; i++)
@@ -73,7 +75,8 @@ void parMatSetup(GenmapHandle h,GenmapComm c,parMat *M_)
 
   for(i=0; i<M->rn; i++)
     for(j=M->row_off[i]; j<M->row_off[i+1]; j++)
-      if(M->row_start+i==M->col[j]) eIds[j]=M->col[j];
+      if(M->row_start+i==M->col[j])
+        eIds[j]=M->col[j],M->diag[i]=M->v[j];
       else eIds[j]=-M->col[j];
 
   M->gsh=gs_setup(eIds,M->row_off[n],&c->gsc,0,gs_crystal_router,0);
@@ -142,6 +145,7 @@ void parMatPrint(parMat M,struct comm *c){
 int parMatFree(parMat M){
   if(M->col) GenmapFree(M->col);
   if(M->v) GenmapFree(M->v);
+  if(M->diag) GenmapFree(M->diag);
   if(M->row_off) GenmapFree(M->row_off);
   if(M->gsh) gs_free(M->gsh);
   if(M->buf.ptr) buffer_free(&M->buf);

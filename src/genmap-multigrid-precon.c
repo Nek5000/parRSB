@@ -151,9 +151,11 @@ void mgLevelSetup(mgData d,uint lvl)
 #endif
 
   if(nnz1==0)
-    M1->col=NULL,M1->v=NULL;
-  else
+    M1->col=NULL,M1->v=NULL,M1->diag=NULL;
+  else{
     GenmapMalloc(nnz1,&M1->col),GenmapMalloc(nnz1,&M1->v);
+    GenmapMalloc(M1->rn,&M1->diag);
+  }
 
   uint rn1; GenmapScalar v;
   M1->row_off[0]=i=j=nn=rn1=0; ptr=entries.ptr; while(i<entries.n){
@@ -175,7 +177,8 @@ void mgLevelSetup(mgData d,uint lvl)
   GenmapRealloc(rn0+rn1,&ids);
   for(i=nn=0; i<rn1; i++)
     for(j=M1->row_off[i]; j<M1->row_off[i+1]; j++)
-      if(M1->row_start+i==M1->col[j]) ids[rn0+nn]=M1->col[j],nn++;
+      if(M1->row_start+i==M1->col[j])
+        ids[rn0+nn]=M1->col[j],M1->diag[i]=M1->col[j],nn++;
   assert(nn==M1->rn);
 
 #if defined(GENMAP_DEBUG)

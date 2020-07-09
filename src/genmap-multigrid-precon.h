@@ -11,7 +11,7 @@ struct parMat_{
 
   uint *row_off;
   ulong *col;
-  GenmapScalar *v;
+  GenmapScalar *v,*diag;
 
   struct gs_data *gsh;
   buffer buf;
