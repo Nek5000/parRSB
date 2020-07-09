@@ -54,6 +54,8 @@ int main(int argc,char *argv[]){
   uint k;
   buffer buf; buffer_init(&buf,1024);
   for(i=0; i<nlevels-1; i++){
+    gs(x+lvl_off[i],gs_double,gs_add,1,l[i]->J,&buf);
+#ifdef GENMAP_DEBUG
     comm_barrier(&comm);
     for(k=0; k<comm.np; k++){
       if(k==comm.id){
@@ -64,17 +66,32 @@ int main(int argc,char *argv[]){
       }
       fflush(stdout);
     }
-
-    gs(x+lvl_off[i],gs_double,gs_add,1,l[i]->J,&buf);
-  }
-  buffer_free(&buf);
-
-  for(i=0; i<lvl_off[nlevels]; i++){
-    printf("%d: x[%d]=%lf\n",rank,i,x[i]);
+#endif
   }
 
   if(lvl_off[nlevels-1]<lvl_off[nlevels]) // rank with last 1-dof
     assert(fabs(x[lvl_off[nlevels]-1]-rg)<GENMAP_TOL);
+
+  for(i=nlevels-2; i>=0; i--){
+    gs(x+lvl_off[i],gs_double,gs_add,0,l[i]->J,&buf);
+#ifdef GENMAP_DEBUG
+    comm_barrier(&comm);
+    for(k=0; k<comm.np; k++){
+      if(k==comm.id){
+        printf("rank %d: lvl %d: ",comm.id,i);
+        for(j=0; j<lvl_off[nlevels]; j++)
+          printf("%lf ",x[j]);
+        printf("\n");
+      }
+      fflush(stdout);
+    }
+#endif
+  }
+
+  for(i=lvl_off[0]; i<lvl_off[nlevels]; i++)
+    assert(fabs(x[i]-rg)<GENMAP_TOL);
+
+  buffer_free(&buf);
 
   mgFree(d);
 
