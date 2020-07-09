@@ -4,7 +4,8 @@ CC ?= mpicc
 CFLAGS ?= -O2
 
 MKFILEPATH = $(abspath $(lastword $(MAKEFILE_LIST)))
-SRCROOT ?= $(patsubst %/,%,$(dir $(MKFILEPATH)))
+SRCROOT_ ?= $(patsubst %/,%,$(dir $(MKFILEPATH)))
+SRCROOT=$(realpath $(SRCROOT_))
 
 GSLIBDIR=$(GSLIBPATH)
 
@@ -20,12 +21,6 @@ EXAMPLE=$(EXAMPLEDIR)/example
 
 INCFLAGS=-I$(SRCDIR) -I$(SORTDIR) -I$(GSLIBDIR)/include
 LDFLAGS:=-L$(BUILDDIR)/lib -l$(TARGET) -L $(GSLIBDIR)/lib -lgs -lm
-
-ifneq (,$(strip $(DESTDIR)))
-  INSTALL_ROOT=$(DESTDIR)
-else
-  INSTALL_ROOT=$(SRCROOT)/build
-endif
 
 SRCS    =$(wildcard $(SRCDIR)/*.c)
 SORTSRCS=$(wildcard $(SORTDIR)/*.c)
@@ -45,6 +40,11 @@ ifneq ($(PAUL),0)
   PP += -DGENMAP_PAUL
 endif
 
+INSTALLDIR=
+ifneq (,$(strip $(DESTDIR)))
+	INSTALLDIR=$(realpath $(DESTDIR))
+endif
+
 .PHONY: default
 default: check lib install
 
@@ -53,13 +53,12 @@ all: check lib tests example install
 
 .PHONY: install
 install: lib
-	@mkdir -p $(INSTALL_ROOT)/lib 2>/dev/null
-	@if [ $(LIB) -nt $(INSTALL_ROOT)/lib/lib$(TARGET).a ]; then \
-	  @cp -v $(LIB) $(INSTALL_ROOT)/lib 2>/dev/null; \
+	@if [ "$(BUILDDIR)" != "$(INSTALLDIR)" ] && [ "$(INSTALLDIR)" != "" ]; then \
+	@mkdir -p $(INSTALLDIR)/lib 2>/dev/null; \
+	@cp -v $(LIB) $(INSTALLDIR)/lib 2>/dev/null; \
+	@mkdir -p $(INSTALLDIR)/include 2>/dev/null; \
+	@cp $(SRCDIR)/*.h $(SORTDIR)/*.h $(INSTALLDIR)/include 2>/dev/null; \
 	fi
-	@mkdir -p $(INSTALL_ROOT)/include 2>/dev/null
-	@cp $(SRCDIR)/*.h $(SORTDIR)/*.h $(INSTALL_ROOT)/include 2>/dev/null
-
 
 .PHONY: lib
 lib: $(SRCOBJS)
@@ -70,7 +69,7 @@ lib: $(SRCOBJS)
 .PHONY: check
 check: 
 ifeq ($(GSLIBPATH),)
-	$(error Specify GSLIBPATH=<path to gslib>/build)
+  $(error Specify GSLIBPATH=<path to gslib>/build)
 endif
 
 $(BUILDDIR)/src/%.o: $(SRCROOT)/src/%.c
@@ -80,7 +79,7 @@ $(BUILDDIR)/src/%.o: $(SRCROOT)/src/%.c
 examples: $(EXAMPLE)
 
 $(EXAMPLE): install
-	$(CC) $(CFLAGS) -I$(GSLIBDIR)/include -I$(INSTALL_ROOT)/include $@.c -o $@ $(LDFLAGS)
+	$(CC) $(CFLAGS) -I$(GSLIBDIR)/include -I$(SRCDIR) -I$(SORTDIR) @.c -o $@ $(LDFLAGS)
 
 .PHONY: tests
 tests: install $(TESTOBJS)
@@ -88,7 +87,7 @@ tests: install $(TESTOBJS)
 	@cd $(BUILDDIR)/tests && ./run-tests.sh
 
 $(BUILDDIR)/tests/%: $(SRCROOT)/tests/%.c
-	$(CC) $(CFLAGS) -I$(GSLIBDIR)/include -I$(BUILDDIR)/include $< -o $@ $(LDFLAGS)
+	$(CC) $(CFLAGS) -I$(GSLIBDIR)/include -I$(SRCDIR) -I$(SORTDIR) $< -o $@ $(LDFLAGS)
 
 .PHONY: clean
 clean:
