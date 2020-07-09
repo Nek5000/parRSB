@@ -53,12 +53,12 @@ all: check lib tests example install
 
 .PHONY: install
 install: lib
-	@if [ "$(BUILDDIR)" != "$(INSTALLDIR)" ] && [ "$(INSTALLDIR)" != "" ]; then \
-	@mkdir -p $(INSTALLDIR)/lib 2>/dev/null; \
-	@cp -v $(LIB) $(INSTALLDIR)/lib 2>/dev/null; \
-	@mkdir -p $(INSTALLDIR)/include 2>/dev/null; \
-	@cp $(SRCDIR)/*.h $(SORTDIR)/*.h $(INSTALLDIR)/include 2>/dev/null; \
-	fi
+ifneq ($(INSTALLDIR),)
+	@mkdir -p $(INSTALLDIR)/lib 2>/dev/null
+	@cp -v $(LIB) $(INSTALLDIR)/lib 2>/dev/null
+	@mkdir -p $(INSTALLDIR)/include 2>/dev/null
+	@cp $(SRCDIR)/*.h $(SORTDIR)/*.h $(INSTALLDIR)/include 2>/dev/null
+endif
 
 .PHONY: lib
 lib: $(SRCOBJS)
@@ -79,7 +79,7 @@ $(BUILDDIR)/src/%.o: $(SRCROOT)/src/%.c
 examples: $(EXAMPLE)
 
 $(EXAMPLE): install
-	$(CC) $(CFLAGS) -I$(GSLIBDIR)/include -I$(SRCDIR) -I$(SORTDIR) @.c -o $@ $(LDFLAGS)
+	$(CC) $(CFLAGS) -I$(GSLIBDIR)/include -I$(SRCDIR) -I$(SORTDIR) $@.c -o $@ $(LDFLAGS)
 
 .PHONY: tests
 tests: install $(TESTOBJS)
