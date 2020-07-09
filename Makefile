@@ -54,14 +54,16 @@ all: check lib tests example install
 .PHONY: install
 install: lib
 	@mkdir -p $(INSTALL_ROOT)/lib 2>/dev/null
-	@cp -v $(LIB) $(INSTALL_ROOT)/lib 2>/dev/null
+	@if [ $(LIB) -nt $(INSTALL_ROOT)/lib/lib$(TARGET).a ]; then \
+	  @cp -v $(LIB) $(INSTALL_ROOT)/lib 2>/dev/null; \
+	fi
 	@mkdir -p $(INSTALL_ROOT)/include 2>/dev/null
 	@cp $(SRCDIR)/*.h $(SORTDIR)/*.h $(INSTALL_ROOT)/include 2>/dev/null
 
 
 .PHONY: lib
 lib: $(SRCOBJS)
-	@mkdir $(BUILDDIR)/lib
+	@mkdir -p $(BUILDDIR)/lib
 	@$(AR) cr $(LIB) $(SRCOBJS)
 	@ranlib $(LIB)
 
@@ -90,7 +92,7 @@ $(BUILDDIR)/tests/%: $(SRCROOT)/tests/%.c
 
 .PHONY: clean
 clean:
-	@rm -f $(BUILDDIR) $(LIB) $(EXAMPLE) $(EXAMPLE).o
+	@rm -rf $(BUILDDIR) $(EXAMPLE) $(EXAMPLE).o
 
 print-%:
 	$(info [ variable name]: $*)
