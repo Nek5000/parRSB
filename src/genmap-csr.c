@@ -35,8 +35,7 @@ void parMatSetup(GenmapHandle h,GenmapComm c,parMat *M_)
   sint lelt=GenmapGetNLocalElements(h);
   sint nv  =GenmapGetNVertices(h);
 
-  GenmapScan(h,c);
-  slong s=GenmapGetLocalStartIndex(h)+1;
+  GenmapScan(h,c); slong s=GenmapGetLocalStartIndex(h)+1;
 
   slong *eIds; sint *offsets;
   GenmapFindNeighbors(h,c,&eIds,&offsets);
@@ -57,7 +56,7 @@ void parMatSetup(GenmapHandle h,GenmapComm c,parMat *M_)
 
   GenmapScan(h,c);
   slong ng=GenmapGetNGlobalElements(h);
-  sint np =GenmapCommSize(c);
+  sint  np=GenmapCommSize(c);
   setOwner(entries.ptr,entries.n,offsetof(entry,c),
     offsetof(entry,owner),ng,np);
 
@@ -81,8 +80,7 @@ void parMatSetup(GenmapHandle h,GenmapComm c,parMat *M_)
   }
 
   M->rn=n;
-  GenmapScan(h,c);
-  M->row_start=GenmapGetLocalStartIndex(h)+1;
+  GenmapScan(h,c); M->row_start=GenmapGetLocalStartIndex(h)+1;
 
   GenmapMalloc(M->rn+1,&M->row_off);
 

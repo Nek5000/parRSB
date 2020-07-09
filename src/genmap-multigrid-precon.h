@@ -17,6 +17,7 @@ struct parMat_{
   buffer buf;
 };
 
+// for the coarse level
 void parMatSetup(GenmapHandle h,GenmapComm c,parMat *M);
 void parMatApply(GenmapScalar *y,parMat M,GenmapScalar *x,
   GenmapScalar *buf);
