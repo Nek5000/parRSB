@@ -133,7 +133,15 @@ int GenmapInvPowerIter(GenmapVector eVector, GenmapVector alpha,
 int GenmapTQLI(GenmapHandle h, GenmapVector diagonal, GenmapVector upper,
                GenmapVector **eVectors, GenmapVector *eValues);
 
-int GenmapFiedler(GenmapHandle h, GenmapComm c, int maxIter, int global);
+int GenmapFiedlerLanczos(GenmapHandle h, GenmapComm c,
+    GenmapVector initVec,int maxIter, int global);
+
+int GenmapFiedlerPowerIter(GenmapHandle h,GenmapComm c,
+    GenmapVector initVec,int maxIter, int global);
+
+int GenmapFiedlerFlexCG(GenmapHandle h,GenmapComm c,
+    GenmapVector initVec,int maxIter, int global);
+
 void GenmapRSB(GenmapHandle h);
 
 /* Debug */

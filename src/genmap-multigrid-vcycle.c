@@ -60,12 +60,14 @@ void mg_vcycle(GenmapScalar *u,GenmapScalar *rhs,mgData d){
     r[off]=u[off];
   }
 
+  GenmapScalar over=1.33333;
   for(lvl=nlevels-2; lvl>=0; lvl++){
     l=lvls[lvl];
+    // J*e
     gs(r+lvl_off[lvl+1],gs_double,gs_add,0,l->J,&buf);
 
+    //u=u+over*J*e
     n=lvl_off[lvl+1]-off;
-    GenmapScalar over=1.33333;
     for(j=0; j<n; j++)
       r[off+j]=over*r[off+j]+u[off+j];
   }
