@@ -1,20 +1,28 @@
 #include <genmap-impl.h>
 #include <genmap-multigrid-precon.h>
 
-void mg_vcycle(GenmapScalar *u,GenmapScalar *rhs,mgData d){
+void mg_vcycle(GenmapScalar *u1,GenmapScalar *rhs1,mgData d){
 
   GenmapScalar *s   =d->x;
   GenmapScalar *Gs  =d->y;
   GenmapScalar *r   =d->b;
+  GenmapScalar *u   =d->u;
+  GenmapScalar *rhs =d->rhs;
 
   mgLevel *lvls=d->levels; uint *lvl_off=d->level_off;
   mgLevel l; parMat M;
 
   buffer buf; buffer_init(&buf,1024);
 
-  int nsmooth,nlevels=d->nlevels;
+  int nsmooth,nlevels=d->nlevels,lvl;
   GenmapScalar *diag,sigma;
-  uint lvl,off,n,i,j;
+  uint off,n,i,j;
+
+  for(i=0; i<lvl_off[nlevels]; i++)
+    s[i]=Gs[i]=r[i]=u[i]=rhs[i]=0.0;
+  for(i=0; i<lvl_off[1]; i++)
+    u[i]=u1[i],rhs[i]=rhs1[i];
+
   for(lvl=0; lvl<nlevels-1; lvl++){
     off=lvl_off[lvl]; n=lvl_off[lvl+1]-off;
     l=lvls[lvl]; nsmooth=l->nsmooth; sigma=l->sigma;
@@ -61,12 +69,13 @@ void mg_vcycle(GenmapScalar *u,GenmapScalar *rhs,mgData d){
   }
 
   GenmapScalar over=1.33333;
-  for(lvl=nlevels-2; lvl>=0; lvl++){
+  for(lvl=nlevels-2; lvl>=0; lvl--){
     l=lvls[lvl];
     // J*e
     gs(r+lvl_off[lvl+1],gs_double,gs_add,0,l->J,&buf);
 
     //u=u+over*J*e
+    off=lvl_off[lvl];
     n=lvl_off[lvl+1]-off;
     for(j=0; j<n; j++)
       r[off+j]=over*r[off+j]+u[off+j];
@@ -74,7 +83,7 @@ void mg_vcycle(GenmapScalar *u,GenmapScalar *rhs,mgData d){
 
   // avoid this
   for(i=0; i<lvl_off[nlevels]; i++)
-    u[i]=r[i];
+    u1[i]=r[i];
 
   buffer_free(&buf);
 }

@@ -245,6 +245,8 @@ void mgSetup(GenmapComm c,parMat M,mgData *d_){
   GenmapMalloc(d->level_off[d->nlevels],&d->x  );
   GenmapMalloc(d->level_off[d->nlevels],&d->y  );
   GenmapMalloc(d->level_off[d->nlevels],&d->b  );
+  GenmapMalloc(d->level_off[d->nlevels],&d->u  );
+  GenmapMalloc(d->level_off[d->nlevels],&d->rhs);
   GenmapMalloc(nnz                     ,&d->buf);
 }
 

@@ -1,12 +1,15 @@
-#include "genmap-impl.h"
+#include <genmap-impl.h>
+#include <genmap-multigrid-precon.h>
 
 #include <math.h>
 #include <stdio.h>
 
-int flex_cg(GenmapHandle h,GenmapComm c,GenmapVector r,int maxIter,
-  GenmapVector x)
+int flex_cg(GenmapHandle h,GenmapComm c,mgData d,GenmapVector r,
+  int maxIter,GenmapVector x)
 {
-  assert(x->size==r->size==GenmapGetNLocalElements(h));
+  assert(x->size==r->size);
+  assert(x->size==GenmapGetNLocalElements(h));
+
   uint lelt=x->size;
 
   GenmapVector z0,z,dz,w,p,weights;
@@ -39,7 +42,9 @@ int flex_cg(GenmapHandle h,GenmapComm c,GenmapVector r,int maxIter,
     GenmapAxpbyVector(r,r,1.0,w,-alpha);
 
     GenmapCopyVector(z0,z);
-    //FIXME: VCYCLE
+    mg_vcycle(z->data,r->data,d);
+    //remove mean from z;
+
     GenmapAxpbyVector(dz,z,1.0,z0,-1.0);
 
     rz0=rz1;

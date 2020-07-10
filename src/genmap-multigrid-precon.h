@@ -1,6 +1,8 @@
 #ifndef _GENMAP_PRECON_H_
 #define _GENMAP_PRECON_H_
 
+#include <genmap-impl.h>
+
 typedef struct parMat_  *parMat;
 typedef struct mgData_  *mgData;
 typedef struct mgLevel_ *mgLevel;
@@ -37,7 +39,7 @@ struct mgData_{
   sint nlevels;
   mgLevel *levels;
   uint *level_off;
-  GenmapScalar *y,*x,*b,*buf;
+  GenmapScalar *y,*x,*b,*u,*rhs,*buf;
 };
 
 void mgSetup(GenmapComm c,parMat M,mgData *d);
@@ -59,5 +61,10 @@ typedef struct{
 
 void setOwner(char *ptr,sint n,size_t inOffset,size_t outOffset,
   slong lelg,sint np);
+
+void mg_vcycle(GenmapScalar *u,GenmapScalar *rhs,mgData d);
+
+int flex_cg(GenmapHandle h,GenmapComm c,mgData d,GenmapVector r,
+  int maxIter,GenmapVector x);
 
 #endif
