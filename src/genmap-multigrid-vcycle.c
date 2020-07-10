@@ -72,7 +72,7 @@ void mg_vcycle(GenmapScalar *u1,GenmapScalar *rhs1,mgData d){
   for(lvl=nlevels-2; lvl>=0; lvl--){
     l=lvls[lvl];
     // J*e
-    gs(r+lvl_off[lvl+1],gs_double,gs_add,0,l->J,&buf);
+    gs(r+lvl_off[lvl],gs_double,gs_add,0,l->J,&buf);
 
     //u=u+over*J*e
     off=lvl_off[lvl];
@@ -82,7 +82,7 @@ void mg_vcycle(GenmapScalar *u1,GenmapScalar *rhs1,mgData d){
   }
 
   // avoid this
-  for(i=0; i<lvl_off[nlevels]; i++)
+  for(i=0; i<lvl_off[1]; i++)
     u1[i]=r[i];
 
   buffer_free(&buf);
