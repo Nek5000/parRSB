@@ -3,7 +3,8 @@
 #include <math.h>
 #include <stdio.h>
 
-int flex_cg(GenmapHandle h,GenmapComm c,GenmapVector r,GenmapVector x)
+int flex_cg(GenmapHandle h,GenmapComm c,GenmapVector r,int maxIter,
+  GenmapVector x)
 {
   assert(x->size==r->size==GenmapGetNLocalElements(h));
   uint lelt=x->size;
@@ -26,7 +27,7 @@ int flex_cg(GenmapHandle h,GenmapComm c,GenmapVector r,GenmapVector x)
 
   GenmapInitLaplacian(h,c,weights);
 
-  for(i=0; i<25; i++){
+  for(i=0; i<maxIter; i++){
     GenmapLaplacian(h,c,p,weights,w);
 
     den=GenmapDotVector(p,w);

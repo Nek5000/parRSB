@@ -105,11 +105,6 @@ int GenmapFiedlerLanczos(GenmapHandle h, GenmapComm c,
   return iter;
 }
 
-int GenmapFiedlerFlexCG(GenmapHandle h,GenmapComm c,
-    GenmapVector u,int maxIter, int global)
-{
-}
-
 int GenmapFiedlerPowerIter(GenmapHandle h,GenmapComm c,
     GenmapVector u,int maxIter, int global)
 {
