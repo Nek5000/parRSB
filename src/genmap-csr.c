@@ -90,6 +90,8 @@ void parMatApply(GenmapScalar *y,parMat M,GenmapScalar *x,
   GenmapScalar *buf)
 {
   const uint rn=M->rn;
+  if(rn==0) return;
+
   const uint *offsets=M->row_off;
   const GenmapScalar *v=M->v;
 

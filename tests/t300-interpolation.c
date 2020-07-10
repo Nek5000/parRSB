@@ -43,7 +43,7 @@ int main(int argc,char *argv[]){
   /* Setup MG levels */
   mgData d; mgSetup(c,M,&d);
 
-  uint nlevels=d->nLevels; mgLevel *l=d->levels;
+  uint nlevels=d->nlevels; mgLevel *l=d->levels;
   uint *lvl_off=d->level_off; GenmapScalar *x=d->x;
 
   for(i=lvl_off[0]; i<lvl_off[1]; i++)

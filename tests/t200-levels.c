@@ -40,7 +40,7 @@ int main(int argc,char *argv[]){
   parMat M; parMatSetup(gh,c,&M);
 
   /* Setup MG levels */
-  mgData d; mgSetup(c,M,&d); uint nlevels=d->nLevels;
+  mgData d; mgSetup(c,M,&d); uint nlevels=d->nlevels;
 
   GenmapScalar *x=d->x,*y=d->y,*buf=d->buf;
 
