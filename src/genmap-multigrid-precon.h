@@ -65,6 +65,6 @@ void setOwner(char *ptr,sint n,size_t inOffset,size_t outOffset,
 void mg_vcycle(GenmapScalar *u,GenmapScalar *rhs,mgData d);
 
 int flex_cg(GenmapHandle h,GenmapComm c,mgData d,GenmapVector r,
-  int maxIter,GenmapVector x);
+  GenmapVector weights,int maxIter,GenmapVector x);
 
 #endif

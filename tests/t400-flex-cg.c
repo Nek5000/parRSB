@@ -48,15 +48,32 @@ int main(int argc,char *argv[]){
 
   srand(time(0));
   for(i=0; i<mesh->nelt; i++)
-    x->data[i]=x0->data[i]=rand()%100/100.0;
+    x->data[i]=rand()%100/100.0,x0->data[i]=0.0;
 
+#if 0
   GenmapInitLaplacian(gh,c,weights);
   GenmapLaplacian(gh,c,x,weights,r);
+#else
+  GenmapInitLaplacianWeighted(gh,c,weights);
+  GenmapLaplacianWeighted(gh,c,x,weights,r);
+#endif
 
-  flex_cg(gh,c,d,r,25,x0);
+  i=flex_cg(gh,c,d,r,weights,100,x0);
+  printf("Iter=%d\n",i);
+
+  for(i=0; i<mesh->nelt; i++)
+    assert(fabs(x->data[i]-x0->data[i])<GENMAP_TOL);
 
   GenmapDestroyVector(r ); GenmapDestroyVector(x);
   GenmapDestroyVector(x0); GenmapDestroyVector(weights);
+
+  mgFree(d);
+
+  GenmapFinalize(gh);
+  MeshFree(mesh);
+
+  comm_free(&comm);
+  MPI_Finalize();
 
   return 0;
 }
