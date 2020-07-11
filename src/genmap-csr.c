@@ -58,32 +58,27 @@ void csr_mat_setup(GenmapHandle h,GenmapComm c,csr_mat *M_)
     GenmapMalloc(M->rn,&M->diag);
   }
 
-  ptr=entries.ptr;
-  for(i=0; i<entries.n; i++)
+  ptr=entries.ptr; uint rn=0;
+  for(i=0; i<entries.n; i++){
     M->col[i]=ptr[i].c,M->v[i]=ptr[i].v;
+    if(ptr[i].r==ptr[i].c) M->diag[rn++]=ptr[i].v;
+  }
+  assert(rn==M->rn);
 
-  M->row_off[0]=0,i=0; sint nn=0;
+  M->row_off[0]=0,i=0; uint nn=0;
   while(i<entries.n){
     j=i+1;
     while(j<entries.n && ptr[i].r==ptr[j].r) j++;
     i=M->row_off[++nn]=j;
   }
   assert(n==nn);
-  assert(M->row_off[n]=entries.n);
-
-  if(entries.n>0) GenmapRealloc(entries.n,&eIds);
-
-  for(i=0; i<M->rn; i++)
-    for(j=M->row_off[i]; j<M->row_off[i+1]; j++)
-      if(M->row_start+i==M->col[j])
-        eIds[j]=M->col[j],M->diag[i]=M->v[j];
-      else eIds[j]=-M->col[j];
-
-  M->gsh=gs_setup(eIds,M->row_off[n],&c->gsc,0,gs_crystal_router,0);
-  buffer_init(&M->buf,1024);
+  assert(M->row_off[n]==entries.n);
 
   GenmapFree(eIds);
   array_free(&entries);
+
+  M->gsh=get_csr_top(M,&c->gsc);
+  buffer_init(&M->buf,1024);
 }
 
 struct gs_data *get_csr_top(csr_mat M,struct comm *c){
