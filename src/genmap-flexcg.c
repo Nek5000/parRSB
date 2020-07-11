@@ -39,15 +39,21 @@ int flex_cg(GenmapHandle h,GenmapComm c,mgData d,GenmapVector r,
   GenmapCreateVector(&z0,lelt);
   GenmapCreateVector(&dz,lelt);
 
-#define FLEX 1
+#define PREC 0
 #define LAPO 0
 #define ORTH 0
 
   uint i;
-  for(i=0; i<lelt; i++) x->data[i]=0,z->data[i]=r->data[i];
-  for(i=0; i<lelt; i++) p->data[i]=z->data[i];
+  for(i=0; i<lelt; i++)
+    x->data[i]=0.0;
+#if PREC
+  printf("Using flex\n");
+  mg_vcycle(z->data,r->data,d);
 #if ORTH
-  GenmapOrthogonalizebyOneVector(h,c,z,GenmapGetNGlobalElements(h));
+  GenmapOrthogonalizebyOneVector(h,c,z,nelg);
+#endif
+#else
+  GenmapCopyVector(z,r);
 #endif
 
   GenmapScalar den,alpha,beta,rz0,rz1,rz2;
@@ -55,10 +61,15 @@ int flex_cg(GenmapHandle h,GenmapComm c,mgData d,GenmapVector r,
   rz1=GenmapDotVector(r,z);
   GenmapGop(c,&rz1,1,GENMAP_SCALAR,GENMAP_SUM);
 
-  for(i=0; i<maxIter && sqrt(rz1)>GENMAP_TOL; i++){
+  GenmapCopyVector(p,z);
+
+  i=0;
+  while(i<maxIter && sqrt(rz1)>GENMAP_TOL){
 #if LAPO
+    printf("Using original Laplacian\n");
     GenmapLaplacian(h,c,p,weights,w);
 #else
+    printf("Using weighted Laplacian\n");
     GenmapLaplacianWeighted(h,c,p,weights,w);
 #endif
 
@@ -70,15 +81,12 @@ int flex_cg(GenmapHandle h,GenmapComm c,mgData d,GenmapVector r,
     GenmapAxpbyVector(x,x,1.0,p, alpha);
     GenmapAxpbyVector(r,r,1.0,w,-alpha);
 
-#if FLEX
-    printf("Using flex\n");
     GenmapCopyVector(z0,z);
-    GenmapCopyVector(z ,r);
+#if PREC
     mg_vcycle(z->data,r->data,d);
 #if ORTH
-    ortho_one_vector(h,c,z,nelg);
+    GenmapOrthogonalizebyOneVector(h,c,z,nelg);
 #endif
-    GenmapAxpbyVector(dz,z,1.0,z0,-1.0);
 #else
     GenmapCopyVector(z,r);
 #endif
@@ -88,16 +96,13 @@ int flex_cg(GenmapHandle h,GenmapComm c,mgData d,GenmapVector r,
     rz1=GenmapDotVector(r,z);
     GenmapGop(c,&rz1,1,GENMAP_SCALAR,GENMAP_SUM);
 
-#if FLEX
+    GenmapAxpbyVector(dz,z,1.0,z0,-1.0);
     rz2=GenmapDotVector(r,dz);
     GenmapGop(c,&rz2,1,GENMAP_SCALAR,GENMAP_SUM);
-    
     beta=rz2/rz0;
-#else
-    beta=rz1/rz0;
-#endif
 
     GenmapAxpbyVector(p,z,1.0,p,beta);
+    i++;
   }
 
   GenmapDestroyVector(z),GenmapDestroyVector(w);

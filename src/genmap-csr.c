@@ -51,8 +51,7 @@ void csr_mat_setup(GenmapHandle h,GenmapComm c,csr_mat *M_)
 
   GenmapMalloc(M->rn+1,&M->row_off);
 
-  if(n==0)
-    M->col=NULL,M->v=NULL,M->diag=NULL;
+  if(n==0) M->col=NULL,M->v=NULL,M->diag=NULL;
   else{
     GenmapMalloc(entries.n,&M->col),GenmapMalloc(entries.n,&M->v);
     GenmapMalloc(M->rn,&M->diag);
