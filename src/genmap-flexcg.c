@@ -40,8 +40,8 @@ int flex_cg(GenmapHandle h,GenmapComm c,mgData d,GenmapVector r,
   GenmapCreateVector(&dz,lelt);
 
 #define PREC 0
-#define LAPO 0
-#define ORTH 0
+#define ORTH 1
+#define LAPO 1
 
   uint i;
   for(i=0; i<lelt; i++)
@@ -49,11 +49,11 @@ int flex_cg(GenmapHandle h,GenmapComm c,mgData d,GenmapVector r,
 #if PREC
   printf("Using flex\n");
   mg_vcycle(z->data,r->data,d);
-#if ORTH
-  GenmapOrthogonalizebyOneVector(h,c,z,nelg);
-#endif
 #else
   GenmapCopyVector(z,r);
+#endif
+#if ORTH
+  GenmapOrthogonalizebyOneVector(h,c,z,nelg);
 #endif
 
   GenmapScalar den,alpha,beta,rz0,rz1,rz2;
@@ -84,11 +84,11 @@ int flex_cg(GenmapHandle h,GenmapComm c,mgData d,GenmapVector r,
     GenmapCopyVector(z0,z);
 #if PREC
     mg_vcycle(z->data,r->data,d);
-#if ORTH
-    GenmapOrthogonalizebyOneVector(h,c,z,nelg);
-#endif
 #else
     GenmapCopyVector(z,r);
+#endif
+#if ORTH
+    GenmapOrthogonalizebyOneVector(h,c,z,nelg);
 #endif
 
     rz0=rz1;
