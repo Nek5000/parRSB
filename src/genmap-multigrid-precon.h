@@ -22,7 +22,8 @@ struct csr_mat_{
 // for the coarse level
 void csr_mat_setup(GenmapHandle h,GenmapComm c,csr_mat *M);
 void csr_mat_apply(GenmapScalar *y,csr_mat M,GenmapScalar *x,
-    GenmapScalar *buf);
+  GenmapScalar *buf);
+struct gs_data *get_csr_top(csr_mat M,struct comm *c);
 void csr_mat_print(csr_mat M,struct comm *c);
 int  csr_mat_free(csr_mat M);
 
@@ -36,7 +37,9 @@ struct mgLevel_{
 
 struct mgData_{
   struct comm c;
-  sint nlevels;
+  struct gs_data *top;
+  buffer bfr;
+  int nlevels;
   mgLevel *levels;
   uint *level_off;
   GenmapScalar *y,*x,*b,*u,*rhs,*buf;

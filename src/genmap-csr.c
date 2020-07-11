@@ -86,6 +86,26 @@ void csr_mat_setup(GenmapHandle h,GenmapComm c,csr_mat *M_)
   array_free(&entries);
 }
 
+struct gs_data *get_csr_top(csr_mat M,struct comm *c){
+  const uint rn=M->rn;
+  const uint n =M->row_off[rn];
+
+  slong *ids;
+  if(n>0) GenmapMalloc(n,&ids);
+
+  uint i,j;
+  for(i=0; i<rn; i++)
+    for(j=M->row_off[i]; j<M->row_off[i+1]; j++)
+      if(M->row_start+i==M->col[j]) ids[j]=M->col[j];
+      else ids[j]=-M->col[j];
+
+  struct gs_data *gsh=gs_setup(ids,n,c,0,gs_auto,0);
+
+  if(n>0) GenmapFree(ids);
+
+  return gsh;
+}
+
 void csr_mat_apply(GenmapScalar *y,csr_mat M,GenmapScalar *x,
   GenmapScalar *buf)
 {

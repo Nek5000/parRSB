@@ -260,5 +260,5 @@ void mgFree(mgData d){
   GenmapFree(l);
   GenmapFree(d->level_off);
   GenmapFree(d->y); GenmapFree(d->x); GenmapFree(d->b);
-  GenmapFree(d->buf);
+  GenmapFree(d->buf); GenmapFree(d->rhs); GenmapFree(d->u);
 }
