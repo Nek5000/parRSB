@@ -3,11 +3,11 @@
 
 #include <genmap-impl.h>
 
-typedef struct parMat_  *parMat;
+typedef struct csr_mat_  *csr_mat;
 typedef struct mgData_  *mgData;
 typedef struct mgLevel_ *mgLevel;
 
-struct parMat_{
+struct csr_mat_{
   uint rn;
   ulong row_start;
 
@@ -20,18 +20,18 @@ struct parMat_{
 };
 
 // for the coarse level
-void parMatSetup(GenmapHandle h,GenmapComm c,parMat *M);
-void parMatApply(GenmapScalar *y,parMat M,GenmapScalar *x,
-  GenmapScalar *buf);
-void parMatPrint(parMat M,struct comm *c);
-int  parMatFree(parMat M);
+void csr_mat_setup(GenmapHandle h,GenmapComm c,csr_mat *M);
+void csr_mat_apply(GenmapScalar *y,csr_mat M,GenmapScalar *x,
+    GenmapScalar *buf);
+void csr_mat_print(csr_mat M,struct comm *c);
+int  csr_mat_free(csr_mat M);
 
 struct mgLevel_{
   mgData data;
   int nsmooth;
   GenmapScalar sigma;
   struct gs_data *J; // interpolation from level i to i+1
-  parMat M;
+  csr_mat M;
 };
 
 struct mgData_{
@@ -42,7 +42,7 @@ struct mgData_{
   GenmapScalar *y,*x,*b,*u,*rhs,*buf;
 };
 
-void mgSetup(GenmapComm c,parMat M,mgData *d);
+void mgSetup(GenmapComm c,csr_mat M,mgData *d);
 void mgLevelSetup(mgData data,uint level);
 void mgFree(mgData d);
 

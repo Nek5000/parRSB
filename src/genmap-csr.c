@@ -5,7 +5,7 @@
 
 #define ABS(i) ((i<0)?-i:i)
 
-void parMatSetup(GenmapHandle h,GenmapComm c,parMat *M_)
+void csr_mat_setup(GenmapHandle h,GenmapComm c,csr_mat *M_)
 {
   sint lelt=GenmapGetNLocalElements(h);
   sint nv  =GenmapGetNVertices(h);
@@ -37,7 +37,7 @@ void parMatSetup(GenmapHandle h,GenmapComm c,parMat *M_)
   sarray_sort_2(entry,ptr,entries.n,r,1,c,1,&buf);
   buffer_free(&buf);
 
-  GenmapMalloc(1,M_); parMat M=*M_;
+  GenmapMalloc(1,M_); csr_mat M=*M_;
 
   i=0,n=0;
   while(i<entries.n){
@@ -86,7 +86,7 @@ void parMatSetup(GenmapHandle h,GenmapComm c,parMat *M_)
   array_free(&entries);
 }
 
-void parMatApply(GenmapScalar *y,parMat M,GenmapScalar *x,
+void csr_mat_apply(GenmapScalar *y,csr_mat M,GenmapScalar *x,
   GenmapScalar *buf)
 {
   const uint rn=M->rn;
@@ -124,7 +124,7 @@ void parMatApply(GenmapScalar *y,parMat M,GenmapScalar *x,
   }
 }
 
-void parMatPrint(parMat M,struct comm *c){
+void csr_mat_print(csr_mat M,struct comm *c){
   const sint rn=M->rn;
   const uint *offsets=M->row_off;
   const GenmapScalar *v=M->v;
@@ -144,7 +144,7 @@ void parMatPrint(parMat M,struct comm *c){
   }
 }
 
-int parMatFree(parMat M){
+int csr_mat_free(csr_mat M){
   if(M->col) GenmapFree(M->col);
   if(M->v) GenmapFree(M->v);
   if(M->diag) GenmapFree(M->diag);

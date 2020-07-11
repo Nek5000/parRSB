@@ -49,7 +49,7 @@ void compress_col(struct array *entries){
 
 void mgLevelSetup(mgData d,uint lvl)
 {
-  assert(lvl>0); parMat M0=d->levels[lvl-1]->M;
+  assert(lvl>0); csr_mat M0=d->levels[lvl-1]->M;
   uint rn0=M0->rn,nnz0=M0->row_off[rn0];
 
   struct array entries=null_array;
@@ -133,7 +133,7 @@ void mgLevelSetup(mgData d,uint lvl)
   /* create the matrix */
   GenmapMalloc(1,&d->levels[lvl]); mgLevel l=d->levels[lvl];l->data=d;
 
-  GenmapMalloc(1,&l->M); parMat M1 =l->M; M1->rn=nn;
+  GenmapMalloc(1,&l->M); csr_mat M1 =l->M; M1->rn=nn;
   GenmapMalloc(M1->rn+1,&M1->row_off);
 
   slong cn=nn; comm_scan(out,&d->c,gs_long,gs_add,&cn,1,bf);
@@ -212,7 +212,7 @@ void mgLevelSetup(mgData d,uint lvl)
   array_free(&entries);
 }
 
-void mgSetup(GenmapComm c,parMat M,mgData *d_){
+void mgSetup(GenmapComm c,csr_mat M,mgData *d_){
   GenmapMalloc(1,d_); mgData d=*d_; comm_dup(&d->c,&c->gsc);
 
   uint np=GenmapCommSize(c); uint rn=M->rn;
@@ -234,7 +234,7 @@ void mgSetup(GenmapComm c,parMat M,mgData *d_){
 
   uint i; uint nnz=M->row_off[M->rn];
   for(i=1;i<d->nlevels;i++){
-    mgLevelSetup(d,i); parMat Mi=d->levels[i]->M;
+    mgLevelSetup(d,i); csr_mat Mi=d->levels[i]->M;
     if(Mi->row_off[Mi->rn]>nnz)
       nnz=Mi->row_off[Mi->rn];
     d->level_off[i+1]=d->level_off[i]+Mi->rn;
@@ -254,8 +254,8 @@ void mgFree(mgData d){
   mgLevel *l=d->levels;
   uint i,nlevels=d->nlevels;
   for(i=0; i<nlevels-1; i++)
-    gs_free(l[i]->J),parMatFree(l[i]->M),GenmapFree(l[i]);
-  parMatFree(l[i]->M); GenmapFree(l[i]);
+    gs_free(l[i]->J),csr_mat_free(l[i]->M),GenmapFree(l[i]);
+  csr_mat_free(l[i]->M); GenmapFree(l[i]);
 
   GenmapFree(l);
   GenmapFree(d->level_off);

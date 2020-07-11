@@ -37,7 +37,7 @@ int main(int argc,char *argv[]){
 
   /* Setup CSR on fine level */
   GenmapComm c=GenmapGetGlobalComm(gh);
-  parMat M; parMatSetup(gh,c,&M);
+  csr_mat M; csr_mat_setup(gh,c,&M);
 
   /* Setup MG levels */
   mgData d; mgSetup(c,M,&d); uint nlevels=d->nlevels;
@@ -48,7 +48,7 @@ int main(int argc,char *argv[]){
     y[i]=10.,x[i]=1.0;
 
   for(i=0; i<nlevels; i++)
-    parMatApply(y+d->level_off[i],d->levels[i]->M,x+d->level_off[i],buf);
+    csr_mat_apply(y+d->level_off[i],d->levels[i]->M,x+d->level_off[i],buf);
 
   for(j=0; j<d->level_off[nlevels]; j++)
     assert(fabs(y[j])<GENMAP_TOL);

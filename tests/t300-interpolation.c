@@ -34,7 +34,7 @@ int main(int argc,char *argv[]){
 
   /* Setup CSR on fine level */
   GenmapComm c=GenmapGetGlobalComm(gh);
-  parMat M; parMatSetup(gh,c,&M);
+  csr_mat M; csr_mat_setup(gh,c,&M);
 
   slong out[2][1],bf[2][1],in=M->rn;
   comm_scan(out,&comm,gs_long,gs_add,&in,1,bf);

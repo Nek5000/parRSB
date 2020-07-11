@@ -35,7 +35,7 @@ int main(int argc,char *argv[]){
 
   /* Setup CSR on fine level */
   GenmapComm c=GenmapGetGlobalComm(gh);
-  parMat M; parMatSetup(gh,c,&M);
+  csr_mat M; csr_mat_setup(gh,c,&M);
 
   /* Setup MG levels */
   mgData d; mgSetup(c,M,&d);
