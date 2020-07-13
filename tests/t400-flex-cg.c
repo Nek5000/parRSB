@@ -73,7 +73,7 @@ int main(int argc,char *argv[]){
 
   for(i=0; i<mesh->nelt; i++){
     GenmapScalar e=x->data[i]-x0->data[i];
-    assert(fabs(e)<GENMAP_TOL);
+    assert(fabs(e)<1e-10);
   }
 
   GenmapDestroyVector(r ); GenmapDestroyVector(x);
