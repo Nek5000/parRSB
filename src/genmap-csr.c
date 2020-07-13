@@ -77,7 +77,6 @@ void csr_mat_setup(GenmapHandle h,GenmapComm c,csr_mat *M_)
   array_free(&entries);
 
   M->gsh=get_csr_top(M,&c->gsc);
-  buffer_init(&M->buf,1024);
 }
 
 struct gs_data *get_csr_top(csr_mat M,struct comm *c){
@@ -100,15 +99,9 @@ struct gs_data *get_csr_top(csr_mat M,struct comm *c){
   return gsh;
 }
 
-void csr_mat_apply(GenmapScalar *y,csr_mat M,GenmapScalar *x,
-  GenmapScalar *buf)
+void csr_mat_gather(csr_mat M,struct gs_data *gsh,GenmapScalar *x,
+  GenmapScalar *buf,buffer *bfr)
 {
-  const uint rn=M->rn;
-  if(rn==0) return;
-
-  const uint *offsets=M->row_off;
-  const GenmapScalar *v=M->v;
-
   ulong s=M->row_start;
   sint i,j;
   for(i=0;i<M->rn;i++)
@@ -123,7 +116,7 @@ void csr_mat_apply(GenmapScalar *y,csr_mat M,GenmapScalar *x,
   printf("\n");
 #endif
 
-  gs(buf,genmap_gs_scalar,gs_add,0,M->gsh,&M->buf);
+  gs(buf,genmap_gs_scalar,gs_add,0,gsh,bfr);
 
 #if defined(EXA_DEBUG)
   printf("buf(after): ");
@@ -131,8 +124,22 @@ void csr_mat_apply(GenmapScalar *y,csr_mat M,GenmapScalar *x,
     printf("%lf ",buf[i]);
   printf("\n");
 #endif
+}
 
-  uint je;
+void csr_mat_apply(GenmapScalar *y,csr_mat M,GenmapScalar *x,
+  GenmapScalar *buf)
+{
+  const uint rn=M->rn;
+  if(rn==0) return;
+
+  const uint *offsets=M->row_off;
+  const GenmapScalar *v=M->v;
+
+  buffer bfr; buffer_init(&bfr,1024);
+  csr_mat_gather(M,M->gsh,x,buf,&bfr);
+  buffer_free(&bfr);
+
+  uint i,j,je;
   for(i=0;i<rn;i++){
     for(y[i]=0.0,j=offsets[i],je=offsets[i+1]; j<je; j++)
       y[i]+=(*v++)*(*buf++);
@@ -165,7 +172,6 @@ int csr_mat_free(csr_mat M){
   if(M->diag) GenmapFree(M->diag);
   if(M->row_off) GenmapFree(M->row_off);
   if(M->gsh) gs_free(M->gsh);
-  if(M->buf.ptr) buffer_free(&M->buf);
   GenmapFree(M);
 
   return 0;

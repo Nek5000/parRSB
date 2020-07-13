@@ -208,7 +208,6 @@ void mgLevelSetup(mgData d,uint lvl)
       else ids[j]=-M1->col[j];
 
   M1->gsh=gs_setup(ids,nnz1,&d->c,0,gs_auto,0);
-  buffer_init(&M1->buf,nnz1);
 
   GenmapFree(ids);
   buffer_free(&buf);

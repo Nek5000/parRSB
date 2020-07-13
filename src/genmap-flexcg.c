@@ -44,13 +44,13 @@ int flex_cg(GenmapHandle h,GenmapComm c,mgData d,GenmapVector r,
 #define LAPO 1
 
 #if LAPO
-  printf("Using original Laplacian\n");
+  printf("Using original Laplacian.\n");
 #else
-  printf("Using weighted Laplacian\n");
+  printf("Using weighted Laplacian.\n");
 #endif
 
 #if PREC
-  printf("Using mg prec\n");
+  printf("Using MG Prec.\n");
 #endif
 
   uint i;

@@ -16,7 +16,6 @@ struct csr_mat_{
   GenmapScalar *v,*diag;
 
   struct gs_data *gsh;
-  buffer buf;
 };
 
 // for the coarse level
@@ -32,6 +31,7 @@ struct mgLevel_{
   int nsmooth;
   GenmapScalar sigma;
   struct gs_data *J; // interpolation from level i to i+1
+  struct gs_data *Q; // global to local conversion of a vector
   csr_mat M;
 };
 
