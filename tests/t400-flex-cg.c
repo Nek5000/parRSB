@@ -64,6 +64,13 @@ int main(int argc,char *argv[]){
 
   i=flex_cg(gh,c,d,r,weights,100,x0);
 
+#if 0
+  printf("x: ");
+  for(i=0; i<mesh->nelt; i++)
+    printf("%lf ",x->data[i]);
+  printf("\n");
+#endif
+
   for(i=0; i<mesh->nelt; i++){
     GenmapScalar e=x->data[i]-x0->data[i];
     assert(fabs(e)<GENMAP_TOL);

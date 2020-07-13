@@ -114,6 +114,7 @@ void csr_mat_apply(GenmapScalar *y,csr_mat M,GenmapScalar *x,
   for(i=0;i<M->rn;i++)
     for(j=M->row_off[i]; j<M->row_off[i+1]; j++)
       if(M->col[j]==s+i) buf[j]=x[i];
+      else buf[j]=0.0;
 
 #if defined(EXA_DEBUG)
   printf("buf(before): ");

@@ -18,14 +18,14 @@ void mg_vcycle(GenmapScalar *u1,GenmapScalar *rhs,mgData d){
   uint off,n,i,j;
 
   for(i=0; i<lvl_off[nlevels]; i++)
-    s[i]=Gs[i]=r[i]=u[i]=rhs[i]=0.0;
+    s[i]=Gs[i]=r[i]=u[i]=0.0;
   for(i=0; i<lvl_off[1]; i++)
     r[i]=rhs[i];
 
   for(lvl=0; lvl<nlevels-1; lvl++){
     off=lvl_off[lvl]; n=lvl_off[lvl+1]-off;
     l=lvls[lvl]; nsmooth=l->nsmooth; sigma=l->sigma;
-    M=l->M; diag=M->diag;
+    M=l->M; diag=M->diag; assert(n==M->rn);
 
     //u=sigma*D*r
     for(j=0; j<n; j++)
@@ -60,11 +60,12 @@ void mg_vcycle(GenmapScalar *u1,GenmapScalar *rhs,mgData d){
   if(n==1){
     l=lvls[nlevels-1]; M=l->M;
     assert(M->rn==1);
-    if(fabs(M->diag[0])>GENMAP_TOL)
+    if(fabs(M->diag[0])>sqrt(GENMAP_TOL))
       u[off]=r[off]/M->diag[0];
     else
       u[off]=0.0;
     r[off]=u[off];
+    printf("1-dof: %lf\n",u[off]);
   }
 
   GenmapScalar over=1.33333;

@@ -39,15 +39,24 @@ int flex_cg(GenmapHandle h,GenmapComm c,mgData d,GenmapVector r,
   GenmapCreateVector(&z0,lelt);
   GenmapCreateVector(&dz,lelt);
 
-#define PREC 0
+#define PREC 1
 #define ORTH 1
 #define LAPO 1
+
+#if LAPO
+  printf("Using original Laplacian\n");
+#else
+  printf("Using weighted Laplacian\n");
+#endif
+
+#if PREC
+  printf("Using mg prec\n");
+#endif
 
   uint i;
   for(i=0; i<lelt; i++)
     x->data[i]=0.0;
 #if PREC
-  printf("Using flex\n");
   mg_vcycle(z->data,r->data,d);
 #else
   GenmapCopyVector(z,r);
@@ -66,10 +75,8 @@ int flex_cg(GenmapHandle h,GenmapComm c,mgData d,GenmapVector r,
   i=0;
   while(i<maxIter && sqrt(rz1)>GENMAP_TOL){
 #if LAPO
-    printf("Using original Laplacian\n");
     GenmapLaplacian(h,c,p,weights,w);
 #else
-    printf("Using weighted Laplacian\n");
     GenmapLaplacianWeighted(h,c,p,weights,w);
 #endif
 

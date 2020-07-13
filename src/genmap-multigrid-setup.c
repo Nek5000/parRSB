@@ -177,8 +177,12 @@ void mgLevelSetup(mgData d,uint lvl)
   GenmapRealloc(rn0+rn1,&ids);
   for(i=nn=0; i<rn1; i++)
     for(j=M1->row_off[i]; j<M1->row_off[i+1]; j++)
-      if(M1->row_start+i==M1->col[j])
-        ids[rn0+nn]=M1->col[j],M1->diag[i]=M1->col[j],nn++;
+      if(M1->row_start+i==M1->col[j]){
+        ids[rn0+nn]=M1->col[j];
+        M1->diag[i]=M1->v[j];
+        printf("diag: %lf\n",M1->diag[i]);
+        nn++;
+      }
   assert(nn==M1->rn);
 
 #if defined(GENMAP_DEBUG)
