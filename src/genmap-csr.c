@@ -126,8 +126,7 @@ void csr_mat_gather(csr_mat M,struct gs_data *gsh,GenmapScalar *x,
 #endif
 }
 
-void csr_mat_apply(GenmapScalar *y,csr_mat M,GenmapScalar *x,
-  GenmapScalar *buf)
+void csr_mat_apply(GenmapScalar *y,csr_mat M,GenmapScalar *x)
 {
   const uint rn=M->rn;
   if(rn==0) return;
@@ -135,14 +134,10 @@ void csr_mat_apply(GenmapScalar *y,csr_mat M,GenmapScalar *x,
   const uint *offsets=M->row_off;
   const GenmapScalar *v=M->v;
 
-  buffer bfr; buffer_init(&bfr,1024);
-  csr_mat_gather(M,M->gsh,x,buf,&bfr);
-  buffer_free(&bfr);
-
   uint i,j,je;
   for(i=0;i<rn;i++){
     for(y[i]=0.0,j=offsets[i],je=offsets[i+1]; j<je; j++)
-      y[i]+=(*v++)*(*buf++);
+      y[i]+=(*v++)*(*x++);
   }
 }
 

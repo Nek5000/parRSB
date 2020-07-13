@@ -26,7 +26,6 @@ void mg_vcycle(GenmapScalar *u1,GenmapScalar *rhs,mgData d){
     off=lvl_off[lvl]; n=lvl_off[lvl+1]-off;
     l=lvls[lvl]; nsmooth=l->nsmooth; sigma=l->sigma;
     M=l->M; diag=M->diag; assert(n==M->rn);
-    csr_mat_print(M,&d->c);
 
 #if 0
     printf("sigma: %lf\n",sigma);
@@ -49,7 +48,8 @@ void mg_vcycle(GenmapScalar *u1,GenmapScalar *rhs,mgData d){
 #endif
 
     // G*u
-    csr_mat_apply(Gs+off,M,u+off,d->buf);
+    csr_mat_gather(M,M->gsh,u+off,d->buf,&buf);
+    csr_mat_apply(Gs+off,M,d->buf);
 
     // r=rhs-G*u
     for(j=0; j<n; j++)
@@ -74,7 +74,8 @@ void mg_vcycle(GenmapScalar *u1,GenmapScalar *rhs,mgData d){
       }
 
       //r=r-G*s
-      csr_mat_apply(Gs+off,M,s+off,d->buf);
+      csr_mat_gather(M,M->gsh,s+off,d->buf,&buf);
+      csr_mat_apply(Gs+off,M,d->buf);
       for(j=0; j<n; j++)
         r[off+j]=r[off+j]-Gs[off+j];
     }

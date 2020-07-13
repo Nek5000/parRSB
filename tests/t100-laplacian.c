@@ -64,7 +64,11 @@ int main(int argc,char *argv[]){
 
   for(i=0; i<mesh->nelt; i++) x[i]=1.0;
 
-  csr_mat_apply(y,M,x,buf);
+  buffer bfr; buffer_init(&bfr,1024);
+  csr_mat_gather(M,M->gsh,x,buf,&bfr);
+  csr_mat_apply(y,M,buf);
+  buffer_free(&bfr);
+
   for(i=0;i<mesh->nelt;i++)
     assert(fabs(y[i])<GENMAP_TOL);
 

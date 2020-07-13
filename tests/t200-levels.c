@@ -47,8 +47,13 @@ int main(int argc,char *argv[]){
   for(i=0; i<d->level_off[nlevels]; i++)
     y[i]=10.,x[i]=1.0;
 
-  for(i=0; i<nlevels; i++)
-    csr_mat_apply(y+d->level_off[i],d->levels[i]->M,x+d->level_off[i],buf);
+  buffer bfr; buffer_init(&bfr,1024);
+  for(i=0; i<nlevels; i++){
+    csr_mat Mi=d->levels[i]->M;
+    csr_mat_gather(Mi,Mi->gsh,x+d->level_off[i],buf,&bfr);
+    csr_mat_apply(y+d->level_off[i],Mi,buf);
+  }
+  buffer_free(&bfr);
 
   for(j=0; j<d->level_off[nlevels]; j++)
     assert(fabs(y[j])<GENMAP_TOL);
