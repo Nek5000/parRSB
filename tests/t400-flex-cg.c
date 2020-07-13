@@ -50,12 +50,6 @@ int main(int argc,char *argv[]){
   for(i=0; i<mesh->nelt; i++)
     x->data[i]=rand()%100/100.0,x0->data[i]=0.0;
 
-#if 0
-  printf("x: ");
-  for(i=0; i<mesh->nelt; i++)
-    printf("%lf ",x->data[i]);
-  printf("\n");
-#endif
   GenmapLong nelg=GenmapGetNGlobalElements(gh);
   GenmapOrthogonalizebyOneVector(gh,c,x,nelg);
 
@@ -63,13 +57,6 @@ int main(int argc,char *argv[]){
   GenmapLaplacian(gh,c,x,weights,r);
 
   i=flex_cg(gh,c,d,r,weights,100,x0);
-
-#if 0
-  printf("x: ");
-  for(i=0; i<mesh->nelt; i++)
-    printf("%lf ",x->data[i]);
-  printf("\n");
-#endif
 
   for(i=0; i<mesh->nelt; i++){
     GenmapScalar e=x->data[i]-x0->data[i];

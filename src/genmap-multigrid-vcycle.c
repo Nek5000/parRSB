@@ -26,15 +26,44 @@ void mg_vcycle(GenmapScalar *u1,GenmapScalar *rhs,mgData d){
     off=lvl_off[lvl]; n=lvl_off[lvl+1]-off;
     l=lvls[lvl]; nsmooth=l->nsmooth; sigma=l->sigma;
     M=l->M; diag=M->diag; assert(n==M->rn);
+    csr_mat_print(M,&d->c);
 
-    //u=sigma*D*r
+#if 0
+    printf("sigma: %lf\n",sigma);
+    printf("D: "); for(i=0; i<n; i++)
+      printf("%lf ",1.0/diag[i]);
+    printf("\n");
+    printf("rhs: "); for(i=0; i<n; i++)
+      printf("%lf ",r[off+i]);
+    printf("\n");
+#endif
+
+    //u=sigma*D*rhs
     for(j=0; j<n; j++)
-        u[off+j]=sigma*r[off+j]/diag[j];
+      u[off+j]=sigma*r[off+j]/diag[j];
 
-    // r=r-G*u
+#if 0
+    printf("u: "); for(i=0; i<n; i++)
+      printf("%lf ",u[off+i]);
+    printf("\n");
+#endif
+
+    // G*u
     csr_mat_apply(Gs+off,M,u+off,d->buf);
+
+    // r=rhs-G*u
     for(j=0; j<n; j++)
         r[off+j]=r[off+j]-Gs[off+j];
+
+#if 0
+    printf("r: "); for(i=0; i<n; i++)
+      printf("%lf ",r[off+i]);
+    printf("\n");
+
+    printf("Gu: "); for(i=0; i<n; i++)
+      printf("%lf ",Gs[off+i]);
+    printf("\n");
+#endif
 
     for(i=0; i<nsmooth; i++){
       sigma=sigma+0.066666/nsmooth;
@@ -48,8 +77,14 @@ void mg_vcycle(GenmapScalar *u1,GenmapScalar *rhs,mgData d){
       csr_mat_apply(Gs+off,M,s+off,d->buf);
       for(j=0; j<n; j++)
         r[off+j]=r[off+j]-Gs[off+j];
-
     }
+
+#if 0
+    printf("r: "); for(i=0; i<n; i++)
+      printf("%lf ",r[off+i]);
+    printf("\n");
+#endif
+
     // interpolate to coarser level
     gs(r+off,gs_double,gs_add,1,l->J,&buf);
   }
@@ -65,7 +100,6 @@ void mg_vcycle(GenmapScalar *u1,GenmapScalar *rhs,mgData d){
     else
       u[off]=0.0;
     r[off]=u[off];
-    printf("1-dof: %lf\n",u[off]);
   }
 
   GenmapScalar over=1.33333;
