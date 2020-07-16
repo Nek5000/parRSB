@@ -67,7 +67,7 @@ void mg_vcycle(GenmapScalar *u1,GenmapScalar *rhs,mgData d){
 
     for(i=0; i<nsmooth; i++){
       sigma=sigma+0.066666/nsmooth;
-      // s=sigma*D*r, u=u+s
+      //s=sigma*D*r, u=u+s
       for(j=0; j<n; j++){
         s[off+j] =sigma*r[off+j]/diag[j];
         u[off+j]+=s[off+j];

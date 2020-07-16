@@ -57,6 +57,8 @@ int main(int argc,char *argv[]){
   GenmapLaplacian(gh,c,x,weights,r);
 
   i=flex_cg(gh,c,d,r,weights,100,x0);
+  if(rank==0)
+    printf("Flex-CG iterations: %d\n",i);
 
   for(i=0; i<mesh->nelt; i++){
     GenmapScalar e=x->data[i]-x0->data[i];

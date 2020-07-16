@@ -43,14 +43,15 @@ int flex_cg(GenmapHandle h,GenmapComm c,mgData d,GenmapVector r,
 #define ORTH 1
 #define LAPO 1
 
+  int rank=GenmapCommRank(c);
 #if LAPO
-  printf("Using original Laplacian.\n");
+  if(rank==0) printf("Using original Laplacian.\n");
 #else
-  printf("Using weighted Laplacian.\n");
+  if(rank==0) printf("Using weighted Laplacian.\n");
 #endif
 
 #if PREC
-  printf("Using MG Prec.\n");
+  if(rank==0) printf("Using MG Prec.\n");
 #endif
 
   uint i;

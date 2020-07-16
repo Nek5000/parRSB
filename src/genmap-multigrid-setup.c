@@ -180,7 +180,6 @@ void mgLevelSetup(mgData d,uint lvl)
       if(M1->row_start+i==M1->col[j]){
         ids[rn0+nn]=M1->col[j];
         M1->diag[i]=M1->v[j];
-        printf("diag: %lf\n",M1->diag[i]);
         nn++;
       }
   assert(nn==M1->rn);
