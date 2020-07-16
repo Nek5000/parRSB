@@ -9,7 +9,7 @@ typedef struct{
   GenmapLong neighbors[8];
   int nNeighbors;
   GenmapULong vertexId;
-  int workProc;
+  uint workProc;
 } vertex;
 
 typedef struct{
@@ -19,6 +19,8 @@ typedef struct{
 int GenmapFindNeighbors(GenmapHandle h,GenmapComm c,GenmapLong **eIds_,
     GenmapInt **neighbors_)
 {
+  struct comm cc=c->gsc;
+
   GenmapInt lelt=GenmapGetNLocalElements(h);
   GenmapInt nv  =GenmapGetNVertices(h);
 
@@ -37,7 +39,7 @@ int GenmapFindNeighbors(GenmapHandle h,GenmapComm c,GenmapLong **eIds_,
         .elementId =elementId,
         .sequenceId=sequenceId,
         .vertexId  =elems[i].vertices[j],
-        .workProc  =elems[i].vertices[j]%GenmapCommSize(c)
+        .workProc  =elems[i].vertices[j]%cc.np
       };
       exaArrayAppend(vertices,(void*)&t);
       sequenceId++;
