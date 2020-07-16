@@ -51,8 +51,25 @@ int parRCB(struct comm *ci,struct array *a,int ndim){
       if(length[d]>length[axis2] && d!=axis1) axis2=d;
 
     uint off=offsets[axis1];
-#if 0
+#if 0 //FIXME
     parallel_sort(elm_rcb,a,off,gs_double,&c);
+#else
+    sort_data_private sd;
+
+    sd.nfields=1;
+    sd.unit_size=sizeof(elm_rcb);
+    sd.align    =ALIGNOF(elm_rcb);
+    sd.t[0]     =gs_double;
+    sd.offset[0]=off;
+
+    sd.a=a;
+
+    sd.balance=1;
+    sd.algo=exaSortAlgoBinSort;
+
+    buffer_init(&sd.buf,1024);
+    sort_private(&sd,&c);
+    buffer_free(&sd.buf);
 #endif
 
     int p=(size+1)/2;

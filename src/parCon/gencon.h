@@ -37,7 +37,11 @@ Element MeshGetElements(Mesh m);
 int MeshFree(Mesh m);
 
 int readRe2File(exaHandle h,Mesh *mesh,char *fileName);
+int read_co2_file(Mesh mesh,char *fileName,struct comm *c);
+
+//TODO: Get rid of this
 int readCo2File(Mesh *mesh,char *fileName,struct comm *c);
+
 int findMinNeighborDistance(exaHandle h,Mesh mesh);
 int findSegments(exaHandle h,Mesh mesh,exaScalar tol);
 int setGlobalID(exaHandle h,Mesh mesh);

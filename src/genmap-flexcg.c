@@ -74,7 +74,7 @@ int flex_cg(GenmapHandle h,GenmapComm c,mgData d,GenmapVector r,
   GenmapCopyVector(p,z);
 
   i=0;
-  while(i<maxIter && sqrt(rz1)>1e-10){
+  while(i<maxIter && sqrt(rz1)>1e-12){
 #if LAPO
     GenmapLaplacian(h,c,p,weights,w);
 #else

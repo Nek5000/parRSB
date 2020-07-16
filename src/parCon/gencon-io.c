@@ -427,5 +427,93 @@ int readCo2File(Mesh *mesh_,char *fileName,struct comm *c){
   return 0;
 };
 
+int read_co2_file(Mesh mesh,char *fileName,struct comm *c){
+  comm_ext comm=c->c;
+  MPI_File file;
+  int err=MPI_File_open(comm,fileName,MPI_MODE_RDONLY,MPI_INFO_NULL,&file);
+
+  int rank=c->id;
+  if(err){
+    if(rank==0)
+      fprintf(stderr,"%s:%d Error opening file: %s for reading.\n",
+        __FILE__,__LINE__,fileName);
+    MPI_Abort(comm,911);
+  }
+
+  char *buf=(char*)calloc(GC_CO2_HEADER_LEN+1,sizeof(char));
+  MPI_Status st;
+
+  if(rank==0){
+    err=MPI_File_read(file,buf,GC_CO2_HEADER_LEN,MPI_BYTE,&st);
+    if(err) return 1;
+  }
+
+  MPI_Bcast(buf,GC_CO2_HEADER_LEN,MPI_BYTE,0,comm);
+
+  int nelgt,nelgv,nVertex;
+  char version[6];
+  sscanf(buf,"%5s%12d%12d%12d",version,&nelgt,&nelgv,&nVertex);
+
+#if defined(GENMPA_DEBUG)
+  if(rank==0)
+    printf("%s %d %d %d\n",version,nelgt,nelgv,nVertex);
+#endif
+
+  //TODO: Assert version
+
+  int size=c->np;
+  int nelt=nelgt/size,nrem=nelgt-nelt*size;
+  nelt+=(rank<nrem ? 1: 0);
+
+  int nDim=(nVertex==8)?3:2;
+
+  // Initialize the mesh structure
+  assert(mesh->nDim==nDim);
+  assert(mesh->nVertex==nVertex);
+  assert(mesh->nNeighbors==nDim);
+  assert(mesh->nelgt==nelgt);
+  assert(mesh->nelgv==nelgv);
+  assert(mesh->nelt==nelt);
+
+#if defined(GENMPA_DEBUG)
+  if(rank==0)
+    printf("ndim/nvertex/nelgt/nelgv/nelt: %d/%d/%d/%d/%d\n",
+      nDim,nVertex,nelgt,nelgv,nelt);
+#endif
+
+  slong out[2][1],buff[2][1],in[1];
+  in[0]=nelt;
+  comm_scan(out,c,gs_long,gs_add,&in,1,buff);
+  slong start=out[0][0];
+
+  int readSize=nelt*(nVertex+1)*sizeof(int);
+  int headerSize=GC_CO2_HEADER_LEN+sizeof(float);
+  if(rank==0)
+    readSize+=headerSize;
+
+  buf=(char*)realloc(buf,readSize*sizeof(char));
+  err=MPI_File_read_ordered(file,buf,readSize,MPI_BYTE,&st);
+  err=MPI_File_close(&file);
+
+  char *buf0=buf;
+  if(rank==0) buf0+=headerSize;
+
+  assert(exaArrayGetMaxSize(mesh->elements)==nelt*nVertex);
+
+  Point ptr=exaArrayGetPointer(mesh->elements);
+  int i,j,tmp1,tmp2;
+  for(i=0;i<nelt;i++){
+    readT(&tmp1,buf0,int,1); buf0+=sizeof(int);
+    for(j=0;j<nVertex;j++){
+      ptr[i*nVertex+j].elementId=tmp1;
+      readT(&tmp2,buf0,int,1); buf0+=sizeof(int);
+      ptr[i*nVertex+j].globalId =tmp2;
+    }
+  }
+
+  free(buf);
+
+  return 0;
+};
 #undef readT
 #undef writeInt

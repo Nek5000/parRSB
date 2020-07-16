@@ -11,14 +11,17 @@ int main(int argc,char *argv[]){
   struct comm comm; comm_init(&comm,MPI_COMM_WORLD);
   int rank=comm.id,size=comm.np;
 
-  if(argc!=2){
-    if(rank==0) printf("Usage: ./%s <co2 file>\n",argv[0]);
+  exaHandle h; exaInit(&h,MPI_COMM_WORLD,"/host");
+
+  if(argc!=3){
+    if(rank==0) printf("Usage: ./%s <re2 file> <co2 file>\n",argv[0]);
     MPI_Finalize();
     exit(1);
   }
 
   Mesh mesh;
-  readCo2File(&mesh,argv[1],&comm);
+  readRe2File(h,&mesh,argv[1]);
+  read_co2_file(mesh,argv[2],&comm);
 
   GenmapHandle gh; GenmapInit(&gh,MPI_COMM_WORLD);
 
@@ -27,11 +30,11 @@ int main(int argc,char *argv[]){
 
   /* Setup mesh */
   GenmapElements e=GenmapGetElements(gh);
-  Element me      =MeshGetElements(mesh);
+  Point   me      =(Point) MeshGetElements(mesh);
   GenmapInt i,j;
   for(i=0;i<mesh->nelt;i++)
     for(j=0;j<mesh->nVertex;j++)
-      e[i].vertices[j]=me[i].vertex[j].globalId;
+      e[i].vertices[j]=me[i*mesh->nVertex+j].globalId;
 
   /* Setup CSR on fine level */
   GenmapComm c=GenmapGetGlobalComm(gh);
@@ -74,6 +77,7 @@ int main(int argc,char *argv[]){
   MeshFree(mesh);
 
   comm_free(&comm);
+  exaFree(h);
   MPI_Finalize();
 
   return 0;
