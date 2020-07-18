@@ -16,8 +16,8 @@ typedef struct {
 
 #define MAXDIM 3
 typedef struct {
-  int proc;
-  int orig;
+  uint proc;
+  uint orig;
   long long id;
   double coord[MAXDIM];
 } elm_rcb;
@@ -50,4 +50,5 @@ int parRSB_findConnectivity(double *coord,int nel,int nDim,
   long long *periodicInfo,int nPeriodicFaces,long long *vertexId,
   double tol,MPI_Comm comm);
 
+void rcb_local(struct array *a,uint start,uint end,int ndim,buffer *buf);
 #endif

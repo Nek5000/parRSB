@@ -13,11 +13,11 @@
 struct Point_private{
   exaScalar dx;
   exaScalar x[GC_MAX_DIM];
-  exaInt proc;
+  exaUInt proc;
   exaInt origin;
   int ifSegment;
-  exaLong sequenceId;
-  exaLong elementId;
+  exaULong sequenceId;
+  exaULong elementId;
   exaLong globalId;
 };
 
@@ -30,8 +30,8 @@ struct Element_private{
 };
 
 struct Boundary_private{
-  exaLong elementId;
-  exaLong faceId;
+  exaULong elementId;
+  exaULong faceId;
   struct Face_private face;
   int proc;
   long bc[2];

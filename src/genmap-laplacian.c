@@ -81,7 +81,9 @@ int GenmapFindNeighbors(GenmapHandle h,GenmapComm c,GenmapLong **eIds_,
 
   exaSortArray(vertices,exaULong_t,offsetof(vertex,sequenceId));
   vPtr=exaArrayGetPointer(vertices);
-  size=exaArrayGetSize(vertices); assert(size==lelt*nv); // sanity check
+  size=exaArrayGetSize(vertices);
+  printf("size=%zu lelt=%d nv=%d\n",size,lelt,nv);
+  assert(size==lelt*nv); // sanity check
 
   exaArray nbrs;
   exaArrayInit(&nbrs,element,GENMAP_MAX_VERTICES*GENMAP_MAX_NEIGHBORS);

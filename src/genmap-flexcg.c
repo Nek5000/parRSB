@@ -10,7 +10,7 @@ int ortho_one_vector(GenmapHandle h,GenmapComm c,GenmapVector q1,
 {
   GenmapInt i;
   GenmapScalar sum = 0.0;
-  for(i = 0;  i < q1->size; i++) {
+  for(i = 0;  i < q1->size; i++){
     sum += q1->data[i];
   }
 
@@ -66,15 +66,17 @@ int flex_cg(GenmapHandle h,GenmapComm c,mgData d,GenmapVector r,
   GenmapOrthogonalizebyOneVector(h,c,z,nelg);
 #endif
 
-  GenmapScalar den,alpha,beta,rz0,rz1,rz2;
+  GenmapScalar den,alpha,beta,rz0,rz1,rz2,rr;
 
   rz1=GenmapDotVector(r,z);
   GenmapGop(c,&rz1,1,GENMAP_SCALAR,GENMAP_SUM);
 
   GenmapCopyVector(p,z);
 
+  printf("rz1=%lf\n",rz1);
+
   i=0;
-  while(i<maxIter && sqrt(rz1)>1e-12){
+  while(i<maxIter && sqrt(rz1)>1e-10){
 #if LAPO
     GenmapLaplacian(h,c,p,weights,w);
 #else
@@ -111,6 +113,10 @@ int flex_cg(GenmapHandle h,GenmapComm c,mgData d,GenmapVector r,
 
     GenmapAxpbyVector(p,z,1.0,p,beta);
     i++;
+
+    rr=GenmapDotVector(r,r);
+    GenmapGop(c,&rr,1,GENMAP_SCALAR,GENMAP_SUM);
+    printf("i=%d rr=%1.10e\n",i,sqrt(rr));
   }
 
   GenmapDestroyVector(z),GenmapDestroyVector(w);
