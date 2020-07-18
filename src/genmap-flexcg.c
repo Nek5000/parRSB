@@ -76,7 +76,7 @@ int flex_cg(GenmapHandle h,GenmapComm c,mgData d,GenmapVector r,
   printf("rz1=%lf\n",rz1);
 
   i=0;
-  while(i<maxIter && sqrt(rz1)>1e-10){
+  while(i<maxIter && sqrt(rz1)>GENMAP_TOL){
 #if LAPO
     GenmapLaplacian(h,c,p,weights,w);
 #else
