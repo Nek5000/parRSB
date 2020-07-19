@@ -194,7 +194,7 @@ int main(int argc,char *argv[]){
   GenmapInitLaplacian(gh,c,weights);
   GenmapLaplacian(gh,c,x,weights,r);
 
-  i=flex_cg(gh,c,d,r,weights,30,x0);
+  i=flex_cg(gh,c,d,r,weights,50,x0);
   if(rank==0)
     printf("Flex-CG iterations: %d\n",i);
 
