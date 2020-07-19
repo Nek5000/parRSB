@@ -63,10 +63,9 @@ typedef struct{
   GenmapScalar v;
 } entry;
 
-#define GETLNG(ptr,i,offset)\
-  (*((ulong*)((char*)(ptr)+offset+(i)*sizeof(entry))))
+#define GETLNG(p,i,off) (*((ulong*)((char*)(p)+(off)+(i)*sizeof(entry))))
 
-#define GETPTR(ptr,i,offset) ((char*)(ptr)+offset+i*sizeof(entry))
+#define GETPTR(p,i,off)            ((char*)(p)+(off)+(i)*sizeof(entry))
 
 void setOwner(char *ptr,sint n,size_t inOffset,size_t outOffset,
   slong lelg,sint np);
