@@ -5,9 +5,9 @@
 
 typedef struct{
   GenmapULong sequenceId;
-  GenmapLong elementId;
   GenmapLong neighbors[8];
   int nNeighbors;
+  GenmapULong elementId;
   GenmapULong vertexId;
   uint workProc;
 } vertex;
@@ -21,12 +21,12 @@ int GenmapFindNeighbors(GenmapHandle h,GenmapComm c,GenmapLong **eIds_,
 {
   struct comm cc=c->gsc;
 
-  GenmapInt lelt=GenmapGetNLocalElements(h);
-  GenmapInt nv  =GenmapGetNVertices(h);
+  sint lelt=GenmapGetNLocalElements(h);
+  sint nv  =GenmapGetNVertices(h);
 
   GenmapScan(h,c);
-  GenmapLong elementId =GenmapGetLocalStartIndex(h)+1;
-  GenmapLong sequenceId=elementId*nv;
+  ulong elem_id =GenmapGetLocalStartIndex(h)+1;
+  ulong sequenceId=elem_id*nv;
 
   size_t size=lelt*nv;
   exaArray vertices; exaArrayInit(&vertices,vertex,size);
@@ -36,7 +36,7 @@ int GenmapFindNeighbors(GenmapHandle h,GenmapComm c,GenmapLong **eIds_,
   for(i=0;i<lelt;i++){
     for(j=0;j<nv;j++){
       vertex t={
-        .elementId =elementId,
+        .elementId =elem_id,
         .sequenceId=sequenceId,
         .vertexId  =elems[i].vertices[j],
         .workProc  =elems[i].vertices[j]%cc.np
@@ -44,7 +44,7 @@ int GenmapFindNeighbors(GenmapHandle h,GenmapComm c,GenmapLong **eIds_,
       exaArrayAppend(vertices,(void*)&t);
       sequenceId++;
     }
-    elementId++;
+    elem_id++;
   }
 
   exaComm comm; exaCommCreate(&comm,c->gsc.c);
@@ -57,33 +57,41 @@ int GenmapFindNeighbors(GenmapHandle h,GenmapComm c,GenmapLong **eIds_,
 
   size=exaArrayGetSize(vertices);
   vertex* vPtr=exaArrayGetPointer(vertices);
-#if defined(GENMAP_DEBUG)
-  printf("nid=%d size=%lu ",exaCommRank(comm),size);
-  for(i=0;i<size;i++)
-    printf("%lld ",vPtr[i].vertexId);
-  printf("\n");
-#endif
+
+  struct array a; array_init(csr_entry,&a,10);
 
   //FIXME: Assumes quads or hexes
-  exaInt s=0,e;
+  exaInt s=0,e; csr_entry t;
   while(s<size){
     for(e=s+1; e<size && vPtr[s].vertexId==vPtr[e].vertexId; e++);
     int nNeighbors=min(e,size)-s;
     for(i=s;i<min(e,size);i++){
+      // get rid of these
       for(j=0;j<nNeighbors;j++)
         vPtr[i].neighbors[j]=vPtr[s+j].elementId;
       vPtr[i].nNeighbors=nNeighbors;
+
+      t.r=vPtr[i].elementId; t.proc=vPtr[i].workProc;
+      for(j=0;j<nNeighbors;j++){
+        t.c=vPtr[s+j].elementId;
+        array_cat(csr_entry,&a,&t,1);
+      }
     }
     s=e;
   }
 
   exaArrayTransfer(vertices,offsetof(vertex,workProc),0,comm);
-
   exaSortArray(vertices,exaULong_t,offsetof(vertex,sequenceId));
   vPtr=exaArrayGetPointer(vertices);
-  size=exaArrayGetSize(vertices);
-  printf("size=%zu lelt=%d nv=%d\n",size,lelt,nv);
-  assert(size==lelt*nv); // sanity check
+  size=exaArrayGetSize(vertices); assert(size==lelt*nv); // sanity check
+
+  struct crystal cr; crystal_init(&cr,&cc);
+  sarray_transfer(csr_entry,&a,proc,1,&cr);
+  crystal_free(&cr);
+
+  buffer buf; buffer_init(&buf,1024);
+  sarray_sort_2(csr_entry,a.ptr,a.n,r,1,c,1,&buf);
+  buffer_free(&buf);
 
   exaArray nbrs;
   exaArrayInit(&nbrs,element,GENMAP_MAX_VERTICES*GENMAP_MAX_NEIGHBORS);

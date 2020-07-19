@@ -20,11 +20,14 @@ void csr_mat_setup(GenmapHandle h,GenmapComm c,csr_mat *M_)
   entries.n=offsets[lelt];
 
   entry *ptr=entries.ptr;
-  sint i,j,n=0;
+  sint i,j,n=0; uint cnt=0;
   for(i=0;i<lelt;i++)
     for(j=0;j<offsets[i]+1;j++){
       ptr[n].r=s+i,ptr[n].c=ABS(eIds[n]),ptr[n].v=-1.0;
-      if(ptr[n].r==ptr[n].c) ptr[n].v=offsets[i];
+      if(ptr[n].r==ptr[n].c){
+        ptr[n].v=offsets[i];
+        cnt++;
+      }
       n++;
     }
   GenmapFree(offsets);

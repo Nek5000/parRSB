@@ -125,8 +125,6 @@ void rcb_local(struct array *a,uint start,uint end,int ndim,buffer *buf){
   if(ndim==3)
     if(fabs(length[axis])<fabs(length[2])) axis=2;
 
-  printf("s: %u e: %u x: %d,%lf\n",start,end,axis,length[axis]);
-
   switch(axis){
     case 0:
       sarray_sort(elm_rcb,st,size,coord[0],3,buf);

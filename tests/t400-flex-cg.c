@@ -32,9 +32,11 @@ int main(int argc,char *argv[]){
   int rcb_g=(argc>4)?atoi(argv[4]):1;
   int rcb_l=(argc>5)?atoi(argv[5]):0;
 
+#if 0
   for(i=0; i<mesh->nelt; i++){
     printf("pre: %llu\n",me[i*mesh->nVertex].elementId);
   }
+#endif
 
   if(seq_g)
     exaSort(mesh->elements,
@@ -99,7 +101,10 @@ int main(int argc,char *argv[]){
       ptr[i].coord[1]/=mesh->nVertex;
       if(nDim==3)
         ptr[i].coord[2]/=mesh->nVertex;
-      printf("centroid: %lf %lf %lf\n",ptr[i].coord[0],ptr[i].coord[1],ptr[i].coord[2]);
+#if 0
+      printf("centroid: %lf %lf %lf\n",\
+          ptr[i].coord[0],ptr[i].coord[1],ptr[i].coord[2]);
+#endif
     }
 
     buffer buf; buffer_init(&buf,1024);
@@ -109,8 +114,10 @@ int main(int argc,char *argv[]){
 
     for(i=0; i<mesh->nelt; i++){
       ptr[i].proc=i;
-      printf("i=%d %lf %lf %lf\n",i,ptr[i].coord[0],ptr[i].coord[1],
-          ptr[i].coord[2]);
+#if 0
+      printf("i=%d %lf %lf %lf\n",i,ptr[i].coord[0],\
+          ptr[i].coord[1],ptr[i].coord[2]);
+#endif
     }
 
     sarray_sort(elm_rcb,a.ptr,a.n,orig,0,&buf);
@@ -136,9 +143,11 @@ int main(int argc,char *argv[]){
   free(part);
   free(coords);
 
+#if 0
   for(i=0; i<mesh->nelt; i++){
     printf("post: %llu\n",me[i*mesh->nVertex].elementId);
   }
+#endif
 
   GenmapHandle gh; GenmapInit(&gh,MPI_COMM_WORLD);
   GenmapSetNLocalElements(gh,mesh->nelt);
@@ -175,10 +184,12 @@ int main(int argc,char *argv[]){
   GenmapLong nelg=GenmapGetNGlobalElements(gh);
   GenmapOrthogonalizebyOneVector(gh,c,x,nelg);
 
+#if 0
   printf("x:");
   for(i=0; i<mesh->nelt; i++)
     printf(" %lf",x->data[i]);
   printf("\n");
+#endif
 
   GenmapInitLaplacian(gh,c,weights);
   GenmapLaplacian(gh,c,x,weights,r);

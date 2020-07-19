@@ -53,6 +53,11 @@ void mgFree(mgData d);
 int log2i(sint i);
 
 typedef struct{
+  ulong r,c;
+  uint proc;
+} csr_entry;
+
+typedef struct{
   ulong r,c,rn,cn;
   uint p;
   GenmapScalar v;
