@@ -44,8 +44,8 @@ int main(int argc,char *argv[]){
     u->data[i]=1.0;
 
   GenmapComm c=GenmapGetGlobalComm(gh);
-  GenmapInitLaplacian(gh,c,weights);
-  GenmapLaplacian(gh,c,u,weights,v);
+  GenmapInitLaplacian(gh,c);
+  GenmapLaplacian(gh,c,u,v);
 
   for(i=0;i<mesh->nelt;i++)
     assert(fabs(v->data[i])<GENMAP_TOL);

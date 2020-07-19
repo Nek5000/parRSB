@@ -98,7 +98,7 @@ struct array *GenmapFindNeighbors(GenmapHandle h,GenmapComm c)
   return nbrs;
 }
 
-int GenmapInitLaplacian(GenmapHandle h,GenmapComm c,GenmapVector weights)
+int GenmapInitLaplacian(GenmapHandle h,GenmapComm c)
 {
   GenmapInt lelt=GenmapGetNLocalElements(h);
   GenmapInt nv  =GenmapGetNVertices(h);
@@ -111,7 +111,7 @@ int GenmapInitLaplacian(GenmapHandle h,GenmapComm c,GenmapVector weights)
 }
 
 int GenmapLaplacian(GenmapHandle h,GenmapComm c,GenmapVector u,
-  GenmapVector weights,GenmapVector v)
+    GenmapVector v)
 {
   GenmapInt lelt=GenmapGetNLocalElements(h);
   GenmapInt nv  =GenmapGetNVertices(h);

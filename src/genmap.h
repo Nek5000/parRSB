@@ -113,12 +113,12 @@ struct array *GenmapFindNeighbors(GenmapHandle h,GenmapComm c);
 
 int GenmapInitLaplacianWeighted(GenmapHandle h, GenmapComm c,
                         GenmapVector weights);
-int GenmapInitLaplacian(GenmapHandle h, GenmapComm c,GenmapVector weights);
+int GenmapInitLaplacian(GenmapHandle h, GenmapComm c);
 
 int GenmapLaplacianWeighted(GenmapHandle h, GenmapComm c, GenmapVector u,
                     GenmapVector weights, GenmapVector v);
 int GenmapLaplacian(GenmapHandle h, GenmapComm c, GenmapVector u,
-                    GenmapVector weights, GenmapVector v);
+                    GenmapVector v);
 
 int GenmapLanczosLegendary(GenmapHandle h, GenmapComm c, GenmapVector f,
                            GenmapInt niter, GenmapVector **rr,

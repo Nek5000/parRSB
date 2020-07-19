@@ -155,8 +155,7 @@ int main(int argc,char *argv[]){
   /* Setup MG levels */
   mgData d; mgSetup(c,M,&d);
 
-  GenmapVector r,x,x0,weights;
-  GenmapCreateVector(&weights,mesh->nelt);
+  GenmapVector r,x,x0;
   GenmapCreateVector(&r      ,mesh->nelt);
   GenmapCreateVector(&x      ,mesh->nelt);
   GenmapCreateVector(&x0     ,mesh->nelt);
@@ -172,10 +171,10 @@ int main(int argc,char *argv[]){
   GenmapLong nelg=GenmapGetNGlobalElements(gh);
   GenmapOrthogonalizebyOneVector(gh,c,x,nelg);
 
-  GenmapInitLaplacian(gh,c,weights);
-  GenmapLaplacian(gh,c,x,weights,r);
+  GenmapInitLaplacian(gh,c);
+  GenmapLaplacian(gh,c,x,r);
 
-  i=flex_cg(gh,c,d,r,weights,50,x0);
+  i=flex_cg(gh,c,d,r,50,x0);
   if(rank==0)
     printf("Flex-CG iterations: %d\n",i);
 
@@ -184,8 +183,9 @@ int main(int argc,char *argv[]){
     assert(fabs(e)<1e-10);
   }
 
-  GenmapDestroyVector(r ); GenmapDestroyVector(x);
-  GenmapDestroyVector(x0); GenmapDestroyVector(weights);
+  GenmapDestroyVector(r );
+  GenmapDestroyVector(x );
+  GenmapDestroyVector(x0);
 
   mgFree(d);
 

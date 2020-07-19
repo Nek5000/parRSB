@@ -24,7 +24,7 @@ int ortho_one_vector(GenmapHandle h,GenmapComm c,GenmapVector q1,
 }
 
 int flex_cg(GenmapHandle h,GenmapComm c,mgData d,GenmapVector r,
-  GenmapVector weights,int maxIter,GenmapVector x)
+  int maxIter,GenmapVector x)
 {
   assert(x->size==r->size);
   assert(x->size==GenmapGetNLocalElements(h));
@@ -41,7 +41,6 @@ int flex_cg(GenmapHandle h,GenmapComm c,mgData d,GenmapVector r,
 
 #define PREC 1
 #define ORTH 1
-#define LAPO 1
 
   int rank=GenmapCommRank(c);
 #if LAPO
@@ -78,11 +77,7 @@ int flex_cg(GenmapHandle h,GenmapComm c,mgData d,GenmapVector r,
 
   i=0;
   while(i<maxIter && sqrt(rz1)>GENMAP_TOL){
-#if LAPO
-    GenmapLaplacian(h,c,p,weights,w);
-#else
-    GenmapLaplacianWeighted(h,c,p,weights,w);
-#endif
+    GenmapLaplacian(h,c,p,w);
 
     den=GenmapDotVector(p,w);
     GenmapGop(c,&den,1,GENMAP_SCALAR,GENMAP_SUM);
