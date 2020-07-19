@@ -14,7 +14,6 @@ void csr_mat_setup(GenmapHandle h,GenmapComm c,csr_mat *M_)
 
   struct array *entries_=GenmapFindNeighbors(h,c);
   struct array entries  =*entries_; entry *ptr=entries.ptr;
-  printf("nnz=%u\n",entries.n);
 
   buffer buf; buffer_init(&buf,1024);
   sarray_sort_2(entry,ptr,entries.n,r,1,c,1,&buf);

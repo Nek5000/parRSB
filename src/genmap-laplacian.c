@@ -61,53 +61,15 @@ struct array *GenmapFindNeighbors(GenmapHandle h,GenmapComm c)
     for(e=s+1; e<size && vPtr[s].vertexId==vPtr[e].vertexId; e++);
     int nNeighbors=min(e,size)-s;
     for(i=s;i<min(e,size);i++){
-#if 0
-      // get rid of these
-      for(j=0;j<nNeighbors;j++)
-        vPtr[i].neighbors[j]=vPtr[s+j].elementId;
-      vPtr[i].nNeighbors=nNeighbors;
-#else
       t.r=vPtr[i].elementId; t.proc=vPtr[i].workProc;
       for(j=0;j<nNeighbors;j++){
         t.c=vPtr[s+j].elementId;
         array_cat(csr_entry,&a,&t,1);
       }
-#endif
     }
     s=e;
   }
 
-#if 0
-  sarray_transfer(vertex,&vertices,workProc,0,&cr);
-  vPtr=vertices.ptr; size=vertices.n;
-  assert(size==lelt*nv);//sanity-check
-  sarray_sort(vertex,vertices.ptr,vertices.n,sequenceId,1,&buf);
-
-  exaMalloc(nbrs.n,eIds_     ); exaLong *eIds     =*eIds_;
-  exaMalloc(lelt+1,neighbors_); exaInt  *neighbors=*neighbors_;
-
-  exaInt cnt=0; int k; neighbors[lelt]=0;
-  for(i=0;i<lelt;i++){
-    element e; GenmapLong curId;
-    curId=e.elementId=vPtr[i*nv].elementId;
-    for(j=0;j<nv;j++){
-      vertex v=vPtr[i*nv+j];
-      for(k=0;k<v.nNeighbors;k++)
-        if((e.elementId=v.neighbors[k])!=curId)
-          exaArrayAppend(nbrs,(void*)&e);
-    }
-
-    exaSortArray(nbrs,exaULong_t,offsetof(element,elementId));
-    element *ePtr=exaArrayGetPointer(nbrs);
-    size=exaArrayGetSize(nbrs);
-
-    neighbors[i]=0;
-    for(eIds[cnt++]=curId,j=0; j<size; j++)
-      if(eIds[cnt-1]!=-ePtr[j].elementId)
-        eIds[cnt++]=-ePtr[j].elementId,neighbors[i]+=1;
-    neighbors[lelt]+=neighbors[i]+1;
-  }
-#else
   sarray_transfer(csr_entry,&a,proc,1,&cr);
   sarray_sort_2(csr_entry,a.ptr,a.n,r,1,c,1,&buf);
 
@@ -120,7 +82,6 @@ struct array *GenmapFindNeighbors(GenmapHandle h,GenmapComm c)
   entry ee,ep; ep.r=aptr->r; ep.c=aptr->c; array_cat(entry,nbrs,&ep,1);
   for(i=1; i<a.n; i++){
     ee.r=aptr[i].r,ee.c=aptr[i].c; ulong n=nbrs->n-1;
-    printf("i=%d n=%u: %lu %lu %lu %lu\n",i,n,ee.r,ee.c,ep.r,ep.c);
     if(ee.r!=ep.r || ee.c!=ep.c){
       array_cat(entry,nbrs,&ee,1);
       ep=ee;
@@ -128,7 +89,6 @@ struct array *GenmapFindNeighbors(GenmapHandle h,GenmapComm c)
   }
 
   sarray_sort_2(entry,nbrs->ptr,nbrs->n,r,1,c,1,&buf);
-#endif
 
   crystal_free(&cr);
 
