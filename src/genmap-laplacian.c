@@ -25,14 +25,14 @@ int GenmapFindNeighbors(GenmapHandle h,GenmapComm c,GenmapLong **eIds_,
   sint nv  =GenmapGetNVertices(h);
 
   GenmapScan(h,c);
-  ulong elem_id =GenmapGetLocalStartIndex(h)+1;
+  ulong elem_id   =GenmapGetLocalStartIndex(h)+1;
   ulong sequenceId=elem_id*nv;
 
   size_t size=lelt*nv;
-  exaArray vertices; exaArrayInit(&vertices,vertex,size);
+  struct array vertices; array_init(vertex,&vertices,size);
 
   GenmapElements elems=GenmapGetElements(h);
-  GenmapInt i; int j;
+  sint i,j;
   for(i=0;i<lelt;i++){
     for(j=0;j<nv;j++){
       vertex t={
@@ -41,22 +41,18 @@ int GenmapFindNeighbors(GenmapHandle h,GenmapComm c,GenmapLong **eIds_,
         .vertexId  =elems[i].vertices[j],
         .workProc  =elems[i].vertices[j]%cc.np
       };
-      exaArrayAppend(vertices,(void*)&t);
+      array_cat(vertex,&vertices,&t,1);
       sequenceId++;
     }
     elem_id++;
   }
 
-  exaComm comm; exaCommCreate(&comm,c->gsc.c);
-  exaArrayTransfer(vertices,offsetof(vertex,workProc),1,comm);
+  struct crystal cr; crystal_init(&cr,&cc);
+  sarray_transfer(vertex,&vertices,workProc,1,&cr);
+  size=vertices.n; vertex* vPtr=vertices.ptr;
 
-  assert(sizeof(GenmapLong)==sizeof(exaLong));
-  assert(sizeof(GenmapInt)==sizeof(exaInt));
-
-  exaSortArray(vertices,exaULong_t,offsetof(vertex,vertexId));
-
-  size=exaArrayGetSize(vertices);
-  vertex* vPtr=exaArrayGetPointer(vertices);
+  buffer buf; buffer_init(&buf,1024);
+  sarray_sort(vertex,vPtr,size,vertexId,1,&buf);
 
   struct array a; array_init(csr_entry,&a,10);
 
@@ -80,17 +76,15 @@ int GenmapFindNeighbors(GenmapHandle h,GenmapComm c,GenmapLong **eIds_,
     s=e;
   }
 
-  exaArrayTransfer(vertices,offsetof(vertex,workProc),0,comm);
-  exaSortArray(vertices,exaULong_t,offsetof(vertex,sequenceId));
-  vPtr=exaArrayGetPointer(vertices);
-  size=exaArrayGetSize(vertices); assert(size==lelt*nv); // sanity check
+  sarray_transfer(vertex,&vertices,workProc,0,&cr);
+  vPtr=vertices.ptr; size=vertices.n; assert(size==lelt*nv);//sanity-check
 
-  struct crystal cr; crystal_init(&cr,&cc);
   sarray_transfer(csr_entry,&a,proc,1,&cr);
   crystal_free(&cr);
 
-  buffer buf; buffer_init(&buf,1024);
+  sarray_sort(vertex,vertices.ptr,vertices.n,sequenceId,1,&buf);
   sarray_sort_2(csr_entry,a.ptr,a.n,r,1,c,1,&buf);
+
   buffer_free(&buf);
 
   exaArray nbrs;
@@ -116,13 +110,6 @@ int GenmapFindNeighbors(GenmapHandle h,GenmapComm c,GenmapLong **eIds_,
     element *ePtr=exaArrayGetPointer(nbrs);
     size=exaArrayGetSize(nbrs);
 
-#if defined(GENMAP_DEBUG)
-    printf("neighbors: ");
-    for(k=0;k<size;k++)
-      printf("%lld ",ePtr[k].elementId);
-    printf("\n");
-#endif
-
     neighbors[i]=0;
     for(eIds[cnt++]=curId,j=0; j<size; j++)
       if(eIds[cnt-1]!=-ePtr[j].elementId)
@@ -130,25 +117,8 @@ int GenmapFindNeighbors(GenmapHandle h,GenmapComm c,GenmapLong **eIds_,
     neighbors[lelt]+=neighbors[i]+1;
   }
 
-#if defined(GENMAP_DEBUG)
-  printf("weights: ");
-  for(i=0;i<lelt;i++){
-    printf(" (%lld,%d)",vPtr[i*nv].elementId,neighbors[i]);
-  }
-  printf("\n");
-  int cnt1=0;
-  for(i=0;i<lelt;i++){
-    printf("%lld:",vPtr[i*nv].elementId);
-    for(int j=0;j<neighbors[i]+1;j++)
-      printf(" %lld",eIds[cnt1++]);
-    printf("\n");
-  }
-  printf("\n");
-#endif
-
+  array_free(&vertices);
   exaDestroy(nbrs);
-  exaDestroy(vertices);
-  exaCommDestroy(comm);
 }
 
 int GenmapInitLaplacian(GenmapHandle h,GenmapComm c,GenmapVector weights)
