@@ -57,6 +57,7 @@ int flex_cg(GenmapHandle h,GenmapComm c,mgData d,GenmapVector r,
   uint i;
   for(i=0; i<lelt; i++)
     x->data[i]=0.0;
+
 #if PREC
   mg_vcycle(z->data,r->data,d);
 #else
