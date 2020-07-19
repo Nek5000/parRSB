@@ -16,8 +16,7 @@ typedef struct{
   GenmapULong elementId;
 } element;
 
-int GenmapFindNeighbors(GenmapHandle h,GenmapComm c,GenmapLong **eIds_,
-    GenmapInt **neighbors_)
+struct array *GenmapFindNeighbors(GenmapHandle h,GenmapComm c)
 {
   struct comm cc=c->gsc;
 
@@ -62,41 +61,33 @@ int GenmapFindNeighbors(GenmapHandle h,GenmapComm c,GenmapLong **eIds_,
     for(e=s+1; e<size && vPtr[s].vertexId==vPtr[e].vertexId; e++);
     int nNeighbors=min(e,size)-s;
     for(i=s;i<min(e,size);i++){
+#if 0
       // get rid of these
       for(j=0;j<nNeighbors;j++)
         vPtr[i].neighbors[j]=vPtr[s+j].elementId;
       vPtr[i].nNeighbors=nNeighbors;
-
+#else
       t.r=vPtr[i].elementId; t.proc=vPtr[i].workProc;
       for(j=0;j<nNeighbors;j++){
         t.c=vPtr[s+j].elementId;
         array_cat(csr_entry,&a,&t,1);
       }
+#endif
     }
     s=e;
   }
 
+#if 0
   sarray_transfer(vertex,&vertices,workProc,0,&cr);
-  vPtr=vertices.ptr; size=vertices.n; assert(size==lelt*nv);//sanity-check
-
-  sarray_transfer(csr_entry,&a,proc,1,&cr);
-  crystal_free(&cr);
-
+  vPtr=vertices.ptr; size=vertices.n;
+  assert(size==lelt*nv);//sanity-check
   sarray_sort(vertex,vertices.ptr,vertices.n,sequenceId,1,&buf);
-  sarray_sort_2(csr_entry,a.ptr,a.n,r,1,c,1,&buf);
 
-  buffer_free(&buf);
-
-  exaArray nbrs;
-  exaArrayInit(&nbrs,element,GENMAP_MAX_VERTICES*GENMAP_MAX_NEIGHBORS);
-
-  exaMalloc(lelt*27,eIds_   ); exaLong *eIds   =*eIds_;
-  exaMalloc(lelt+ 1,neighbors_); exaInt  *neighbors=*neighbors_;
+  exaMalloc(nbrs.n,eIds_     ); exaLong *eIds     =*eIds_;
+  exaMalloc(lelt+1,neighbors_); exaInt  *neighbors=*neighbors_;
 
   exaInt cnt=0; int k; neighbors[lelt]=0;
   for(i=0;i<lelt;i++){
-    exaArraySetSize(nbrs,0);
-
     element e; GenmapLong curId;
     curId=e.elementId=vPtr[i*nv].elementId;
     for(j=0;j<nv;j++){
@@ -116,28 +107,45 @@ int GenmapFindNeighbors(GenmapHandle h,GenmapComm c,GenmapLong **eIds_,
         eIds[cnt++]=-ePtr[j].elementId,neighbors[i]+=1;
     neighbors[lelt]+=neighbors[i]+1;
   }
+#else
+  sarray_transfer(csr_entry,&a,proc,1,&cr);
+  sarray_sort_2(csr_entry,a.ptr,a.n,r,1,c,1,&buf);
 
+  struct array *nbrs=tmalloc(struct array,1);
+  array_init(entry,nbrs,lelt);
+
+  if(lelt==0) return nbrs;
+
+  csr_entry *aptr=a.ptr; entry *nptr=nbrs->ptr;
+  entry ee,ep; ep.r=aptr->r; ep.c=aptr->c; array_cat(entry,nbrs,&ep,1);
+  for(i=1; i<a.n; i++){
+    ee.r=aptr[i].r,ee.c=aptr[i].c; ulong n=nbrs->n-1;
+    printf("i=%d n=%u: %lu %lu %lu %lu\n",i,n,ee.r,ee.c,ep.r,ep.c);
+    if(ee.r!=ep.r || ee.c!=ep.c){
+      array_cat(entry,nbrs,&ee,1);
+      ep=ee;
+    }
+  }
+
+  sarray_sort_2(entry,nbrs->ptr,nbrs->n,r,1,c,1,&buf);
+#endif
+
+  crystal_free(&cr);
+
+  buffer_free(&buf);
   array_free(&vertices);
-  exaDestroy(nbrs);
+
+  return nbrs;
 }
 
 int GenmapInitLaplacian(GenmapHandle h,GenmapComm c,GenmapVector weights)
 {
-  GenmapLong *eIds; GenmapInt *neighbors;
-  GenmapFindNeighbors(h,c,&eIds,&neighbors);
-
   GenmapInt lelt=GenmapGetNLocalElements(h);
   GenmapInt nv  =GenmapGetNVertices(h);
 
-  GenmapInt i;
-  for(i=0;i<lelt;i++)
-    weights->data[i]=neighbors[i];
-
-  c->gsh=gs_setup(eIds,neighbors[lelt],&c->gsc,0,gs_crystal_router,0);
-  GenmapMalloc(neighbors[lelt],&c->laplacianBuf);
-
-  exaFree(eIds);
-  exaFree(neighbors);
+  csr_mat_setup(h,c,&c->M);
+  c->gsh=get_csr_top(c->M,&c->gsc);
+  GenmapMalloc(c->M->row_off[c->M->rn],&c->b);
 
   return 0;
 }
@@ -151,19 +159,8 @@ int GenmapLaplacian(GenmapHandle h,GenmapComm c,GenmapVector u,
   assert(u->size==v->size);
   assert(u->size==lelt   );
 
-  GenmapInt i,cnt; int j;
-  for(i=0,cnt=0; i<lelt; cnt+=weights->data[i],i++)
-    c->laplacianBuf[cnt++]=u->data[i];
-
-  gs(c->laplacianBuf,genmap_gs_scalar,gs_add,0,c->gsh,
-    &c->buf);
-
-  for(cnt=0,i=0; i<lelt; i++){
-    int nbrs=weights->data[i];
-    v->data[i]=c->laplacianBuf[cnt++]*nbrs;
-    for(j=0; j<nbrs; j++)
-      v->data[i]-=c->laplacianBuf[cnt++];
-  }
+  csr_mat_gather(c->M,c->gsh,u->data,c->b,&c->buf);
+  csr_mat_apply(v->data,c->M,c->b);
 
   return 0;
 }

@@ -12,34 +12,33 @@ void csr_mat_setup(GenmapHandle h,GenmapComm c,csr_mat *M_)
 
   GenmapScan(h,c); slong s=GenmapGetLocalStartIndex(h)+1;
 
-  slong *eIds; sint *offsets;
-  GenmapFindNeighbors(h,c,&eIds,&offsets);
+  struct array *entries_=GenmapFindNeighbors(h,c);
+  struct array entries  =*entries_; entry *ptr=entries.ptr;
+  printf("nnz=%u\n",entries.n);
 
-  struct array entries=null_array;
-  array_init(entry,&entries,offsets[lelt]);
-  entries.n=offsets[lelt];
+  buffer buf; buffer_init(&buf,1024);
+  sarray_sort_2(entry,ptr,entries.n,r,1,c,1,&buf);
+  buffer_free(&buf);
 
-  entry *ptr=entries.ptr;
-  sint i,j,n=0;
-  for(i=0;i<lelt;i++)
-    for(j=0;j<offsets[i]+1;j++){
-      ptr[n].r=s+i,ptr[n].c=ABS(eIds[n]),ptr[n].v=-1.0;
-      if(ptr[n].r==ptr[n].c) ptr[n].v=offsets[i];
-      n++;
+  uint st=0,e=0; sint diag;
+  while(st<entries.n){
+    diag=-1; e=st;
+    while(e<entries.n && ptr[st].r==ptr[e].r){
+      if(ptr[e].r==ptr[e].c) diag=e;
+      else ptr[e].v=-1.0;
+      e++;
     }
-  GenmapFree(offsets);
+    assert(diag>=0);
+    ptr[diag].v=e-st-1;
+    st=e;
+  }
 
   GenmapScan(h,c); slong ng=GenmapGetNGlobalElements(h);
   sint np=GenmapCommSize(c);
 
-  buffer buf; buffer_init(&buf,1024);
-  ptr=entries.ptr;
-  sarray_sort_2(entry,ptr,entries.n,r,1,c,1,&buf);
-  buffer_free(&buf);
-
   GenmapMalloc(1,M_); csr_mat M=*M_;
 
-  i=0,n=0;
+  uint i=0,j,n=0;
   while(i<entries.n){
     j=i+1;
     while(j<entries.n && ptr[i].r==ptr[j].r) j++;
@@ -73,8 +72,8 @@ void csr_mat_setup(GenmapHandle h,GenmapComm c,csr_mat *M_)
   assert(n==nn);
   assert(M->row_off[n]==entries.n);
 
-  GenmapFree(eIds);
   array_free(&entries);
+  free(entries_);
 
   M->gsh=get_csr_top(M,&c->gsc);
 }

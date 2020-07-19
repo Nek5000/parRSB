@@ -1,20 +1,22 @@
 #include "genmap-impl.h"
 
-int GenmapCreateComm(GenmapComm *c, GenmapCommExternal ce) {
-  GenmapMalloc(1, c);
-  comm_init(&(*c)->gsc, ce);
-  (*c)->gsh=NULL;
-  (*c)->laplacianBuf=NULL;
-  buffer_init(&(*c)->buf,1024);
+int GenmapCreateComm(GenmapComm *c_,GenmapCommExternal ce){
+  GenmapMalloc(1,c_); GenmapComm c=*c_;
+  comm_init(&c->gsc, ce); c->gsh=NULL; c->M=NULL; c->b=NULL;
+  buffer_init(&c->buf,1024);
   return 0;
 }
 
 int GenmapDestroyComm(GenmapComm c) {
   buffer_free(&c->buf);
+
   if(c->gsh)
     gs_free(c->gsh);
-  if(c->laplacianBuf)
-    GenmapFree(c->laplacianBuf);
+  if(c->M)
+    csr_mat_free(c->M);
+  if(c->b)
+    GenmapFree(c->b);
+
   comm_free(&c->gsc);
   GenmapFree(c);
 

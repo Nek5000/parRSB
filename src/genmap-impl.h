@@ -21,8 +21,9 @@
 struct GenmapComm_private {
   struct comm gsc;
   struct gs_data *gsh;
-  GenmapScalar *laplacianBuf;
+  csr_mat M;
   buffer buf;
+  GenmapScalar *b;
 };
 
 struct GenmapElement_private {
