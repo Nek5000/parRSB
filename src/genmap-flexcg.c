@@ -23,18 +23,19 @@ int ortho_one_vector(GenmapHandle h,GenmapComm c,GenmapVector q1,
   return 0;
 }
 
-int flex_cg(GenmapHandle h,GenmapComm c,mgData d,GenmapVector r,
+int flex_cg(GenmapHandle h,GenmapComm c,mgData d,GenmapVector ri,
   int maxIter,int verbose,GenmapVector x)
 {
-  assert(x->size==r->size);
+  assert(x->size==ri->size);
   assert(x->size==GenmapGetNLocalElements(h));
 
   uint lelt=x->size;
   GenmapLong nelg=GenmapGetNGlobalElements(h);
 
-  GenmapVector z0,z,dz,w,p;
+  GenmapVector z0,z,dz,w,p,r;
   GenmapCreateVector(&z ,lelt);
   GenmapCreateVector(&w ,lelt);
+  GenmapCreateVector(&r,lelt);
   GenmapCreateVector(&p ,lelt);
   GenmapCreateVector(&z0,lelt);
   GenmapCreateVector(&dz,lelt);
@@ -50,7 +51,7 @@ int flex_cg(GenmapHandle h,GenmapComm c,mgData d,GenmapVector r,
 
   uint i;
   for(i=0; i<lelt; i++)
-    x->data[i]=0.0;
+    x->data[i]=0.0,r->data[i]=ri->data[i];
 
 #if PREC
   mg_vcycle(z->data,r->data,d);
@@ -112,7 +113,7 @@ int flex_cg(GenmapHandle h,GenmapComm c,mgData d,GenmapVector r,
   }
 
   GenmapDestroyVector(z),GenmapDestroyVector(w);
-  GenmapDestroyVector(p);
+  GenmapDestroyVector(p); GenmapDestroyVector(r);
   GenmapDestroyVector(z0),GenmapDestroyVector(dz);
 
   return i;

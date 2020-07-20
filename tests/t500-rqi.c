@@ -155,22 +155,30 @@ int main(int argc,char *argv[]){
   GenmapVector r; GenmapCreateVector(&r,mesh->nelt);
 
   srand(time(0));
-  for(i=0; i<mesh->nelt; i++)
+  for(i=0; i<mesh->nelt; i++){
 #if 0
-    x->data[i]=me[i*mesh->nVertex].elementId,x0->data[i]=0.0;
+    x->data[i]=me[i*mesh->nVertex].elementId;
+    printf(" %lf",x->data[i]);
 #else
     x->data[i]=rand()%100/50.;
 #endif
+  }
+
+  printf("M->rn=%d\n",c->M->rn);
 
   GenmapLong nelg=GenmapGetNGlobalElements(gh);
   GenmapOrthogonalizebyOneVector(gh,c,x,nelg);
 
   GenmapScalar norm=GenmapDotVector(x,x);
   GenmapGop(c,&norm,1,GENMAP_SCALAR,GENMAP_SUM);
-  GenmapScalar normi=1.0/sqrt(norm);
-  printf("normi=%lf\n",normi);
+  printf("norm(z)=%lf\n",sqrt(norm));
 
+  GenmapScalar normi=1.0/sqrt(norm);
   GenmapAxpbyVector(x,x,0.0,x,normi);
+
+  norm=GenmapDotVector(x,x);
+  GenmapGop(c,&norm,1,GENMAP_SCALAR,GENMAP_SUM);
+  printf("norm(z)=%lf\n",sqrt(norm));
 
   rqi(gh,c,x,30,1,r);
 

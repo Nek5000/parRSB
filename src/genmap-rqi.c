@@ -28,14 +28,16 @@ int rqi(GenmapHandle h,GenmapComm c,GenmapVector z,int iter,int verbose,
 
   lambda=GenmapDotVector(y,z);
   GenmapGop(c,&lambda,1,GENMAP_SCALAR,GENMAP_SUM);
+  if(rank==0 && verbose)
+    printf("lambda: %lf\n",lambda);
 
   uint i;
   for(i=0; i<iter; i++){
     norm=GenmapDotVector(y,y);
     GenmapGop(c,&norm,1,GENMAP_SCALAR,GENMAP_SUM);
     normi=1.0/sqrt(norm);
-    GenmapAxpbyVector(z,z,0.0,y,normi);
 
+    GenmapAxpbyVector(z,z,0.0,y,normi);
     ortho_one_vector(h,c,z,nelg);
 
     flex_cg(h,c,d,z,iter,0,y);
@@ -48,7 +50,7 @@ int rqi(GenmapHandle h,GenmapComm c,GenmapVector z,int iter,int verbose,
     norm=GenmapDotVector(err,err);
     GenmapGop(c,&norm,1,GENMAP_SCALAR,GENMAP_SUM);
     if(rank==0 && verbose)
-      printf("i=%d lambda=%1.10e\n",i,lambda);
+      printf("i=%02d lambda=%1.10e\n",i,lambda);
   }
 
   mgFree(d);
