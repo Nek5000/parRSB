@@ -72,7 +72,11 @@ void setOwner(char *ptr,sint n,size_t inOffset,size_t outOffset,
 
 void mg_vcycle(GenmapScalar *u,GenmapScalar *rhs,mgData d);
 
+int ortho_one_vector(GenmapHandle h,GenmapComm c,GenmapVector q1,
+  GenmapLong n);
 int flex_cg(GenmapHandle h,GenmapComm c,mgData d,GenmapVector r,
-  int maxIter,GenmapVector x);
+  int maxIter,int verbose,GenmapVector x);
+int rqi(GenmapHandle h,GenmapComm c,GenmapVector z,int maxIter,int verbose,
+  GenmapVector fiedler);
 
 #endif

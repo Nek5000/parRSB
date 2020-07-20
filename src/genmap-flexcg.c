@@ -24,7 +24,7 @@ int ortho_one_vector(GenmapHandle h,GenmapComm c,GenmapVector q1,
 }
 
 int flex_cg(GenmapHandle h,GenmapComm c,mgData d,GenmapVector r,
-  int maxIter,GenmapVector x)
+  int maxIter,int verbose,GenmapVector x)
 {
   assert(x->size==r->size);
   assert(x->size==GenmapGetNLocalElements(h));
@@ -43,14 +43,9 @@ int flex_cg(GenmapHandle h,GenmapComm c,mgData d,GenmapVector r,
 #define ORTH 1
 
   int rank=GenmapCommRank(c);
-#if LAPO
-  if(rank==0) printf("Using original Laplacian.\n");
-#else
-  if(rank==0) printf("Using weighted Laplacian.\n");
-#endif
 
 #if PREC
-  if(rank==0) printf("Using MG Prec.\n");
+  if(rank==0 && verbose) printf("Using MG Prec.\n");
 #endif
 
   uint i;
@@ -66,14 +61,14 @@ int flex_cg(GenmapHandle h,GenmapComm c,mgData d,GenmapVector r,
   GenmapOrthogonalizebyOneVector(h,c,z,nelg);
 #endif
 
-  GenmapScalar den,alpha,beta,rz0,rz1,rz2,rr;
+  GenmapScalar den,alpha,beta,rz0,rz1=0,rz2,rr;
 
   rz1=GenmapDotVector(r,z);
   GenmapGop(c,&rz1,1,GENMAP_SCALAR,GENMAP_SUM);
+  if(GenmapCommRank(c)==0 && verbose)
+    printf("rz1=%lf\n",rz1);
 
   GenmapCopyVector(p,z);
-
-  printf("rz1=%lf\n",rz1);
 
   i=0;
   while(i<maxIter && sqrt(rz1)>GENMAP_TOL){
@@ -112,7 +107,8 @@ int flex_cg(GenmapHandle h,GenmapComm c,mgData d,GenmapVector r,
 
     rr=GenmapDotVector(r,r);
     GenmapGop(c,&rr,1,GENMAP_SCALAR,GENMAP_SUM);
-    printf("i=%d rr=%1.10e\n",i,sqrt(rr));
+    if(rank==0 && verbose)
+      printf("i=%d rr=%1.10e\n",i,sqrt(rr));
   }
 
   GenmapDestroyVector(z),GenmapDestroyVector(w);

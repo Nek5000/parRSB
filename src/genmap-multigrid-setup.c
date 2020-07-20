@@ -255,9 +255,13 @@ void mgSetup(GenmapComm c,csr_mat M,mgData *d_){
 void mgFree(mgData d){
   mgLevel *l=d->levels;
   uint i,nlevels=d->nlevels;
-  for(i=0; i<nlevels-1; i++)
-    gs_free(l[i]->J),csr_mat_free(l[i]->M),GenmapFree(l[i]);
-  csr_mat_free(l[i]->M); GenmapFree(l[i]);
+  for(i=0; i<nlevels; i++){
+    if(i>0)
+      csr_mat_free(l[i]->M);
+    if(i<nlevels-1){
+      gs_free(l[i]->J); GenmapFree(l[i]);
+    }
+  }
 
   GenmapFree(l);
   GenmapFree(d->level_off);

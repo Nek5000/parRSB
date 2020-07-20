@@ -72,7 +72,7 @@ function run_test_suite(){
       np=$(echo $np | sed 's/^0*//')
       np=$(( np>4?4:np ))
 
-      if [ "$t" == "t400-flex-cg" ]; then
+      if [ "$t" == "t400-flex-cg" ] || [ "$t" == "t500-rqi" ]; then
         mpirun --use-hwthread-cpus -np ${np} ../${t} `pwd`/${m}.re2 `pwd`/${m}.co2 >out.log 2>err.log
       else
         mpirun --use-hwthread-cpus -np ${np} ../${t} `pwd`/${m}.co2 >out.log 2>err.log
