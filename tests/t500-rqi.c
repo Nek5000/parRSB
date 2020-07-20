@@ -26,16 +26,17 @@ int main(int argc,char *argv[]){
   read_co2_file(mesh,argv[2],&comm);
 
   GenmapInt i,j;
-  Point me=(Point)MeshGetElements(mesh);
 
   int seq_g=(argc>3)?atoi(argv[3]):1;
   int rcb_g=(argc>4)?atoi(argv[4]):1;
   int rcb_l=(argc>5)?atoi(argv[5]):0;
 
-  if(seq_g)
+  if(seq_g){
     exaSort(mesh->elements,
       exaULong_t,offsetof(struct Point_private,sequenceId),
       exaSortAlgoBinSort,1,exaGetComm(h));
+    mesh->nelt=exaArrayGetSize(mesh->elements)/mesh->nVertex;
+  }
 
   //partition
   int      *part; GenmapMalloc(mesh->nelt              ,&part  );
@@ -43,6 +44,8 @@ int main(int argc,char *argv[]){
   double *coords; GenmapMalloc(mesh->nelt*mesh->nDim   ,&coords);
 
   int nDim=mesh->nDim;
+
+  Point me=(Point)MeshGetElements(mesh);
 
   if(rcb_g){
     for(i=0; i<mesh->nelt; i++){
@@ -75,6 +78,8 @@ int main(int argc,char *argv[]){
       offsetof(struct Point_private,sequenceId));
     mesh->nelt=exaArrayGetSize(mesh->elements)/mesh->nVertex;
   }
+
+  me=(Point)MeshGetElements(mesh);
 
   if(rcb_l){
     struct array a; array_init(elm_rcb,&a,mesh->nelt); a.n=mesh->nelt;
@@ -137,6 +142,8 @@ int main(int argc,char *argv[]){
   free(part);
   free(coords);
 
+  me=(Point)MeshGetElements(mesh);
+
   GenmapHandle gh; GenmapInit(&gh,MPI_COMM_WORLD);
   GenmapSetNLocalElements(gh,mesh->nelt);
   GenmapSetNVertices(gh,mesh->nVertex);
@@ -164,21 +171,21 @@ int main(int argc,char *argv[]){
 #endif
   }
 
-  printf("M->rn=%d\n",c->M->rn);
+  csr_mat_print(c->M,&c->gsc);
 
   GenmapLong nelg=GenmapGetNGlobalElements(gh);
   GenmapOrthogonalizebyOneVector(gh,c,x,nelg);
 
   GenmapScalar norm=GenmapDotVector(x,x);
   GenmapGop(c,&norm,1,GENMAP_SCALAR,GENMAP_SUM);
-  printf("norm(z)=%lf\n",sqrt(norm));
+  //printf("norm(z)=%lf\n",sqrt(norm));
 
   GenmapScalar normi=1.0/sqrt(norm);
   GenmapAxpbyVector(x,x,0.0,x,normi);
 
   norm=GenmapDotVector(x,x);
   GenmapGop(c,&norm,1,GENMAP_SCALAR,GENMAP_SUM);
-  printf("norm(z)=%lf\n",sqrt(norm));
+  //printf("norm(z)=%lf\n",sqrt(norm));
 
   rqi(gh,c,x,30,1,r);
 
