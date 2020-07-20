@@ -68,9 +68,6 @@ int parRCB(struct comm *ci,struct array *a,int ndim){
 #endif
     rank=c.id;
     size=c.np;
-
-    if(rank == 0)
-      printf("."), fflush(stdout);
   }
 
   comm_free(&c);
