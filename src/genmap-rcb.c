@@ -41,6 +41,9 @@ int parRCB(struct comm *ci,struct array *a,int ndim){
   sint rank=c.id;
   sint size=c.np;
 
+  if(rank == 0)
+    printf("running RCB "), fflush(stdout);
+
   while(size>1){
     get_axis_len(length,a,&c,ndim);
 
