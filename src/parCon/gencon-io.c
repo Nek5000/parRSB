@@ -91,9 +91,6 @@ int readRe2Coordinates(exaHandle h,Mesh mesh,MPI_File file){
   int nDim=mesh->nDim;
   int nVertex=mesh->nVertex;
 
-  exaDebug(h,"rank=%d reads %d elements.\n",rank,
-    nelt);
-
   exaLong out[2][1],buff[2][1],in[1];
   in[0]=nelt;
   exaScan(h,out,in,buff,1,exaLong_t,exaAddOp);
@@ -187,8 +184,6 @@ int readRe2Boundaries(exaHandle h,Mesh mesh,MPI_File file){
   
   int nbcsLocal=nbcs/size,nrem=nbcs-nbcsLocal*size;
   nbcsLocal+=(rank<nrem ? 1 : 0);
-  exaDebug(h,"rank=%d reads %d boundary faces.\n",rank,
-    nbcsLocal);
 
   exaLong out[2][1],buff[2][1],in[1];
   in[0]=nbcsLocal;

@@ -74,8 +74,12 @@ void mg_vcycle(GenmapScalar *u,GenmapScalar *rhs,mgData d);
 
 int ortho_one_vector(GenmapHandle h,GenmapComm c,GenmapVector q1,
   GenmapLong n);
+
 int flex_cg(GenmapHandle h,GenmapComm c,mgData d,GenmapVector r,
   int maxIter,int verbose,GenmapVector x);
+int project_pf(GenmapHandle h,GenmapComm c,mgData d,GenmapVector r,
+  int maxIter,int verbose,GenmapVector x);
+
 int rqi(GenmapHandle h,GenmapComm c,GenmapVector z,int maxIter,int verbose,
   GenmapVector fiedler);
 

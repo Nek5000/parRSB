@@ -26,17 +26,16 @@ int main(int argc,char *argv[]){
   read_co2_file(mesh,argv[2],&comm);
 
   GenmapInt i,j;
+  Point me=(Point)MeshGetElements(mesh);
 
   int seq_g=(argc>3)?atoi(argv[3]):1;
   int rcb_g=(argc>4)?atoi(argv[4]):1;
   int rcb_l=(argc>5)?atoi(argv[5]):0;
 
-  if(seq_g){
+  if(seq_g)
     exaSort(mesh->elements,
       exaULong_t,offsetof(struct Point_private,sequenceId),
       exaSortAlgoBinSort,1,exaGetComm(h));
-    mesh->nelt=exaArrayGetSize(mesh->elements)/mesh->nVertex;
-  }
 
   //partition
   int      *part; GenmapMalloc(mesh->nelt              ,&part  );
@@ -44,8 +43,6 @@ int main(int argc,char *argv[]){
   double *coords; GenmapMalloc(mesh->nelt*mesh->nDim   ,&coords);
 
   int nDim=mesh->nDim;
-
-  Point me=(Point)MeshGetElements(mesh);
 
   if(rcb_g){
     for(i=0; i<mesh->nelt; i++){
@@ -78,8 +75,6 @@ int main(int argc,char *argv[]){
       offsetof(struct Point_private,sequenceId));
     mesh->nelt=exaArrayGetSize(mesh->elements)/mesh->nVertex;
   }
-
-  me=(Point)MeshGetElements(mesh);
 
   if(rcb_l){
     struct array a; array_init(elm_rcb,&a,mesh->nelt); a.n=mesh->nelt;
@@ -142,8 +137,6 @@ int main(int argc,char *argv[]){
   free(part);
   free(coords);
 
-  me=(Point)MeshGetElements(mesh);
-
   GenmapHandle gh; GenmapInit(&gh,MPI_COMM_WORLD);
   GenmapSetNLocalElements(gh,mesh->nelt);
   GenmapSetNVertices(gh,mesh->nVertex);
@@ -155,47 +148,53 @@ int main(int argc,char *argv[]){
     for(j=0;j<mesh->nVertex;j++)
       e[i].vertices[j]=me[i*mesh->nVertex+j].globalId;
 
+  /* Setup CSR on fine level */
   GenmapComm c=GenmapGetGlobalComm(gh);
-  GenmapInitLaplacian(gh,c);
+  csr_mat M; csr_mat_setup(gh,c,&M);
 
-  GenmapVector x; GenmapCreateVector(&x,mesh->nelt);
-  GenmapVector r; GenmapCreateVector(&r,mesh->nelt);
+  /* Setup MG levels */
+  mgData d; mgSetup(c,M,&d);
+
+  GenmapVector r,x,x0;
+  GenmapCreateVector(&r      ,mesh->nelt);
+  GenmapCreateVector(&x      ,mesh->nelt);
+  GenmapCreateVector(&x0     ,mesh->nelt);
 
   srand(time(0));
-  for(i=0; i<mesh->nelt; i++){
+  for(i=0; i<mesh->nelt; i++)
 #if 0
-    x->data[i]=me[i*mesh->nVertex].elementId;
-    printf(" %lf",x->data[i]);
+    x->data[i]=me[i*mesh->nVertex].elementId,x0->data[i]=0.0;
 #else
-    x->data[i]=rand()%100/50.;
+    x->data[i]=rand()%100/50.,x0->data[i]=0.0;
 #endif
-  }
-
-  //csr_mat_print(c->M,&c->gsc);
 
   GenmapLong nelg=GenmapGetNGlobalElements(gh);
   GenmapOrthogonalizebyOneVector(gh,c,x,nelg);
 
-  GenmapScalar norm=GenmapDotVector(x,x);
-  GenmapGop(c,&norm,1,GENMAP_SCALAR,GENMAP_SUM);
-  //printf("norm(z)=%lf\n",sqrt(norm));
+  GenmapInitLaplacian(gh,c);
+  GenmapLaplacian(gh,c,x,r);
 
-  GenmapScalar normi=1.0/sqrt(norm);
-  GenmapAxpbyVector(x,x,0.0,x,normi);
+  i=project_pf(gh,c,d,r,30,1,x0);
+  if(rank==0)
+    printf("Flex-CG iterations: %d\n",i);
 
-  norm=GenmapDotVector(x,x);
-  GenmapGop(c,&norm,1,GENMAP_SCALAR,GENMAP_SUM);
-  //printf("norm(z)=%lf\n",sqrt(norm));
+  for(i=0; i<mesh->nelt; i++){
+    GenmapScalar e=x->data[i]-x0->data[i];
+    assert(fabs(e)<1e-10);
+  }
 
-  rqi(gh,c,x,30,1,r);
+  GenmapDestroyVector(r );
+  GenmapDestroyVector(x );
+  GenmapDestroyVector(x0);
 
-  GenmapDestroyVector(x); GenmapDestroyVector(r);
+  mgFree(d);
 
   GenmapFinalize(gh);
   MeshFree(mesh);
 
   comm_free(&comm);
-  exaFree(h); MPI_Finalize();
+  exaFree(h);
+  MPI_Finalize();
 
   return 0;
 }
