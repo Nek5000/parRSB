@@ -22,8 +22,8 @@ int main(int argc,char *argv[]){
   }
 
   Mesh mesh;
-  readRe2File(h,&mesh,argv[1]);
-  read_co2_file(mesh,argv[2],&comm);
+  read_re2_mesh(&mesh,argv[1],&comm);
+  read_co2_file( mesh,argv[2],&comm);
 
   GenmapInt i,j;
 

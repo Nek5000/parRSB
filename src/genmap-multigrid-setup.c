@@ -110,7 +110,6 @@ void mgLevelSetup(mgData d,uint lvl)
   struct crystal cr;
   crystal_init(&cr,&d->c);
 
-  /* coarsen the rows */
   setOwner(entries.ptr,nnz0,offsetof(entry,rn),offsetof(entry,p),ngc,npc);
   sarray_transfer(entry,&entries,p,1,&cr);
 

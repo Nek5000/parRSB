@@ -1,8 +1,9 @@
 #include <math.h>
 #include <string.h>
 
-#include "gencon-impl.h"
-#include "exa-memory.h"
+#include <exa-impl.h>
+#include <genmap-impl.h>
+#include <gencon-impl.h>
 
 #define readT(coords,buf,T,nVertex) do{\
   memcpy((coords),buf,sizeof(T)*nVertex);\
@@ -15,8 +16,8 @@
 int PRE_TO_SYM_VERTEX[GC_MAX_VERTICES]={0,1,3,2,4,5,7,6};
 int PRE_TO_SYM_FACE[GC_MAX_FACES]={2,1,3,0,4,5};
 
-int transferBoundaryFaces(exaHandle h,Mesh mesh){
-  int size=exaSize(h);
+int transferBoundaryFaces(Mesh mesh,struct comm *c){
+  uint size=c->np;
   BoundaryFace ptr=exaArrayGetPointer(mesh->boundary);
   int nFaces=exaArrayGetSize(mesh->boundary);
 
@@ -32,19 +33,20 @@ int transferBoundaryFaces(exaHandle h,Mesh mesh){
     else ptr->proc=ceil((eid+1.0-N)/nelt)-1+nrem;
   }
 
-  exaComm c=exaGetComm(h);
-  exaArrayTransfer(mesh->boundary,
-    offsetof(struct Boundary_private,proc),1,c);
+  struct crystal cr; crystal_init(&cr,c);
+  sarray_transfer(struct Boundary_private,
+    &mesh->boundary->arr,proc,1,&cr);
+  crystal_free(&cr);
 }
 
-int readRe2Header(exaHandle h,Mesh *mesh_,MPI_File file){
+int readRe2Header(Mesh *mesh_,MPI_File file,struct comm *c){
   char version[BUFSIZ];
   int nelgt,nDim,nelgv,err;
   MPI_Status st;
 
-  exaInt rank=exaRank(h);
-  exaInt size=exaSize(h);
-  exaExternalComm comm=exaGetExternalComm(h);
+  uint rank=c->id;
+  uint size=c->np;
+  MPI_Comm comm=c->c;
 
   char *buf=(char *)calloc(GC_RE2_HEADER_LEN+1,sizeof(char));
   if(rank==0){
@@ -52,14 +54,18 @@ int readRe2Header(exaHandle h,Mesh *mesh_,MPI_File file){
     if(err) return 1;
   }
   MPI_Bcast(buf,GC_RE2_HEADER_LEN,MPI_BYTE,0,comm);
-  if(rank==0) exaDebug(h,"header: %s\n",buf);
+  if(rank==0){
+#if defined(GENMAP_DEBUG)
+    printf("header: %s\n",buf);
+#endif
+  }
   sscanf(buf,"%5s %d %d %d",version,&nelgt,&nDim,&nelgv);
 
   int nVertex=(nDim==2)?4:8;
   int nelt=nelgt/size,nrem=nelgt-nelt*size;
   nelt+=(rank<nrem ? 1: 0);
 
-  exaMalloc(1,mesh_);
+  GenmapMalloc(1,mesh_);
   Mesh mesh=*mesh_;
 
   // Initialize the mesh structure
@@ -71,9 +77,11 @@ int readRe2Header(exaHandle h,Mesh *mesh_,MPI_File file){
   mesh->nelt=nelt;
 
   if(rank==0){
-    exaDebug(h,"ndim,nvertex,nneighbors,nelgt,nelt:%d %d %d %d "
+#if defined(GENMAP_DEBUG)
+    printf("ndim,nvertex,nneighbors,nelgt,nelt:%d %d %d %d "
       "%d\n",mesh->nDim,mesh->nVertex,mesh->nNeighbors,\
       mesh->nelgt,mesh->nelt);
+#endif
   }
 
   free(buf);
@@ -81,20 +89,19 @@ int readRe2Header(exaHandle h,Mesh *mesh_,MPI_File file){
   return 0;
 }
 
-int readRe2Coordinates(exaHandle h,Mesh mesh,MPI_File file){
-  exaInt rank=exaRank(h);
-  exaInt size=exaSize(h);
-  exaExternalComm comm=exaGetExternalComm(h);
+int readRe2Coordinates(Mesh mesh,MPI_File file,struct comm *c){
+  uint rank=c->id;
+  uint size=c->np;
+  MPI_Comm comm=c->c;
 
   int nelt=mesh->nelt;
   int nelgt=mesh->nelgt;
   int nDim=mesh->nDim;
   int nVertex=mesh->nVertex;
 
-  exaLong out[2][1],buff[2][1],in[1];
-  in[0]=nelt;
-  exaScan(h,out,in,buff,1,exaLong_t,exaAddOp);
-  exaLong start=out[0][0];
+  slong out[2][1],buff[2][1],in=nelt;
+  comm_scan(out,c,gs_long,gs_add,&in,1,buff);
+  slong start=out[0][0];
 
   int elemDataSize=nVertex*nDim*sizeof(double)+sizeof(double);
   int headerSize=GC_RE2_HEADER_LEN+sizeof(float);
@@ -146,10 +153,10 @@ int readRe2Coordinates(exaHandle h,Mesh mesh,MPI_File file){
   return 0;
 }
 
-int readRe2Boundaries(exaHandle h,Mesh mesh,MPI_File file){
-  exaInt rank=exaRank(h);
-  exaInt size=exaSize(h);
-  exaExternalComm comm=exaGetExternalComm(h);
+int readRe2Boundaries(Mesh mesh,MPI_File file,struct comm *c){
+  uint rank=c->id;
+  uint size=c->np;
+  MPI_Comm comm=c->c;
 
   int nelt=mesh->nelt;
   int nelgt=mesh->nelgt;
@@ -185,10 +192,9 @@ int readRe2Boundaries(exaHandle h,Mesh mesh,MPI_File file){
   int nbcsLocal=nbcs/size,nrem=nbcs-nbcsLocal*size;
   nbcsLocal+=(rank<nrem ? 1 : 0);
 
-  exaLong out[2][1],buff[2][1],in[1];
-  in[0]=nbcsLocal;
-  exaScan(h,out,in,buff,1,exaLong_t,exaAddOp);
-  exaLong start=out[0][0];
+  slong out[2][1],buff[2][1],in=nbcsLocal;
+  comm_scan(out,c,gs_long,gs_add,&in,1,buff);
+  slong start=out[0][0];
 
   int offset=boundaryOffset+sizeof(long)+start*8*sizeof(long);
   int readSize=nbcsLocal*sizeof(long)*8;
@@ -221,13 +227,13 @@ int readRe2Boundaries(exaHandle h,Mesh mesh,MPI_File file){
   free(buf);
 }
 
-int readRe2File(exaHandle h,Mesh *mesh_,char *fileName){
+int read_re2_mesh(Mesh *mesh_,char *fileName,struct comm *c){
   int nelt,nDim,nVertex;
   int errs=0;
 
-  exaInt rank=exaRank(h);
-  exaInt size=exaSize(h);
-  exaExternalComm comm=exaGetExternalComm(h);
+  uint rank=c->id;
+  uint size=c->np;
+  MPI_Comm comm=c->c;
 
   MPI_File file;
   int err=MPI_File_open(comm,fileName,MPI_MODE_RDONLY,\
@@ -240,11 +246,11 @@ int readRe2File(exaHandle h,Mesh *mesh_,char *fileName){
     MPI_Abort(comm,911);
   }
 
-  readRe2Header(h,mesh_,file);
+  readRe2Header(mesh_,file,c);
   Mesh mesh=*mesh_;
-  readRe2Coordinates(h,mesh,file);
-  readRe2Boundaries(h,mesh,file);
-  transferBoundaryFaces(h,mesh);
+  readRe2Coordinates(mesh,file,c);
+  readRe2Boundaries(mesh,file,c);
+  transferBoundaryFaces(mesh,c);
 
   err=MPI_File_close(&file);
   if(err) errs++;
@@ -330,7 +336,7 @@ int writeCo2File(exaHandle h,Mesh mesh,char *fileName){
   return errs;
 }
 
-int readCo2File(Mesh *mesh_,char *fileName,struct comm *c){
+int read_co2_mesh(Mesh *mesh_,char *fileName,struct comm *c){
   comm_ext comm=c->c;
   MPI_File file;
   int err=MPI_File_open(comm,fileName,MPI_MODE_RDONLY,MPI_INFO_NULL,&file);

@@ -100,7 +100,10 @@ struct array *GenmapFindNeighbors(GenmapHandle h,GenmapComm c)
 
 int GenmapInitLaplacian(GenmapHandle h,GenmapComm c)
 {
-  csr_mat_setup(h,c,&c->M);
+  struct array *entries=GenmapFindNeighbors(h,c);
+  csr_mat_setup(entries,&c->gsc,&c->M);
+  array_free(entries); free(entries);
+
   c->gsh=get_csr_top(c->M,&c->gsc);
   GenmapMalloc(c->M->row_off[c->M->rn],&c->b);
 

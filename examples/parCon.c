@@ -8,6 +8,7 @@ int main(int argc,char *argv[]){
 
   exaHandle h;
   exaInit(&h,MPI_COMM_WORLD,"/host");
+  struct comm comm; comm_init(&comm,MPI_COMM_WORLD);
 
   if(argc<2) {
     if(exaRank(h)==0) printf("Usage: ./%s foo.re2 [tol]\n",argv[0]);
@@ -15,7 +16,7 @@ int main(int argc,char *argv[]){
   }
 
   Mesh mesh;
-  readRe2File(h,&mesh,argv[1]);
+  read_re2_mesh(&mesh,argv[1],&comm);
 
   findMinNeighborDistance(h,mesh);
 
@@ -35,6 +36,7 @@ int main(int argc,char *argv[]){
 
   MeshFree(mesh);
 
+  comm_free(&comm);
   exaFinalize(h);
 
   MPI_Finalize();

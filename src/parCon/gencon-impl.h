@@ -33,7 +33,7 @@ struct Boundary_private{
   exaULong elementId;
   exaULong faceId;
   struct Face_private face;
-  int proc;
+  uint proc;
   long bc[2];
 };
 

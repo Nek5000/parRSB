@@ -20,7 +20,7 @@ int main(int argc,char *argv[]){
   }
 
   Mesh mesh;
-  readCo2File(&mesh,argv[1],&comm);
+  read_co2_mesh(&mesh,argv[1],&comm);
 
   GenmapHandle gh; GenmapInit(&gh,MPI_COMM_WORLD);
 
@@ -56,7 +56,9 @@ int main(int argc,char *argv[]){
     v->data[i]=100; // Random number to reset v for next test
 
   /* Test Laplacian based on CSR representation */
-  csr_mat M; csr_mat_setup(gh,c,&M);
+  struct array *entries=GenmapFindNeighbors(gh,c);
+  csr_mat M; csr_mat_setup(entries,&c->gsc,&M);
+  array_free(entries); free(entries);
 
   GenmapScalar *x,*y,*buf;
   GenmapMalloc(mesh->nelt,&x); GenmapMalloc(mesh->nelt,&y);

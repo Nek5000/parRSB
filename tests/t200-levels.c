@@ -20,7 +20,7 @@ int main(int argc,char *argv[]){
   }
 
   Mesh mesh;
-  readCo2File(&mesh,argv[1],&comm);
+  read_co2_mesh(&mesh,argv[1],&comm);
 
   GenmapHandle gh; GenmapInit(&gh,MPI_COMM_WORLD);
 
@@ -37,7 +37,9 @@ int main(int argc,char *argv[]){
 
   /* Setup CSR on fine level */
   GenmapComm c=GenmapGetGlobalComm(gh);
-  csr_mat M; csr_mat_setup(gh,c,&M);
+  struct array *entries=GenmapFindNeighbors(gh,c);
+  csr_mat M; csr_mat_setup(entries,&c->gsc,&M);
+  array_free(entries); free(entries);
 
   /* Setup MG levels */
   mgData d; mgSetup(c,M,&d); uint nlevels=d->nlevels;

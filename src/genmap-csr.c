@@ -1,22 +1,20 @@
 #include <genmap-impl.h>
 #include <genmap-multigrid-precon.h>
-
 #include <exa.h>
 
 #define ABS(i) ((i<0)?-i:i)
 
-void csr_mat_setup(GenmapHandle h,GenmapComm c,csr_mat *M_){
-  struct array *entries_=GenmapFindNeighbors(h,c);
-  struct array entries  =*entries_; entry *ptr=entries.ptr;
+void csr_mat_setup(struct array *entries,struct comm *c,csr_mat *M_){
+  entry *ptr=entries->ptr;
 
   buffer buf; buffer_init(&buf,1024);
-  sarray_sort_2(entry,ptr,entries.n,r,1,c,1,&buf);
+  sarray_sort_2(entry,ptr,entries->n,r,1,c,1,&buf);
   buffer_free(&buf);
 
   uint st=0,e=0; sint diag;
-  while(st<entries.n){
+  while(st<entries->n){
     diag=-1; e=st;
-    while(e<entries.n && ptr[st].r==ptr[e].r){
+    while(e<entries->n && ptr[st].r==ptr[e].r){
       if(ptr[e].r==ptr[e].c) diag=e;
       else ptr[e].v=-1.0;
       e++;
@@ -26,18 +24,17 @@ void csr_mat_setup(GenmapHandle h,GenmapComm c,csr_mat *M_){
     st=e;
   }
 
-  GenmapMalloc(1,M_); csr_mat M=*M_;
-
   uint i=0,j,n=0;
-  while(i<entries.n){
+  while(i<entries->n){
     j=i+1;
-    while(j<entries.n && ptr[i].r==ptr[j].r) j++;
+    while(j<entries->n && ptr[i].r==ptr[j].r) j++;
     i=j,n++;
   }
-  M->rn=n;
+
+  GenmapMalloc(1,M_); csr_mat M=*M_; M->rn=n;
 
   slong out[2][1],bf[2][1],in=M->rn;
-  comm_scan(out,&c->gsc,gs_long,gs_add,&in,1,bf);
+  comm_scan(out,c,gs_long,gs_add,&in,1,bf);
   M->row_start=out[0][0]+1;
 
   GenmapMalloc(M->rn+1,&M->row_off);
@@ -45,30 +42,27 @@ void csr_mat_setup(GenmapHandle h,GenmapComm c,csr_mat *M_){
   if(n==0)
     M->col=NULL,M->v=NULL,M->diag=NULL;
   else{
-    GenmapMalloc(entries.n,&M->col),GenmapMalloc(entries.n,&M->v);
+    GenmapMalloc(entries->n,&M->col),GenmapMalloc(entries->n,&M->v);
     GenmapMalloc(M->rn,&M->diag);
   }
 
-  ptr=entries.ptr; uint rn=0;
-  for(i=0; i<entries.n; i++){
+  ptr=entries->ptr; uint rn=0;
+  for(i=0; i<entries->n; i++){
     M->col[i]=ptr[i].c,M->v[i]=ptr[i].v;
     if(ptr[i].r==ptr[i].c) M->diag[rn++]=ptr[i].v;
   }
   assert(rn==M->rn);
 
   M->row_off[0]=0,i=0; uint nn=0;
-  while(i<entries.n){
+  while(i<entries->n){
     j=i+1;
-    while(j<entries.n && ptr[i].r==ptr[j].r) j++;
+    while(j<entries->n && ptr[i].r==ptr[j].r) j++;
     i=M->row_off[++nn]=j;
   }
   assert(n==nn);
-  assert(M->row_off[n]==entries.n);
+  assert(M->row_off[n]==entries->n);
 
-  array_free(&entries);
-  free(entries_);
-
-  M->gsh=get_csr_top(M,&c->gsc);
+  M->gsh=get_csr_top(M,c);
 }
 
 struct gs_data *get_csr_top(csr_mat M,struct comm *c){

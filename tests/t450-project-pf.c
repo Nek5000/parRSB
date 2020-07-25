@@ -22,8 +22,8 @@ int main(int argc,char *argv[]){
   }
 
   Mesh mesh;
-  readRe2File(h,&mesh,argv[1]);
-  read_co2_file(mesh,argv[2],&comm);
+  read_re2_mesh(&mesh,argv[1],&comm);
+  read_co2_file( mesh,argv[2],&comm);
 
   GenmapInt i,j;
   Point me=(Point)MeshGetElements(mesh);
@@ -150,7 +150,9 @@ int main(int argc,char *argv[]){
 
   /* Setup CSR on fine level */
   GenmapComm c=GenmapGetGlobalComm(gh);
-  csr_mat M; csr_mat_setup(gh,c,&M);
+  struct array *entries=GenmapFindNeighbors(gh,c);
+  csr_mat M; csr_mat_setup(entries,&c->gsc,&M);
+  array_free(entries); free(entries);
 
   /* Setup MG levels */
   mgData d; mgSetup(c,M,&d);

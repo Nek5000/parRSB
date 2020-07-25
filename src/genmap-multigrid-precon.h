@@ -19,7 +19,7 @@ struct csr_mat_{
 };
 
 // for the coarse level
-void csr_mat_setup(GenmapHandle h,GenmapComm c,csr_mat *M);
+void csr_mat_setup(struct array *entries,struct comm *c,csr_mat *M);
 void csr_mat_apply(GenmapScalar *y,csr_mat M,GenmapScalar *x);
 void csr_mat_print(csr_mat M,struct comm *c);
 int  csr_mat_free(csr_mat M);

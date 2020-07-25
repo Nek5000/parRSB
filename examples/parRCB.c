@@ -40,9 +40,10 @@ int main(int argc,char *argv[]){
   if(color==1){
     exaHandle h;
     exaInit(&h,commRead,"/host");
+    comm comm; comm_init(&comm,commRead);
 
     Mesh mesh;
-    int ierr=readRe2File(h,&mesh,reaFile);
+    int ierr=read_re2_mesh(&mesh,reaFile,&comm);
     CHECK_ERR(ierr);
 
     int nelt=mesh->nelt;
@@ -127,6 +128,7 @@ int main(int argc,char *argv[]){
     exaFree(buf);
     exaFree(vtx);
     exaFree(part);
+    comm_free(&comm);
     exaFinalize(h);
   }
 
