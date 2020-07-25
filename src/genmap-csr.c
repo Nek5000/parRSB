@@ -5,13 +5,7 @@
 
 #define ABS(i) ((i<0)?-i:i)
 
-void csr_mat_setup(GenmapHandle h,GenmapComm c,csr_mat *M_)
-{
-  sint lelt=GenmapGetNLocalElements(h);
-  sint nv  =GenmapGetNVertices(h);
-
-  GenmapScan(h,c); slong s=GenmapGetLocalStartIndex(h)+1;
-
+void csr_mat_setup(GenmapHandle h,GenmapComm c,csr_mat *M_){
   struct array *entries_=GenmapFindNeighbors(h,c);
   struct array entries  =*entries_; entry *ptr=entries.ptr;
 
@@ -32,9 +26,6 @@ void csr_mat_setup(GenmapHandle h,GenmapComm c,csr_mat *M_)
     st=e;
   }
 
-  GenmapScan(h,c); slong ng=GenmapGetNGlobalElements(h);
-  sint np=GenmapCommSize(c);
-
   GenmapMalloc(1,M_); csr_mat M=*M_;
 
   uint i=0,j,n=0;
@@ -43,13 +34,16 @@ void csr_mat_setup(GenmapHandle h,GenmapComm c,csr_mat *M_)
     while(j<entries.n && ptr[i].r==ptr[j].r) j++;
     i=j,n++;
   }
-
   M->rn=n;
-  GenmapScan(h,c); M->row_start=GenmapGetLocalStartIndex(h)+1;
+
+  slong out[2][1],bf[2][1],in=M->rn;
+  comm_scan(out,&c->gsc,gs_long,gs_add,&in,1,bf);
+  M->row_start=out[0][0]+1;
 
   GenmapMalloc(M->rn+1,&M->row_off);
 
-  if(n==0) M->col=NULL,M->v=NULL,M->diag=NULL;
+  if(n==0)
+    M->col=NULL,M->v=NULL,M->diag=NULL;
   else{
     GenmapMalloc(entries.n,&M->col),GenmapMalloc(entries.n,&M->v);
     GenmapMalloc(M->rn,&M->diag);
@@ -151,11 +145,11 @@ void csr_mat_print(csr_mat M,struct comm *c){
     comm_barrier(c);
     if(c->id==k)
       for(i=0; i<rn; i++){
-        printf("%02u: r%02lld: ",c->id,M->row_start+i);
         for(j=offsets[i]; j<offsets[i+1]; j++)
-          printf("(%2lld,%.2lf)",col[j],v[j]);
-        printf("\n");
+          fprintf(stderr,"(%d,%lld,%lld,%.10lf)\n",c->id,M->row_start+i,
+              col[j],v[j]);
       }
+    fflush(stderr);
   }
 }
 

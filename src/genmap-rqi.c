@@ -18,8 +18,7 @@ int rqi(GenmapHandle h,GenmapComm c,GenmapVector z,int iter,int verbose,
 
   int rank=GenmapCommRank(c);
 
-  flex_cg(h,c,d,z,iter,0,y);
-  ortho_one_vector(h,c,y,nelg);
+  project_pf(h,c,d,z,30,0,y);
 
   norm=GenmapDotVector(y,y);
   GenmapGop(c,&norm,1,GENMAP_SCALAR,GENMAP_SUM);
@@ -40,7 +39,7 @@ int rqi(GenmapHandle h,GenmapComm c,GenmapVector z,int iter,int verbose,
     GenmapAxpbyVector(z,z,0.0,y,normi);
     ortho_one_vector(h,c,z,nelg);
 
-    flex_cg(h,c,d,z,iter,0,y);
+    project_pf(h,c,d,z,30,0,y);
     ortho_one_vector(h,c,y,nelg);
 
     lambda=GenmapDotVector(y,z);
