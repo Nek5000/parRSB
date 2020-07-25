@@ -10,7 +10,9 @@
 
 int main(int argc,char *argv[]){
   MPI_Init(&argc,&argv);
-  struct comm comm; comm_init(&comm,MPI_COMM_WORLD);
+
+  struct comm comm;
+  comm_init(&comm,MPI_COMM_WORLD);
   int rank=comm.id,size=comm.np;
 
   if(argc!=2){
@@ -23,7 +25,6 @@ int main(int argc,char *argv[]){
   read_co2_mesh(&mesh,argv[1],&comm);
 
   GenmapHandle gh; GenmapInit(&gh,MPI_COMM_WORLD);
-
   GenmapSetNLocalElements(gh,mesh->nelt);
   GenmapSetNVertices(gh,mesh->nVertex);
 

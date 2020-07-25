@@ -1,8 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-
 #include <mpi.h>
-#include <exa.h>
 
 #include <genmap-impl.h>
 #include <gencon-impl.h>
@@ -10,8 +8,10 @@
 
 int main(int argc,char *argv[]){
   MPI_Init(&argc,&argv);
-  struct comm comm; comm_init(&comm,MPI_COMM_WORLD);
-  int rank=comm.id,size=comm.np;
+
+  struct comm comm;
+  comm_init(&comm,MPI_COMM_WORLD);
+  uint rank=comm.id,size=comm.np;
 
   if(argc!=2){
     if(rank==0) printf("Usage: ./%s <co2 file>\n",argv[0]);
@@ -23,7 +23,6 @@ int main(int argc,char *argv[]){
   read_co2_mesh(&mesh,argv[1],&comm);
 
   GenmapHandle gh; GenmapInit(&gh,MPI_COMM_WORLD);
-
   GenmapSetNLocalElements(gh,mesh->nelt);
   GenmapSetNVertices(gh,mesh->nVertex);
 

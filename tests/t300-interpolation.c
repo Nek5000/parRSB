@@ -7,7 +7,9 @@
 
 int main(int argc,char *argv[]){
   MPI_Init(&argc,&argv);
-  struct comm comm; comm_init(&comm,MPI_COMM_WORLD);
+
+  struct comm comm;
+  comm_init(&comm,MPI_COMM_WORLD);
   int rank=comm.id,size=comm.np;
 
   if(argc!=2){
@@ -20,7 +22,6 @@ int main(int argc,char *argv[]){
   read_co2_mesh(&mesh,argv[1],&comm);
 
   GenmapHandle gh; GenmapInit(&gh,MPI_COMM_WORLD);
-
   GenmapSetNLocalElements(gh,mesh->nelt);
   GenmapSetNVertices(gh,mesh->nVertex);
 
@@ -57,18 +58,6 @@ int main(int argc,char *argv[]){
   buffer buf; buffer_init(&buf,1024);
   for(i=0; i<nlevels-1; i++){
     gs(x+lvl_off[i],gs_double,gs_add,1,l[i]->J,&buf);
-#ifdef GENMAP_DEBUG
-    comm_barrier(&comm);
-    for(k=0; k<comm.np; k++){
-      if(k==comm.id){
-        printf("rank %d: lvl %d: ",comm.id,i);
-        for(j=0; j<lvl_off[nlevels]; j++)
-          printf("%lf ",x[j]);
-        printf("\n");
-      }
-      fflush(stdout);
-    }
-#endif
   }
 
   if(lvl_off[nlevels-1]<lvl_off[nlevels]) // rank with last 1-dof
@@ -76,18 +65,6 @@ int main(int argc,char *argv[]){
 
   for(i=nlevels-2; i>=0; i--){
     gs(x+lvl_off[i],gs_double,gs_add,0,l[i]->J,&buf);
-#ifdef GENMAP_DEBUG
-    comm_barrier(&comm);
-    for(k=0; k<comm.np; k++){
-      if(k==comm.id){
-        printf("rank %d: lvl %d: ",comm.id,i);
-        for(j=0; j<lvl_off[nlevels]; j++)
-          printf("%lf ",x[j]);
-        printf("\n");
-      }
-      fflush(stdout);
-    }
-#endif
   }
 
   for(i=lvl_off[0]; i<lvl_off[nlevels]; i++)
@@ -96,7 +73,6 @@ int main(int argc,char *argv[]){
   buffer_free(&buf);
 
   mgFree(d);
-
   GenmapFinalize(gh);
   MeshFree(mesh);
 

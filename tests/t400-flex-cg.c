@@ -9,7 +9,9 @@
 
 int main(int argc,char *argv[]){
   MPI_Init(&argc,&argv);
-  struct comm comm; comm_init(&comm,MPI_COMM_WORLD);
+
+  struct comm comm;
+  comm_init(&comm,MPI_COMM_WORLD);
   int rank=comm.id,size=comm.np;
 
   exaHandle h; exaInit(&h,MPI_COMM_WORLD,"/host");
