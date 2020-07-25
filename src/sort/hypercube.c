@@ -1,10 +1,10 @@
 #include <sort-impl.h>
 #include <math.h>
 
-int init_probes(hypercube_sort_data data,struct comm *c)
+int init_probes(struct hypercube *data,struct comm *c)
 {
   /* get input data */
-  sort_data input=data->data;
+  struct sort *input=data->data;
 
   /* Allocate space for probes and counts */
   int nprobes=data->nprobes=3;
@@ -23,9 +23,9 @@ int init_probes(hypercube_sort_data data,struct comm *c)
   return 0;
 }
 
-int update_probe_counts(hypercube_sort_data data,struct comm *c)
+int update_probe_counts(struct hypercube *data,struct comm *c)
 {
-  sort_data input=data->data;
+  struct sort *input=data->data;
   uint offset  =input->offset[0];
   gs_dom t=input->t[0];
 
@@ -62,9 +62,9 @@ int update_probes(slong nelem,double *probes,ulong *probe_cnt,
   return 0;
 }
 
-int transfer_elem(hypercube_sort_data data,struct comm *c)
+int transfer_elem(struct hypercube *data,struct comm *c)
 {
-  sort_data input=data->data;
+  struct sort *input=data->data;
   struct array *a=input->a;
   uint usize     =input->unit_size;
   uint offset    =input->offset[0];
@@ -103,9 +103,9 @@ int transfer_elem(hypercube_sort_data data,struct comm *c)
   return 0;
 }
 
-int parallel_hypercube_sort(hypercube_sort_data data,struct comm *c)
+int parallel_hypercube_sort(struct hypercube *data,struct comm *c)
 {
-  sort_data input=data->data;
+  struct sort *input=data->data;
   struct array *a=input->a;
   gs_dom t  =input->t[0];
   uint offset    =input->offset[0];

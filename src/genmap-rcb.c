@@ -32,17 +32,13 @@ void get_axis_len(double *length,struct array *a,struct comm *c,int ndim)
 
 int parRCB(struct comm *ci,struct array *a,int ndim){
   struct comm c; comm_dup(&c,ci);
-
-  uint offsets[3]={offsetof(elm_rcb,coord[0]),
-    offsetof(elm_rcb,coord[1]),offsetof(elm_rcb,coord[2])};
-
-  double length[MAXDIM];
-
   sint rank=c.id;
   sint size=c.np;
 
   if(rank == 0)
     printf("running RCB "), fflush(stdout);
+
+  double length[MAXDIM];
 
   while(size>1){
     get_axis_len(length,a,&c,ndim);
@@ -54,8 +50,19 @@ int parRCB(struct comm *ci,struct array *a,int ndim){
     for(d=0;d<ndim;d++)
       if(length[d]>length[axis2] && d!=axis1) axis2=d;
 
-    uint off=offsets[axis1];
-    parallel_sort(elm_rcb,a,off,gs_double,&c);
+    switch(axis1){
+      case 0:
+        parallel_sort(elm_rcb,a,coord[0],gs_double,0,1,&c);
+        break;
+      case 1:
+        parallel_sort(elm_rcb,a,coord[1],gs_double,0,1,&c);
+        break;
+      case 2:
+        parallel_sort(elm_rcb,a,coord[2],gs_double,0,1,&c);
+        break;
+      default:
+        break;
+    }
 
     int p=(size+1)/2;
     int bin=(rank>=p);
