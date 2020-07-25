@@ -260,13 +260,13 @@ int read_re2_mesh(Mesh *mesh_,char *fileName,struct comm *c){
   return errs;
 }
 
-int writeCo2File(exaHandle h,Mesh mesh,char *fileName){
+int write_co2_file(Mesh mesh,char *fileName,struct comm *c){
   const char version[5]="#v001";
   const float test=6.54321;
 
-  sint rank=exaRank(h);
-  sint size=exaSize(h);
-  exaExternalComm comm=exaGetExternalComm(h);
+  uint rank=c->id;
+  uint size=c->np;
+  MPI_Comm comm=c->c;
 
   int nVertex=mesh->nVertex;
   int nDim=mesh->nDim;
@@ -287,9 +287,8 @@ int writeCo2File(exaHandle h,Mesh mesh,char *fileName){
     MPI_Abort(comm,911);
   }
 
-  slong out[2][1],buff[2][1],in[1];
-  in[0]=nelt;
-  exaScan(h,out,in,buff,1,slong_t,exaAddOp);
+  slong out[2][1],buff[2][1],in=nelt;
+  comm_scan(out,c,gs_long,gs_add,&in,1,buff);
   slong start=out[0][0];
 
   int writeSize=nelt*(nVertex+1)*sizeof(int);
@@ -301,8 +300,9 @@ int writeCo2File(exaHandle h,Mesh mesh,char *fileName){
   if(rank==0){
     sprintf(buf0,"%5s%12d%12d%12d",version,(int)nelgt,\
         (int)nelgv,nVertex);
-    exaDebug(h,"%5s%12d%12d%12d\n",version,(int)nelgt,\
-        (int)nelgv,nVertex);
+#if defined(GENMAP_DEBUG)
+    printf("%5s%12d%12d%12d\n",version,(int)nelgt,(int)nelgv,nVertex);
+#endif
     memset(buf0+strlen(buf0),' ',GC_CO2_HEADER_LEN-strlen(buf0));
     buf0[GC_CO2_HEADER_LEN]='\0';
     buf0+=GC_CO2_HEADER_LEN;
@@ -314,14 +314,20 @@ int writeCo2File(exaHandle h,Mesh mesh,char *fileName){
   for(i=0;i<nelt;i++){
     temp=ptr->elementId+1;
     writeInt(buf0,temp); buf0+=sizeof(int);
-    exaDebug(h,"%lld",temp);
+#if defined(GENMAP_DEBUG)
+    printf("%lld",temp);
+#endif
     for(k=0;k<nVertex;k++){
       temp=ptr->globalId+1;
       writeInt(buf0,temp); buf0+=sizeof(int);
-      exaDebug(h," %lld",temp);
+#if defined(GENMAP_DEBUG)
+      printf("%lld",temp);
+#endif
       ptr++;
     }
-    exaDebug(h,"\n");
+#if defined(GENMAP_DEBUG)
+    printf("\n");
+#endif
   }
 
   err=MPI_File_write_ordered(file,buf,writeSize,MPI_BYTE,&st);
@@ -426,7 +432,7 @@ int read_co2_mesh(Mesh *mesh_,char *fileName,struct comm *c){
   free(buf);
 
   return 0;
-};
+}
 
 int read_co2_file(Mesh mesh,char *fileName,struct comm *c){
   comm_ext comm=c->c;
@@ -515,6 +521,7 @@ int read_co2_file(Mesh mesh,char *fileName,struct comm *c){
   free(buf);
 
   return 0;
-};
+}
+
 #undef readT
 #undef writeInt

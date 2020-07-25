@@ -38,6 +38,7 @@ int MeshFree(Mesh m);
 
 int read_re2_mesh(Mesh *mesh,char *fname,struct comm *c);
 int read_co2_file(Mesh  mesh,char *fname,struct comm *c);
+int write_co2_file(Mesh mesh,char *fname,struct comm *c);
 int read_co2_mesh(Mesh *mesh,char *fname,struct comm *c);
 
 int findMinNeighborDistance(exaHandle h,Mesh mesh);
@@ -45,6 +46,5 @@ int findSegments(exaHandle h,Mesh mesh,exaScalar tol);
 int setGlobalID(exaHandle h,Mesh mesh);
 int sendBack(exaHandle h,Mesh mesh);
 int matchPeriodicFaces(exaHandle h,Mesh mesh);
-int writeCo2File(exaHandle h,Mesh mesh,char *fileName);
 
 #endif

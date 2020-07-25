@@ -32,7 +32,7 @@ int main(int argc,char *argv[]){
   int len=strlen(co2FileName); assert(len>4);
   co2FileName[len-2]='o',co2FileName[len-3]='c';
 
-  writeCo2File(h,mesh,co2FileName);
+  write_co2_file(mesh,co2FileName,&comm);
 
   MeshFree(mesh);
 
