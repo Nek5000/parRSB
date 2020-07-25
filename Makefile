@@ -2,33 +2,41 @@ DEBUG ?= 0
 PAUL ?= 1
 CC ?= mpicc
 CFLAGS ?= -O2
+MPI ?= 1
 
-MKFILEPATH = $(abspath $(lastword $(MAKEFILE_LIST)))
-SRCROOT_ ?= $(patsubst %/,%,$(dir $(MKFILEPATH)))
-SRCROOT=$(realpath $(SRCROOT_))
+MKFILEPATH =$(abspath $(lastword $(MAKEFILE_LIST)))
+SRCROOT_  ?=$(patsubst %/,%,$(dir $(MKFILEPATH)))
+SRCROOT    =$(realpath $(SRCROOT_))
 
 GSLIBDIR=$(GSLIBPATH)
 
 SRCDIR    =$(SRCROOT)/src
 SORTDIR   =$(SRCROOT)/src/sort
+PRECONDDIR=$(SRCROOT)/src/precond
+GENCONDIR =$(SRCROOT)/src/gencon
 BUILDDIR  =$(SRCROOT)/build
-EXAMPLEDIR=$(SRCROOT)/example
+EXAMPLEDIR=$(SRCROOT)/examples
 TESTDIR   =$(SRCROOT)/tests
 
 TARGET=parRSB
 LIB=$(BUILDDIR)/lib/lib$(TARGET).a
-EXAMPLE=$(EXAMPLEDIR)/example
 
-INCFLAGS=-I$(SRCDIR) -I$(SORTDIR) -I$(GSLIBDIR)/include
+INCFLAGS=-I$(SRCDIR) -I$(SORTDIR) -I$(PRECONDDIR) -I$(GENCONDIR) -I$(GSLIBDIR)/include
 LDFLAGS:=-L$(BUILDDIR)/lib -l$(TARGET) -L $(GSLIBDIR)/lib -lgs -lm
 
-SRCS    =$(wildcard $(SRCDIR)/*.c)
-SORTSRCS=$(wildcard $(SORTDIR)/*.c)
-TESTSRCS=$(wildcard $(TESTDIR)/*.c)
+SRCS       =$(wildcard $(SRCDIR)/*.c)
+SORTSRCS   =$(wildcard $(SORTDIR)/*.c)
+PRECONDSRCS=$(wildcard $(PRECONDDIR)/*.c)
+GENCONSRCS =$(wildcard $(GENCONDIR)/*.c)
+TESTSRCS   =$(wildcard $(TESTDIR)/*.c)
+EXAMPLESRCS=$(wildcard $(EXAMPLEDIR)/*.c)
 
 SRCOBJS =$(patsubst $(SRCROOT)/%.c,$(BUILDDIR)/%.o,$(SRCS))
 SRCOBJS+=$(patsubst $(SRCROOT)/%.c,$(BUILDDIR)/%.o,$(SORTSRCS))
+SRCOBJS+=$(patsubst $(SRCROOT)/%.c,$(BUILDDIR)/%.o,$(PRECONDSRCS))
+SRCOBJS+=$(patsubst $(SRCROOT)/%.c,$(BUILDDIR)/%.o,$(GENCONSRCS))
 TESTOBJS=$(patsubst $(SRCROOT)/%.c,$(BUILDDIR)/%,$(TESTSRCS))
+EXAMPLEOBJS=$(patsubst $(SRCROOT)/%.c,$(BUILDDIR)/%,$(EXAMPLESRCS))
 
 PP=
 
@@ -40,6 +48,10 @@ ifneq ($(PAUL),0)
   PP += -DGENMAP_PAUL
 endif
 
+ifneq ($(MPI),0)
+  PP += -DMPI
+endif
+
 INSTALLDIR=
 ifneq (,$(strip $(DESTDIR)))
 	INSTALLDIR=$(realpath $(DESTDIR))
@@ -49,7 +61,7 @@ endif
 default: check lib install
 
 .PHONY: all
-all: check lib tests example install
+all: check lib tests examples install
 
 .PHONY: install
 install: lib
@@ -57,7 +69,7 @@ ifneq ($(INSTALLDIR),)
 	@mkdir -p $(INSTALLDIR)/lib 2>/dev/null
 	@cp -v $(LIB) $(INSTALLDIR)/lib 2>/dev/null
 	@mkdir -p $(INSTALLDIR)/include 2>/dev/null
-	@cp $(SRCDIR)/*.h $(SORTDIR)/*.h $(INSTALLDIR)/include 2>/dev/null
+	@cp $(SRCDIR)/*.h $(SORTDIR)/*.h $(PRECONDDIR)/*.h $(INSTALLDIR)/include 2>/dev/null
 endif
 
 .PHONY: lib
@@ -76,10 +88,10 @@ $(BUILDDIR)/src/%.o: $(SRCROOT)/src/%.c
 	$(CC) $(CFLAGS) $(PP) $(INCFLAGS) -c $< -o $@
 
 .PHONY: examples
-examples: $(EXAMPLE)
+examples: install $(EXAMPLEOBJS)
 
-$(EXAMPLE): install
-	$(CC) $(CFLAGS) -I$(GSLIBDIR)/include -I$(SRCDIR) -I$(SORTDIR) $@.c -o $@ $(LDFLAGS)
+$(BUILDDIR)/examples/%: $(SRCROOT)/examples/%.c
+	$(CC) $(CFLAGS) $(PP) $(INCFLAGS) $< -o $@ $(LDFLAGS)
 
 .PHONY: tests
 tests: install $(TESTOBJS)
@@ -87,7 +99,7 @@ tests: install $(TESTOBJS)
 	@cd $(BUILDDIR)/tests && ./run-tests.sh
 
 $(BUILDDIR)/tests/%: $(SRCROOT)/tests/%.c
-	$(CC) $(CFLAGS) -I$(GSLIBDIR)/include -I$(SRCDIR) -I$(SORTDIR) $< -o $@ $(LDFLAGS)
+	$(CC) $(CFLAGS) $(PP) $(INCFLAGS) $< -o $@ $(LDFLAGS)
 
 .PHONY: clean
 clean:
@@ -102,4 +114,7 @@ print-%:
 	@true
 
 $(shell mkdir -p $(BUILDDIR)/src/sort)
+$(shell mkdir -p $(BUILDDIR)/src/precond)
+$(shell mkdir -p $(BUILDDIR)/src/gencon)
 $(shell mkdir -p $(BUILDDIR)/tests)
+$(shell mkdir -p $(BUILDDIR)/examples)

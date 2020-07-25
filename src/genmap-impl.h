@@ -10,7 +10,8 @@
 #include <stdio.h>
 #endif
 
-#include "genmap.h"
+#include <genmap.h>
+#include <genmap-multigrid-precon.h>
 
 #define GENMAP_FIEDLER 0
 #define GENMAP_GLOBALID 1
@@ -18,10 +19,11 @@
 #define GENMAP_ORIGIN 3
 
 struct GenmapComm_private {
-  struct comm gsComm;
-  struct gs_data *verticesHandle;
-  GenmapScalar *laplacianWeights;
+  struct comm gsc;
+  struct gs_data *gsh;
+  csr_mat M;
   buffer buf;
+  GenmapScalar *b;
 };
 
 struct GenmapElement_private {
@@ -52,6 +54,7 @@ struct GenmapHandle_private {
 
   int dbgLevel;
   int printStat;
+  double time[16];
 };
 
 int GenmapCreateHandle(GenmapHandle h);
@@ -66,13 +69,27 @@ struct GenmapVector_private {
 #define GenmapCalloc(n, p) GenmapCallocArray ((n), sizeof(**(p)), p)
 #define GenmapRealloc(n, p) GenmapReallocArray((n), sizeof(**(p)), p)
 
-void GenmapFiedlerMinMax(GenmapHandle h,GenmapScalar *min,
+void GenmapFiedlerMinMax(GenmapHandle h, GenmapScalar *min,
     GenmapScalar *max);
-void GenmapGlobalIdMinMax(GenmapHandle h,GenmapLong *min,GenmapLong *max);
+void GenmapGlobalIdMinMax(GenmapHandle h, GenmapLong *min,
+    GenmapLong *max);
 GenmapInt GenmapSetFiedlerBin(GenmapHandle h);
 GenmapInt GenmapSetGlobalIdBin(GenmapHandle h);
 void GenmapAssignBins(GenmapHandle h, int field, buffer *buf0);
 void GenmapTransferToBins(GenmapHandle h, int field, buffer *buf0);
 void GenmapBinSort(GenmapHandle h, int field, buffer *buf0);
+
+#define MAXDIM 3
+typedef struct{
+  int proc;
+  int orig;
+  int seq;
+  unsigned long long id;
+  double coord[MAXDIM];
+}elm_rcb;
+
+int parRCB(struct comm *ci,struct array *a,int ndim);
+void rcb_local(struct array *a,uint start,uint end,
+    int ndim,buffer *buf);
 
 #endif

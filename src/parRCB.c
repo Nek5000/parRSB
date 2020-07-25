@@ -4,19 +4,20 @@
 #include <time.h>
 
 #include <sort.h>
+#include <genmap-impl.h>
 #include <parRSB.h>
 
-void fparRCB_partMesh(int *part,double *vtx,int *nel,int *nv,
+void fparRCB_partMesh(int *part,int *seq,double *vtx,int *nel,int *nv,
   int *options,int *comm,int *err)
 {
   *err = 1;
 
   comm_ext c; c = MPI_Comm_f2c(*comm);
-  *err=parRCB_partMesh(part,vtx,*nel,*nv,options,c);
+  *err=parRCB_partMesh(part,seq,vtx,*nel,*nv,options,c);
 }
 
 // vtx = [nel,nv,ndim]
-int parRCB_partMesh(int *part,double *vtx,int nel,int nv,
+int parRCB_partMesh(int *part,int *seq,double *vtx,int nel,int nv,
   int *options,MPI_Comm comm)
 {
   struct comm c; comm_init(&c,comm);
@@ -35,7 +36,6 @@ int parRCB_partMesh(int *part,double *vtx,int nel,int nv,
   int ndim=(nv==8)?3:2;
 
   int e,n,v;
-
   for(e=0;e<nel;++e){
     data[e].id=nelg_start+(e+1);
     data[e].orig=rank;
@@ -45,7 +45,7 @@ int parRCB_partMesh(int *part,double *vtx,int nel,int nv,
         data[e].coord[n]+=vtx[e*ndim*nv+v*ndim+n];
     }
     for(n=0;n<ndim;n++)
-      data[e].coord[n]/=8;
+      data[e].coord[n]/=nv;
   }
   a.n=nel;
 
@@ -65,6 +65,17 @@ int parRCB_partMesh(int *part,double *vtx,int nel,int nv,
     double time=comm_time();
 
     parRCB(&rcb,&a,ndim);
+
+    // do local rcb
+    buffer bfr; buffer_init(&bfr,1024);
+    uint s1=0,e1=a.n;
+    rcb_local(&a,s1,e1,ndim,&bfr);
+    buffer_free(&bfr);
+
+    elm_rcb *ptr=a.ptr;
+    int i;
+    for(i=0; i<a.n; i++)
+      ptr[i].seq=i;
 
     comm_barrier(&rcb);
     time=comm_time()-time;
@@ -89,7 +100,10 @@ int parRCB_partMesh(int *part,double *vtx,int nel,int nv,
   buffer_free(&b);
 
   data=a.ptr;
-  for(int e=0;e<nel;e++) part[e]=data[e].orig;
+  for(e=0;e<nel;e++){
+    part[e]=data[e].orig;
+    seq [e]=data[e].seq ;
+  }
 
   return 0;
 }
