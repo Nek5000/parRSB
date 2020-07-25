@@ -21,11 +21,11 @@ int transferBoundaryFaces(Mesh mesh,struct comm *c){
   BoundaryFace ptr=exaArrayGetPointer(mesh->boundary);
   int nFaces=exaArrayGetSize(mesh->boundary);
 
-  exaLong nelgt=mesh->nelgt;
-  exaInt nelt=nelgt/size,nrem=nelgt-nelt*size;
-  exaLong N=nrem*(nelt+1);
+  slong nelgt=mesh->nelgt;
+  sint nelt=nelgt/size,nrem=nelgt-nelt*size;
+  slong N=nrem*(nelt+1);
 
-  exaInt i; exaLong eid;
+  sint i; slong eid;
   for(i=0;i<nFaces;i++,ptr++){
     eid=ptr->elementId;
     if(N==0) ptr->proc=eid/nelt;
@@ -206,7 +206,7 @@ int readRe2Boundaries(Mesh mesh,MPI_File file,struct comm *c){
   double tmp[5];
   char cbc[4];
   struct Boundary_private boundary;
-  exaInt i;
+  sint i;
   for(i=0;i<nbcsLocal;i++){
     readT(tmp,buf0,long,1);buf0+=sizeof(long);
     boundary.elementId=tmp[0]-1;
@@ -264,15 +264,15 @@ int writeCo2File(exaHandle h,Mesh mesh,char *fileName){
   const char version[5]="#v001";
   const float test=6.54321;
 
-  exaInt rank=exaRank(h);
-  exaInt size=exaSize(h);
+  sint rank=exaRank(h);
+  sint size=exaSize(h);
   exaExternalComm comm=exaGetExternalComm(h);
 
   int nVertex=mesh->nVertex;
   int nDim=mesh->nDim;
-  exaInt nelt=mesh->nelt;
-  exaLong nelgt=mesh->nelgt;
-  exaLong nelgv=mesh->nelgv;
+  sint nelt=mesh->nelt;
+  slong nelgt=mesh->nelgt;
+  slong nelgv=mesh->nelgv;
 
   int errs=0;
 
@@ -287,10 +287,10 @@ int writeCo2File(exaHandle h,Mesh mesh,char *fileName){
     MPI_Abort(comm,911);
   }
 
-  exaLong out[2][1],buff[2][1],in[1];
+  slong out[2][1],buff[2][1],in[1];
   in[0]=nelt;
-  exaScan(h,out,in,buff,1,exaLong_t,exaAddOp);
-  exaLong start=out[0][0];
+  exaScan(h,out,in,buff,1,slong_t,exaAddOp);
+  slong start=out[0][0];
 
   int writeSize=nelt*(nVertex+1)*sizeof(int);
   int headerSize=GC_CO2_HEADER_LEN+sizeof(float);
