@@ -14,9 +14,9 @@ int main(int argc,char *argv[]){
 
   exaHandle h; exaInit(&h,MPI_COMM_WORLD,"/host");
 
-  if(argc>6){
+  if(argc>5){
     if(rank==0)
-      printf("Usage: ./%s <re2 file> <co2 file> 1 2 3 \n",argv[0]);
+      printf("Usage: ./%s <re2 file> <co2 file> global local\n",argv[0]);
     MPI_Finalize();
     exit(1);
   }
@@ -27,16 +27,8 @@ int main(int argc,char *argv[]){
 
   GenmapInt i,j;
 
-  int seq_g=(argc>3)?atoi(argv[3]):1;
-  int rcb_g=(argc>4)?atoi(argv[4]):1;
-  int rcb_l=(argc>5)?atoi(argv[5]):0;
-
-  if(seq_g){
-    exaSort(mesh->elements,
-      exaULong_t,offsetof(struct Point_private,sequenceId),
-      exaSortAlgoBinSort,1,exaGetComm(h));
-    mesh->nelt=exaArrayGetSize(mesh->elements)/mesh->nVertex;
-  }
+  int rcb_g=(argc>3)?atoi(argv[3]):1;
+  int rcb_l=(argc>4)?atoi(argv[4]):1;
 
   //partition
   int      *part; GenmapMalloc(mesh->nelt              ,&part  );
@@ -44,7 +36,6 @@ int main(int argc,char *argv[]){
   double *coords; GenmapMalloc(mesh->nelt*mesh->nDim   ,&coords);
 
   int nDim=mesh->nDim;
-
   Point me=(Point)MeshGetElements(mesh);
 
   if(rcb_g){
@@ -100,10 +91,6 @@ int main(int argc,char *argv[]){
       ptr[i].coord[1]/=mesh->nVertex;
       if(nDim==3)
         ptr[i].coord[2]/=mesh->nVertex;
-#if 0
-      printf("centroid: %lf %lf %lf\n",\
-          ptr[i].coord[0],ptr[i].coord[1],ptr[i].coord[2]);
-#endif
     }
 
     buffer buf; buffer_init(&buf,1024);
@@ -111,13 +98,7 @@ int main(int argc,char *argv[]){
     rcb_local(&a,s1,e1,mesh->nDim,&buf);
     ptr=a.ptr;
 
-    for(i=0; i<mesh->nelt; i++){
-      ptr[i].proc=i;
-#if 0
-      printf("i=%d %lf %lf %lf\n",i,ptr[i].coord[0],\
-          ptr[i].coord[1],ptr[i].coord[2]);
-#endif
-    }
+    for(i=0; i<mesh->nelt; i++) ptr[i].proc=i;
 
     sarray_sort(elm_rcb,a.ptr,a.n,orig,0,&buf);
     ptr=a.ptr;
@@ -163,15 +144,8 @@ int main(int argc,char *argv[]){
 
   srand(time(0));
   for(i=0; i<mesh->nelt; i++){
-#if 0
-    x->data[i]=me[i*mesh->nVertex].elementId;
-    printf(" %lf",x->data[i]);
-#else
     x->data[i]=rand()%100/50.;
-#endif
   }
-
-  //csr_mat_print(c->M,&c->gsc);
 
   GenmapLong nelg=GenmapGetNGlobalElements(gh);
   GenmapOrthogonalizebyOneVector(gh,c,x,nelg);
