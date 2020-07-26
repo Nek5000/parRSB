@@ -37,10 +37,10 @@ int rqi(GenmapHandle h,GenmapComm c,GenmapVector z,int iter,int verbose,
     normi=1.0/sqrt(norm);
 
     GenmapAxpbyVector(z,z,0.0,y,normi);
-    ortho_one_vector(h,c,z,nelg);
+    GenmapOrthogonalizebyOneVector(h,c,z,nelg);
 
     project_pf(h,c,d,z,30,0,y);
-    ortho_one_vector(h,c,y,nelg);
+    GenmapOrthogonalizebyOneVector(h,c,y,nelg);
 
     lambda=GenmapDotVector(y,z);
     GenmapGop(c,&lambda,1,GENMAP_SCALAR,GENMAP_SUM);

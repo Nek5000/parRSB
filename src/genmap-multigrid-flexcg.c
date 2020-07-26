@@ -4,25 +4,6 @@
 #include <math.h>
 #include <stdio.h>
 
-/* Orthogonalize by 1-vector (vector of all 1's) */
-int ortho_one_vector(GenmapHandle h,GenmapComm c,GenmapVector q1,
-  GenmapLong n)
-{
-  GenmapInt i;
-  GenmapScalar sum = 0.0;
-  for(i = 0;  i < q1->size; i++){
-    sum += q1->data[i];
-  }
-
-  GenmapGop(c, &sum, 1, GENMAP_SCALAR, GENMAP_SUM);
-  sum /= n;
-  for(i = 0;  i < q1->size; i++) {
-    q1->data[i] -= sum;
-  }
-
-  return 0;
-}
-
 int flex_cg(GenmapHandle h,GenmapComm c,mgData d,GenmapVector ri,
   int maxIter,int verbose,GenmapVector x)
 {

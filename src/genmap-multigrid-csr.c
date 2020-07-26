@@ -1,6 +1,5 @@
 #include <genmap-impl.h>
 #include <genmap-multigrid-precon.h>
-#include <exa.h>
 
 #define ABS(i) ((i<0)?-i:i)
 
@@ -95,7 +94,7 @@ void csr_mat_gather(csr_mat M,struct gs_data *gsh,GenmapScalar *x,
       if(M->col[j]==s+i) buf[j]=x[i];
       else buf[j]=0.0;
 
-#if defined(EXA_DEBUG)
+#if defined(GENMAP_DEBUG)
   printf("buf(before): ");
   for(i=0;i<M->row_off[rn];i++)
     printf("%lf ",buf[i]);
@@ -104,7 +103,7 @@ void csr_mat_gather(csr_mat M,struct gs_data *gsh,GenmapScalar *x,
 
   gs(buf,genmap_gs_scalar,gs_add,0,gsh,bfr);
 
-#if defined(EXA_DEBUG)
+#if defined(GENMAP_DEBUG)
   printf("buf(after): ");
   for(i=0;i<M->row_off[rn];i++)
     printf("%lf ",buf[i]);
