@@ -163,7 +163,7 @@ void GenmapRSB(GenmapHandle h) {
   if(GenmapCommRank(GenmapGetGlobalComm(h)) == 0 && h->dbgLevel > 0)
     printf("running RSB "), fflush(stdout);
 
-  crystal_init(&(h->cr), &(h->local->gsComm));
+  crystal_init(&(h->cr), &(h->local->gsc));
   buffer buf0 = null_buffer;
 
   while(GenmapCommSize(GenmapGetLocalComm(h)) > 1) {
@@ -204,7 +204,7 @@ void GenmapRSB(GenmapHandle h) {
         fflush(stdout);
       }
     }
-    MPI_Barrier(GenmapGetGlobalComm(h)->gsComm.c);
+    MPI_Barrier(GenmapGetGlobalComm(h)->gsc.c);
     if(GenmapCommRank(GenmapGetGlobalComm(h)) == 1) {
       for(int i = 0; i < GenmapGetNLocalElements(h); i++) {
         printf("\nglobalId="GenmapLongFormat",Fiedler(%d):"GenmapScalarFormat,

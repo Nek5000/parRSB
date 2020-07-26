@@ -3,14 +3,15 @@ PAUL ?= 1
 CC ?= mpicc
 CFLAGS ?= -O2
 
-MKFILEPATH = $(abspath $(lastword $(MAKEFILE_LIST)))
-SRCROOT_ ?= $(patsubst %/,%,$(dir $(MKFILEPATH)))
-SRCROOT=$(realpath $(SRCROOT_))
+MKFILEPATH =$(abspath $(lastword $(MAKEFILE_LIST)))
+SRCROOT_  ?=$(patsubst %/,%,$(dir $(MKFILEPATH)))
+SRCROOT    =$(realpath $(SRCROOT_))
 
 GSLIBDIR=$(GSLIBPATH)
 
 SRCDIR    =$(SRCROOT)/src
 SORTDIR   =$(SRCROOT)/src/sort
+PRECONDDIR=$(SRCROOT)/src/precond
 BUILDDIR  =$(SRCROOT)/build
 EXAMPLEDIR=$(SRCROOT)/example
 TESTDIR   =$(SRCROOT)/tests
@@ -19,15 +20,17 @@ TARGET=parRSB
 LIB=$(BUILDDIR)/lib/lib$(TARGET).a
 EXAMPLE=$(EXAMPLEDIR)/example
 
-INCFLAGS=-I$(SRCDIR) -I$(SORTDIR) -I$(GSLIBDIR)/include
+INCFLAGS=-I$(SRCDIR) -I$(SORTDIR) -I$(PRECONDDIR) -I$(GSLIBDIR)/include
 LDFLAGS:=-L$(BUILDDIR)/lib -l$(TARGET) -L $(GSLIBDIR)/lib -lgs -lm
 
-SRCS    =$(wildcard $(SRCDIR)/*.c)
-SORTSRCS=$(wildcard $(SORTDIR)/*.c)
-TESTSRCS=$(wildcard $(TESTDIR)/*.c)
+SRCS       =$(wildcard $(SRCDIR)/*.c)
+SORTSRCS   =$(wildcard $(SORTDIR)/*.c)
+PRECONDSRCS=$(wildcard $(PRECONDDIR)/*.c)
+TESTSRCS   =$(wildcard $(TESTDIR)/*.c)
 
 SRCOBJS =$(patsubst $(SRCROOT)/%.c,$(BUILDDIR)/%.o,$(SRCS))
 SRCOBJS+=$(patsubst $(SRCROOT)/%.c,$(BUILDDIR)/%.o,$(SORTSRCS))
+SRCOBJS+=$(patsubst $(SRCROOT)/%.c,$(BUILDDIR)/%.o,$(PRECONDSRCS))
 TESTOBJS=$(patsubst $(SRCROOT)/%.c,$(BUILDDIR)/%,$(TESTSRCS))
 
 PP=
@@ -57,7 +60,7 @@ ifneq ($(INSTALLDIR),)
 	@mkdir -p $(INSTALLDIR)/lib 2>/dev/null
 	@cp -v $(LIB) $(INSTALLDIR)/lib 2>/dev/null
 	@mkdir -p $(INSTALLDIR)/include 2>/dev/null
-	@cp $(SRCDIR)/*.h $(SORTDIR)/*.h $(INSTALLDIR)/include 2>/dev/null
+	@cp $(SRCDIR)/*.h $(SORTDIR)/*.h $(PRECONDDIR)/*.h $(INSTALLDIR)/include 2>/dev/null
 endif
 
 .PHONY: lib
@@ -79,7 +82,7 @@ $(BUILDDIR)/src/%.o: $(SRCROOT)/src/%.c
 examples: $(EXAMPLE)
 
 $(EXAMPLE): install
-	$(CC) $(CFLAGS) -I$(GSLIBDIR)/include -I$(SRCDIR) -I$(SORTDIR) $@.c -o $@ $(LDFLAGS)
+	$(CC) $(CFLAGS) $(INCFLAGS) $@.c -o $@ $(LDFLAGS)
 
 .PHONY: tests
 tests: install $(TESTOBJS)
@@ -87,7 +90,7 @@ tests: install $(TESTOBJS)
 	@cd $(BUILDDIR)/tests && ./run-tests.sh
 
 $(BUILDDIR)/tests/%: $(SRCROOT)/tests/%.c
-	$(CC) $(CFLAGS) -I$(GSLIBDIR)/include -I$(SRCDIR) -I$(SORTDIR) $< -o $@ $(LDFLAGS)
+	$(CC) $(CFLAGS) $(INCFLAGS) $< -o $@ $(LDFLAGS)
 
 .PHONY: clean
 clean:
@@ -102,4 +105,5 @@ print-%:
 	@true
 
 $(shell mkdir -p $(BUILDDIR)/src/sort)
+$(shell mkdir -p $(BUILDDIR)/src/precond)
 $(shell mkdir -p $(BUILDDIR)/tests)
