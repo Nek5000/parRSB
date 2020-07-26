@@ -12,6 +12,7 @@ GSLIBDIR=$(GSLIBPATH)
 SRCDIR    =$(SRCROOT)/src
 SORTDIR   =$(SRCROOT)/src/sort
 PRECONDDIR=$(SRCROOT)/src/precond
+GENCONDIR =$(SRCROOT)/src/gencon
 BUILDDIR  =$(SRCROOT)/build
 EXAMPLEDIR=$(SRCROOT)/example
 TESTDIR   =$(SRCROOT)/tests
@@ -20,17 +21,19 @@ TARGET=parRSB
 LIB=$(BUILDDIR)/lib/lib$(TARGET).a
 EXAMPLE=$(EXAMPLEDIR)/example
 
-INCFLAGS=-I$(SRCDIR) -I$(SORTDIR) -I$(PRECONDDIR) -I$(GSLIBDIR)/include
+INCFLAGS=-I$(SRCDIR) -I$(SORTDIR) -I$(PRECONDDIR) -I$(GENCONDIR) -I$(GSLIBDIR)/include
 LDFLAGS:=-L$(BUILDDIR)/lib -l$(TARGET) -L $(GSLIBDIR)/lib -lgs -lm
 
 SRCS       =$(wildcard $(SRCDIR)/*.c)
 SORTSRCS   =$(wildcard $(SORTDIR)/*.c)
 PRECONDSRCS=$(wildcard $(PRECONDDIR)/*.c)
+GENCONSRCS =$(wildcard $(GENCONDIR)/*.c)
 TESTSRCS   =$(wildcard $(TESTDIR)/*.c)
 
 SRCOBJS =$(patsubst $(SRCROOT)/%.c,$(BUILDDIR)/%.o,$(SRCS))
 SRCOBJS+=$(patsubst $(SRCROOT)/%.c,$(BUILDDIR)/%.o,$(SORTSRCS))
 SRCOBJS+=$(patsubst $(SRCROOT)/%.c,$(BUILDDIR)/%.o,$(PRECONDSRCS))
+SRCOBJS+=$(patsubst $(SRCROOT)/%.c,$(BUILDDIR)/%.o,$(GENCONSRCS))
 TESTOBJS=$(patsubst $(SRCROOT)/%.c,$(BUILDDIR)/%,$(TESTSRCS))
 
 PP=
@@ -106,4 +109,5 @@ print-%:
 
 $(shell mkdir -p $(BUILDDIR)/src/sort)
 $(shell mkdir -p $(BUILDDIR)/src/precond)
+$(shell mkdir -p $(BUILDDIR)/src/gencon)
 $(shell mkdir -p $(BUILDDIR)/tests)

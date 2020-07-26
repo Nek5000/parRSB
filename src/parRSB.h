@@ -22,9 +22,10 @@ typedef struct {
 void fparRCB_partMesh(int *part,double *vtx,int *nel,int *nv,
   int *options,int *comm,int *err);
 
-int parRCB(struct comm *ci,struct array *a,int ndim);
-
 int parRCB_partMesh(int *part,double *vtx,int nel,int nv,
   int *options,MPI_Comm comm);
 
+int parRCB(struct comm *ci,struct array *a,int ndim);
+
+void rcb_local(struct array *a,uint start,uint end,int ndim,buffer *buf);
 #endif

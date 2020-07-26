@@ -45,7 +45,7 @@ int parRCB_partMesh(int *part,double *vtx,int nel,int nv,
         data[e].coord[n]+=vtx[e*ndim*nv+v*ndim+n];
     }
     for(n=0;n<ndim;n++)
-      data[e].coord[n]/=8;
+      data[e].coord[n]/=nv;
   }
   a.n=nel;
 
