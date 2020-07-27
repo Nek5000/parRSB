@@ -51,23 +51,9 @@ int GenmapInitLaplacianWeighted(GenmapHandle h, GenmapComm c, GenmapVector weigh
     }
   }
 
-#if defined(GENMAP_LANCZOS)
   for(i = 0; i < lelt; i++) {
     weights->data[i] *= -1;
   }
-#else
-  GenmapScalar max=0.;
-  for(i = 0; i < lelt; i++) {
-    if(weights->data[i]>max)
-      max=weights->data[i];
-  }
-
-  GenmapGop(c,&max,1,GENMAP_SCALAR,GENMAP_MAX);
-
-  for(int i=0;i<lelt;i++){
-    weights->data[i]=2*max-weights->data[i];
-  }
-#endif
 
   GenmapFree(u);
   GenmapFree(vertices);
