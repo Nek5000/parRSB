@@ -37,6 +37,8 @@ int GenmapFiedlerRQI(GenmapHandle h,GenmapComm c,int maxIter,int global)
   GenmapScalar rni=1.0/sqrt(rtr);
   GenmapScaleVector(initVec,initVec,rni);
  
+  GenmapInitLaplacian(h,c);
+
   GenmapVector y; GenmapCreateZerosVector(&y,lelt);
   rqi(h,c,initVec,maxIter,0,y);
 
