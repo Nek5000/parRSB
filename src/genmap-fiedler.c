@@ -4,8 +4,59 @@
 #include <limits.h>
 
 #include <genmap-impl.h>
+//
+//TODO: use a separate function to generate init vector
+//
+int GenmapFiedlerRQI(GenmapHandle h,GenmapComm c,int maxIter,int global)
+{
+  GenmapInt lelt = GenmapGetNLocalElements(h);
+  GenmapVector initVec; GenmapCreateVector(&initVec,lelt);
 
-int GenmapFiedler(GenmapHandle h, GenmapComm c, int maxIter, int global){
+  GenmapElements elements = GenmapGetElements(h);
+
+  GenmapInt i;
+  if(global>0){
+#if defined(GENMAP_PAUL)
+    for(i = 0;  i < lelt; i++) {
+      initVec->data[i] = GenmapGetLocalStartIndex(h) + i + 1;
+    }
+#else
+    for(i = 0;  i < lelt; i++) {
+      initVec->data[i] = (GenmapScalar) elements[i].globalId;
+    }
+#endif
+  }else{
+    for(i = 0;  i < lelt; i++) {
+      initVec->data[i] = elements[i].fiedler;
+    }
+  }
+
+  GenmapOrthogonalizebyOneVector(h,c,initVec,GenmapGetNGlobalElements(h));
+  GenmapScalar rtr=GenmapDotVector(initVec,initVec);
+  GenmapGop(c,&rtr,1,GENMAP_SCALAR,GENMAP_SUM);
+  GenmapScalar rni=1.0/sqrt(rtr);
+  GenmapScaleVector(initVec,initVec,rni);
+ 
+  GenmapVector y; GenmapCreateZerosVector(&y,lelt);
+  rqi(h,c,initVec,maxIter,0,y);
+
+  GenmapScalar lNorm = 0;
+  for(i = 0; i < lelt; i++)
+    lNorm+=y->data[i]*y->data[i];
+  GenmapGop(c,&lNorm,1,GENMAP_SCALAR,GENMAP_SUM);
+
+  GenmapScaleVector(y,y,1./sqrt(lNorm));
+  for(i = 0; i < lelt; i++)
+    elements[i].fiedler=y->data[i];
+
+  GenmapDestroyVector(y);
+
+  return 0;
+}
+
+int GenmapFiedlerLanczos(GenmapHandle h,GenmapComm c,int maxIter,
+  int global)
+{
   GenmapInt lelt = GenmapGetNLocalElements(h);
   GenmapVector initVec, alphaVec, betaVec;
 
@@ -35,21 +86,23 @@ int GenmapFiedler(GenmapHandle h, GenmapComm c, int maxIter, int global){
   }
 #endif
 
-  GenmapCreateVector(&alphaVec, maxIter);
-  GenmapCreateVector(&betaVec, maxIter - 1);
+  GenmapCreateVector(&alphaVec,maxIter);
+  GenmapCreateVector(&betaVec,maxIter-1);
   GenmapVector *q = NULL;
 
-  GenmapOrthogonalizebyOneVector(h, c, initVec, GenmapGetNGlobalElements(h));
+  GenmapOrthogonalizebyOneVector(h,c,initVec,GenmapGetNGlobalElements(h));
   GenmapScalar rtr = GenmapDotVector(initVec, initVec);
   GenmapGop(c, &rtr, 1, GENMAP_SCALAR, GENMAP_SUM);
   GenmapScalar rni = 1.0 / sqrt(rtr);
   GenmapScaleVector(initVec, initVec, rni);
+
 #if defined(GENMAP_PAUL)
-  int iter = GenmapLanczosLegendary(h, c, initVec, maxIter, &q, alphaVec,
-                                    betaVec);
+  int iter=GenmapLanczosLegendary(h,c,initVec,maxIter,&q,
+    alphaVec,betaVec);
 #else
-  int iter = GenmapLanczos(h, c, initVec, maxIter, &q, alphaVec, betaVec);
+  int iter=GenmapLanczos(h,c,initVec,maxIter,&q,alphaVec,betaVec);
 #endif
+
   GenmapVector evLanczos, evTriDiag;
   GenmapCreateVector(&evTriDiag, iter);
 

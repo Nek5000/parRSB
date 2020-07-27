@@ -4,8 +4,9 @@
 #include <stdio.h>
 
 /* Orthogonalize by 1-vector (vector of all 1's) */
-int GenmapOrthogonalizebyOneVector(GenmapHandle h, GenmapComm c,
-                                   GenmapVector q1, GenmapLong n) {
+int GenmapOrthogonalizebyOneVector(GenmapHandle h,GenmapComm c,
+  GenmapVector q1, GenmapLong n)
+{
   GenmapInt i;
   GenmapScalar sum = 0.0;
   for(i = 0;  i < q1->size; i++) {
@@ -21,9 +22,9 @@ int GenmapOrthogonalizebyOneVector(GenmapHandle h, GenmapComm c,
   return 0;
 }
 
-int GenmapLanczosLegendary(GenmapHandle h, GenmapComm c, GenmapVector f,
-                           GenmapInt niter, GenmapVector **rr, GenmapVector diag,
-                           GenmapVector upper) {
+int GenmapLanczosLegendary(GenmapHandle h,GenmapComm c,GenmapVector f,
+  GenmapInt niter,GenmapVector **rr,GenmapVector diag,GenmapVector upper)
+{
   assert(diag->size == niter);
   assert(diag->size == upper->size + 1);
   assert(f->size == GenmapGetNLocalElements(h));
@@ -105,13 +106,8 @@ int GenmapLanczosLegendary(GenmapHandle h, GenmapComm c, GenmapVector f,
       diag->data[iter] = (beta * beta * pap_old + pap) / rtz1;
       upper->data[iter - 1] = -beta * pap_old / sqrt(rtz2 * rtz1);
     }
-#if defined(GENMAP_DEBUG)
-    if(GenmapCommRank(GenmapGetGlobalComm(h)) == 0) {
-      printf("diag[%d]="GenmapScalarFormat"\n", iter + 1, diag->data[iter]);
-    }
-#endif
 
-    if(rnorm < rtol)  {
+    if(rnorm < rtol){
       diag->size = iter + 1;
       upper->size = iter;
       iter = iter + 1;

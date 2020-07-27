@@ -5,7 +5,7 @@
 
 #include <genmap-impl.h>
 
-void GenmapRSB(GenmapHandle h){
+void GenmapRSB(GenmapHandle h,int verbose){
   int maxIter=50;
   int npass  =50;
 
@@ -23,6 +23,9 @@ void GenmapRSB(GenmapHandle h){
   crystal_init(&(h->cr), &(h->local->gsc));
   buffer buf0 = null_buffer;
 
+  int rank=GenmapCommRank(GenmapGetGlobalComm(h));
+  int level=0;
+
   while(GenmapCommSize(GenmapGetLocalComm(h)) > 1) {
     if(GenmapCommRank(GenmapGetGlobalComm(h)) == 0
         && h->dbgLevel > 1) printf("."), fflush(stdout);
@@ -36,20 +39,33 @@ void GenmapRSB(GenmapHandle h){
     int global=(np==GenmapCommSize(GenmapGetGlobalComm(h)));
 #endif
 
-    int ipass = 0;
+    int ntot=0,ipass=0;
     int iter;
     do {
-      iter=GenmapFiedler(h,local_c,maxIter,global);
-      ipass++;
-      global = 0;
-    } while(ipass < npass && iter == maxIter);
+      //iter=GenmapFiedlerLanczos(h,local_c,maxIter,global);
+      iter=GenmapFiedlerRQI(h,local_c,maxIter,global);
+      ntot+=iter;
+      global=0;
+    }while(++ipass < npass && iter==maxIter);
+
+    int min,max,sum,buf[1];
+    min=ntot;
+    comm_allreduce(&local_c->gsc,gs_int,gs_min,&min,1,buf); // min
+    max=ntot;
+    comm_allreduce(&local_c->gsc,gs_int,gs_max,&max,1,buf); // max
+    sum=ntot;
+    comm_allreduce(&local_c->gsc,gs_int,gs_add,&sum,1,buf); // sum
+
+    if(rank==0 && verbose)
+      printf("level=%02d, iter: min=%d max=%d avg=%d\n",
+        level,min,max,sum/np);
 
     GenmapBinSort(h, GENMAP_FIEDLER, &buf0);
 
-    int bin;
     GenmapInt id=GenmapCommRank(local_c);
-    if(id < (np + 1) / 2) bin = 0;
-    else bin = 1;
+    int bin;
+    if(id<(np+1)/2) bin=0;
+    else bin=1;
 
     GenmapSplitComm(h,&local_c,bin);
     GenmapSetLocalComm(h,local_c);
@@ -57,6 +73,8 @@ void GenmapRSB(GenmapHandle h){
 #if defined(GENMAP_PAUL)
     GenmapBinSort(h,GENMAP_GLOBALID,&buf0);
 #endif
+
+    level++;
   }
 
   crystal_free(&(h->cr));

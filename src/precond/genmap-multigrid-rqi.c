@@ -6,7 +6,7 @@
 
 //input r should have zero-sum
 int rqi(GenmapHandle h,GenmapComm c,GenmapVector z,int iter,int verbose,
-    GenmapVector y)
+  GenmapVector y)
 {
   assert(z->size==y->size);
 
@@ -20,18 +20,18 @@ int rqi(GenmapHandle h,GenmapComm c,GenmapVector z,int iter,int verbose,
 
   project_pf(h,c,d,z,30,0,y);
 
-  norm=GenmapDotVector(y,y);
-  GenmapGop(c,&norm,1,GENMAP_SCALAR,GENMAP_SUM);
-  if(rank==0 && verbose)
-    printf("norm(y): %lf\n",sqrt(norm));
-
   lambda=GenmapDotVector(y,z);
   GenmapGop(c,&lambda,1,GENMAP_SCALAR,GENMAP_SUM);
-  if(rank==0 && verbose)
-    printf("lambda: %lf\n",lambda);
+
+  GenmapAxpbyVector(err,y,1.0,z,-lambda);
+  norm=GenmapDotVector(err,err);
+  GenmapGop(c,&norm,1,GENMAP_SCALAR,GENMAP_SUM);
+
+  double eps=1e-5;
+  GenmapScalar rnorm=norm*eps;
 
   uint i;
-  for(i=0; i<iter; i++){
+  for(i=0; i<iter && norm>rnorm; i++){
     norm=GenmapDotVector(y,y);
     GenmapGop(c,&norm,1,GENMAP_SCALAR,GENMAP_SUM);
     normi=1.0/sqrt(norm);
