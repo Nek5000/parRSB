@@ -28,14 +28,11 @@ int project_pf(GenmapHandle h,GenmapComm c,mgData d,GenmapVector ri,
   GenmapCalloc(lelt*MM,&P);
   GenmapCalloc(lelt*MM,&W);
 
-#define PREC 1
 #define ORTH 1
 
   int rank=GenmapCommRank(c);
 
-#if PREC
   if(rank==0 && verbose) printf("Using MG Prec.\n");
-#endif
 #if ORTH
   if(rank==0 && verbose) printf("Using Orthogonalization.\n");
 #endif
@@ -44,11 +41,11 @@ int project_pf(GenmapHandle h,GenmapComm c,mgData d,GenmapVector ri,
   for(i=0; i<lelt; i++)
     x->data[i]=0.0,r->data[i]=ri->data[i];
 
-#if PREC
+  comm_barrier(&c->gsc);
+  h->time[7]-=comm_time();
   mg_vcycle(z->data,r->data,d);
-#else
-  GenmapCopyVector(z,r);
-#endif
+  comm_barrier(&c->gsc);
+  h->time[7]+=comm_time();
 #if ORTH
   GenmapOrthogonalizebyOneVector(h,c,z,nelg);
 #endif
@@ -63,7 +60,7 @@ int project_pf(GenmapHandle h,GenmapComm c,mgData d,GenmapVector ri,
   GenmapCopyVector(p,z);
 
   i=0; uint j,k;
-  while(i<maxIter && sqrt(rz1)>GENMAP_TOL){
+  while(i<maxIter && sqrt(rz1)>1e-5){
     GenmapLaplacian(h,c,p,w);
     den=GenmapDotVector(p,w);
     GenmapGop(c,&den,1,GENMAP_SCALAR,GENMAP_SUM);
@@ -79,11 +76,13 @@ int project_pf(GenmapHandle h,GenmapComm c,mgData d,GenmapVector ri,
     GenmapAxpbyVector(r,r,1.0,w,-alpha);
 
     GenmapCopyVector(z0,z);
-#if PREC
+
+    comm_barrier(&c->gsc);
+    h->time[7]-=comm_time();
     mg_vcycle(z->data,r->data,d);
-#else
-    GenmapCopyVector(z,r);
-#endif
+    comm_barrier(&c->gsc);
+    h->time[7]+=comm_time();
+
 #if ORTH
     GenmapOrthogonalizebyOneVector(h,c,z,nelg);
 #endif

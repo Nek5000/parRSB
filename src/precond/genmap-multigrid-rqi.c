@@ -14,11 +14,21 @@ int rqi(GenmapHandle h,GenmapComm c,GenmapVector z,int iter,int verbose,
   GenmapLong nelg=GenmapGetNGlobalElements(h);
 
   GenmapVector err; GenmapCreateVector(&err,z->size);
+
+  comm_barrier(&c->gsc);
+  h->time[4]-=comm_time();
   mgData d; mgSetup(c,c->M,&d);
+  comm_barrier(&c->gsc);
+  h->time[4]+=comm_time();
 
   int rank=GenmapCommRank(c);
+  int projecti;
 
-  project_pf(h,c,d,z,30,0,y);
+  comm_barrier(&c->gsc);
+  h->time[5]-=comm_time();
+  h->time[6]+=project_pf(h,c,d,z,30,0,y);
+  comm_barrier(&c->gsc);
+  h->time[5]+=comm_time();
 
   lambda=GenmapDotVector(y,z);
   GenmapGop(c,&lambda,1,GENMAP_SCALAR,GENMAP_SUM);
@@ -39,7 +49,12 @@ int rqi(GenmapHandle h,GenmapComm c,GenmapVector z,int iter,int verbose,
     GenmapAxpbyVector(z,z,0.0,y,normi);
     GenmapOrthogonalizebyOneVector(h,c,z,nelg);
 
-    project_pf(h,c,d,z,30,0,y);
+    comm_barrier(&c->gsc);
+    h->time[5]-=comm_time();
+    h->time[6]+=project_pf(h,c,d,z,30,0,y);
+    comm_barrier(&c->gsc);
+    h->time[5]+=comm_time();
+
     GenmapOrthogonalizebyOneVector(h,c,y,nelg);
 
     lambda=GenmapDotVector(y,z);

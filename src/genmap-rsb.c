@@ -26,10 +26,7 @@ void GenmapRSB(GenmapHandle h,int verbose){
   int rank=GenmapCommRank(GenmapGetGlobalComm(h));
   int level=0;
 
-  while(GenmapCommSize(GenmapGetLocalComm(h)) > 1) {
-    if(GenmapCommRank(GenmapGetGlobalComm(h)) == 0
-        && h->dbgLevel > 1) printf("."), fflush(stdout);
-
+  while(GenmapCommSize(GenmapGetLocalComm(h)) > 1){
     GenmapComm local_c=GenmapGetLocalComm(h);
     GenmapInt np=GenmapCommSize(local_c);
 
@@ -39,26 +36,43 @@ void GenmapRSB(GenmapHandle h,int verbose){
     int global=(np==GenmapCommSize(GenmapGetGlobalComm(h)));
 #endif
 
-    int ntot=0,ipass=0;
-    int iter;
-    do {
-      iter=GenmapFiedlerLanczos(h,local_c,maxIter,global);
-      //iter=GenmapFiedlerRQI(h,local_c,maxIter,global);
-      ntot+=iter;
-      global=0;
+    for(i=0; i<16; i++)
+      h->time[i]=0.0;
+
+    int ipass=0,iter;
+    do{
+      comm_barrier(&local_c->gsc);
+      h->time[0]-=comm_time();
+#if 0
+     iter=GenmapFiedlerLanczos(h,local_c,maxIter,global);
+#else
+     int iter=GenmapFiedlerRQI(h,local_c,maxIter,global);
+#endif
+     comm_barrier(&local_c->gsc);
+     h->time[0]+=comm_time();
+     h->time[1]+=iter;
+     global=0;
     }while(++ipass < npass && iter==maxIter);
 
-    int min,max,sum,buf[1];
-    min=ntot;
-    comm_allreduce(&local_c->gsc,gs_int,gs_min,&min,1,buf); // min
-    max=ntot;
-    comm_allreduce(&local_c->gsc,gs_int,gs_max,&max,1,buf); // max
-    sum=ntot;
-    comm_allreduce(&local_c->gsc,gs_int,gs_add,&sum,1,buf); // sum
+    double min[16],max[16],sum[16],buf[16];
+    for(i=0; i<16; i++)
+      min[i]=max[i]=sum[i]=h->time[i];
 
-    if(rank==0 && verbose)
-      printf("level=%02d, iter: min=%d max=%d avg=%d\n",
-        level,min,max,sum/np);
+    comm_allreduce(&local_c->gsc,gs_double,gs_min,min,16,buf); // min
+    comm_allreduce(&local_c->gsc,gs_double,gs_max,max,16,buf); // max
+    comm_allreduce(&local_c->gsc,gs_double,gs_add,sum,16,buf); // sum
+
+    if(rank==0 && verbose){
+      printf("level=%02d:\n",level);
+      printf("fiedler(time)   : %lf/%lf/%lf\n",min[0],max[0],sum[0]/np);
+      printf("fiedler(iter)   : %lf/%lf/%lf\n",min[1],max[1],sum[1]/np);
+      printf("init laplacian  : %lf/%lf/%lf\n",min[2],max[2],sum[2]/np);
+      printf("rqi(time)       : %lf/%lf/%lf\n",min[3],max[3],sum[3]/np);
+      printf("mg setup        : %lf/%lf/%lf\n",min[4],max[4],sum[4]/np);
+      printf("project_pf(time): %lf/%lf/%lf\n",min[5],max[5],sum[5]/np);
+      printf("project_pf(iter): %lf/%lf/%lf\n",min[6],max[6],sum[6]/np);
+      printf("mg_vcycle       : %lf/%lf/%lf\n",min[7],max[7],sum[7]/np);
+    }
 
     GenmapBinSort(h, GENMAP_FIEDLER, &buf0);
 

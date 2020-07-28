@@ -54,6 +54,7 @@ struct GenmapHandle_private {
 
   int dbgLevel;
   int printStat;
+  double time[16];
 };
 
 int GenmapCreateHandle(GenmapHandle h);

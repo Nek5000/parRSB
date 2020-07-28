@@ -37,10 +37,18 @@ int GenmapFiedlerRQI(GenmapHandle h,GenmapComm c,int maxIter,int global)
   GenmapScalar rni=1.0/sqrt(rtr);
   GenmapScaleVector(initVec,initVec,rni);
  
+  comm_barrier(&c->gsc);
+  h->time[2]-=comm_time();
   GenmapInitLaplacian(h,c);
+  comm_barrier(&c->gsc);
+  h->time[2]+=comm_time();
 
   GenmapVector y; GenmapCreateZerosVector(&y,lelt);
+  comm_barrier(&c->gsc);
+  h->time[3]-=comm_time();
   int iter=rqi(h,c,initVec,maxIter,0,y);
+  comm_barrier(&c->gsc);
+  h->time[3]+=comm_time();
 
   GenmapScalar lNorm = 0;
   for(i = 0; i < lelt; i++)
