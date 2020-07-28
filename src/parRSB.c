@@ -24,8 +24,9 @@ void fparRSB_partMesh(int *part, long long *vtx, int *nel, int *nve,
   *err = parRSB_partMesh(part, vtx, *nel, *nve, options, c);
 }
 
-int parRSB_partMesh(int *part, long long *vtx, int nel, int nve, int *options,
-                    MPI_Comm comm) {
+int parRSB_partMesh(int *part,long long *vtx,int nel,int nve,
+  int *options,MPI_Comm comm)
+{
   int rank,size;
   MPI_Comm_rank(comm,&rank);
   MPI_Comm_size(comm,&size);
@@ -90,8 +91,9 @@ int parRSB_partMesh(int *part, long long *vtx, int nel, int nve, int *options,
     GenmapInt size_ = GenmapCommSize(GenmapGetGlobalComm(h));
     if((GenmapLong)size_ > nelg) {
       if(id == 0)
-        printf("Total number of elements is smaller than the number of processors.\n"
-               "Run with smaller number of processors.\n");
+        printf("Total number of elements is smaller than the "
+          "number of processors.\n"
+          "Run with smaller number of processors.\n");
       return 1;
     }
     GenmapElements e = GenmapGetElements(h);
@@ -119,7 +121,7 @@ int parRSB_partMesh(int *part, long long *vtx, int nel, int nve, int *options,
     assert(GenmapGetNLocalElements(h) == nel);
 
     e = GenmapGetElements(h);
-    sarray_sort(struct GenmapElement_private, e, (unsigned int)nel, globalId,
+    sarray_sort(struct GenmapElement_private,e,(unsigned int)nel,globalId,
                 TYPE_LONG, &buf);
 
     for(i = 0; i < nel; i++) {

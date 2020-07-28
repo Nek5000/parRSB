@@ -42,8 +42,8 @@ void GenmapRSB(GenmapHandle h,int verbose){
     int ntot=0,ipass=0;
     int iter;
     do {
-      //iter=GenmapFiedlerLanczos(h,local_c,maxIter,global);
-      iter=GenmapFiedlerRQI(h,local_c,maxIter,global);
+      iter=GenmapFiedlerLanczos(h,local_c,maxIter,global);
+      //iter=GenmapFiedlerRQI(h,local_c,maxIter,global);
       ntot+=iter;
       global=0;
     }while(++ipass < npass && iter==maxIter);

@@ -40,7 +40,7 @@ int GenmapFiedlerRQI(GenmapHandle h,GenmapComm c,int maxIter,int global)
   GenmapInitLaplacian(h,c);
 
   GenmapVector y; GenmapCreateZerosVector(&y,lelt);
-  rqi(h,c,initVec,maxIter,0,y);
+  int iter=rqi(h,c,initVec,maxIter,0,y);
 
   GenmapScalar lNorm = 0;
   for(i = 0; i < lelt; i++)
@@ -53,7 +53,7 @@ int GenmapFiedlerRQI(GenmapHandle h,GenmapComm c,int maxIter,int global)
 
   GenmapDestroyVector(y);
 
-  return 0;
+  return iter;
 }
 
 int GenmapFiedlerLanczos(GenmapHandle h,GenmapComm c,int maxIter,
