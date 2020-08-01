@@ -32,7 +32,8 @@ int main(int argc,char *argv[]){
   int rcb_l=(argc>4)?atoi(argv[4]):1;
 
   //partition
-  int *part; GenmapMalloc(mesh->nelt,&part );
+  int *part; GenmapMalloc(mesh->nelt,&part);
+  int *seq; GenmapMalloc(mesh->nelt,&seq);
   uint *upart; GenmapMalloc(mesh->nelt*mesh->nVertex,&upart);
   double *coords;
   GenmapMalloc(mesh->nelt*mesh->nVertex*mesh->nDim,&coords);
@@ -114,6 +115,7 @@ int main(int argc,char *argv[]){
 
   free(upart);
   free(part);
+  free(seq);
   free(coords);
   buffer_free(&buf);
 

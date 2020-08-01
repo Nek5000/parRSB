@@ -85,7 +85,7 @@ $(BUILDDIR)/src/%.o: $(SRCROOT)/src/%.c
 examples: $(EXAMPLE)
 
 $(EXAMPLE): install
-	$(CC) $(CFLAGS) $(INCFLAGS) $@.c -o $@ $(LDFLAGS)
+	$(CC) $(CFLAGS) $(PP) $(INCFLAGS) $@.c -o $@ $(LDFLAGS)
 
 .PHONY: tests
 tests: install $(TESTOBJS)
@@ -93,7 +93,7 @@ tests: install $(TESTOBJS)
 	@cd $(BUILDDIR)/tests && ./run-tests.sh
 
 $(BUILDDIR)/tests/%: $(SRCROOT)/tests/%.c
-	$(CC) $(CFLAGS) $(INCFLAGS) $< -o $@ $(LDFLAGS)
+	$(CC) $(CFLAGS) $(PP) $(INCFLAGS) $< -o $@ $(LDFLAGS)
 
 .PHONY: clean
 clean:
