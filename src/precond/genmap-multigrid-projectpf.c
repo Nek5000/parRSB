@@ -55,7 +55,7 @@ int project_pf(GenmapHandle h,GenmapComm c,mgData d,GenmapVector ri,
   rz1=GenmapDotVector(r,z);
   GenmapGop(c,&rz1,1,GENMAP_SCALAR,GENMAP_SUM);
 
-  rz1=GenmapDotVector(r,r);
+  rr=GenmapDotVector(r,r);
   GenmapGop(c,&rr,1,GENMAP_SCALAR,GENMAP_SUM);
 
   if(GenmapCommRank(c)==0 && verbose)

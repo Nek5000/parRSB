@@ -137,7 +137,7 @@ int main(int argc,char *argv[]){
   array_free(entries); free(entries);
 
   /* Setup MG levels */
-  mgData d; mgSetup(c,M,&d);
+  mgData d; mgSetup(c,M,&d); d->h=gh;
 
   GenmapVector r,x,x0;
   GenmapCreateVector(&r      ,mesh->nelt);

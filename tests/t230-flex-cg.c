@@ -33,6 +33,7 @@ int main(int argc,char *argv[]){
 
   //partition
   int *part; GenmapMalloc(mesh->nelt,&part );
+  int *seq; GenmapMalloc(mesh->nelt,&seq);
   uint *upart; GenmapMalloc(mesh->nelt*mesh->nVertex,&upart);
   double *coords;
   GenmapMalloc(mesh->nelt*mesh->nVertex*mesh->nDim,&coords);
@@ -52,7 +53,7 @@ int main(int argc,char *argv[]){
     }
 
     int options[3]; options[0]=options[1]=options[2]=0;
-    parRCB_partMesh(part,coords,mesh->nelt,mesh->nVertex,options,
+    parRCB_partMesh(part,seq,coords,mesh->nelt,mesh->nVertex,options,
       MPI_COMM_WORLD);
 
     for(i=0; i<mesh->nelt; i++)
@@ -114,6 +115,7 @@ int main(int argc,char *argv[]){
 
   free(upart);
   free(part);
+  free(seq);
   free(coords);
   buffer_free(&buf);
 
@@ -135,7 +137,7 @@ int main(int argc,char *argv[]){
   array_free(entries); free(entries);
 
   /* Setup MG levels */
-  mgData d; mgSetup(c,M,&d);
+  mgData d; mgSetup(c,M,&d); d->h=gh;
 
   GenmapVector r,x,x0;
   GenmapCreateVector(&r      ,mesh->nelt);

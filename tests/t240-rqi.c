@@ -53,7 +53,7 @@ int main(int argc,char *argv[]){
     }
 
     int options[3]; options[0]=options[1]=options[2]=0;
-    parRCB_partMesh(part,coords,mesh->nelt,mesh->nVertex,options,
+    parRCB_partMesh(part,seq,coords,mesh->nelt,mesh->nVertex,options,
       MPI_COMM_WORLD);
 
     for(i=0; i<mesh->nelt; i++)
@@ -153,7 +153,11 @@ int main(int argc,char *argv[]){
   norm=GenmapDotVector(x,x);
   GenmapGop(c,&norm,1,GENMAP_SCALAR,GENMAP_SUM);
 
-  rqi(gh,c,x,30,1,r);
+  mgData d; mgSetup(c,c->M,&d); d->h=gh;
+
+  rqi(gh,c,d,x,30,1,r);
+
+  mgFree(d);
 
   GenmapDestroyVector(x); GenmapDestroyVector(r);
 
