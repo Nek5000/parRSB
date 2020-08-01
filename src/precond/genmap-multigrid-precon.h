@@ -38,6 +38,7 @@ struct mgLevel_{
 
 struct mgData_{
   struct comm c;
+  GenmapHandle h;
   struct gs_data *top;
   buffer bfr;
   int nlevels;
@@ -80,7 +81,7 @@ int flex_cg(GenmapHandle h,GenmapComm c,mgData d,GenmapVector r,
 int project_pf(GenmapHandle h,GenmapComm c,mgData d,GenmapVector r,
   int maxIter,int verbose,GenmapVector x);
 
-int rqi(GenmapHandle h,GenmapComm c,GenmapVector z,int maxIter,int verbose,
-  GenmapVector fiedler);
+int rqi(GenmapHandle h,GenmapComm c,mgData d,GenmapVector z,
+  int maxIter,int verbose,GenmapVector fiedler);
 
 #endif

@@ -5,8 +5,8 @@
 #include <genmap-multigrid-precon.h>
 
 //input r should have zero-sum
-int rqi(GenmapHandle h,GenmapComm c,GenmapVector z,int iter,int verbose,
-  GenmapVector y)
+int rqi(GenmapHandle h,GenmapComm c,mgData d,GenmapVector z,
+  int iter,int verbose,GenmapVector y)
 {
   assert(z->size==y->size);
 
@@ -15,18 +15,12 @@ int rqi(GenmapHandle h,GenmapComm c,GenmapVector z,int iter,int verbose,
 
   GenmapVector err; GenmapCreateVector(&err,z->size);
 
-  comm_barrier(&c->gsc);
-  h->time[4]-=comm_time();
-  mgData d; mgSetup(c,c->M,&d);
-  comm_barrier(&c->gsc);
-  h->time[4]+=comm_time();
-
   int rank=GenmapCommRank(c);
   int projecti;
 
   comm_barrier(&c->gsc);
   h->time[5]-=comm_time();
-  h->time[6]+=project_pf(h,c,d,z,30,0,y);
+  h->time[6]+=project_pf(h,c,d,z,30,verbose,y);
   comm_barrier(&c->gsc);
   h->time[5]+=comm_time();
 
@@ -51,7 +45,7 @@ int rqi(GenmapHandle h,GenmapComm c,GenmapVector z,int iter,int verbose,
 
     comm_barrier(&c->gsc);
     h->time[5]-=comm_time();
-    h->time[6]+=project_pf(h,c,d,z,30,0,y);
+    h->time[6]+=project_pf(h,c,d,z,30,verbose,y);
     comm_barrier(&c->gsc);
     h->time[5]+=comm_time();
 
@@ -64,10 +58,9 @@ int rqi(GenmapHandle h,GenmapComm c,GenmapVector z,int iter,int verbose,
     norm=GenmapDotVector(err,err);
     GenmapGop(c,&norm,1,GENMAP_SCALAR,GENMAP_SUM);
     if(rank==0 && verbose)
-      printf("i=%02d lambda=%1.10e\n",i,lambda);
+      printf("rqi i=%02d lambda=%1.10e\n",i,lambda);
   }
 
-  mgFree(d);
   GenmapDestroyVector(err);
 
   return i;

@@ -22,48 +22,30 @@ void mg_vcycle(GenmapScalar *u1,GenmapScalar *rhs,mgData d){
   for(i=0; i<lvl_off[1]; i++)
     r[i]=rhs[i];
 
+  GenmapHandle h=d->h;
+  comm_barrier(&d->c);
+  h->time[8]-=comm_time();
+
   for(lvl=0; lvl<nlevels-1; lvl++){
     off=lvl_off[lvl]; n=lvl_off[lvl+1]-off;
     l=lvls[lvl]; nsmooth=l->nsmooth; sigma=l->sigma;
     M=l->M; diag=M->diag; assert(n==M->rn);
 
-#if 0
-    printf("sigma: %lf\n",sigma);
-    printf("D: "); for(i=0; i<n; i++)
-      printf("%lf ",1.0/diag[i]);
-    printf("\n");
-    printf("rhs: "); for(i=0; i<n; i++)
-      printf("%lf ",r[off+i]);
-    printf("\n");
-#endif
-
     //u=sigma*D*rhs
     for(j=0; j<n; j++)
       u[off+j]=sigma*r[off+j]/diag[j];
 
-#if 0
-    printf("u: "); for(i=0; i<n; i++)
-      printf("%lf ",u[off+i]);
-    printf("\n");
-#endif
-
     // G*u
+    comm_barrier(&d->c);
+    h->time[10]-=comm_time();
     csr_mat_gather(M,M->gsh,u+off,d->buf,&buf);
     csr_mat_apply(Gs+off,M,d->buf);
+    comm_barrier(&d->c);
+    h->time[10]+=comm_time();
 
-    // r=rhs-G*u
+    // r=rhs-Gu
     for(j=0; j<n; j++)
         r[off+j]=r[off+j]-Gs[off+j];
-
-#if 0
-    printf("r: "); for(i=0; i<n; i++)
-      printf("%lf ",r[off+i]);
-    printf("\n");
-
-    printf("Gu: "); for(i=0; i<n; i++)
-      printf("%lf ",Gs[off+i]);
-    printf("\n");
-#endif
 
     for(i=0; i<nsmooth; i++){
       sigma=sigma+0.066666/nsmooth;
@@ -73,22 +55,24 @@ void mg_vcycle(GenmapScalar *u1,GenmapScalar *rhs,mgData d){
         u[off+j]+=s[off+j];
       }
 
-      //r=r-G*s
+      //G*s
+      comm_barrier(&d->c);
+      h->time[10]-=comm_time();
       csr_mat_gather(M,M->gsh,s+off,d->buf,&buf);
       csr_mat_apply(Gs+off,M,d->buf);
+      comm_barrier(&d->c);
+      h->time[10]+=comm_time();
+
+      //r=r-Gs
       for(j=0; j<n; j++)
         r[off+j]=r[off+j]-Gs[off+j];
     }
 
-#if 0
-    printf("r: "); for(i=0; i<n; i++)
-      printf("%lf ",r[off+i]);
-    printf("\n");
-#endif
-
     // interpolate to coarser level
     gs(r+off,gs_double,gs_add,1,l->J,&buf);
   }
+  comm_barrier(&d->c);
+  h->time[8]+=comm_time();
 
   //coarsest level
   off=lvl_off[nlevels-1]; n=lvl_off[nlevels]-off;
@@ -103,6 +87,9 @@ void mg_vcycle(GenmapScalar *u1,GenmapScalar *rhs,mgData d){
     r[off]=u[off];
   }
 
+  comm_barrier(&d->c);
+  h->time[9]-=comm_time();
+
   GenmapScalar over=1.33333;
   for(lvl=nlevels-2; lvl>=0; lvl--){
     l=lvls[lvl];
@@ -115,6 +102,8 @@ void mg_vcycle(GenmapScalar *u1,GenmapScalar *rhs,mgData d){
     for(j=0; j<n; j++)
       r[off+j]=over*r[off+j]+u[off+j];
   }
+  comm_barrier(&d->c);
+  h->time[9]+=comm_time();
 
   // avoid this
   for(i=0; i<lvl_off[1]; i++)

@@ -54,14 +54,23 @@ int project_pf(GenmapHandle h,GenmapComm c,mgData d,GenmapVector ri,
 
   rz1=GenmapDotVector(r,z);
   GenmapGop(c,&rz1,1,GENMAP_SCALAR,GENMAP_SUM);
+
+  rz1=GenmapDotVector(r,r);
+  GenmapGop(c,&rr,1,GENMAP_SCALAR,GENMAP_SUM);
+
   if(GenmapCommRank(c)==0 && verbose)
-    printf("rz1=%lf\n",rz1);
+    printf("projectpf initial rr=%1.10e rz1=%1.10e\n",sqrt(rr),sqrt(rz1));
 
   GenmapCopyVector(p,z);
 
   i=0; uint j,k;
   while(i<maxIter && sqrt(rz1)>1e-5){
+    comm_barrier(&c->gsc);
+    h->time[11]-=comm_time();
     GenmapLaplacian(h,c,p,w);
+    comm_barrier(&c->gsc);
+    h->time[11]+=comm_time();
+
     den=GenmapDotVector(p,w);
     GenmapGop(c,&den,1,GENMAP_SCALAR,GENMAP_SUM);
     alpha=rz1/den;
@@ -91,13 +100,14 @@ int project_pf(GenmapHandle h,GenmapComm c,mgData d,GenmapVector ri,
 
     rr=GenmapDotVector(r,r);
     GenmapGop(c,&rr,1,GENMAP_SCALAR,GENMAP_SUM);
-    if(rank==0 && verbose)
-      printf("i=%d rr=%1.10e\n",i,sqrt(rr));
 
     rz0=rz1;
 
     rz1=GenmapDotVector(r,z);
     GenmapGop(c,&rz1,1,GENMAP_SCALAR,GENMAP_SUM);
+
+    if(rank==0 && verbose)
+      printf("projectpf i=%d rr=%1.10e rz1=%1.10e\n",i,sqrt(rr),sqrt(rz1));
 
     rz2=GenmapDotVector(r,dz);
     GenmapGop(c,&rz2,1,GENMAP_SCALAR,GENMAP_SUM);
