@@ -43,7 +43,7 @@ void GenmapRSB(GenmapHandle h,int verbose){
     do{
       comm_barrier(&local_c->gsc);
       h->time[0]-=comm_time();
-#if 0
+#if 1
       iter=GenmapFiedlerLanczos(h,local_c,maxIter,global);
 #else
       iter=GenmapFiedlerRQI(h,local_c,maxIter,global);

@@ -96,7 +96,6 @@ struct array *GenmapFindNeighbors(GenmapHandle h,GenmapComm c)
   sarray_sort_2(entry,nbrs->ptr,nbrs->n,r,1,c,1,&buf);
 
   crystal_free(&cr);
-
   buffer_free(&buf);
   array_free(&vertices);
   array_free(&a);

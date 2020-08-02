@@ -10,8 +10,8 @@ int MeshInit(Mesh *m_,int nel,int nDim){
   m->nNeighbors=nDim;
   m->nVertex=(nDim==2)?4:8;
 
-  array_init(struct Element_private ,&m->elements,nel); m->elements.n=0;
-  array_init(struct Boundary_private,&m->boundary, 10); m->boundary.n=0;
+  array_init(struct Point_private   ,&m->elements,10); m->elements.n=0;
+  array_init(struct Boundary_private,&m->boundary,10); m->boundary.n=0;
 
   return 0;
 }

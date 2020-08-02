@@ -1,6 +1,9 @@
 #ifndef _GENMAP_GENCON_H_
 #define _GENMAP_GENCON_H_
 
+#include <genmap-gslib.h>
+#include <genmap-types.h>
+
 /* Upper bound for number of dimensions */
 #define GC_MAX_DIM 3
 
@@ -39,12 +42,10 @@ int read_co2_file(Mesh  mesh,char *fname,struct comm *c);
 int write_co2_file(Mesh mesh,char *fname,struct comm *c);
 int read_co2_mesh(Mesh *mesh,char *fname,struct comm *c);
 
-#if 0
-int findMinNeighborDistance(exaHandle h,Mesh mesh);
-int findSegments(exaHandle h,Mesh mesh,exaScalar tol);
-int setGlobalID(exaHandle h,Mesh mesh);
-int sendBack(exaHandle h,Mesh mesh);
-int matchPeriodicFaces(exaHandle h,Mesh mesh);
-#endif
+int findMinNeighborDistance(Mesh mesh);
+int findSegments(Mesh mesh,struct comm *c,GenmapScalar tol);
+int setGlobalID(Mesh mesh,struct comm *c);
+int sendBack(Mesh mesh,struct comm *c);
+int matchPeriodicFaces(Mesh mesh,struct comm *c);
 
 #endif

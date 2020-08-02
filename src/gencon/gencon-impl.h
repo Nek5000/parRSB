@@ -7,6 +7,7 @@
 #define distance2D(a,b)\
   (sqrDiff((a).x[0],(b).x[0])+sqrDiff((a).x[1],(b).x[1]))
 #define distance3D(a,b) (distance2D(a,b)+sqrDiff((a).x[2],(b).x[2]))
+
 #define min(a,b) ((a)<(b) ? (a) : (b))
 #define max(a,b) ((a)>(b) ? (a) : (b))
 
@@ -48,6 +49,8 @@ struct Mesh_private{
   struct array boundary;
 };
 
+int transferBoundaryFaces(Mesh mesh,struct comm *c);
+
 /*
  Preprocessor Corner notation:      Symmetric Corner notation:
 
@@ -87,17 +90,17 @@ struct Mesh_private{
                                  +--------+     T
                                      3
 
-   EFACE(IFACE)  -   Given face number IFACE in symmetric notation,
-                     returns preprocessor notation face number.
+   EFACE(IFACE)  - Given face number IFACE in symmetric notation,
+                   returns preprocessor notation face number.
 
-   EFACE1(IFACE) -   Given face number IFACE in preprocessor notation,
-                     returns symmetric notation face number.
+   EFACE1(IFACE) - Given face number IFACE in preprocessor notation,
+                   returns symmetric notation face number.
 
-The following variables all take the symmetric
-notation of IFACE as arguments:
+The following variables all take the symmetric notation of IFACE
+as arguments:
 
-   ICFACE(i,IFACE) -   Gives the 4 vertices which reside on face IFACE
-                       as depicted below, e.g. ICFACE(i,2)=2,4,6,8.
+   ICFACE(i,IFACE) - Gives the 4 vertices which reside on face IFACE
+                     as depicted below, e.g. ICFACE(i,2)=2,4,6,8.
 
                       3+-----+4    ^ Y
                       /  2  /|     |
@@ -108,21 +111,21 @@ notation of IFACE as arguments:
                    5+-----+6    Z
                        3
 
-   IEDGFC(i,IFACE) -   Gives the 4 edges which border the face IFACE
-                       Edge numbering is as follows:
-                          Edge = 1,2,3,4     run in +r direction
-                          Edge = 5,6,7,8     run in +s direction
-                          Edge = 9,10,11,12  run in +t direction
+   IEDGFC(i,IFACE) - Gives the 4 edges which border the face IFACE
+                     Edge numbering is as follows:
+                        Edge = 1,2,3,4     run in +r direction
+                        Edge = 5,6,7,8     run in +s direction
+                        Edge = 9,10,11,12  run in +t direction
 
-                       Ordering of each edge is such that a monotonically
-                       increasing sequence of vertices is associated with
-                       the start point of a corresponding set of
-                       monotonically increasing edge numbers, e.g.,
+                     Ordering of each edge is such that a monotonically
+                     increasing sequence of vertices is associated with
+                     the start point of a corresponding set of
+                     monotonically increasing edge numbers, e.g.,
 
-   ICEDG(i,IEDGE)  -   Gives 3 variables for determining the stride along
-                       a given edge, IEDGE;  i=1 gives the starting vertex
-                                             i=2 gives the stopping vertex
-                                             i=3 gives the stride size.
+   ICEDG(i,IEDGE)  - Gives 3 variables for determining the stride along
+                     a given edge, IEDGE;  i=1 gives the starting vertex
+                                           i=2 gives the stopping vertex
+                                           i=3 gives the stride size.
 
 */
 #endif

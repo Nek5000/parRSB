@@ -79,4 +79,17 @@ void GenmapAssignBins(GenmapHandle h, int field, buffer *buf0);
 void GenmapTransferToBins(GenmapHandle h, int field, buffer *buf0);
 void GenmapBinSort(GenmapHandle h, int field, buffer *buf0);
 
+#define MAXDIM 3
+typedef struct{
+  int proc;
+  int orig;
+  int seq;
+  unsigned long long id;
+  double coord[MAXDIM];
+}elm_rcb;
+
+int parRCB(struct comm *ci,struct array *a,int ndim);
+void rcb_local(struct array *a,uint start,uint end,
+    int ndim,buffer *buf);
+
 #endif

@@ -4,6 +4,7 @@
 #include <time.h>
 
 #include <sort.h>
+#include <genmap-impl.h>
 #include <parRSB.h>
 
 void fparRCB_partMesh(int *part,int *seq,double *vtx,int *nel,int *nv,

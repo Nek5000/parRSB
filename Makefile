@@ -14,12 +14,11 @@ SORTDIR   =$(SRCROOT)/src/sort
 PRECONDDIR=$(SRCROOT)/src/precond
 GENCONDIR =$(SRCROOT)/src/gencon
 BUILDDIR  =$(SRCROOT)/build
-EXAMPLEDIR=$(SRCROOT)/example
+EXAMPLEDIR=$(SRCROOT)/examples
 TESTDIR   =$(SRCROOT)/tests
 
 TARGET=parRSB
 LIB=$(BUILDDIR)/lib/lib$(TARGET).a
-EXAMPLE=$(EXAMPLEDIR)/example
 
 INCFLAGS=-I$(SRCDIR) -I$(SORTDIR) -I$(PRECONDDIR) -I$(GENCONDIR) -I$(GSLIBDIR)/include
 LDFLAGS:=-L$(BUILDDIR)/lib -l$(TARGET) -L $(GSLIBDIR)/lib -lgs -lm
@@ -29,12 +28,14 @@ SORTSRCS   =$(wildcard $(SORTDIR)/*.c)
 PRECONDSRCS=$(wildcard $(PRECONDDIR)/*.c)
 GENCONSRCS =$(wildcard $(GENCONDIR)/*.c)
 TESTSRCS   =$(wildcard $(TESTDIR)/*.c)
+EXAMPLESRCS=$(wildcard $(EXAMPLEDIR)/*.c)
 
 SRCOBJS =$(patsubst $(SRCROOT)/%.c,$(BUILDDIR)/%.o,$(SRCS))
 SRCOBJS+=$(patsubst $(SRCROOT)/%.c,$(BUILDDIR)/%.o,$(SORTSRCS))
 SRCOBJS+=$(patsubst $(SRCROOT)/%.c,$(BUILDDIR)/%.o,$(PRECONDSRCS))
 SRCOBJS+=$(patsubst $(SRCROOT)/%.c,$(BUILDDIR)/%.o,$(GENCONSRCS))
 TESTOBJS=$(patsubst $(SRCROOT)/%.c,$(BUILDDIR)/%,$(TESTSRCS))
+EXAMPLEOBJS=$(patsubst $(SRCROOT)/%.c,$(BUILDDIR)/%,$(EXAMPLESRCS))
 
 PP=
 
@@ -55,7 +56,7 @@ endif
 default: check lib install
 
 .PHONY: all
-all: check lib tests example install
+all: check lib tests examples install
 
 .PHONY: install
 install: lib
@@ -82,10 +83,10 @@ $(BUILDDIR)/src/%.o: $(SRCROOT)/src/%.c
 	$(CC) $(CFLAGS) $(PP) $(INCFLAGS) -c $< -o $@
 
 .PHONY: examples
-examples: $(EXAMPLE)
+examples: install $(EXAMPLEOBJS)
 
-$(EXAMPLE): install
-	$(CC) $(CFLAGS) $(PP) $(INCFLAGS) $@.c -o $@ $(LDFLAGS)
+$(BUILDDIR)/examples/%: $(SRCROOT)/examples/%.c
+	$(CC) $(CFLAGS) $(PP) $(INCFLAGS) $< -o $@ $(LDFLAGS)
 
 .PHONY: tests
 tests: install $(TESTOBJS)
@@ -111,3 +112,4 @@ $(shell mkdir -p $(BUILDDIR)/src/sort)
 $(shell mkdir -p $(BUILDDIR)/src/precond)
 $(shell mkdir -p $(BUILDDIR)/src/gencon)
 $(shell mkdir -p $(BUILDDIR)/tests)
+$(shell mkdir -p $(BUILDDIR)/examples)

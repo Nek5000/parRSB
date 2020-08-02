@@ -65,22 +65,14 @@ int readRe2Header(Mesh *mesh_,MPI_File file,struct comm *c){
   int nelt=nelgt/size,nrem=nelgt-nelt*size;
   nelt+=(rank<nrem ? 1: 0);
 
-  GenmapMalloc(1,mesh_);
-  Mesh mesh=*mesh_;
-
-  // Initialize the mesh structure
-  mesh->nDim=nDim;
-  mesh->nVertex=nVertex;
-  mesh->nNeighbors=nDim;
+  MeshInit(mesh_,nelt,nDim); Mesh mesh=*mesh_;
   mesh->nelgt=nelgt;
   mesh->nelgv=nelgv;
-  mesh->nelt=nelt;
 
   if(rank==0){
 #if defined(GENMAP_DEBUG)
-    printf("ndim,nvertex,nneighbors,nelgt,nelt:%d %d %d %d "
-      "%d\n",mesh->nDim,mesh->nVertex,mesh->nNeighbors,\
-      mesh->nelgt,mesh->nelt);
+    printf("ndim,nvertex,nneighbors,nelgt,nelt:%d %d %d %lld %d\n",
+      mesh->nDim,mesh->nVertex,mesh->nNeighbors,mesh->nelgt,mesh->nelt);
 #endif
   }
 
@@ -118,7 +110,7 @@ int readRe2Coordinates(Mesh mesh,MPI_File file,struct comm *c){
   if(rank==0) buf0+=headerSize;
 
   /* initialize array */
-  size_t nUnits=nelt*nVertex;
+  uint nUnits=nelt*nVertex;
   array_init(struct Point_private,&mesh->elements,nUnits);
   Point ptr=mesh->elements.ptr;
 
@@ -147,6 +139,10 @@ int readRe2Coordinates(Mesh mesh,MPI_File file,struct comm *c){
     }
   }
   mesh->elements.n=nUnits;
+
+#if defined(GENMAP_DEBUG)
+  printf("io: rank=%d npts=%u\n",rank,nUnits);
+#endif
 
   free(buf);
   return 0;
@@ -427,10 +423,6 @@ int read_co2_file(Mesh mesh,char *fname,struct comm *c){
   return 0;
 }
 
-#undef readT
-#undef writeInt
-
-#if 0
 int write_co2_file(Mesh mesh,char *fileName,struct comm *c){
   const char version[5]="#v001";
   const float test=6.54321;
@@ -480,19 +472,19 @@ int write_co2_file(Mesh mesh,char *fileName,struct comm *c){
     memcpy(buf0,&test,sizeof(float)),buf0+=sizeof(float);
   }
 
-  Point ptr=exaArrayGetPointer(mesh->elements);
+  Point ptr=mesh->elements.ptr;
   int i,k,temp;
   for(i=0;i<nelt;i++){
     temp=ptr->elementId+1;
     writeInt(buf0,temp); buf0+=sizeof(int);
 #if defined(GENMAP_DEBUG)
-    printf("%lld",temp);
+    printf("%d ",temp);
 #endif
     for(k=0;k<nVertex;k++){
       temp=ptr->globalId+1;
       writeInt(buf0,temp); buf0+=sizeof(int);
 #if defined(GENMAP_DEBUG)
-      printf("%lld",temp);
+      printf("%d ",temp);
 #endif
       ptr++;
     }
@@ -513,4 +505,5 @@ int write_co2_file(Mesh mesh,char *fileName,struct comm *c){
   return errs;
 }
 
-#endif
+#undef readT
+#undef writeInt
