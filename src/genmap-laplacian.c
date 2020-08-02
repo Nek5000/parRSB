@@ -75,7 +75,13 @@ struct array *GenmapFindNeighbors(GenmapHandle h,GenmapComm c)
   struct array *nbrs=tmalloc(struct array,1);
   array_init(entry,nbrs,lelt);
 
-  if(lelt==0) return nbrs;
+  if(lelt==0){
+    crystal_free(&cr);
+    buffer_free(&buf);
+    array_free(&vertices);
+    array_free(&a);
+    return nbrs;
+  }
 
   csr_entry *aptr=a.ptr; entry *nptr=nbrs->ptr;
   entry ee,ep; ep.r=aptr->r; ep.c=aptr->c; array_cat(entry,nbrs,&ep,1);
@@ -93,6 +99,7 @@ struct array *GenmapFindNeighbors(GenmapHandle h,GenmapComm c)
 
   buffer_free(&buf);
   array_free(&vertices);
+  array_free(&a);
 
   return nbrs;
 }
