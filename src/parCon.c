@@ -32,21 +32,21 @@ int parRSB_findConnectivity(long long *vertexid,double *coord,
   ulong nelgt=mesh->nelgt=mesh->nelgv=out[1][0];
 
   int nvertex=mesh->nVertex;
-  uint nunits=nvertex*ndim;
+  uint nunits=nvertex*nelt;
 
   struct Point_private p;
   uint i,j,k,l;
   for(i=0; i<nelt; i++){
     for(k=0; k<nvertex; k++){
       j=PRE_TO_SYM_VERTEX[k];
-      for(l=0; l<ndim; j++)
+      for(l=0; l<ndim; l++)
         p.x[l]=coord[i*nvertex*ndim+j*ndim+l];
-
       p.elementId =start+i;
       p.sequenceId=nvertex*(start+i)+k;
       p.origin    =rank;
+
+      array_cat(struct Point_private,&mesh->elements,&p,1);
     }
-    array_cat(struct Point_private,&mesh->elements,&p,1);
   }
   assert(mesh->elements.n==nunits);
 
@@ -67,6 +67,17 @@ int parRSB_findConnectivity(long long *vertexid,double *coord,
   setGlobalID(mesh,&c);
   sendBack(mesh,&c);
   matchPeriodicFaces(mesh,&c);
+
+  // copy output
+  Point ptr=mesh->elements.ptr;
+  k=0;
+  for(i=0; i<nelt; i++){
+    vertexid[k++]=ptr->elementId+1;
+    for(j=0; j<nvertex; j++){
+      vertexid[k++]=ptr->globalId+1;
+      ptr++;
+    }
+  }
 
   MeshFree(mesh);
   comm_free(&c);
