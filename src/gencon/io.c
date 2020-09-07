@@ -24,14 +24,13 @@ int transferBoundaryFaces(Mesh mesh,struct comm *c){
 
   slong nelgt=mesh->nelgt;
   sint nelt=nelgt/size,nrem=nelgt-nelt*size;
-  slong N=nrem*(nelt+1);
+  slong N=(size-nrem)*nelt;
 
   sint i; slong eid;
   for(i=0;i<nFaces;i++,ptr++){
     eid=ptr->elementId;
-    if(N==0) ptr->proc=eid/nelt;
-    else if(eid+1<=N) ptr->proc=ceil((eid+1.0)/(nelt+1.0))-1;
-    else ptr->proc=ceil((eid+1.0-N)/nelt)-1+nrem;
+    if(eid<N) ptr->proc=eid/nelt;
+    else ptr->proc=(eid-N)/(nelt+1)+size-nrem;
   }
 
   struct crystal cr; crystal_init(&cr,c);
@@ -63,7 +62,7 @@ int readRe2Header(Mesh *mesh_,MPI_File file,struct comm *c){
 
   int nVertex=(nDim==2)?4:8;
   int nelt=nelgt/size,nrem=nelgt-nelt*size;
-  nelt+=(rank<nrem ? 1: 0);
+  nelt+=(rank>=(size-nrem) ? 1: 0);
 
   MeshInit(mesh_,nelt,nDim); Mesh mesh=*mesh_;
   mesh->nelgt=nelgt;
@@ -185,7 +184,7 @@ int readRe2Boundaries(Mesh mesh,MPI_File file,struct comm *c){
   double nbcsD; readT(&nbcsD,bufL,long,1); long nbcs=nbcsD;
   
   int nbcsLocal=nbcs/size,nrem=nbcs-nbcsLocal*size;
-  nbcsLocal+=(rank<nrem ? 1 : 0);
+  nbcsLocal+=(rank>=(size-nrem) ? 1 : 0);
 
   slong out[2][1],buff[2][1],in=nbcsLocal;
   comm_scan(out,c,gs_long,gs_add,&in,1,buff);
@@ -215,8 +214,6 @@ int readRe2Boundaries(Mesh mesh,MPI_File file,struct comm *c){
       boundary.bc[0]=(long)tmp[0]-1;
       boundary.bc[1]=PRE_TO_SYM_FACE[(long)tmp[1]-1];
       array_cat(struct Boundary_private,&mesh->boundary,&boundary,1);
-      printf("eid/faceid/bc[0]/bc[1]:%lld %d %lld %d\n",
-        boundary.elementId,boundary.faceId,boundary.bc[0],boundary.bc[1]);
     }
   }
   free(buf);
@@ -289,7 +286,7 @@ int read_co2_mesh(Mesh *mesh_,char *fname,struct comm *c){
 
   //TODO: Assert version
   int nelt=nelgt/size,nrem=nelgt-nelt*size;
-  nelt+=(rank<nrem ? 1: 0);
+  nelt+=(rank>=(size-nrem) ? 1: 0);
 
   int nDim=(nVertex==8)?3:2;
 

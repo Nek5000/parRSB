@@ -127,7 +127,6 @@ int renumberPeriodicVertices(Mesh mesh,struct comm *c,\
   sint rank=c->id;
   ptr=compressed.ptr; size=compressed.n;
   if(rank==0){
-    printf("compressed.n=%u\n",size);
     sarray_sort_2(struct minPair_private,ptr,size,orig,1,min,1,&buf);
     for(i=0; i<size; i++)
       ptr[i].min=findMinBelowI(ptr[i].min,i,&compressed);
@@ -247,17 +246,14 @@ int gatherMatchingPeriodicFaces(Mesh mesh,struct comm *c){
 
   sint i; slong eid;
   for(i=0;i<nFaces;i++){
-    eid=bPtr[i].bc[0];
-    if(eid<bPtr[i].elementId){
+    eid=min(bPtr[i].bc[0],bPtr->elementId);
 #if defined(GENMAP_DEBUG)
       printf("Send matching (%lld,%lld) to (%ld,%ld).\n",\
           bPtr[i].elementId,bPtr[i].faceId,
           bPtr[i].bc[0]    ,bPtr[i].bc[1]);
 #endif
-      if(N==nelgt) bPtr[i].proc=eid/nelt;
-      else if(eid+1<=N) bPtr[i].proc=ceil((eid+1.0)/nelt)-1;
-      else bPtr[i].proc=ceil((eid+1.0-N)/(nelt+1.0))-1+size-nrem;
-    } else bPtr[i].proc=rank;
+    if(eid<N) bPtr[i].proc=eid/nelt;
+    else bPtr[i].proc=(eid-N)/(nelt+1)+size-nrem;
   }
 
   struct crystal cr; crystal_init(&cr,c);

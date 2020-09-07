@@ -30,9 +30,8 @@ int transferBoundaryFaces_(Mesh mesh,struct comm *c){
   sint i; slong eid;
   for(i=0;i<nFaces;i++,ptr++){
     eid=ptr->elementId;
-    if(N==nelgt) ptr->proc=eid/nelt;
-    else if(eid+1<=N) ptr->proc=ceil((eid+1.0)/nelt)-1;
-    else ptr->proc=ceil((eid+1.0-N)/(nelt+1.0))-1+size-nrem;
+    if(eid<N) ptr->proc=eid/nelt;
+    else ptr->proc=(eid-N)/(nelt+1)+size-nrem;
   }
 
   struct crystal cr; crystal_init(&cr,c);
@@ -82,12 +81,12 @@ int parRSB_findConnectivity(long long *vertexid,double *coord,
     b.bc[0]    =periodicInfo[4*i+2]-1;
     b.bc[1]    =PRE_TO_SYM_FACE[periodicInfo[4*i+3]-1];
     array_cat(struct Boundary_private,&mesh->boundary,&b,1);
-    printf("eid/faceid/bc[0]/bc[1]:%lld %d %lld %d\n",
-      b.elementId,b.faceId,b.bc[0],b.bc[1]);
+    //printf("eid/faceid/bc[0]/bc[1]:%lld %d %lld %d\n",
+    //  b.elementId,b.faceId,b.bc[0],b.bc[1]);
   }
   assert(mesh->boundary.n==nPeriodicFaces);
 
-  transferBoundaryFaces_(mesh,&c);
+  transferBoundaryFaces(mesh,&c);
 
   findMinNeighborDistance(mesh);
   findSegments(mesh,&c,tol);
