@@ -2,6 +2,7 @@ DEBUG ?= 0
 PAUL ?= 1
 CC ?= mpicc
 CFLAGS ?= -O2
+MPI ?= 1
 
 MKFILEPATH =$(abspath $(lastword $(MAKEFILE_LIST)))
 SRCROOT_  ?=$(patsubst %/,%,$(dir $(MKFILEPATH)))
@@ -45,6 +46,10 @@ endif
 
 ifneq ($(PAUL),0)
   PP += -DGENMAP_PAUL
+endif
+
+ifneq ($(MPI),0)
+  PP += -DMPI
 endif
 
 INSTALLDIR=

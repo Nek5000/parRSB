@@ -64,7 +64,10 @@ int findSegments(Mesh mesh,struct comm *c,GenmapScalar tol){
 
   //TODO: load balance
 
-  sint bin=1; if(nPoints==0) bin=0;
+  sint bin=1;
+  if(nPoints==0)
+    bin=0;
+
   sint rank=c->id,size=c->np; comm_ext old=c->c;
   struct comm nonZeroRanks;
 #ifdef MPI
@@ -90,23 +93,21 @@ int findSegments(Mesh mesh,struct comm *c,GenmapScalar tol){
     sint i; for(i=0;i<nPoints;i++)
       points[i].ifSegment=0,points[i].proc=rank;
 
-    int ipass,dim;
-    for(ipass=0;ipass<nDim;ipass++){
-      for(dim=0;dim<nDim;dim++){
-        findLocalSegments(mesh,dim,tolSquared);
-        mergeSegments(mesh,&nonZeroRanks,dim,tolSquared);
+    int dim;
+    for(dim=0;dim<nDim;dim++){
+      findLocalSegments(mesh,dim,tolSquared);
+      mergeSegments(mesh,&nonZeroRanks,dim,tolSquared);
 #if 1
-      sint count=0;
-      for(i=0;i<nPoints;i++)
-        if(points[i].ifSegment>0)
-          count++;
+    sint count=0;
+    for(i=0;i<nPoints;i++)
+      if(points[i].ifSegment>0)
+        count++;
 
-      in[0]=count;
-      comm_allreduce(&nonZeroRanks,gs_long,gs_add,in,1,buff);
-      if(rank==0)
-        printf("locglob: %d %lld\n",dim+1,in[0]+1);
+    in[0]=count;
+    comm_allreduce(&nonZeroRanks,gs_long,gs_add,in,1,buff);
+    if(rank==0)
+      printf("locglob: %d %lld\n",dim+1,in[0]+1);
 #endif
-      }
     }
   }
 

@@ -106,7 +106,7 @@ int parRSB_partMesh(int *part,long long *vtx,int nel,int nve,
       }
     }
 
-    GenmapRSB(h,1);
+    GenmapRSB(h,h->dbgLevel>1);
 
     e = GenmapGetElements(h);
     for(j = 0; j < GenmapGetNLocalElements(h); j++) {

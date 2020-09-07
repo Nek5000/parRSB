@@ -36,7 +36,6 @@ int parRCB_partMesh(int *part,int *seq,double *vtx,int nel,int nv,
   int ndim=(nv==8)?3:2;
 
   int e,n,v;
-
   for(e=0;e<nel;++e){
     data[e].id=nelg_start+(e+1);
     data[e].orig=rank;
@@ -101,7 +100,7 @@ int parRCB_partMesh(int *part,int *seq,double *vtx,int nel,int nv,
   buffer_free(&b);
 
   data=a.ptr;
-  for(int e=0;e<nel;e++){
+  for(e=0;e<nel;e++){
     part[e]=data[e].orig;
     seq [e]=data[e].seq ;
   }
