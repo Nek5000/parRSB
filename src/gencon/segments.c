@@ -97,7 +97,8 @@ int findSegments(Mesh mesh,struct comm *c,GenmapScalar tol){
     for(dim=0;dim<nDim;dim++){
       findLocalSegments(mesh,dim,tolSquared);
       mergeSegments(mesh,&nonZeroRanks,dim,tolSquared);
-#if 1
+
+#if defined(GENMAP_DEBUG)
     sint count=0;
     for(i=0;i<nPoints;i++)
       if(points[i].ifSegment>0)

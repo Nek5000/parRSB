@@ -243,7 +243,7 @@ int gatherMatchingPeriodicFaces(Mesh mesh,struct comm *c){
 
   slong nelgt=mesh->nelgt;
   sint nelt=nelgt/size,nrem=nelgt-nelt*size;
-  slong N=nrem*(nelt+1);
+  slong N=(size-nrem)*nelt;
 
   sint i; slong eid;
   for(i=0;i<nFaces;i++){
@@ -254,9 +254,9 @@ int gatherMatchingPeriodicFaces(Mesh mesh,struct comm *c){
           bPtr[i].elementId,bPtr[i].faceId,
           bPtr[i].bc[0]    ,bPtr[i].bc[1]);
 #endif
-      if(N==0) bPtr[i].proc=eid/nelt;
-      else if(eid<N) bPtr[i].proc=ceil((eid+1.0)/(nelt+1.0))-1;
-      else bPtr[i].proc=ceil((eid+1.0-N)/nelt)-1+nrem;
+      if(N==nelgt) bPtr[i].proc=eid/nelt;
+      else if(eid+1<=N) bPtr[i].proc=ceil((eid+1.0)/nelt)-1;
+      else bPtr[i].proc=ceil((eid+1.0-N)/(nelt+1.0))-1+size-nrem;
     } else bPtr[i].proc=rank;
   }
 

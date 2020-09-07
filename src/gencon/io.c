@@ -215,6 +215,8 @@ int readRe2Boundaries(Mesh mesh,MPI_File file,struct comm *c){
       boundary.bc[0]=(long)tmp[0]-1;
       boundary.bc[1]=PRE_TO_SYM_FACE[(long)tmp[1]-1];
       array_cat(struct Boundary_private,&mesh->boundary,&boundary,1);
+      printf("eid/faceid/bc[0]/bc[1]:%lld %d %lld %d\n",
+        boundary.elementId,boundary.faceId,boundary.bc[0],boundary.bc[1]);
     }
   }
   free(buf);
