@@ -21,9 +21,9 @@ int parRCB_partMesh  (int *part,int *seq,double *vtx,int  nel,int  nv,
   FORTRAN_UNPREFIXED(fparrsb_findconnectivity,FPARRSB_FINDCONNECTIVITY)
 void fparRSB_findConnectivity(long long *vertexId,double *coord,int *nel,
   int *nDim,long long *periodicInfo,int *nPeriodicFaces,double *tol,
-  MPI_Fint *fcomm,int *err);
+  MPI_Fint *fcomm,int *verbose,int *err);
 
 int parRSB_findConnectivity(long long *vertexid,double *coord,int nel,
   int nDim,long long *periodicInfo,int nPeriodicFaces,double tol,
-  MPI_Comm comm);
+  MPI_Comm comm,int verbose);
 #endif

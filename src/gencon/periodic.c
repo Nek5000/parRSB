@@ -208,8 +208,8 @@ int findConnectedPeriodicPairs(Mesh mesh,BoundaryFace f_,BoundaryFace g_,
     exit(1);
   }
 #if defined(GENMAP_DEBUG)
-  printf("Periodic face match (elementId,faceId): (%lld %lld) "\
-      "and (%lld %lld)\n",f.elementId,f.faceId,g.elementId,g.faceId);
+    printf("Periodic face match (elementId,faceId): (%lld %lld) "\
+        "and (%lld %lld)\n",f.elementId,f.faceId,g.elementId,g.faceId);
 #endif
 
   struct minPair_private m;
@@ -230,8 +230,9 @@ int findConnectedPeriodicFaces(Mesh mesh,struct array *matched)
 
   for(i=0;i<bSize-1;i++)
     for(j=i+1;j<bSize;j++)
-      if(ptr[j].bc[0]==ptr[i].elementId && ptr[j].bc[1]==ptr[i].faceId)
+      if(ptr[j].bc[0]==ptr[i].elementId && ptr[j].bc[1]==ptr[i].faceId){
         findConnectedPeriodicPairs(mesh,&ptr[i],&ptr[j],matched);
+      }
 }
 
 int gatherMatchingPeriodicFaces(Mesh mesh,struct comm *c){
@@ -241,12 +242,13 @@ int gatherMatchingPeriodicFaces(Mesh mesh,struct comm *c){
   int nFaces=mesh->boundary.n;
 
   slong nelgt=mesh->nelgt;
-  sint nelt=nelgt/size,nrem=nelgt-nelt*size;
+  sint nelt=nelgt/size;
+  sint nrem=nelgt-nelt*size;
   slong N=(size-nrem)*nelt;
 
   sint i; slong eid;
   for(i=0;i<nFaces;i++){
-    eid=min(bPtr[i].bc[0],bPtr->elementId);
+    eid=max(bPtr[i].bc[0],bPtr[i].elementId);
 #if defined(GENMAP_DEBUG)
       printf("Send matching (%lld,%lld) to (%ld,%ld).\n",\
           bPtr[i].elementId,bPtr[i].faceId,

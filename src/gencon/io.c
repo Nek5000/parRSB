@@ -23,14 +23,15 @@ int transferBoundaryFaces(Mesh mesh,struct comm *c){
   int nFaces=boundary->n;
 
   slong nelgt=mesh->nelgt;
-  sint nelt=nelgt/size,nrem=nelgt-nelt*size;
+  sint nelt=nelgt/size;
+  sint nrem=nelgt-nelt*size;
   slong N=(size-nrem)*nelt;
 
   sint i; slong eid;
-  for(i=0;i<nFaces;i++,ptr++){
-    eid=ptr->elementId;
-    if(eid<N) ptr->proc=eid/nelt;
-    else ptr->proc=(eid-N)/(nelt+1)+size-nrem;
+  for(i=0;i<nFaces;i++){
+    eid=ptr[i].elementId;
+    if(eid<N) ptr[i].proc=eid/nelt;
+    else ptr[i].proc=(eid-N)/(nelt+1)+size-nrem;
   }
 
   struct crystal cr; crystal_init(&cr,c);

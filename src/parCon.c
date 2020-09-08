@@ -8,45 +8,30 @@
 
 void fparRSB_findConnectivity(long long *vertexId,double *coord,
   int *nelt,int *ndim,long long *periodicInfo,int *nPeriodicFaces,
-  double *tol,MPI_Fint *fcomm,int *err)
+  double *tol,MPI_Fint *fcomm,int *verbose,int *err)
 {
   *err=1;
   MPI_Comm c=MPI_Comm_f2c(*fcomm);
   *err=parRSB_findConnectivity(vertexId,coord,*nelt,*ndim,periodicInfo,
-      *nPeriodicFaces,*tol,c);
-}
-
-int transferBoundaryFaces_(Mesh mesh,struct comm *c){
-  uint size=c->np;
-
-  struct array *boundary=&mesh->boundary;
-  BoundaryFace ptr=boundary->ptr;
-  int nFaces=boundary->n;
-
-  slong nelgt=mesh->nelgt;
-  sint nelt=nelgt/size,nrem=nelgt-nelt*size;
-  slong N=(size-nrem)*nelt;
-
-  sint i; slong eid;
-  for(i=0;i<nFaces;i++,ptr++){
-    eid=ptr->elementId;
-    if(eid<N) ptr->proc=eid/nelt;
-    else ptr->proc=(eid-N)/(nelt+1)+size-nrem;
-  }
-
-  struct crystal cr; crystal_init(&cr,c);
-  sarray_transfer(struct Boundary_private,boundary,proc,1,&cr);
-  crystal_free(&cr);
+      *nPeriodicFaces,*tol,c,verbose);
 }
 
 // coord[nelt,nv,ndim] - in, vertices are orders in preprocessor ordering
 // vertexid[nelt,nv] - out
 int parRSB_findConnectivity(long long *vertexid,double *coord,
   int nelt,int ndim,long long *periodicInfo,int nPeriodicFaces,
-  double tol,MPI_Comm comm)
+  double tol,MPI_Comm comm,int verbose)
 {
   struct comm c; comm_init(&c,comm);
   uint rank=c.id,size=c.np;
+
+  if(rank==0 && verbose)
+    printf("Calculating connectivity .... ");
+  fflush(stdout);
+
+  double t_con=0.0;
+  comm_barrier(&c);
+  t_con-=comm_time();
 
   Mesh mesh; MeshInit(&mesh,nelt,ndim);
 
@@ -54,6 +39,12 @@ int parRSB_findConnectivity(long long *vertexid,double *coord,
   comm_scan(out,&c,gs_long,gs_add,&in,1,buff);
   ulong start=out[0][0];
   ulong nelgt=mesh->nelgt=mesh->nelgv=out[1][0];
+
+  int nelt_=nelgt/size;
+  int nrem =nelgt-nelt_*size;
+  if(rank>=(size-nrem))
+    nelt_++;
+  assert(nelt==nelt_);
 
   int nvertex=mesh->nVertex;
   uint nunits=nvertex*nelt;
@@ -81,8 +72,6 @@ int parRSB_findConnectivity(long long *vertexid,double *coord,
     b.bc[0]    =periodicInfo[4*i+2]-1;
     b.bc[1]    =PRE_TO_SYM_FACE[periodicInfo[4*i+3]-1];
     array_cat(struct Boundary_private,&mesh->boundary,&b,1);
-    //printf("eid/faceid/bc[0]/bc[1]:%lld %d %lld %d\n",
-    //  b.elementId,b.faceId,b.bc[0],b.bc[1]);
   }
   assert(mesh->boundary.n==nPeriodicFaces);
 
@@ -104,6 +93,12 @@ int parRSB_findConnectivity(long long *vertexid,double *coord,
       ptr++;
     }
   }
+
+  comm_barrier(&c);
+  t_con+=comm_time();
+
+  if(rank==0 && verbose)
+    printf(" finished in %g seconds\n",t_con);
 
   MeshFree(mesh);
   comm_free(&c);
