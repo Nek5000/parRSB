@@ -81,7 +81,7 @@ int parRCB_partMesh(int *part,int *seq,double *vtx,int nel,int nv,
     time=comm_time()-time;
 
     if(c.id==0)
-      printf(" finished in %lfs\n",time);
+      printf(" finished in %g s\n",time);
     fflush(stdout);
   }
   comm_free(&rcb);

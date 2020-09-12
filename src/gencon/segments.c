@@ -59,7 +59,10 @@ int findSegments(Mesh mesh,struct comm *c,GenmapScalar tol){
   Point points=mesh->elements.ptr;
 
   buffer buf; buffer_init(&buf,1024);
-  sarray_sort_2(struct Point_private,points,nPoints,x[1],3,x[2],3,&buf);
+  if(nDim==3)
+    sarray_sort_2(struct Point_private,points,nPoints,x[1],3,x[2],3,&buf);
+  else
+    sarray_sort  (struct Point_private,points,nPoints,x[1],3,&buf);
   buffer_free(&buf);
 
   //TODO: load balance

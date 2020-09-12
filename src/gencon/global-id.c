@@ -48,7 +48,7 @@ int setGlobalID(Mesh mesh,struct comm *c){
 
 int sendBack(Mesh mesh,struct comm *c){
   struct crystal cr; crystal_init(&cr,c);
-  sarray_transfer(struct Point_private,&mesh->elements,origin,1,&cr);
+  sarray_transfer(struct Point_private,&mesh->elements,origin,0,&cr);
   crystal_free(&cr);
 
   buffer buf; buffer_init(&buf,1024);

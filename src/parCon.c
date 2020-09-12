@@ -13,7 +13,7 @@ void fparRSB_findConnectivity(long long *vertexId,double *coord,
   *err=1;
   MPI_Comm c=MPI_Comm_f2c(*fcomm);
   *err=parRSB_findConnectivity(vertexId,coord,*nelt,*ndim,periodicInfo,
-      *nPeriodicFaces,*tol,c,verbose);
+      *nPeriodicFaces,*tol,c,*verbose);
 }
 
 // coord[nelt,nv,ndim] - in, vertices are orders in preprocessor ordering

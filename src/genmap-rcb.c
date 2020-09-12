@@ -35,8 +35,10 @@ int parRCB(struct comm *ci,struct array *a,int ndim){
   sint rank=c.id;
   sint size=c.np;
 
-  if(rank == 0)
-    printf("running RCB "), fflush(stdout);
+  if(rank == 0){
+    printf("running RCB ...");
+    fflush(stdout);
+  }
 
   double length[MAXDIM];
 

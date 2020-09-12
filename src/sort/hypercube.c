@@ -106,9 +106,9 @@ int transfer_elem(struct hypercube *data,struct comm *c)
 int parallel_hypercube_sort(struct hypercube *data,struct comm *c)
 {
   struct sort *input=data->data;
-  struct array *a=input->a;
-  gs_dom t  =input->t[0];
-  uint offset    =input->offset[0];
+  struct array *a   =input->a;
+  gs_dom t          =input->t[0];
+  uint offset       =input->offset[0];
 
   sint size=c->np,rank=c->id;
 

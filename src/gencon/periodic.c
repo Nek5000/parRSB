@@ -4,6 +4,7 @@
 
 #include <gencon-impl.h>
 #include <genmap-impl.h>
+#include <sort.h>
 
 int faces3D[GC_MAX_FACES][GC_MAX_FACE_VERTICES]={
   {1,5,7,3},{2,4,8,6},{1,2,6,5},{3,7,8,4},{1,3,4,2},{5,6,8,7}
@@ -21,56 +22,34 @@ struct minPair_private{
 typedef struct minPair_private* minPair;
 
 int compressPeriodicVertices(Mesh mesh,struct comm *c){
-#if 0
-  exaSort(mesh->elements,slong_t,\
-    offsetof(struct Point_private,globalId),
-    exaSortAlgoBinSort,0,exaGetComm(h));
+  parallel_sort(struct Point_private,&mesh->elements,globalId,
+    gs_long,0,0,c);
 
-  Point   points=exaArrayGetPointer(mesh->elements);
-  sint nPoints=exaArrayGetSize(mesh->elements);
+  Point points=mesh->elements.ptr;
+  uint npoints=mesh->elements.n;
 
-  sint i,nUnique=0;
-  if(nPoints){
+  sint i,nunique=0;
+  if(npoints>0){
     slong current=points[0].globalId;
-    points[0].globalId=nUnique;
-    for(i=1;i<nPoints;i++)
+    points[0].globalId=nunique;
+    for(i=1;i<npoints;i++)
       if(points[i].globalId==current)
-        points[i].globalId=nUnique;
+        points[i].globalId=nunique;
       else{
-        current=points[i].globalId,++nUnique;
-        points[i].globalId=nUnique;
+        current=points[i].globalId,++nunique;
+        points[i].globalId=nunique;
       }
   }
 
   slong out[2][1],buf[2][1],in[1];
-  if(nPoints) in[0]=nUnique+1;
-  else in[0]=0;
-
-  exaScan(h,out,in,buf,1,slong_t,exaAddOp);
+  if(npoints>0) in[0]=nunique+1; else in[0]=0;
+  comm_scan(out,c,gs_long,gs_add,in,1,buf);
   slong start=out[0][0];
 
-  for(i=0;i<nPoints;i++) points[i].globalId+=start;
+  for(i=0;i<npoints;i++)
+    points[i].globalId+=start;
 
-  int size=exaSize(h);
-  int rank=exaRank(h);
-
-  slong nelgt=mesh->nelgt;
-  sint nelt=nelgt/size,nrem=nelgt-nelt*size;
-  slong N=nrem*(nelt+1);
-
-  slong eid;
-  for(i=0;i<nPoints;i++){
-    eid=points[i].elementId;
-    if(N==0) points[i].proc=eid/nelt;
-    else if(eid+1<=N)
-      points[i].proc=ceil((eid+1.0)/(nelt+1.0))-1;
-    else points[i].proc=ceil((eid+1.0-N)/nelt)-1+nrem;
-  }
-
-  exaComm c=exaGetComm(h);
-  exaArrayTransfer(mesh->elements,\
-      offsetof(struct Point_private,proc),1,c);
-#endif
+  return 0;
 }
 
 ulong findMinBelowI(ulong min,uint I,struct array *arr){
@@ -319,9 +298,7 @@ int matchPeriodicFaces(Mesh mesh,struct comm *c){
   array_free(&matched);
 
   compressPeriodicVertices(mesh,c);
+  sendBack(mesh,c);
 
-  buffer buf; buffer_init(&buf,1024);
-  sarray_sort(struct Point_private,mesh->elements.ptr,mesh->elements.n,\
-      sequenceId,1,&buf);
-  buffer_free(&buf);
+  return 0;
 }
