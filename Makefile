@@ -2,6 +2,8 @@ DEBUG ?= 0
 PAUL ?= 1
 CC ?= mpicc
 CFLAGS ?= -O2
+## ALGO=0 (Lanczos),1 (RQI),2 (FMG)
+ALGO ?= 0
 MPI ?= 1
 
 MKFILEPATH =$(abspath $(lastword $(MAKEFILE_LIST)))
@@ -42,6 +44,12 @@ PP=
 
 ifneq ($(DEBUG),0)
   PP += -g -DGENMAP_DEBUG
+endif
+
+ifeq ($(ALGO),0)
+  PP += -DGENMAP_LANCZOS
+else ifeq ($(ALGO),1)
+  PP += -DGENMAP_RQI
 endif
 
 ifneq ($(PAUL),0)

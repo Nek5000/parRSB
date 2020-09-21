@@ -23,7 +23,6 @@ int parRCB_partMesh(int *part,int *seq,double *vtx,int nel,int nv,
   struct comm c; comm_init(&c,comm);
   int rank=c.id,size=c.np;
 
-  /* load balance input data */
   slong out[2][1],buf[2][1];
   slong nell=nel;
   comm_scan(out,&c,gs_long,gs_add,&nell,1,&buf);

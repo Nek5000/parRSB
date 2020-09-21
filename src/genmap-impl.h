@@ -39,6 +39,39 @@ int GenmapCreateElements(GenmapElements *e);
 int GenmapDestroyElements(GenmapElements e);
 GenmapElements GenmapGetElements_default(GenmapHandle h);
 
+typedef enum{
+  RSB,
+  RCB,
+  GSSETUP,
+  PAIRWISE,
+  CRYSTAL,
+  ALLREDUCE,
+  NNEIGHBORS,
+  FIEDLER,
+  NFIEDLER,
+  LANCZOS,
+  RQI,
+  FMG,
+  GSOP,
+  LAPLACIANSETUP,
+  NCONN,
+  LAPLACIAN,
+  PROJECTPF,
+  NPROJECTPF,
+  PRECONSETUP,
+  PRECONVCYCLE,
+  PRECONAX,
+  END
+}metric;
+
+void metric_init();
+void metric_finalize();
+void metric_acc(metric m,double count);
+void metric_tic(struct comm *c,metric m);
+void metric_toc(struct comm *c,metric m);
+void metric_push_level();
+void metric_print(struct comm *c);
+
 struct GenmapHandle_private {
   GenmapComm global;
   GenmapComm local;
@@ -54,7 +87,6 @@ struct GenmapHandle_private {
 
   int dbgLevel;
   int printStat;
-  double time[16];
 };
 
 int GenmapCreateHandle(GenmapHandle h);

@@ -1,8 +1,6 @@
 #include <genmap-impl.h>
 #include <genmap-multigrid-precon.h>
 
-#define DBG 0
-
 int log2i(sint i){
   sint k=1,l=0;
   while(k<=i) k*=2,l++;
@@ -69,10 +67,6 @@ void mgLevelSetup(mgData d,uint lvl)
     }
   assert(nn==nnz0);
 
-#if DBG
-  printf("A: nid=%d nnz=%zu\n",d->c.id,entries.n);
-#endif
-
   slong out[2][1],bf[2][1],in=rn0;
   comm_scan(out,&d->c,gs_long,gs_add,&in,1,bf);
   slong ng=out[1][0];
@@ -88,10 +82,6 @@ void mgLevelSetup(mgData d,uint lvl)
 
   uint npc=d->c.np;
   if(ngc<npc) npc=ngc;
-
-#if DBG
-  printf("id=%u ng=%lld ng_c=%lld np_c=%d\n",d->c.id,ng,ngc,npc);
-#endif
 
   /* setup gs ids for fine level (rhs interpolation) */
   ptr=entries.ptr;
@@ -113,10 +103,6 @@ void mgLevelSetup(mgData d,uint lvl)
   setOwner(entries.ptr,nnz0,offsetof(entry,rn),offsetof(entry,p),ngc,npc);
   sarray_transfer(entry,&entries,p,1,&cr);
 
-#if DBG
-  printf("C: nid=%d nnz=%zu\n",d->c.id,entries.n);
-#endif
-
   // sort by rn and cn
   sarray_sort_2(entry,entries.ptr,entries.n,rn,1,cn,1,&buf);
 
@@ -124,10 +110,6 @@ void mgLevelSetup(mgData d,uint lvl)
     while(j<entries.n && ptr[j].rn==ptr[i].rn) j++;
     i=j,nn++;
   }
-
-#if DBG
-  printf("D: nid=%d rn=%d\n",d->c.id,nn);
-#endif
 
   /* create the matrix */
   GenmapMalloc(1,&d->levels[lvl]); mgLevel l=d->levels[lvl];l->data=d;
@@ -144,10 +126,6 @@ void mgLevelSetup(mgData d,uint lvl)
       j++;
     i=j,nnz1++;
   }
-
-#if DBG
-  printf("C: nid=%d rn=%d nnz0=%u nnz1=%d\n",d->c.id,nn,nnz0,nnz1);
-#endif
 
   if(nnz1==0)
     M1->col=NULL,M1->v=NULL,M1->diag=NULL;
@@ -183,19 +161,6 @@ void mgLevelSetup(mgData d,uint lvl)
       }
   assert(nn==M1->rn);
 
-#if defined(GENMAP_DEBUG)
-  for(i=0; i<d->c.np; i++){
-    comm_barrier(&d->c);
-    if(i==d->c.id){
-      printf("rank=%d lvl=%d:",d->c.id,lvl);
-      for(j=0; j<rn0+rn1; j++)
-        printf(" %lld",ids[j]);
-      printf("\n");
-    }
-    fflush(stdout);
-  }
-#endif
-
   d->levels[lvl-1]->J=gs_setup(ids,rn0+M1->rn,&d->c,0,gs_crystal_router,0);
 
   /* setup gs handle for the mat-vec */
@@ -223,9 +188,6 @@ void mgSetup(GenmapComm c,csr_mat M,mgData *d_){
   slong rg=out[1][0];
 
   d->nlevels=log2i(rg)+1;
-#if DBG
-  printf("A: nid=%d nLevel=%d\n",d->c.id,d->nlevels);
-#endif
   GenmapMalloc(d->nlevels  ,&d->levels   );
   GenmapMalloc(d->nlevels+1,&d->level_off);
 

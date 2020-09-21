@@ -4,61 +4,54 @@
 #include <genmap-impl.h>
 #include <genmap-multigrid-precon.h>
 
-//input r should have zero-sum
+// Input z should be orthogonal to 1-vector, have unit norm.
+// RQI should not change z.
 int rqi(GenmapHandle h,GenmapComm c,mgData d,GenmapVector z,
   int iter,int verbose,GenmapVector y)
 {
   assert(z->size==y->size);
 
-  GenmapScalar lambda,norm,normi;
-  GenmapLong nelg=GenmapGetNGlobalElements(h);
+  int ppfi;
+  metric_tic(&c->gsc,PROJECTPF);
+  ppfi=project_pf(h,c,d,z,20,verbose,y);
+  metric_toc(&c->gsc,PROJECTPF);
+  metric_acc(NPROJECTPF,ppfi);
 
   GenmapVector err; GenmapCreateVector(&err,z->size);
-
-  int rank=GenmapCommRank(c);
-  int projecti;
-
-  comm_barrier(&c->gsc);
-  h->time[5]-=comm_time();
-  h->time[6]+=project_pf(h,c,d,z,30,verbose,y);
-  comm_barrier(&c->gsc);
-  h->time[5]+=comm_time();
-
-  lambda=GenmapDotVector(y,z);
-  GenmapGop(c,&lambda,1,GENMAP_SCALAR,GENMAP_SUM);
-
-  GenmapAxpbyVector(err,y,1.0,z,-lambda);
-  norm=GenmapDotVector(err,err);
-  GenmapGop(c,&norm,1,GENMAP_SCALAR,GENMAP_SUM);
-
-  double eps=1e-5;
-  GenmapScalar rnorm=norm*eps;
+  GenmapLong nelg=GenmapGetNGlobalElements(h);
+  int rank=GenmapCommRank(GenmapGetGlobalComm(h));
 
   uint i;
-  for(i=0; i<iter && norm>rnorm; i++){
-    norm=GenmapDotVector(y,y);
-    GenmapGop(c,&norm,1,GENMAP_SCALAR,GENMAP_SUM);
-    normi=1.0/sqrt(norm);
+  for(i=0; i<iter; i++){
+    GenmapScalar norm0=GenmapDotVector(y,y);
+    GenmapGop(c,&norm0,1,GENMAP_SCALAR,GENMAP_SUM);
+    GenmapScalar normi0=1.0/sqrt(norm0);
 
-    GenmapAxpbyVector(z,z,0.0,y,normi);
+    GenmapAxpbyVector(z,z,0.0,y,normi0);
     GenmapOrthogonalizebyOneVector(h,c,z,nelg);
 
-    comm_barrier(&c->gsc);
-    h->time[5]-=comm_time();
-    h->time[6]+=project_pf(h,c,d,z,30,verbose,y);
-    comm_barrier(&c->gsc);
-    h->time[5]+=comm_time();
-
+    metric_tic(&c->gsc,PROJECTPF);
+    ppfi=project_pf(h,c,d,z,100,verbose,y);
+    metric_toc(&c->gsc,PROJECTPF);
+    metric_acc(NPROJECTPF,ppfi);
     GenmapOrthogonalizebyOneVector(h,c,y,nelg);
 
-    lambda=GenmapDotVector(y,z);
+    //char fname[BUFSIZ];
+    //sprintf(fname,"rqi_fiedler.%03d",i);
+    //GenmapFiedlerDump(fname,y,h,c);
+
+    GenmapScalar lambda=GenmapDotVector(y,z);
     GenmapGop(c,&lambda,1,GENMAP_SCALAR,GENMAP_SUM);
 
     GenmapAxpbyVector(err,y,1.0,z,-lambda);
-    norm=GenmapDotVector(err,err);
-    GenmapGop(c,&norm,1,GENMAP_SCALAR,GENMAP_SUM);
-    if(rank==0 && verbose)
-      printf("rqi i=%02d lambda=%1.10e\n",i,lambda);
+    GenmapScalar norme=GenmapDotVector(err,err);
+    GenmapGop(c,&norme,1,GENMAP_SCALAR,GENMAP_SUM);
+    norme=sqrt(norme);
+
+    GenmapScalar norm1=GenmapDotVector(y,y);
+    GenmapGop(c,&norm1,1,GENMAP_SCALAR,GENMAP_SUM);
+    GenmapScalar normi1=1.0/sqrt(norm1);
+    metric_acc(END+i,norme*normi1);
   }
 
   GenmapDestroyVector(err);

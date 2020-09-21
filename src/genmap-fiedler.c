@@ -37,25 +37,20 @@ int GenmapFiedlerRQI(GenmapHandle h,GenmapComm c,int maxIter,int global)
   GenmapScalar rni=1.0/sqrt(rtr);
   GenmapScaleVector(initVec,initVec,rni);
  
-  comm_barrier(&c->gsc);
-  h->time[2]-=comm_time();
-  GenmapInitLaplacian(h,c);
-  comm_barrier(&c->gsc);
-  h->time[2]+=comm_time();
+  struct comm *gsc=&c->gsc;
 
-  comm_barrier(&c->gsc);
-  h->time[4]-=comm_time();
+  metric_tic(gsc,LAPLACIANSETUP);
+  GenmapInitLaplacian(h,c);
+  metric_toc(gsc,LAPLACIANSETUP);
+
+  metric_tic(gsc,PRECONSETUP);
   mgData d; mgSetup(c,c->M,&d); d->h=h;
-  comm_barrier(&c->gsc);
-  h->time[4]+=comm_time();
+  metric_toc(gsc,PRECONSETUP);
 
   GenmapVector y; GenmapCreateZerosVector(&y,lelt);
-  comm_barrier(&c->gsc);
-  h->time[3]-=comm_time();
-  int iter=rqi(h,c,d,initVec,maxIter,1,y);
-  h->time[12]+=iter;
-  comm_barrier(&c->gsc);
-  h->time[3]+=comm_time();
+  metric_tic(gsc,RQI);
+  int iter=rqi(h,c,d,initVec,maxIter,0,y);
+  metric_toc(gsc,RQI);
 
   mgFree(d);
 
@@ -139,12 +134,6 @@ int GenmapFiedlerLanczos(GenmapHandle h,GenmapComm c,int maxIter,
     }
   }
   GenmapCopyVector(evTriDiag, eVectors[eValMinI]);
-#if defined(GENMAP_DEBUG)
-  if(GenmapCommRank(GenmapGetGlobalComm(h)) == 0) {
-    printf("evTriDiag:\n");
-    GenmapPrintVector(evTriDiag);
-  }
-#endif
 #else
   GenmapVector init;
   GenmapCreateVector(&init, iter);
