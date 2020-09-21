@@ -1,6 +1,7 @@
 #include <sort.h>
 #include <float.h>
 #include <parRSB.h>
+#include <genmap-impl.h>
 
 void get_axis_len(double *length,struct array *a,struct comm *c,int ndim)
 {
@@ -35,23 +36,23 @@ int parRCB(struct comm *ci,struct array *a,int ndim){
   sint rank=c.id;
   sint size=c.np;
 
-  if(rank == 0){
-    printf("running RCB ...");
-    fflush(stdout);
-  }
-
   double length[MAXDIM];
 
   while(size>1){
+    metric_acc(RCBN,a->n);
+
+    metric_tic(&c,AXISLEN);
     get_axis_len(length,a,&c,ndim);
+    metric_toc(&c,AXISLEN);
 
     int axis1=0,d;
     for(d=1;d<ndim;d++)
       if(length[d]>length[axis1]) axis1=d;
-    int axis2=(axis1+1)%2;
-    for(d=0;d<ndim;d++)
-      if(length[d]>length[axis2] && d!=axis1) axis2=d;
+    //int axis2=(axis1+1)%2;
+    //for(d=0;d<ndim;d++)
+    //  if(length[d]>length[axis2] && d!=axis1) axis2=d;
 
+    metric_tic(&c,PARSORT);
     switch(axis1){
       case 0:
         parallel_sort(elm_rcb,a,coord[0],gs_double,0,1,&c);
@@ -65,6 +66,9 @@ int parRCB(struct comm *ci,struct array *a,int ndim){
       default:
         break;
     }
+    metric_toc(&c,PARSORT);
+
+    metric_push_level();
 
     int p=(size+1)/2;
     int bin=(rank>=p);

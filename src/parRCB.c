@@ -50,6 +50,9 @@ int parRCB_partMesh(int *part,int *seq,double *vtx,int nel,int nv,
 
   //TODO: load balance
 
+  buffer bfr; buffer_init(&bfr,1024);
+  metric_init();
+
   struct comm rcb;
   comm_ext old=c.c;
 #ifdef MPI
@@ -63,13 +66,15 @@ int parRCB_partMesh(int *part,int *seq,double *vtx,int nel,int nv,
     comm_barrier(&rcb);
     double time=comm_time();
 
+    if(c.id==0)
+      printf("running RCB ...");
+    fflush(stdout);
+
     parRCB(&rcb,&a,ndim);
 
     // do local rcb
-    buffer bfr; buffer_init(&bfr,1024);
     uint s1=0,e1=a.n;
     rcb_local(&a,s1,e1,ndim,&bfr);
-    buffer_free(&bfr);
 
     elm_rcb *ptr=a.ptr;
     int i;
@@ -83,26 +88,27 @@ int parRCB_partMesh(int *part,int *seq,double *vtx,int nel,int nv,
       printf(" finished in %g s\n",time);
     fflush(stdout);
   }
-  comm_free(&rcb);
 
   /* restore original input */
   struct crystal cr; crystal_init(&cr,&c);
   sarray_transfer(elm_rcb,&a,orig,1,&cr);
   crystal_free(&cr);
-
-  comm_free(&c);
-
   assert(a.n==nel);
+  sarray_sort(elm_rcb,a.ptr,a.n,id,1,&bfr);
 
-  buffer b; buffer_init(&b,1024);
-  sarray_sort(elm_rcb,a.ptr,a.n,id,1,&b);
-  buffer_free(&b);
 
   data=a.ptr;
   for(e=0;e<nel;e++){
     part[e]=data[e].orig;
     seq [e]=data[e].seq ;
   }
+
+  metric_print(&c);
+
+  comm_free(&rcb);
+  metric_finalize();
+  buffer_free(&bfr);
+  comm_free(&c);
 
   return 0;
 }

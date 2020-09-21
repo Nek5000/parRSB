@@ -42,6 +42,13 @@ GenmapElements GenmapGetElements_default(GenmapHandle h);
 typedef enum{
   RSB,
   RCB,
+  RCBN,
+  AXISLEN,
+  PARSORT,
+  SETPROC,
+  LOCALSORT,
+  LOADBALANCE,
+  RCBTRANSFER,
   GSSETUP,
   PAIRWISE,
   CRYSTAL,

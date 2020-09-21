@@ -1,5 +1,6 @@
 #include <sort-impl.h>
 #include <float.h>
+#include <genmap-impl.h>  //FIXME - include genmap-statistics
 
 int set_dest(uint *proc,uint np,ulong start,uint size,ulong nelem)
 {
@@ -122,8 +123,12 @@ int parallel_sort_private(struct sort *data,struct comm *c){
 
   if(balance){
     struct crystal cr; crystal_init(&cr,c);
+    metric_tic(c,LOADBALANCE);
     load_balance(a,usize,c,&cr);
+    metric_toc(c,LOADBALANCE);
+    metric_tic(c,LOCALSORT);
     sort_local(data);
+    metric_toc(c,LOCALSORT);
     crystal_free(&cr);
   }
 

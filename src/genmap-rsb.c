@@ -77,7 +77,7 @@ void GenmapRSB(GenmapHandle h,int verbose){
     metric_push_level();
   }
 
-  metric_print(&global_c->gsc);
+  //metric_print(&global_c->gsc);
   metric_finalize();
 
   crystal_free(&(h->cr));

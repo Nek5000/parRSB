@@ -33,8 +33,8 @@ void metric_tic(struct comm *c,metric m){
 }
 
 void metric_toc(struct comm *c,metric m){
-  comm_barrier(c);
   metrics[m]+=comm_time();
+  comm_barrier(c);
 }
 
 void metric_push_level(){
@@ -72,35 +72,13 @@ void metric_print(struct comm *c){
   for(i=0; i<stack_size; i++){
     if(c->id==0){
       printf("level=%02d\n",i);
-#if defined(GENMAP_RCB)
-      printf("  RCB             : %g/%g/%g\n",summary(i,RCB));
-#endif
-      printf("  pairwise        : %g/%g/%g\n",summary(i,PAIRWISE      ));
-      printf("  crystal_router  : %g/%g/%g\n",summary(i,CRYSTAL       ));
-      printf("  allreduce       : %g/%g/%g\n",summary(i,ALLREDUCE     ));
-      printf("  nneighbors      : %g/%g/%g\n",summary(i,NNEIGHBORS    ));
-      printf("  gs_setup        : %g/%g/%g\n",summary(i,GSSETUP       ));
-      printf("  laplacian_setup : %g/%g/%g\n",summary(i,LAPLACIANSETUP));
-      printf("  nconn           : %g/%g/%g\n",summary(i,NCONN         ));
-      printf("  gs              : %g/%g/%g\n",summary(i,GSOP          ));
-      printf("  laplacian       : %g/%g/%g\n",summary(i,LAPLACIAN     ));
-#if defined(GENMAP_RQI) || defined(GENMAP_FMG)
-      printf("  precon_setup    : %g/%g/%g\n",summary(i,PRECONSETUP   ));
-      printf("  precon_ax       : %g/%g/%g\n",summary(i,PRECONAX      ));
-      printf("  precon_vcycle   : %g/%g/%g\n",summary(i,PRECONVCYCLE  ));
-      printf("  projectpf       : %g/%g/%g\n",summary(i,PROJECTPF     ));
-      printf("  nprojectpf      : %g/%g/%g\n",summary(i,NPROJECTPF    ));
-#if defined(GENMAP_RQI)
-      printf("  RQI             : %g/%g/%g\n",summary(i,RQI           ));
-#elif defined(GENMAP_FMG)
-      printf("  FMG             : %g/%g/%g\n",summary(i,FMG           ));
-#endif
-      for(int j=0; j<100; j++)
-      printf("  PPF i=%02d        : %g/%g/%g\n",j,summary(i,END+j       ));
-#endif
-      printf("  fiedler_time    : %g/%g/%g\n",summary(i,FIEDLER       ));
-      printf("  fiedler_iter    : %g/%g/%g\n",summary(i,NFIEDLER      ));
-      printf("  RSB             : %g/%g/%g\n",summary(i,RSB           ));
+      printf("  RCBN         : %g/%g/%g\n",summary(i,RCBN        ));
+      printf("  AXISLEN      : %g/%g/%g\n",summary(i,AXISLEN     ));
+      printf("  PARSORT      : %g/%g/%g\n",summary(i,PARSORT     ));
+      printf("  LOCALSORT    : %g/%g/%g\n",summary(i,LOCALSORT   ));
+      printf("  SETPROC      : %g/%g/%g\n",summary(i,SETPROC     ));
+      printf("  RCBTRANSFER  : %g/%g/%g\n",summary(i,RCBTRANSFER ));
+      printf("  LOADBALANCE  : %g/%g/%g\n",summary(i,LOADBALANCE ));
     }
   }
 }
