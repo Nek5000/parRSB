@@ -48,8 +48,6 @@ int parRCB_partMesh(int *part,int *seq,double *vtx,int nel,int nv,
   }
   a.n=nel;
 
-  //TODO: load balance
-
   buffer bfr; buffer_init(&bfr,1024);
   metric_init();
 
@@ -72,14 +70,16 @@ int parRCB_partMesh(int *part,int *seq,double *vtx,int nel,int nv,
 
     parRCB(&rcb,&a,ndim);
 
-    // do local rcb
-    uint s1=0,e1=a.n;
-    rcb_local(&a,s1,e1,ndim,&bfr);
+    // Do a local RCB if seq!=NULL
+    if(seq!=NULL){
+      uint s1=0,e1=a.n;
+      rcb_local(&a,s1,e1,ndim,&bfr);
 
-    elm_rcb *ptr=a.ptr;
-    int i;
-    for(i=0; i<a.n; i++)
-      ptr[i].seq=i;
+      elm_rcb *ptr=a.ptr;
+      int i;
+      for(i=0; i<a.n; i++)
+        ptr[i].seq=i;
+    }
 
     comm_barrier(&rcb);
     time=comm_time()-time;
@@ -98,10 +98,11 @@ int parRCB_partMesh(int *part,int *seq,double *vtx,int nel,int nv,
 
 
   data=a.ptr;
-  for(e=0;e<nel;e++){
+  for(e=0;e<nel;e++)
     part[e]=data[e].orig;
-    seq [e]=data[e].seq ;
-  }
+  if(seq!=NULL)
+    for(e=0;e<nel;e++)
+      seq[e]=data[e].seq ;
 
   metric_print(&c);
 

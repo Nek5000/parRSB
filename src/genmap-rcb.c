@@ -48,9 +48,6 @@ int parRCB(struct comm *ci,struct array *a,int ndim){
     int axis1=0,d;
     for(d=1;d<ndim;d++)
       if(length[d]>length[axis1]) axis1=d;
-    //int axis2=(axis1+1)%2;
-    //for(d=0;d<ndim;d++)
-    //  if(length[d]>length[axis2] && d!=axis1) axis2=d;
 
     metric_tic(&c,PARSORT);
     switch(axis1){

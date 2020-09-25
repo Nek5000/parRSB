@@ -67,23 +67,24 @@ void metric_print(struct comm *c){
   for(i=0; i<max_size; i++)
     sum[i]/=c->np;
 
-#define summary(i,m) sum[i*MAXMETS+m],min[i*MAXMETS+m],max[i*MAXMETS+m]
+#define SUMMARY(i,m) sum[i*MAXMETS+m],min[i*MAXMETS+m],max[i*MAXMETS+m]
 
   for(i=0; i<stack_size; i++){
     if(c->id==0){
       printf("level=%02d\n",i);
-      printf("  RCBN         : %g/%g/%g\n",summary(i,RCBN        ));
-      printf("  AXISLEN      : %g/%g/%g\n",summary(i,AXISLEN     ));
-      printf("  PARSORT      : %g/%g/%g\n",summary(i,PARSORT     ));
-      printf("  LOCALSORT    : %g/%g/%g\n",summary(i,LOCALSORT   ));
-      printf("  SETPROC      : %g/%g/%g\n",summary(i,SETPROC     ));
-      printf("  RCBTRANSFER  : %g/%g/%g\n",summary(i,RCBTRANSFER ));
-      printf("  LOADBALANCE  : %g/%g/%g\n",summary(i,LOADBALANCE ));
+      printf("  RCBN         : %g/%g/%g\n",SUMMARY(i,RCBN        ));
+      printf("  AXISLEN      : %g/%g/%g\n",SUMMARY(i,AXISLEN     ));
+      printf("  LOCALSORT    : %g/%g/%g\n",SUMMARY(i,LOCALSORT   ));
+      printf("  SETPROC      : %g/%g/%g\n",SUMMARY(i,SETPROC     ));
+      printf("  RCBTRANSFER  : %g/%g/%g\n",SUMMARY(i,RCBTRANSFER ));
+      printf("  PARSORT      : %g/%g/%g\n",SUMMARY(i,PARSORT     ));
+      printf("  LOADBALANCE  : %g/%g/%g\n",SUMMARY(i,LOADBALANCE ));
     }
   }
 }
 
-#undef summary
+#undef SUMMARY
+
 #undef MAXMETS
 #undef MAXLVLS
 #undef MAXSIZE
