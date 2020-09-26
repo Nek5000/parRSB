@@ -23,9 +23,16 @@ int parRCB_partMesh(int *part,int *seq,double *vtx,int nel,int nv,
   struct comm c; comm_init(&c,comm);
   int rank=c.id,size=c.np;
 
+  comm_barrier(&c);
+  double time=comm_time();
+
+  if(rank==0)
+    printf("running RCB ...");
+  fflush(stdout);
+
   slong out[2][1],buf[2][1];
   slong nell=nel;
-  comm_scan(out,&c,gs_long,gs_add,&nell,1,&buf);
+  comm_scan(out,&c,gs_long,gs_add,&nell,1,buf);
   slong nelg_start=out[0][0];
   slong nelg      =out[1][0];
 
@@ -61,13 +68,6 @@ int parRCB_partMesh(int *part,int *seq,double *vtx,int nel,int nv,
 #endif
 
   if(nel>0){
-    comm_barrier(&rcb);
-    double time=comm_time();
-
-    if(c.id==0)
-      printf("running RCB ...");
-    fflush(stdout);
-
     parRCB(&rcb,&a,ndim);
 
     // Do a local RCB if seq!=NULL
@@ -80,13 +80,6 @@ int parRCB_partMesh(int *part,int *seq,double *vtx,int nel,int nv,
       for(i=0; i<a.n; i++)
         ptr[i].seq=i;
     }
-
-    comm_barrier(&rcb);
-    time=comm_time()-time;
-
-    if(c.id==0)
-      printf(" finished in %g s\n",time);
-    fflush(stdout);
   }
 
   /* restore original input */
@@ -96,13 +89,27 @@ int parRCB_partMesh(int *part,int *seq,double *vtx,int nel,int nv,
   assert(a.n==nel);
   sarray_sort(elm_rcb,a.ptr,a.n,id,1,&bfr);
 
-
   data=a.ptr;
   for(e=0;e<nel;e++)
     part[e]=data[e].orig;
   if(seq!=NULL)
     for(e=0;e<nel;e++)
       seq[e]=data[e].seq ;
+
+  double time1=comm_time()-time;
+  comm_barrier(&rcb);
+  double time2=comm_time()-time;
+
+  double min,max,sum,bff;
+  min=max=sum=time1;
+
+  comm_allreduce(&c,gs_double,gs_min,&min,1,&bff);// min
+  comm_allreduce(&c,gs_double,gs_max,&max,1,&bff);// max
+  comm_allreduce(&c,gs_double,gs_add,&sum,1,&bff);// sum
+
+  if(c.id==0)
+    printf(" finished in %g %g %g %g s\n",time2,min,max,sum/size);
+  fflush(stdout);
 
   metric_print(&c);
 
