@@ -79,6 +79,7 @@ void metric_print(struct comm *c){
       printf("  RCBTRANSFER  : %g/%g/%g\n",SUMMARY(i,RCBTRANSFER ));
       printf("  PARSORT      : %g/%g/%g\n",SUMMARY(i,PARSORT     ));
       printf("  LOADBALANCE  : %g/%g/%g\n",SUMMARY(i,LOADBALANCE ));
+      printf("  UPDATEPROBE  : %g/%g/%g\n",SUMMARY(i,UPDATEPROBE ));
     }
   }
 }
