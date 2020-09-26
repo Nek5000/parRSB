@@ -63,17 +63,20 @@ int parRCB(struct comm *ci,struct array *a,int ndim){
     }
     metric_toc(&c,PARSORT);
 
-    metric_push_level();
-
     int p=(size+1)/2;
     int bin=(rank>=p);
 
+    metric_tic(&c,COMMSPLIT);
     comm_ext old=c.c;
 #ifdef MPI
     MPI_Comm new; MPI_Comm_split(old,bin,rank,&new);
     comm_free(&c); comm_init(&c,new);
     MPI_Comm_free(&new);
 #endif
+    metric_toc(&c,COMMSPLIT);
+
+    metric_push_level();
+
     rank=c.id;
     size=c.np;
   }

@@ -82,6 +82,9 @@ int parRCB_partMesh(int *part,int *seq,double *vtx,int nel,int nv,
     }
   }
 
+  comm_barrier(&c);
+  double cr0=comm_time();
+
   /* restore original input */
   struct crystal cr; crystal_init(&cr,&c);
   sarray_transfer(elm_rcb,&a,orig,1,&cr);
@@ -96,20 +99,31 @@ int parRCB_partMesh(int *part,int *seq,double *vtx,int nel,int nv,
     for(e=0;e<nel;e++)
       seq[e]=data[e].seq ;
 
+  double cr1=comm_time()-cr0;
+  comm_barrier(&c);
+  double cr2=comm_time()-cr0;
+
   double time1=comm_time()-time;
-  comm_barrier(&rcb);
+  comm_barrier(&c);
   double time2=comm_time()-time;
 
   double min,max,sum,bff;
-  min=max=sum=time1;
 
+  min=max=sum=time1;
   comm_allreduce(&c,gs_double,gs_min,&min,1,&bff);// min
   comm_allreduce(&c,gs_double,gs_max,&max,1,&bff);// max
   comm_allreduce(&c,gs_double,gs_add,&sum,1,&bff);// sum
 
   if(c.id==0)
-    printf(" finished in %g %g %g %g s\n",time2,min,max,sum/size);
+    printf(" finished in %g %g %g %g s\n",time2,sum/size,min,max);
   fflush(stdout);
+
+  min=max=sum=cr1;
+  comm_allreduce(&c,gs_double,gs_min,&min,1,&bff);// min
+  comm_allreduce(&c,gs_double,gs_max,&max,1,&bff);// max
+  comm_allreduce(&c,gs_double,gs_add,&sum,1,&bff);// sum
+  if(c.id==0)
+    printf("restore original: %g %g %g %g s\n",cr2,sum/size,min,max);
 
   metric_print(&c);
 

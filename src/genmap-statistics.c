@@ -5,7 +5,7 @@
 
 #include <genmap-impl.h>
 
-#define MAXMETS 130
+#define MAXMETS 150
 #define MAXLVLS  30
 #define MAXSIZE (MAXMETS*MAXLVLS)
 
@@ -78,9 +78,10 @@ void metric_print(struct comm *c){
       printf("  LOCALSORT    : %g/%g/%g\n",SUMMARY(i,LOCALSORT   ));
       printf("  SETPROC      : %g/%g/%g\n",SUMMARY(i,SETPROC     ));
       printf("  RCBTRANSFER  : %g/%g/%g\n",SUMMARY(i,RCBTRANSFER ));
-      printf("  PARSORT      : %g/%g/%g\n",SUMMARY(i,PARSORT     ));
+      printf("  COMMSPLIT    : %g/%g/%g\n",SUMMARY(i,COMMSPLIT));
       printf("  LOADBALANCE0 : %g/%g/%g\n",SUMMARY(i,LOADBALANCE0));
       printf("  LOADBALANCE1 : %g/%g/%g\n",SUMMARY(i,LOADBALANCE1));
+      printf("  PARSORT      : %g/%g/%g\n",SUMMARY(i,PARSORT     ));
       printf("  UPDATEPROBE  : %g/%g/%g\n",SUMMARY(i,UPDATEPROBE ));
     }
   }
