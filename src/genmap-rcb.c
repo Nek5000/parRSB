@@ -39,8 +39,6 @@ int parRCB(struct comm *ci,struct array *a,int ndim){
   double length[MAXDIM];
 
   while(size>1){
-    metric_acc(RCBN,a->n);
-
     metric_tic(&c,AXISLEN);
     get_axis_len(length,a,&c,ndim);
     metric_toc(&c,AXISLEN);

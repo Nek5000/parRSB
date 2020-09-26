@@ -72,13 +72,15 @@ void metric_print(struct comm *c){
   for(i=0; i<stack_size; i++){
     if(c->id==0){
       printf("level=%02d\n",i);
-      printf("  RCBN         : %g/%g/%g\n",SUMMARY(i,RCBN        ));
+      printf("  BINN1        : %g/%g/%g\n",SUMMARY(i,BINN1       ));
+      printf("  BINN2        : %g/%g/%g\n",SUMMARY(i,BINN2       ));
       printf("  AXISLEN      : %g/%g/%g\n",SUMMARY(i,AXISLEN     ));
       printf("  LOCALSORT    : %g/%g/%g\n",SUMMARY(i,LOCALSORT   ));
       printf("  SETPROC      : %g/%g/%g\n",SUMMARY(i,SETPROC     ));
       printf("  RCBTRANSFER  : %g/%g/%g\n",SUMMARY(i,RCBTRANSFER ));
       printf("  PARSORT      : %g/%g/%g\n",SUMMARY(i,PARSORT     ));
-      printf("  LOADBALANCE  : %g/%g/%g\n",SUMMARY(i,LOADBALANCE ));
+      printf("  LOADBALANCE0 : %g/%g/%g\n",SUMMARY(i,LOADBALANCE0));
+      printf("  LOADBALANCE1 : %g/%g/%g\n",SUMMARY(i,LOADBALANCE1));
       printf("  UPDATEPROBE  : %g/%g/%g\n",SUMMARY(i,UPDATEPROBE ));
     }
   }

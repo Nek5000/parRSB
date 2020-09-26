@@ -121,16 +121,18 @@ int parallel_sort_private(struct sort *data,struct comm *c){
       break;
   }
 
+  metric_tic(c,LOADBALANCE0);
   if(balance){
+    metric_tic(c,LOADBALANCE1);
     struct crystal cr; crystal_init(&cr,c);
-    metric_tic(c,LOADBALANCE);
     load_balance(a,usize,c,&cr);
-    metric_toc(c,LOADBALANCE);
+    metric_toc(c,LOADBALANCE1);
     metric_tic(c,LOCALSORT);
     sort_local(data);
     metric_toc(c,LOCALSORT);
     crystal_free(&cr);
   }
+  metric_toc(c,LOADBALANCE0);
 
   comm_free(&dup);
 
