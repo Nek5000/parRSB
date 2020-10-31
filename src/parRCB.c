@@ -115,7 +115,7 @@ int parRCB_partMesh(int *part,int *seq,double *vtx,int nel,int nv,
   comm_allreduce(&c,gs_double,gs_add,&sum,1,&bff);// sum
 
   if(c.id==0)
-    printf(" finished in %g %g %g %g s\n",time2,sum/size,min,max);
+    printf(" finished in %g s\n",time2);
   fflush(stdout);
 
   /*
