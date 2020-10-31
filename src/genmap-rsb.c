@@ -22,7 +22,7 @@ void GenmapRSB(GenmapHandle h,int verbose){
   int rank=GenmapCommRank(global_c);
 
   if(rank == 0 && h->dbgLevel > 0)
-    printf("running RSB ");
+    printf("running RSB ...");
   fflush(stdout);
 
   crystal_init(&(h->cr), &(h->local->gsc));
@@ -75,6 +75,19 @@ void GenmapRSB(GenmapHandle h,int verbose){
 
     level++;
     metric_push_level();
+  }
+
+  sint converged=1,buf;
+  for(i=0; i<metric_get_levels(); i++){
+    int val=(int)metric_get_value(i,NFIEDLER);
+    if(val>=npass*maxIter){
+      converged=0;
+      break;
+    }
+  }
+  comm_allreduce(&global_c->gsc,gs_int,gs_min,&converged,1,&buf);// min
+  if(converged==0 && GenmapCommRank(global_c)==0){
+    printf(" Lanczos failed to converge during partitioning. ");
   }
 
   //metric_print(&global_c->gsc);
