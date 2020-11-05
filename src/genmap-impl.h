@@ -39,52 +39,6 @@ int GenmapCreateElements(GenmapElements *e);
 int GenmapDestroyElements(GenmapElements e);
 GenmapElements GenmapGetElements_default(GenmapHandle h);
 
-typedef enum{
-  RSB,
-  RCB,
-  BINN1,
-  BINN2,
-  AXISLEN,
-  PARSORT,
-  SETPROC,
-  LOCALSORT,
-  COMMSPLIT,
-  LOADBALANCE0,
-  LOADBALANCE1,
-  RCBTRANSFER,
-  UPDATEPROBE,
-  GSSETUP,
-  PAIRWISE,
-  CRYSTAL,
-  ALLREDUCE,
-  NNEIGHBORS,
-  FIEDLER,
-  NFIEDLER,
-  LANCZOS,
-  RQI,
-  FMG,
-  GSOP,
-  LAPLACIANSETUP,
-  NCONN,
-  LAPLACIAN,
-  PROJECTPF,
-  NPROJECTPF,
-  PRECONSETUP,
-  PRECONVCYCLE,
-  PRECONAX,
-  END
-}metric;
-
-void metric_init();
-void metric_finalize();
-void metric_acc(metric m,double count);
-void metric_tic(struct comm *c,metric m);
-void metric_toc(struct comm *c,metric m);
-double metric_get_value(int level,metric m);
-void metric_push_level();
-uint metric_get_levels();
-void metric_print(struct comm *c);
-
 struct GenmapHandle_private {
   GenmapComm global;
   GenmapComm local;
@@ -94,8 +48,8 @@ struct GenmapHandle_private {
   GenmapLong start;
   int nv;
 
+  GenmapVector weights;
   struct array elementArray;
-
   struct crystal cr;
 
   int dbgLevel;
@@ -114,16 +68,70 @@ struct GenmapVector_private {
 #define GenmapCalloc(n, p) GenmapCallocArray ((n), sizeof(**(p)), p)
 #define GenmapRealloc(n, p) GenmapReallocArray((n), sizeof(**(p)), p)
 
-void GenmapFiedlerMinMax(GenmapHandle h, GenmapScalar *min,
-    GenmapScalar *max);
-void GenmapGlobalIdMinMax(GenmapHandle h, GenmapLong *min,
-    GenmapLong *max);
+/* Fiedler related */
+void GenmapFiedlerMinMax(GenmapHandle h,GenmapScalar *min,
+  GenmapScalar *max);
+void GenmapGlobalIdMinMax(GenmapHandle h,GenmapLong *min,
+  GenmapLong *max);
 GenmapInt GenmapSetFiedlerBin(GenmapHandle h);
 GenmapInt GenmapSetGlobalIdBin(GenmapHandle h);
 void GenmapAssignBins(GenmapHandle h, int field, buffer *buf0);
 void GenmapTransferToBins(GenmapHandle h, int field, buffer *buf0);
 void GenmapBinSort(GenmapHandle h, int field, buffer *buf0);
 
+/* Genmap Metrics */
+typedef enum{
+  ALLREDUCE,
+  AXISLEN,
+  BINN1,
+  BINN2,
+  COMMSPLIT,
+  CRYSTAL,
+  END,
+  FIEDLER,
+  FMG,
+  GSOP,
+  GSSETUP,
+  LANCZOS,
+  LAPLACIANSETUP,
+  LAPLACIAN,
+  LOCALSORT,
+  LOADBALANCE0,
+  LOADBALANCE1,
+  NCONN,
+  NNEIGHBORS,
+  NFIEDLER,
+  NDISCON,
+  NPROJECTPF,
+  PAIRWISE,
+  PARSORT,
+  PRECONSETUP,
+  PRECONVCYCLE,
+  PRECONAX,
+  PROJECTPF,
+  RCB,
+  RCBTRANSFER,
+  RSB,
+  RQI,
+  SETPROC,
+  UPDATEPROBE,
+} metric;
+
+void metric_init();
+void metric_finalize();
+void metric_acc(metric m,double count);
+void metric_tic(struct comm *c,metric m);
+void metric_toc(struct comm *c,metric m);
+double metric_get_value(int level,metric m);
+void metric_push_level();
+uint metric_get_levels();
+void metric_print(struct comm *c);
+
+/* Components */
+sint is_disconnected(struct comm *c,struct gs_data *gsh,buffer *buf,
+  uint nelt,uint nv);
+
+/* parRCB internals */
 #define MAXDIM 3
 typedef struct{
   int proc;
@@ -131,10 +139,9 @@ typedef struct{
   int seq;
   unsigned long long id;
   double coord[MAXDIM];
-}elm_rcb;
+} elm_rcb;
 
 int parRCB(struct comm *ci,struct array *a,int ndim);
-void rcb_local(struct array *a,uint start,uint end,
-    int ndim,buffer *buf);
+void rcb_local(struct array *a,uint start,uint end,int ndim,buffer *buf);
 
 #endif

@@ -30,7 +30,7 @@ int parRSB_partMesh(int *part,long long *vtx,int nel,int nve,
   MPI_Comm_rank(comm,&rank);
   MPI_Comm_size(comm,&size);
 
-  /* load balance input data */
+  /* Load balance input data */
   GenmapLong nelg;
   GenmapLong nell = nel;
   MPI_Allreduce(&nell,&nelg,1,MPI_LONG_LONG_INT,MPI_SUM,comm);
@@ -95,6 +95,11 @@ int parRSB_partMesh(int *part,long long *vtx,int nel,int nve,
           "Run with smaller number of processors.\n");
       return 1;
     }
+
+    if(id == 0 && h->dbgLevel > 0)
+      printf("running RSB ...");
+    fflush(stdout);
+
     GenmapElements e = GenmapGetElements(h);
     GenmapLong start = GenmapGetLocalStartIndex(h);
 
@@ -129,9 +134,9 @@ int parRSB_partMesh(int *part,long long *vtx,int nel,int nve,
 
     if(id == 0 && h->dbgLevel > 0)
       printf(" finished in %lfs\n", comm_time() - time0);
+    fflush(stdout);
 
     GenmapFinalize(h);
-    fflush(stdout);
   }
 
   MPI_Comm_free(&commRSB);
