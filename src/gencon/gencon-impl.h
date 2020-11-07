@@ -22,6 +22,10 @@ struct Point_private{
   slong globalId;
 };
 
+
+extern int faces3D[GC_MAX_FACES][GC_MAX_FACE_VERTICES];
+extern int faces2D[GC_MAX_FACES][GC_MAX_FACE_VERTICES];
+
 struct Face_private{
   struct Point_private vertex[GC_MAX_FACE_VERTICES];
 };

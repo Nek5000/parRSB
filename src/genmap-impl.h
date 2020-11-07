@@ -127,6 +127,15 @@ void metric_push_level();
 uint metric_get_levels();
 void metric_print(struct comm *c);
 
+/* genCon */
+typedef struct{
+  GenmapULong sequenceId;
+  int nNeighbors;
+  GenmapULong elementId;
+  GenmapULong vertexId;
+  uint workProc;
+} vertex;
+
 /* Components */
 sint is_disconnected(struct comm *c,struct gs_data *gsh,buffer *buf,
   uint nelt,uint nv);

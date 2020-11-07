@@ -2,19 +2,6 @@
 
 #define min(a,b) ((b)<(a)?(b):(a))
 
-typedef struct{
-  GenmapULong sequenceId;
-  GenmapLong neighbors[8];
-  int nNeighbors;
-  GenmapULong elementId;
-  GenmapULong vertexId;
-  uint workProc;
-} vertex;
-
-typedef struct{
-  GenmapULong elementId;
-} element;
-
 struct array *GenmapFindNeighbors(GenmapHandle h,GenmapComm c)
 {
   struct comm cc=c->gsc;

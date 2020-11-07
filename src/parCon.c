@@ -81,17 +81,13 @@ int parRSB_findConnectivity(long long *vertexid,double *coord,
   findSegments(mesh,&c,tol);
   setGlobalID(mesh,&c);
   sendBack(mesh,&c);
+  faceCheck(mesh,&c);
   matchPeriodicFaces(mesh,&c);
 
   // copy output
   Point ptr=mesh->elements.ptr;
-  k=0;
-  for(i=0; i<nelt; i++){
-    vertexid[k++]=ptr->elementId+1;
-    for(j=0; j<nvertex; j++){
-      vertexid[k++]=ptr->globalId+1;
-      ptr++;
-    }
+  for(i=0; i<nelt*nvertex; i++){
+    vertexid[i]=ptr[i].globalId+1;
   }
 
   comm_barrier(&c);
