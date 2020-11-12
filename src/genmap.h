@@ -25,7 +25,7 @@ typedef MPI_Comm GenmapCommExternal;
 typedef struct GenmapComm_private *GenmapComm;
 typedef struct GenmapHandle_private *GenmapHandle;
 typedef struct GenmapVector_private *GenmapVector;
-typedef struct GenmapElement_private *GenmapElements;
+typedef struct rsb_element *GenmapElements;
 
 int GenmapInit(GenmapHandle *h, GenmapCommExternal ce);
 int GenmapFinalize(GenmapHandle h);
@@ -36,7 +36,6 @@ int GenmapReallocArray(size_t n, size_t unit, void *p);
 int GenmapFree(void *p);
 
 GenmapElements GenmapGetElements(GenmapHandle h);
-void GenmapSetElements(GenmapHandle h, GenmapElements elements);
 
 GenmapComm GenmapGetLocalComm(GenmapHandle h);
 void GenmapSetLocalComm(GenmapHandle h, GenmapComm c);
@@ -45,7 +44,7 @@ GenmapComm GenmapGetGlobalComm(GenmapHandle h);
 void GenmapSetGlobalComm(GenmapHandle h, GenmapComm c);
 
 GenmapInt GenmapGetNLocalElements(GenmapHandle h);
-void GenmapSetNLocalElements(GenmapHandle h, GenmapInt localElements);
+void GenmapSetArrayElements(GenmapHandle h, struct array *localElements);
 
 GenmapLong GenmapGetNGlobalElements(GenmapHandle h);
 void GenmapSetNGlobalElements(GenmapHandle h, GenmapLong globalElements);

@@ -25,8 +25,8 @@ int GenmapInitLaplacianWeighted(GenmapHandle h, GenmapComm c, GenmapVector weigh
     printf("RSS before gs_setup: %lf\n", t1);
 #endif
 
-  c->gsh = gs_setup(vertices, numPoints, &c->gsc, 0,
-                               gs_crystal_router, 0);
+  c->gsh=gs_setup(vertices,numPoints,&c->gsc,0,gs_crystal_router,0);
+
 #if defined(GENMAP_DEBUG)
   t1 = GenmapGetMaxRss();
   if(GenmapCommRank(GenmapGetLocalComm(h)) == 0)

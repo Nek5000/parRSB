@@ -10,9 +10,6 @@ int GenmapInit(GenmapHandle *h, GenmapCommExternal ce) {
   GenmapCreateComm(&h_->global, ce);
   GenmapCreateComm(&h_->local, ce);
 
-  h_->elementArray.ptr = NULL;
-  h_->elementArray.n = (*h)->elementArray.max = 0;
-
   h_->dbgLevel = 0;
   h_->printStat = 0;
 
@@ -24,8 +21,6 @@ int GenmapFinalize(GenmapHandle h) {
     GenmapDestroyComm(GenmapGetGlobalComm(h));
   if(GenmapGetLocalComm(h))
     GenmapDestroyComm(h->local);
-
-  array_free(&(h->elementArray));
 
   GenmapFree(h);
 

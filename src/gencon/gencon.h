@@ -44,6 +44,7 @@ int read_co2_mesh(Mesh *mesh,char *fname,struct comm *c);
 
 int findMinNeighborDistance(Mesh mesh);
 int findSegments(Mesh mesh,struct comm *c,GenmapScalar tol);
+int faceCheck(Mesh mesh,struct comm *c);
 int setGlobalID(Mesh mesh,struct comm *c);
 int sendBack(Mesh mesh,struct comm *c);
 int matchPeriodicFaces(Mesh mesh,struct comm *c);

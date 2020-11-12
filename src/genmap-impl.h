@@ -18,7 +18,13 @@
 #define GENMAP_PROC 2
 #define GENMAP_ORIGIN 3
 
-struct GenmapComm_private {
+#define GENMAP_RCB_ELEMENT 0
+#define GENMAP_RSB_ELEMENT 1
+
+#define MAXDIM 3 /* Maximum dimension of the mesh */
+#define MAXNV 8 /* Maximum number of vertices per element */
+
+struct GenmapComm_private{
   struct comm gsc;
   struct gs_data *gsh;
   csr_mat M;
@@ -26,13 +32,17 @@ struct GenmapComm_private {
   GenmapScalar *b;
 };
 
-struct GenmapElement_private {
-  GenmapScalar fiedler;
-  GenmapLong globalId;
-  GenmapLong globalId0;
-  GenmapLong vertices[8];
+struct rsb_element{
+  unsigned char type;
   GenmapInt proc;
   GenmapInt origin;
+  GenmapInt seq;
+  GenmapLong globalId;
+  GenmapScalar coord[MAXDIM];
+  GenmapLong vertices[8];
+  GenmapInt part;
+  GenmapULong globalId0;
+  GenmapScalar fiedler;
 };
 
 int GenmapCreateElements(GenmapElements *e);
@@ -49,7 +59,7 @@ struct GenmapHandle_private {
   int nv;
 
   GenmapVector weights;
-  struct array elementArray;
+  struct array *elementArray;
   struct crystal cr;
 
   int dbgLevel;
@@ -67,17 +77,6 @@ struct GenmapVector_private {
 #define GenmapMalloc(n, p) GenmapMallocArray ((n), sizeof(**(p)), p)
 #define GenmapCalloc(n, p) GenmapCallocArray ((n), sizeof(**(p)), p)
 #define GenmapRealloc(n, p) GenmapReallocArray((n), sizeof(**(p)), p)
-
-/* Fiedler related */
-void GenmapFiedlerMinMax(GenmapHandle h,GenmapScalar *min,
-  GenmapScalar *max);
-void GenmapGlobalIdMinMax(GenmapHandle h,GenmapLong *min,
-  GenmapLong *max);
-GenmapInt GenmapSetFiedlerBin(GenmapHandle h);
-GenmapInt GenmapSetGlobalIdBin(GenmapHandle h);
-void GenmapAssignBins(GenmapHandle h, int field, buffer *buf0);
-void GenmapTransferToBins(GenmapHandle h, int field, buffer *buf0);
-void GenmapBinSort(GenmapHandle h, int field, buffer *buf0);
 
 /* Genmap Metrics */
 typedef enum{
@@ -140,17 +139,18 @@ typedef struct{
 sint is_disconnected(struct comm *c,struct gs_data *gsh,buffer *buf,
   uint nelt,uint nv);
 
-/* parRCB internals */
-#define MAXDIM 3
-typedef struct{
-  int proc;
-  int orig;
-  int seq;
-  unsigned long long id;
-  double coord[MAXDIM];
-} elm_rcb;
+/* parRSB/parRCB internals */
+struct rcb_element{
+  unsigned char type;
+  GenmapInt proc;
+  GenmapInt origin;
+  GenmapInt seq;
+  GenmapLong globalId;
+  GenmapScalar coord[MAXDIM];
+};
 
-int parRCB(struct comm *ci,struct array *a,int ndim);
 void rcb_local(struct array *a,uint start,uint end,int ndim,buffer *buf);
+int rcb_level(struct comm *c,struct array *a,int ndim);
+int rcb(struct comm *ci,struct array *a,int ndim);
 
 #endif

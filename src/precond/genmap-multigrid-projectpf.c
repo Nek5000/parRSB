@@ -32,8 +32,14 @@ int project_pf(GenmapHandle h,GenmapComm c,mgData d,GenmapVector ri,
     x->data[i]=0.0,r->data[i]=ri->data[i];
 
   metric_tic(&d->c,PRECONVCYCLE);
+#if 0
   mg_vcycle(z->data,r->data,d);
+#else
+  for(i=0; i<lelt; i++)
+    z->data[i]=r->data[i];
+#endif
   metric_toc(&d->c,PRECONVCYCLE);
+
   GenmapOrthogonalizebyOneVector(h,c,z,nelg);
   GenmapCopyVector(p,z);
 
