@@ -1,8 +1,12 @@
 #include "genmap-impl.h"
 
 int GenmapCreateComm(GenmapComm *c_,GenmapCommExternal ce){
-  GenmapMalloc(1,c_); GenmapComm c=*c_;
-  comm_init(&c->gsc, ce); c->gsh=NULL; c->M=NULL; c->b=NULL;
+  GenmapMalloc(1,c_);
+  GenmapComm c=*c_;
+  comm_init(&c->gsc, ce);
+  c->gsh=NULL;
+  c->M=NULL;
+  c->b=NULL;
   buffer_init(&c->buf,1024);
   return 0;
 }
@@ -93,9 +97,9 @@ int GenmapCrystalInit(genmap_handle h, GenmapComm c) {
 
 int GenmapCrystalTransfer(genmap_handle h, int field) {
   if(field == GENMAP_ORIGIN)
-    sarray_transfer(struct rsb_element,h->elementArray,origin,0,&h->cr);
+    sarray_transfer(struct rsb_element,h->elements,origin,0,&h->cr);
   else if(field == GENMAP_PROC)
-    sarray_transfer(struct rsb_element,h->elementArray,proc  ,0,&h->cr);
+    sarray_transfer(struct rsb_element,h->elements,proc  ,0,&h->cr);
   return 0;
 }
 

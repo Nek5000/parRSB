@@ -59,7 +59,7 @@ struct genmap_handle_private {
   int nv;
 
   GenmapVector weights;
-  struct array *elementArray;
+  struct array *elements;
   struct crystal cr;
 
   int dbgLevel;
@@ -80,40 +80,41 @@ struct GenmapVector_private {
 
 /* Genmap Metrics */
 typedef enum{
-  ALLREDUCE,
+  ALLREDUCE=0,
   AXISLEN,
   BINN1,
   BINN2,
+  BISECT,
   COMMSPLIT,
   CRYSTAL,
-  END,
   FIEDLER,
   FMG,
   GSOP,
   GSSETUP,
+  GRAMMIAN,
   LANCZOS,
-  LAPLACIANSETUP,
+  LAPLACIANSETUP0,
+  LAPLACIANSETUP1,
   LAPLACIAN,
   LOCALSORT,
-  LOADBALANCE0,
-  LOADBALANCE1,
   NCONN,
   NNEIGHBORS,
   NFIEDLER,
   NDISCON,
   NPROJECTPF,
+  NRQI,
   PAIRWISE,
   PARSORT,
   PRECONSETUP,
-  PRECONVCYCLE,
   PRECONAX,
   PROJECTPF,
+  PROJECT,
   RCB,
   RCBTRANSFER,
-  RSB,
   RQI,
   SETPROC,
   UPDATEPROBE,
+  VCYCLE
 } metric;
 
 void metric_init();
@@ -152,5 +153,8 @@ struct rcb_element{
 void rcb_local(struct array *a,uint start,uint end,int ndim,buffer *buf);
 int rcb_level(struct comm *c,struct array *a,int ndim);
 int rcb(struct comm *ci,struct array *a,int ndim);
+
+/* Matrix inverse */
+void matrix_inverse(int N,double *A);
 
 #endif

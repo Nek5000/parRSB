@@ -1,16 +1,21 @@
+## General build parameters ##
 DEBUG ?= 0
-PAUL ?= 1
+MPI ?= 1
 CC ?= mpicc
 CFLAGS ?= -O2
-## ALGO=0 (Lanczos),1 (RQI),2 (FMG)
-ALGO ?= 0
-MPI ?= 1
+BLAS ?= 0
 
+## Genmap algorithmic parameters ##
+# ALGO = 0 (Lanczos),1 (RQI),2 (FMG)
+ALGO ?= 1
+RCB_PRE_STEP ?= 1
+PAUL ?= 1
+GRAMMIAN ?= 0
+
+## Don't touch what follows ##
 MKFILEPATH =$(abspath $(lastword $(MAKEFILE_LIST)))
 SRCROOT_  ?=$(patsubst %/,%,$(dir $(MKFILEPATH)))
 SRCROOT    =$(realpath $(SRCROOT_))
-
-GSLIBDIR=$(GSLIBPATH)
 
 SRCDIR    =$(SRCROOT)/src
 SORTDIR   =$(SRCROOT)/src/sort
@@ -23,8 +28,9 @@ TESTDIR   =$(SRCROOT)/tests
 TARGET=parRSB
 LIB=$(BUILDDIR)/lib/lib$(TARGET).a
 
-INCFLAGS=-I$(SRCDIR) -I$(SORTDIR) -I$(PRECONDDIR) -I$(GENCONDIR) -I$(GSLIBDIR)/include
-LDFLAGS:=-L$(BUILDDIR)/lib -l$(TARGET) -L $(GSLIBDIR)/lib -lgs -lm
+INCFLAGS=-I$(SRCDIR) -I$(SORTDIR) -I$(PRECONDDIR) -I$(GENCONDIR) \
+	-I$(GSLIBPATH)/include
+LDFLAGS:=-L$(BUILDDIR)/lib -l$(TARGET) -L$(GSLIBPATH)/lib -lgs -lm
 
 SRCS       =$(wildcard $(SRCDIR)/*.c)
 SORTSRCS   =$(wildcard $(SORTDIR)/*.c)
@@ -52,12 +58,25 @@ else ifeq ($(ALGO),1)
   PP += -DGENMAP_RQI
 endif
 
+ifneq ($(RCB_PRE_STEP),0)
+  PP += -DGENMAP_RCB_PRE_STEP
+endif
+
 ifneq ($(PAUL),0)
   PP += -DGENMAP_PAUL
 endif
 
+ifneq ($(GRAMMIAN),0)
+  PP += -DGENMAP_GRAMMIAN
+endif
+
 ifneq ($(MPI),0)
   PP += -DMPI
+endif
+
+ifneq ($(BLAS),0)
+  PP += -DGENMAP_BLAS
+  LDFLAGS += -L$(BLASDIR)/lib -lblasLapack
 endif
 
 INSTALLDIR=
@@ -77,7 +96,8 @@ ifneq ($(INSTALLDIR),)
 	@mkdir -p $(INSTALLDIR)/lib 2>/dev/null
 	@cp -v $(LIB) $(INSTALLDIR)/lib 2>/dev/null
 	@mkdir -p $(INSTALLDIR)/include 2>/dev/null
-	@cp $(SRCDIR)/*.h $(SORTDIR)/*.h $(PRECONDDIR)/*.h $(INSTALLDIR)/include 2>/dev/null
+	@cp $(SRCDIR)/*.h $(SORTDIR)/*.h $(PRECONDDIR)/*.h \
+		$(INSTALLDIR)/include 2>/dev/null
 endif
 
 .PHONY: lib

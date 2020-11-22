@@ -24,9 +24,8 @@ void genmap_rsb(genmap_handle h,int verbose){
   uint nelt=GenmapGetNLocalElements(h);
   GenmapElements e=GenmapGetElements(h);
   GenmapInt i;
-  for(i=0; i<nelt; i++) {
+  for(i=0; i<nelt; i++)
     e[i].globalId0=GenmapGetLocalStartIndex(h)+i+1;
-  }
 
   buffer buf0=null_buffer;
 
@@ -40,25 +39,31 @@ void genmap_rsb(genmap_handle h,int verbose){
     lc=&local_c->gsc;
     np=lc->np;
 
-    metric_tic(lc,RSB);
-
 #if defined(GENMAP_PAUL)
     int global=1;
 #else
     int global=(np==gc->np);
 #endif
 
+#if defined(GENMAP_RCB_PRE_STEP)
     /* Run RCB pre-step */
-    rcb(lc,h->elementArray,ndim);
+    metric_tic(lc,RCB);
+    rcb(lc,h->elements,ndim);
+    metric_toc(lc,RCB);
+#else
+    /* Sort by global id otherwise */
+    parallel_sort(struct rsb_element,h->elements,globalId0,gs_long,0,1,lc);
+#endif
 
     /* Initialize the laplacian */
+    metric_tic(lc,LAPLACIANSETUP0);
     nelt=GenmapGetNLocalElements(h);
     GenmapCreateVector(&h->weights,nelt);
     GenmapInitLaplacianWeighted(h,local_c,h->weights);
+    metric_toc(lc,LAPLACIANSETUP0);
 
     /* Run fiedler */
     metric_tic(lc,FIEDLER);
-
     int ipass=0,iter;
     do {
 #if defined(GENMAP_LANCZOS)
@@ -71,26 +76,25 @@ void genmap_rsb(genmap_handle h,int verbose){
     } while(++ipass<max_pass && iter==max_iter);
     metric_toc(lc,FIEDLER);
 
-    parallel_sort(struct rsb_element,h->elementArray,fiedler,
-      gs_double,0,1,lc);
-
-    metric_toc(lc,RSB);
-
-    GenmapInt id=lc->id;
-    int bin=1; if(id<(np+1)/2) bin=0;
+    /* Bisect */
+    metric_tic(lc,BISECT);
+    parallel_sort(struct rsb_element,h->elements,fiedler,gs_double,0,1,lc);
+    int bin=1;
+    if(lc->id<(np+1)/2)
+      bin=0;
     GenmapSplitComm(h,&local_c,bin);
     GenmapSetLocalComm(h,local_c);
     lc=&local_c->gsc;
-
     GenmapScan(h,local_c);
+    metric_toc(lc,BISECT);
 
     // FIXME: Do this only at begining of the loop
     GenmapFree(h->weights);
-
-    level++;
     metric_push_level();
+    level++;
   }
 
+#if 0
   /* Check if Fidler converged */
   sint converged=1,buf;
   for(i=0; i<metric_get_levels(); i++){
@@ -111,8 +115,8 @@ void genmap_rsb(genmap_handle h,int verbose){
   sint discon=is_disconnected(gc,global_c->gsh,&global_c->buf,nelt,nve);
   if(discon>0 && gc->id==0)
     printf("\tWarning: There are disconnected components!\n");
-
   GenmapFree(h->weights);
+#endif
 
   crystal_free(&h->cr);
   buffer_free(&buf0);

@@ -1,15 +1,15 @@
 #include "genmap-impl.h"
 
 GenmapElements GenmapGetElements(genmap_handle h) {
-  return (GenmapElements) h->elementArray->ptr;
+  return (GenmapElements) h->elements->ptr;
 }
 
 GenmapInt GenmapGetNLocalElements(genmap_handle h) {
-  return h->elementArray->n;
+  return h->elements->n;
 }
 
 void GenmapSetArrayElements(genmap_handle h, struct array *localElements) {
-  h->elementArray = localElements;
+  h->elements = localElements;
 }
 
 GenmapLong GenmapGetNGlobalElements(genmap_handle h) {

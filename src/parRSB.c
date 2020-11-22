@@ -21,17 +21,15 @@ int parRSB_partMesh(int *part,long long *vtx,double *coord,int nel,
   struct comm c; comm_init(&c,comm);
   int rank=c.id,size=c.np;
 
-  comm_barrier(&c);
-  double time=comm_time();
-
-  metric_init();
-
   if(rank==0)
     printf("running RSB ...");
   fflush(stdout);
 
+  comm_barrier(&c);
+  double time0=comm_time();
+
   /* Load balance input data */
-  slong out[2][1],buf[2][1],in=nel;
+  slong out[2][1],buf[3][1],in=nel;
   comm_scan(out,&c,gs_long,gs_add,&in,1,buf);
   slong nelg_start=out[0][0];
   slong nelg=out[1][0];
@@ -76,6 +74,13 @@ int parRSB_partMesh(int *part,long long *vtx,double *coord,int nel,
   buffer bfr; buffer_init(&bfr,1024);
   sarray_sort(struct rsb_element,eList.ptr,(unsigned)nel,globalId,1,&bfr);
 
+  double time1=comm_time();
+  comm_barrier(&c);
+  double time2=comm_time();
+
+  /* Run RSB now */
+  metric_init();
+
   struct comm comm_rsb;
   comm_ext old=c.c;
 #ifdef MPI
@@ -110,9 +115,12 @@ int parRSB_partMesh(int *part,long long *vtx,double *coord,int nel,
     }
 
     genmap_rsb(h,h->dbgLevel>1);
-
     genmap_finalize(h);
   }
+
+  double time3=comm_time();
+  comm_barrier(&c);
+  double time4=comm_time();
 
   /* Restore original input */
   sarray_transfer(struct rsb_element,&eList,origin,1,&cr);
@@ -123,19 +131,34 @@ int parRSB_partMesh(int *part,long long *vtx,double *coord,int nel,
   for(e=0;e<nel;e++)
     part[e]=e_ptr[e].origin;
 
+  double time5=comm_time();
   comm_barrier(&c);
-  time=comm_time()-time;
-  if(rank==0)
+  double time=comm_time()-time0;
+
+  /* Report time and finish */
+  double min[3],max[3],sum[3];
+  min[0]=max[0]=sum[0]=time1-time0;
+  min[1]=max[1]=sum[1]=time3-time2;
+  min[2]=max[2]=sum[2]=time5-time4;
+  comm_allreduce(&c,gs_double,gs_min,min,3,buf); // min
+  comm_allreduce(&c,gs_double,gs_max,max,3,buf); // max
+  comm_allreduce(&c,gs_double,gs_add,sum,3,buf); // sum
+  if(rank==0){
     printf(" finished in %g s\n",time);
+    printf("LOADBALANCE : %g/%g/%g\n",min[0],max[0],sum[0]/c.np);
+    printf("RSB         : %g/%g/%g\n",min[1],max[1],sum[1]/c.np);
+    printf("RESTORE     : %g/%g/%g\n",min[2],max[2],sum[2]/c.np);
+  }
   fflush(stdout);
+
+  metric_print(&c);
+  metric_finalize();
 
   array_free(&eList);
   buffer_free(&bfr);
   crystal_free(&cr);
   comm_free(&comm_rsb);
   comm_free(&c);
-
-  metric_finalize();
 
   return 0;
 }

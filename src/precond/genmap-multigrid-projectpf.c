@@ -31,14 +31,14 @@ int project_pf(genmap_handle h,GenmapComm c,mgData d,GenmapVector ri,
   for(i=0; i<lelt; i++)
     x->data[i]=0.0,r->data[i]=ri->data[i];
 
-  metric_tic(&d->c,PRECONVCYCLE);
-#if 0
+#if 1
+  metric_tic(&c->gsc,VCYCLE);
   mg_vcycle(z->data,r->data,d);
+  metric_toc(&c->gsc,VCYCLE);
 #else
   for(i=0; i<lelt; i++)
     z->data[i]=r->data[i];
 #endif
-  metric_toc(&d->c,PRECONVCYCLE);
 
   GenmapOrthogonalizebyOneVector(h,c,z,nelg);
   GenmapCopyVector(p,z);
@@ -86,9 +86,9 @@ int project_pf(genmap_handle h,GenmapComm c,mgData d,GenmapVector ri,
     GenmapScalar norm0=GenmapDotVector(z,z);
     GenmapGop(c,&norm0,1,GENMAP_SCALAR,GENMAP_SUM);
 
-    metric_tic(&c->gsc,PRECONVCYCLE);
+    metric_tic(&c->gsc,VCYCLE);
     mg_vcycle(z->data,r->data,d);
-    metric_toc(&c->gsc,PRECONVCYCLE);
+    metric_toc(&c->gsc,VCYCLE);
 
     GenmapScalar norm1=GenmapDotVector(z,z);
     GenmapGop(c,&norm1,1,GENMAP_SCALAR,GENMAP_SUM);
@@ -115,6 +115,7 @@ int project_pf(genmap_handle h,GenmapComm c,mgData d,GenmapVector ri,
 
     i++;
 
+    metric_tic(&c->gsc,PROJECT);
     for(k=0; k<lelt; k++)
       P[(MM-1)*lelt+k]=0.0;
 
@@ -129,6 +130,7 @@ int project_pf(genmap_handle h,GenmapComm c,mgData d,GenmapVector ri,
 
     for(k=0; k<lelt; k++)
       p->data[k]-=P[(MM-1)*lelt+k];
+    metric_toc(&c->gsc,PROJECT);
   }
 
   GenmapDestroyVector(z),GenmapDestroyVector(w);
@@ -166,9 +168,9 @@ int project_pf_lvl(genmap_handle h,GenmapComm c,mgData d,GenmapScalar *ri,
   for(i=0; i<lelt; i++)
     x->data[i]=0.0,r->data[i]=ri[i];
 
-  metric_tic(&d->c,PRECONVCYCLE);
+  metric_tic(&d->c,VCYCLE);
   mg_vcycle_lvl(z->data,r->data,d,lvl_start);
-  metric_toc(&d->c,PRECONVCYCLE);
+  metric_toc(&d->c,VCYCLE);
   GenmapOrthogonalizebyOneVector(h,c,z,nelg);
   GenmapCopyVector(p,z);
 
@@ -218,9 +220,9 @@ int project_pf_lvl(genmap_handle h,GenmapComm c,mgData d,GenmapScalar *ri,
     GenmapScalar norm0=GenmapDotVector(z,z);
     GenmapGop(c,&norm0,1,GENMAP_SCALAR,GENMAP_SUM);
 
-    metric_tic(&c->gsc,PRECONVCYCLE);
+    metric_tic(&c->gsc,VCYCLE);
     mg_vcycle_lvl(z->data,r->data,d,lvl_start);
-    metric_toc(&c->gsc,PRECONVCYCLE);
+    metric_toc(&c->gsc,VCYCLE);
 
     GenmapScalar norm1=GenmapDotVector(z,z);
     GenmapGop(c,&norm1,1,GENMAP_SCALAR,GENMAP_SUM);

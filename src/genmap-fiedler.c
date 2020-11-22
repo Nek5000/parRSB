@@ -7,13 +7,13 @@
 //
 //TODO: use a separate function to generate init vector
 //
-int GenmapFiedlerRQI(genmap_handle h,GenmapComm c,int maxIter,int global)
+int GenmapFiedlerRQI(genmap_handle h,GenmapComm c,int max_iter,int global)
 {
   GenmapInt lelt = GenmapGetNLocalElements(h);
-  GenmapVector initVec; GenmapCreateVector(&initVec,lelt);
+  GenmapVector initVec;
+  GenmapCreateVector(&initVec,lelt);
 
   GenmapElements elements = GenmapGetElements(h);
-
   GenmapInt i;
   if(global>0){
 #if defined(GENMAP_PAUL)
@@ -39,9 +39,9 @@ int GenmapFiedlerRQI(genmap_handle h,GenmapComm c,int maxIter,int global)
  
   struct comm *gsc=&c->gsc;
 
-  metric_tic(gsc,LAPLACIANSETUP);
+  metric_tic(gsc,LAPLACIANSETUP1);
   GenmapInitLaplacian(h,c);
-  metric_toc(gsc,LAPLACIANSETUP);
+  metric_toc(gsc,LAPLACIANSETUP1);
 
   metric_tic(gsc,PRECONSETUP);
   mgData d; mgSetup(c,c->M,&d); d->h=h;
@@ -49,7 +49,8 @@ int GenmapFiedlerRQI(genmap_handle h,GenmapComm c,int maxIter,int global)
 
   GenmapVector y; GenmapCreateZerosVector(&y,lelt);
   metric_tic(gsc,RQI);
-  int iter=rqi(h,c,d,initVec,maxIter,0,y);
+  int iter=rqi(h,c,d,initVec,max_iter,0,y);
+  metric_acc(NRQI,iter);
   metric_toc(gsc,RQI);
 
   mgFree(d);
@@ -68,7 +69,7 @@ int GenmapFiedlerRQI(genmap_handle h,GenmapComm c,int maxIter,int global)
   return iter;
 }
 
-int GenmapFiedlerLanczos(genmap_handle h,GenmapComm c,int maxIter,
+int GenmapFiedlerLanczos(genmap_handle h,GenmapComm c,int max_iter,
   int global)
 {
   GenmapInt lelt = GenmapGetNLocalElements(h);
@@ -100,8 +101,8 @@ int GenmapFiedlerLanczos(genmap_handle h,GenmapComm c,int maxIter,
   }
 #endif
 
-  GenmapCreateVector(&alphaVec,maxIter);
-  GenmapCreateVector(&betaVec,maxIter-1);
+  GenmapCreateVector(&alphaVec,max_iter);
+  GenmapCreateVector(&betaVec,max_iter-1);
   GenmapVector *q = NULL;
 
   GenmapOrthogonalizebyOneVector(h,c,initVec,GenmapGetNGlobalElements(h));
@@ -111,10 +112,9 @@ int GenmapFiedlerLanczos(genmap_handle h,GenmapComm c,int maxIter,
   GenmapScaleVector(initVec, initVec, rni);
 
 #if defined(GENMAP_PAUL)
-  int iter=GenmapLanczosLegendary(h,c,initVec,maxIter,&q,
-    alphaVec,betaVec);
+  int iter=GenmapLanczosLegendary(h,c,initVec,max_iter,&q,alphaVec,betaVec);
 #else
-  int iter=GenmapLanczos(h,c,initVec,maxIter,&q,alphaVec,betaVec);
+  int iter=GenmapLanczos(h,c,initVec,max_iter,&q,alphaVec,betaVec);
 #endif
 
   GenmapVector evLanczos, evTriDiag;

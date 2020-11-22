@@ -21,7 +21,7 @@ int main(int argc,char *argv[]){
 
   double tol=(argc>2)?atof(argv[2]):0.2;
 
-  findSegments(mesh,&comm,tol);
+  findSegments(mesh,&comm,tol,0);
   setGlobalID(mesh,&comm);
   sendBack(mesh,&comm);
   matchPeriodicFaces(mesh,&comm);
