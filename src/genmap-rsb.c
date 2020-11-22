@@ -7,7 +7,7 @@
 #include <sort.h>
 #include <parRSB.h>
 
-void GenmapRSB(GenmapHandle h,int verbose){
+void genmap_rsb(genmap_handle h,int verbose){
   int max_iter=50;
   int max_pass=50;
 

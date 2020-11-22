@@ -47,9 +47,9 @@ struct rsb_element{
 
 int GenmapCreateElements(GenmapElements *e);
 int GenmapDestroyElements(GenmapElements e);
-GenmapElements GenmapGetElements_default(GenmapHandle h);
+GenmapElements GenmapGetElements_default(genmap_handle h);
 
-struct GenmapHandle_private {
+struct genmap_handle_private {
   GenmapComm global;
   GenmapComm local;
 
@@ -66,8 +66,8 @@ struct GenmapHandle_private {
   int printStat;
 };
 
-int GenmapCreateHandle(GenmapHandle h);
-int GenmapDestroyHandle(GenmapHandle h);
+int GenmapCreateHandle(genmap_handle h);
+int GenmapDestroyHandle(genmap_handle h);
 
 struct GenmapVector_private {
   GenmapInt size;

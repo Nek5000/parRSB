@@ -119,7 +119,7 @@ int main(int argc,char *argv[]){
   free(coords);
   buffer_free(&buf);
 
-  GenmapHandle gh; GenmapInit(&gh,MPI_COMM_WORLD);
+  genmap_handle gh; genmap_init(&gh,MPI_COMM_WORLD);
   GenmapSetNLocalElements(gh,mesh->nelt);
   GenmapSetNVertices(gh,mesh->nVertex);
 
@@ -161,7 +161,7 @@ int main(int argc,char *argv[]){
 
   GenmapDestroyVector(x); GenmapDestroyVector(r);
 
-  GenmapFinalize(gh);
+  genmap_finalize(gh);
   MeshFree(mesh);
 
   comm_free(&comm);

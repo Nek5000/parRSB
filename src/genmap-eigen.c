@@ -80,7 +80,7 @@ GenmapScalar GenmapSign(GenmapScalar a, GenmapScalar b) {
   return fabs(a) * m;
 }
 
-int GenmapTQLI(GenmapHandle h, GenmapVector diagonal, GenmapVector upper,
+int GenmapTQLI(genmap_handle h, GenmapVector diagonal, GenmapVector upper,
                GenmapVector **eVectors, GenmapVector *eValues) {
   assert(diagonal->size == upper->size + 1);
 

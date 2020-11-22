@@ -2,7 +2,7 @@
 
 #define min(a,b) ((b)<(a)?(b):(a))
 
-struct array *GenmapFindNeighbors(GenmapHandle h,GenmapComm c)
+struct array *GenmapFindNeighbors(genmap_handle h,GenmapComm c)
 {
   struct comm cc=c->gsc;
 
@@ -90,7 +90,7 @@ struct array *GenmapFindNeighbors(GenmapHandle h,GenmapComm c)
   return nbrs;
 }
 
-int GenmapInitLaplacian(GenmapHandle h,GenmapComm c)
+int GenmapInitLaplacian(genmap_handle h,GenmapComm c)
 {
   struct array *entries=GenmapFindNeighbors(h,c);
   csr_mat_setup(entries,&c->gsc,&c->M);
@@ -102,7 +102,7 @@ int GenmapInitLaplacian(GenmapHandle h,GenmapComm c)
   return 0;
 }
 
-int GenmapLaplacian(GenmapHandle h,GenmapComm c,GenmapVector u,
+int GenmapLaplacian(genmap_handle h,GenmapComm c,GenmapVector u,
     GenmapVector v)
 {
   assert(u->size==v->size);

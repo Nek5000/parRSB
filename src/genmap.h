@@ -23,39 +23,39 @@ typedef MPI_Datatype GenmapDataType;
 typedef MPI_Comm GenmapCommExternal;
 
 typedef struct GenmapComm_private *GenmapComm;
-typedef struct GenmapHandle_private *GenmapHandle;
+typedef struct genmap_handle_private *genmap_handle;
 typedef struct GenmapVector_private *GenmapVector;
 typedef struct rsb_element *GenmapElements;
 
-int GenmapInit(GenmapHandle *h, GenmapCommExternal ce);
-int GenmapFinalize(GenmapHandle h);
+int genmap_init(genmap_handle *h, GenmapCommExternal ce);
+int genmap_finalize(genmap_handle h);
 
 int GenmapMallocArray(size_t n, size_t unit, void *p);
 int GenmapCallocArray(size_t n, size_t unit, void *p);
 int GenmapReallocArray(size_t n, size_t unit, void *p);
 int GenmapFree(void *p);
 
-GenmapElements GenmapGetElements(GenmapHandle h);
+GenmapElements GenmapGetElements(genmap_handle h);
 
-GenmapComm GenmapGetLocalComm(GenmapHandle h);
-void GenmapSetLocalComm(GenmapHandle h, GenmapComm c);
+GenmapComm GenmapGetLocalComm(genmap_handle h);
+void GenmapSetLocalComm(genmap_handle h, GenmapComm c);
 
-GenmapComm GenmapGetGlobalComm(GenmapHandle h);
-void GenmapSetGlobalComm(GenmapHandle h, GenmapComm c);
+GenmapComm GenmapGetGlobalComm(genmap_handle h);
+void GenmapSetGlobalComm(genmap_handle h, GenmapComm c);
 
-GenmapInt GenmapGetNLocalElements(GenmapHandle h);
-void GenmapSetArrayElements(GenmapHandle h, struct array *localElements);
+GenmapInt GenmapGetNLocalElements(genmap_handle h);
+void GenmapSetArrayElements(genmap_handle h, struct array *localElements);
 
-GenmapLong GenmapGetNGlobalElements(GenmapHandle h);
-void GenmapSetNGlobalElements(GenmapHandle h, GenmapLong globalElements);
+GenmapLong GenmapGetNGlobalElements(genmap_handle h);
+void GenmapSetNGlobalElements(genmap_handle h, GenmapLong globalElements);
 
-GenmapLong GenmapGetLocalStartIndex(GenmapHandle h);
-void GenmapSetLocalStartIndex(GenmapHandle h, GenmapLong localStart);
+GenmapLong GenmapGetLocalStartIndex(genmap_handle h);
+void GenmapSetLocalStartIndex(genmap_handle h, GenmapLong localStart);
 
-int GenmapGetNVertices(GenmapHandle h);
-void GenmapSetNVertices(GenmapHandle, int nVertices);
+int GenmapGetNVertices(genmap_handle h);
+void GenmapSetNVertices(genmap_handle h, int nVertices);
 
-void GenmapScan(GenmapHandle h, GenmapComm c);
+void GenmapScan(genmap_handle h, GenmapComm c);
 
 int GenmapCreateComm(GenmapComm *c, GenmapCommExternal ce);
 int GenmapCommSize(GenmapComm c);
@@ -68,12 +68,12 @@ int GenmapReduce(GenmapComm c, void *out, void *in, GenmapInt size,
 int GenmapBcast(GenmapComm c, void *in, GenmapInt count, GenmapDataType type);
 
 int GenmapDestroyComm(GenmapComm c);
-void GenmapSplitComm(GenmapHandle h, GenmapComm *c, int bin);
-int GenmapCrystalInit(GenmapHandle h, GenmapComm c);
-int GenmapCrystalTransfer(GenmapHandle h, int field);
-int GenmapCrystalFinalize(GenmapHandle h);
+void GenmapSplitComm(genmap_handle h, GenmapComm *c, int bin);
+int GenmapCrystalInit(genmap_handle h, GenmapComm c);
+int GenmapCrystalTransfer(genmap_handle h, int field);
+int GenmapCrystalFinalize(genmap_handle h);
 
-int GenmapRead(GenmapHandle h, void *data);
+int GenmapRead(genmap_handle h, void *data);
 
 int GenmapCreateVector(GenmapVector *x, GenmapInt size);
 int GenmapSetVector(GenmapVector x, GenmapScalar *array);
@@ -100,41 +100,41 @@ int GenmapPrintVector(GenmapVector x);
 int GenmapDestroyVector(GenmapVector x);
 
 /* Laplacian */
-struct array *GenmapFindNeighbors(GenmapHandle h,GenmapComm c);
+struct array *GenmapFindNeighbors(genmap_handle h,GenmapComm c);
 
-int GenmapInitLaplacianWeighted(GenmapHandle h, GenmapComm c,
+int GenmapInitLaplacianWeighted(genmap_handle h, GenmapComm c,
                         GenmapVector weights);
-int GenmapInitLaplacian(GenmapHandle h, GenmapComm c);
+int GenmapInitLaplacian(genmap_handle h, GenmapComm c);
 
-int GenmapLaplacianWeighted(GenmapHandle h, GenmapComm c, GenmapVector u,
+int GenmapLaplacianWeighted(genmap_handle h, GenmapComm c, GenmapVector u,
                     GenmapVector weights, GenmapVector v);
-int GenmapLaplacian(GenmapHandle h, GenmapComm c, GenmapVector u,
+int GenmapLaplacian(genmap_handle h, GenmapComm c, GenmapVector u,
                     GenmapVector v);
 
 /* Eigen */
 int GenmapInvPowerIter(GenmapVector eVector, GenmapVector alpha,
                        GenmapVector beta, GenmapVector init, int iter);
-int GenmapTQLI(GenmapHandle h, GenmapVector diagonal, GenmapVector upper,
+int GenmapTQLI(genmap_handle h, GenmapVector diagonal, GenmapVector upper,
                GenmapVector **eVectors, GenmapVector *eValues);
 
-int GenmapOrthogonalizebyOneVector(GenmapHandle h, GenmapComm c,
+int GenmapOrthogonalizebyOneVector(genmap_handle h, GenmapComm c,
                                    GenmapVector q1, GenmapLong n);
 
 /* Lanczos */
-int GenmapLanczosLegendary(GenmapHandle h, GenmapComm c, GenmapVector f,
+int GenmapLanczosLegendary(genmap_handle h, GenmapComm c, GenmapVector f,
                            GenmapInt niter, GenmapVector **rr, GenmapVector diag,
                            GenmapVector upper);
-int GenmapLanczos(GenmapHandle h, GenmapComm c, GenmapVector init,
+int GenmapLanczos(genmap_handle h, GenmapComm c, GenmapVector init,
                   GenmapInt iter, GenmapVector **q, GenmapVector alpha,
                   GenmapVector beta);
 
 /* Fiedler */
-int GenmapFiedlerLanczos(GenmapHandle h,GenmapComm c,int maxIter,
+int GenmapFiedlerLanczos(genmap_handle h,GenmapComm c,int maxIter,
   int global);
-int GenmapFiedlerRQI(GenmapHandle h,GenmapComm c,int maxIter,int global);
+int GenmapFiedlerRQI(genmap_handle h,GenmapComm c,int maxIter,int global);
 
 /* RSB */
-void GenmapRSB(GenmapHandle h,int verbose);
+void genmap_rsb(genmap_handle h,int verbose);
 
 double GenmapGetMaxRss();
 void GenmapPrintStack();

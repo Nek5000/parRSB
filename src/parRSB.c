@@ -85,12 +85,9 @@ int parRSB_partMesh(int *part,long long *vtx,double *coord,int nel,
   comm_init(&comm_rsb,1);
 #endif
 
-  MPI_Comm commRSB;
-  MPI_Comm_split(comm, nel>0, rank, &commRSB);
-
   if(nel>0) {
-    GenmapHandle h;
-    GenmapInit(&h, commRSB);
+    genmap_handle h;
+    genmap_init(&h, comm_rsb.c);
 
     if(options[0]!=0){
       h->dbgLevel=options[1];
@@ -112,12 +109,10 @@ int parRSB_partMesh(int *part,long long *vtx,double *coord,int nel,
       return 1;
     }
 
-    GenmapRSB(h,h->dbgLevel>1);
+    genmap_rsb(h,h->dbgLevel>1);
 
-    GenmapFinalize(h);
+    genmap_finalize(h);
   }
-
-  MPI_Comm_free(&commRSB);
 
   /* Restore original input */
   sarray_transfer(struct rsb_element,&eList,origin,1,&cr);
@@ -137,6 +132,7 @@ int parRSB_partMesh(int *part,long long *vtx,double *coord,int nel,
   array_free(&eList);
   buffer_free(&bfr);
   crystal_free(&cr);
+  comm_free(&comm_rsb);
   comm_free(&c);
 
   metric_finalize();

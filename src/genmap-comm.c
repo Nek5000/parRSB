@@ -31,19 +31,19 @@ int GenmapCommRank(GenmapComm c) {
   return (int) c->gsc.id;
 }
 
-GenmapComm GenmapGetLocalComm(GenmapHandle h) {
+GenmapComm GenmapGetLocalComm(genmap_handle h) {
   return h->local;
 }
 
-void GenmapSetLocalComm(GenmapHandle h, GenmapComm c) {
+void GenmapSetLocalComm(genmap_handle h, GenmapComm c) {
   h->local = c;
 }
 
-GenmapComm GenmapGetGlobalComm(GenmapHandle h) {
+GenmapComm GenmapGetGlobalComm(genmap_handle h) {
   return h->global;
 }
 
-void GenmapSetGlobalComm(GenmapHandle h, GenmapComm c) {
+void GenmapSetGlobalComm(genmap_handle h, GenmapComm c) {
   h->global = c;
 }
 
@@ -75,7 +75,7 @@ int GenmapBcast(GenmapComm c, void *in, GenmapInt count, GenmapDataType type) {
   return MPI_Bcast(in, count, type, 0, c->gsc.c);
 }
 
-void GenmapSplitComm(GenmapHandle h, GenmapComm *c, int bin) {
+void GenmapSplitComm(genmap_handle h, GenmapComm *c, int bin) {
   GenmapCommExternal local;
   int id = GenmapCommRank(*c);
   MPI_Comm_split((*c)->gsc.c, bin, id, &local);
@@ -86,12 +86,12 @@ void GenmapSplitComm(GenmapHandle h, GenmapComm *c, int bin) {
   GenmapCrystalInit(h, *c);
 }
 
-int GenmapCrystalInit(GenmapHandle h, GenmapComm c) {
+int GenmapCrystalInit(genmap_handle h, GenmapComm c) {
   crystal_init(&(h->cr), &(c->gsc));
   return 0;
 }
 
-int GenmapCrystalTransfer(GenmapHandle h, int field) {
+int GenmapCrystalTransfer(genmap_handle h, int field) {
   if(field == GENMAP_ORIGIN)
     sarray_transfer(struct rsb_element,h->elementArray,origin,0,&h->cr);
   else if(field == GENMAP_PROC)
@@ -99,7 +99,7 @@ int GenmapCrystalTransfer(GenmapHandle h, int field) {
   return 0;
 }
 
-int GenmapCrystalFinalize(GenmapHandle h) {
+int GenmapCrystalFinalize(genmap_handle h) {
   crystal_free(&(h->cr));
   return 0;
 }

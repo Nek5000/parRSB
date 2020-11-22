@@ -74,9 +74,7 @@ int parRCB_partMesh(int *part,int *seq,double *coord,int nel,int nv,
   struct rcb_element *e_ptr=eList.ptr;
 
   buffer bfr; buffer_init(&bfr,1024);
-#if 0
-  sarray_sort(struct rsb_element,eList.ptr,(unsigned)nel,globalId,1,&bfr);
-#endif
+  sarray_sort(struct rcb_element,eList.ptr,(unsigned)nel,globalId,1,&bfr);
 
   struct comm comm_rcb;
   comm_ext old=c.c;

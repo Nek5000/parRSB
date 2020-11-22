@@ -1,6 +1,6 @@
 #include <genmap-impl.h>
 
-int GenmapInitLaplacianWeighted(GenmapHandle h, GenmapComm c, GenmapVector weights) {
+int GenmapInitLaplacianWeighted(genmap_handle h, GenmapComm c, GenmapVector weights) {
   GenmapInt lelt = GenmapGetNLocalElements(h);
   GenmapInt nv = GenmapGetNVertices(h);
   GenmapUInt numPoints = (GenmapUInt) nv * lelt;
@@ -61,7 +61,7 @@ int GenmapInitLaplacianWeighted(GenmapHandle h, GenmapComm c, GenmapVector weigh
   return 0;
 }
 
-int GenmapLaplacianWeighted(GenmapHandle h, GenmapComm c, GenmapVector u,
+int GenmapLaplacianWeighted(genmap_handle h, GenmapComm c, GenmapVector u,
                     GenmapVector weights, GenmapVector v) {
   assert(u->size == v->size);
   assert(u->size == GenmapGetNLocalElements(h));

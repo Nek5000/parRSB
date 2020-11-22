@@ -6,7 +6,7 @@
 
 // Input z should be orthogonal to 1-vector, have unit norm.
 // RQI should not change z.
-int rqi(GenmapHandle h,GenmapComm c,mgData d,GenmapVector z,
+int rqi(genmap_handle h,GenmapComm c,mgData d,GenmapVector z,
   int iter,int verbose,GenmapVector y)
 {
   assert(z->size==y->size);

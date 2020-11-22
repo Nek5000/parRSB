@@ -6,7 +6,7 @@
 
 #define MM 505 
 
-int project_pf(GenmapHandle h,GenmapComm c,mgData d,GenmapVector ri,
+int project_pf(genmap_handle h,GenmapComm c,mgData d,GenmapVector ri,
   int maxIter,int verbose,GenmapVector x)
 {
   assert(x->size==ri->size);
@@ -140,7 +140,7 @@ int project_pf(GenmapHandle h,GenmapComm c,mgData d,GenmapVector ri,
   return i;
 }
 
-int project_pf_lvl(GenmapHandle h,GenmapComm c,mgData d,GenmapScalar *ri,
+int project_pf_lvl(genmap_handle h,GenmapComm c,mgData d,GenmapScalar *ri,
   int maxIter,int verbose,int lvl_start,GenmapScalar *xo)
 {
   assert(lvl_start<d->nlevels-1);

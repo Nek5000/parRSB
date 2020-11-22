@@ -7,7 +7,7 @@
 //
 //TODO: use a separate function to generate init vector
 //
-int GenmapFiedlerRQI(GenmapHandle h,GenmapComm c,int maxIter,int global)
+int GenmapFiedlerRQI(genmap_handle h,GenmapComm c,int maxIter,int global)
 {
   GenmapInt lelt = GenmapGetNLocalElements(h);
   GenmapVector initVec; GenmapCreateVector(&initVec,lelt);
@@ -68,7 +68,7 @@ int GenmapFiedlerRQI(GenmapHandle h,GenmapComm c,int maxIter,int global)
   return iter;
 }
 
-int GenmapFiedlerLanczos(GenmapHandle h,GenmapComm c,int maxIter,
+int GenmapFiedlerLanczos(genmap_handle h,GenmapComm c,int maxIter,
   int global)
 {
   GenmapInt lelt = GenmapGetNLocalElements(h);
@@ -199,7 +199,7 @@ int GenmapFiedlerLanczos(GenmapHandle h,GenmapComm c,int maxIter,
   dest+=sizeof(T)*nunits;\
 } while(0)
 
-int GenmapFiedlerDump(const char *fname,GenmapHandle h,GenmapComm comm)
+int GenmapFiedlerDump(const char *fname,genmap_handle h,GenmapComm comm)
 {
   struct comm *c=&comm->gsc;
 

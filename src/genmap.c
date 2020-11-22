@@ -3,9 +3,9 @@
 
 #include <genmap-impl.h>
 
-int GenmapInit(GenmapHandle *h, GenmapCommExternal ce) {
+int genmap_init(genmap_handle *h, GenmapCommExternal ce) {
   GenmapMalloc(1, h);
-  GenmapHandle h_ = *h;
+  genmap_handle h_ = *h;
 
   GenmapCreateComm(&h_->global, ce);
   GenmapCreateComm(&h_->local, ce);
@@ -16,7 +16,7 @@ int GenmapInit(GenmapHandle *h, GenmapCommExternal ce) {
   return 0;
 }
 
-int GenmapFinalize(GenmapHandle h) {
+int genmap_finalize(genmap_handle h) {
   if(GenmapGetGlobalComm(h))
     GenmapDestroyComm(GenmapGetGlobalComm(h));
   if(GenmapGetLocalComm(h))
