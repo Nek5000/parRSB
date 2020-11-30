@@ -31,7 +31,7 @@ int project_pf(genmap_handle h,GenmapComm c,mgData d,GenmapVector ri,
   for(i=0; i<lelt; i++)
     x->data[i]=0.0,r->data[i]=ri->data[i];
 
-#if 1
+#if 0
   metric_tic(&c->gsc,VCYCLE);
   mg_vcycle(z->data,r->data,d);
   metric_toc(&c->gsc,VCYCLE);

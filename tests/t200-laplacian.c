@@ -52,7 +52,7 @@ int main(int argc,char *argv[]){
   GenmapDestroyVector(v);
   GenmapDestroyVector(u);
 
-  MeshFree(mesh);
+  mesh_free(mesh);
   genmap_finalize(gh);
 
   comm_free(&comm);

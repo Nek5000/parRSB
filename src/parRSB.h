@@ -11,10 +11,10 @@ int parRSB_partMesh(int *part,long long *vtx,double *coord,int nel,
 
 #define fparRCB_partMesh \
   FORTRAN_UNPREFIXED(fparrcb_partmesh,FPARRCB_PARTMESH)
-void fparRCB_partMesh(int *part,int *seq,double *vtx,int *nel,int *nv,
+void fparRCB_partMesh(int *part,int *seq,double *coord,int *nel,int *nv,
   int *options,int *comm,int *err);
 
-int parRCB_partMesh(int *part,int *seq,double *vtx,int  nel,int  nv,
+int parRCB_partMesh(int *part,int *seq,double *coord,int  nel,int  nv,
   int *options,MPI_Comm comm);
 
 #define fparRSB_findConnectivity\

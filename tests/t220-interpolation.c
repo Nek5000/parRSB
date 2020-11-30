@@ -74,7 +74,7 @@ int main(int argc,char *argv[]){
 
   mgFree(d);
   genmap_finalize(gh);
-  MeshFree(mesh);
+  mesh_free(mesh);
 
   comm_free(&comm);
   MPI_Finalize();

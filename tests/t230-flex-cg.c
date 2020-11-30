@@ -23,8 +23,8 @@ int main(int argc,char *argv[]){
   }
 
   Mesh mesh;
-  read_re2_mesh(&mesh,argv[1],&comm);
-  read_co2_file( mesh,argv[2],&comm);
+  read_geometry(&mesh,argv[1],&comm);
+  read_connectivity( mesh,argv[2],&comm);
 
   GenmapInt i,j;
 
@@ -170,7 +170,7 @@ int main(int argc,char *argv[]){
   mgFree(d);
 
   genmap_finalize(gh);
-  MeshFree(mesh);
+  mesh_free(mesh);
 
   comm_free(&comm);
   MPI_Finalize();

@@ -37,7 +37,7 @@ int parRSB_findConnectivity(long long *vertexid,double *coord,
   comm_barrier(&c);
   t_con-=comm_time();
 
-  Mesh mesh; MeshInit(&mesh,nelt,ndim);
+  Mesh mesh; mesh_init(&mesh,nelt,ndim);
 
   slong out[2][1],buff[2][1],in=nelt;
   comm_scan(out,&c,gs_long,gs_add,&in,1,buff);
@@ -100,7 +100,7 @@ int parRSB_findConnectivity(long long *vertexid,double *coord,
   if(rank==0 && verbose>0)
     printf(" finished in %g s\n",t_con);
 
-  MeshFree(mesh);
+  mesh_free(mesh);
   comm_free(&c);
 
   return 0;

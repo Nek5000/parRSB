@@ -46,7 +46,7 @@ int parRSB_partMesh(int *part,long long *vtx,double *coord,int nel,
 
   int ndim=(nve==8)?3:2;
   int e,n,v;
-  for(e=0; e<nel; ++e) {
+  for(e=0; e<nel; ++e){
     data.globalId=nelg_start+(e+1);
 
     GenmapLong eg=data.globalId;

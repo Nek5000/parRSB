@@ -8,7 +8,7 @@ BLAS ?= 0
 ## Genmap algorithmic parameters ##
 # ALGO = 0 (Lanczos),1 (RQI),2 (FMG)
 ALGO ?= 1
-RCB_PRE_STEP ?= 1
+RCB_PRE_STEP ?= 0
 PAUL ?= 1
 GRAMMIAN ?= 0
 

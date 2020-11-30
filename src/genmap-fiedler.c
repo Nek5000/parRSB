@@ -31,13 +31,19 @@ int GenmapFiedlerRQI(genmap_handle h,GenmapComm c,int max_iter,int global)
     }
   }
 
+  int verbose=h->dbgLevel;
+
   GenmapOrthogonalizebyOneVector(h,c,initVec,GenmapGetNGlobalElements(h));
   GenmapScalar rtr=GenmapDotVector(initVec,initVec);
   GenmapGop(c,&rtr,1,GENMAP_SCALAR,GENMAP_SUM);
   GenmapScalar rni=1.0/sqrt(rtr);
   GenmapScaleVector(initVec,initVec,rni);
- 
+
   struct comm *gsc=&c->gsc;
+
+  if(verbose>1 && gsc->id==0){
+    printf("RQI, |init| = %g\n",sqrt(rtr));
+  }
 
   metric_tic(gsc,LAPLACIANSETUP1);
   GenmapInitLaplacian(h,c);
@@ -208,8 +214,7 @@ int GenmapFiedlerDump(const char *fname,genmap_handle h,GenmapComm comm)
                         MPI_INFO_NULL,&file);
   uint rank=c->id;
   if(err!=0 && rank==0){
-    fprintf(stderr,"%s:%d Error opening file %s for writing.\n",
-                   __FILE__,__LINE__);
+    fprintf(stderr,"%s:%d Error opening file %s for writing.\n",__FILE__,__LINE__,fname);
     return err;
   }
 
@@ -241,8 +246,7 @@ int GenmapFiedlerDump(const char *fname,genmap_handle h,GenmapComm comm)
   MPI_Status st;
   err=MPI_File_write_ordered(file,pbuf,write_size,MPI_BYTE,&st);
   if(err!=0 && rank==0){
-    fprintf(stderr,"%s:%d Error opening file %s for writing.\n",
-                  __FILE__,__LINE__);
+    fprintf(stderr,"%s:%d Error opening file %s for writing.\n",__FILE__,__LINE__,fname);
     return err;
   }
 
@@ -262,8 +266,7 @@ int GenmapVectorDump(const char *fname,GenmapScalar *y,uint size,
                         MPI_INFO_NULL,&file);
   uint rank=c->id;
   if(err!=0 && rank==0){
-    fprintf(stderr,"%s:%d Error opening file %s for writing.\n",
-                   __FILE__,__LINE__);
+    fprintf(stderr,"%s:%d Error opening file %s for writing.\n",__FILE__,__LINE__,fname);
     return err;
   }
 
@@ -292,8 +295,7 @@ int GenmapVectorDump(const char *fname,GenmapScalar *y,uint size,
   MPI_Status st;
   err=MPI_File_write_ordered(file,pbuf,write_size,MPI_BYTE,&st);
   if(err!=0 && rank==0){
-    fprintf(stderr,"%s:%d Error opening file %s for writing.\n",
-                  __FILE__,__LINE__);
+    fprintf(stderr,"%s:%d Error opening file %s for writing.\n",__FILE__,__LINE__,fname);
     return err;
   }
 

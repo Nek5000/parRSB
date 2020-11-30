@@ -15,7 +15,7 @@ int main(int argc,char *argv[]){
   }
 
   Mesh mesh;
-  read_re2_mesh(&mesh,argv[1],&comm);
+  read_geometry(&mesh,argv[1],&comm);
 
   findMinNeighborDistance(mesh);
 
@@ -30,9 +30,9 @@ int main(int argc,char *argv[]){
   int len=strlen(co2FileName); assert(len>4 && len<BUFSIZ);
   co2FileName[len-2]='o',co2FileName[len-3]='c';
 
-  write_co2_file(mesh,co2FileName,&comm);
+  write_connectivity(mesh,co2FileName,&comm);
 
-  MeshFree(mesh);
+  mesh_free(mesh);
   comm_free(&comm);
   MPI_Finalize();
 
