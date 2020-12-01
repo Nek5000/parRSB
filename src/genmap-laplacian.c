@@ -99,15 +99,26 @@ int GenmapInitLaplacian(genmap_handle h,GenmapComm c)
   c->gsh=get_csr_top(c->M,&c->gsc);
   GenmapMalloc(c->M->row_off[c->M->rn],&c->b);
 
+#if defined(GENMAP_DEBUG)
+  int nnz = c->M->row_off[c->M->rn];
+  double fro[2] = {0.0, 0.0}, buf[2];
+  for(int i=0; i<nnz; i++){
+    fro[0] += c->M->v[i];
+    fro[1] += c->M->v[i]*c->M->v[i];
+  }
+  comm_allreduce(&c->gsc, gs_double, gs_add, &fro, 2, &buf);
+  printf("nrom(G,'1')=%g\nnorm(G,'fro')=%g\n", fro[0], fro[1]);
+
+  csr_mat_print(c->M, &c->gsc);
+#endif
+
   return 0;
 }
 
-int GenmapLaplacian(genmap_handle h,GenmapComm c,GenmapVector u,
-    GenmapVector v)
+int GenmapLaplacian(genmap_handle h,GenmapComm c,GenmapScalar *u, GenmapScalar *v)
 {
-  assert(u->size==v->size);
-  csr_mat_gather(c->M,c->gsh,u->data,c->b,&c->buf);
-  csr_mat_apply(v->data,c->M,c->b);
+  csr_mat_gather(c->M,c->gsh,u,c->b,&c->buf);
+  csr_mat_apply(v,c->M,c->b);
 
   return 0;
 }

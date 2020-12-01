@@ -4,8 +4,7 @@
 #include <stdio.h>
 
 /* Orthogonalize by 1-vector (vector of all 1's) */
-int GenmapOrthogonalizebyOneVector(genmap_handle h,GenmapComm c,
-  GenmapVector q1, GenmapLong n)
+int GenmapOrthogonalizebyOneVector(GenmapComm c, GenmapVector q1, GenmapLong n)
 {
   GenmapInt i;
   GenmapScalar sum = 0.0;
@@ -50,7 +49,7 @@ int GenmapLanczosLegendary(genmap_handle h,GenmapComm c,GenmapVector f,
 
   GenmapCreateVector(&r, lelt);
   GenmapCopyVector(r, f);
-  GenmapOrthogonalizebyOneVector(h, c, r, GenmapGetNGlobalElements(h));
+  GenmapOrthogonalizebyOneVector(c, r, GenmapGetNGlobalElements(h));
   rtr = GenmapDotVector(r, r);
   GenmapGop(c, &rtr, 1, GENMAP_SCALAR, GENMAP_SUM);
   rnorm = sqrt(rtr);
@@ -74,9 +73,9 @@ int GenmapLanczosLegendary(genmap_handle h,GenmapComm c,GenmapVector f,
     if(iter == 0) beta = 0.0;
 
     GenmapAxpbyVector(p, p, beta, r, 1.0);
-    GenmapOrthogonalizebyOneVector(h, c, p, GenmapGetNGlobalElements(h));
+    GenmapOrthogonalizebyOneVector(c, p, GenmapGetNGlobalElements(h));
 
-    GenmapLaplacianWeighted(h, c, p, h->weights, w);
+    GenmapLaplacianWeighted(h, c, p->data, w->data);
     GenmapScaleVector(w, w, -1.0);
 
     pap_old = pap;
@@ -140,7 +139,7 @@ int GenmapLanczos(genmap_handle h, GenmapComm c, GenmapVector init,
 
   GenmapCreateVector(&q1, lelt);
   GenmapCopyVector(q1, init);
-  GenmapOrthogonalizebyOneVector(h, c, q1, GenmapGetNGlobalElements(h));
+  GenmapOrthogonalizebyOneVector(c, q1, GenmapGetNGlobalElements(h));
   normq1 = GenmapDotVector(q1, q1);
   GenmapGop(c, &normq1, 1, GENMAP_SCALAR, GENMAP_SUM);
   normq1 = sqrt(normq1);
@@ -164,7 +163,7 @@ int GenmapLanczos(genmap_handle h, GenmapComm c, GenmapVector init,
     GenmapCreateVector(&(*q)[k], lelt);
     GenmapCopyVector((*q)[k], q1);
 
-    GenmapLaplacianWeighted(h, c, q1, h->weights, u);
+    GenmapLaplacianWeighted(h, c, q1->data, u->data);
 
     alpha->data[k] = GenmapDotVector(q1, u);
     GenmapGop(c, &alpha->data[k], 1, GENMAP_SCALAR, GENMAP_SUM);

@@ -2,13 +2,14 @@
 DEBUG ?= 0
 MPI ?= 1
 CC ?= mpicc
-CFLAGS ?= -O2
+CFLAGS ?= -g -O0
 BLAS ?= 0
+UNDERSCORE ?= 0
 
 ## Genmap algorithmic parameters ##
 # ALGO = 0 (Lanczos),1 (RQI),2 (FMG)
-ALGO ?= 1
-RCB_PRE_STEP ?= 0
+ALGO ?= 0
+RCB_PRE_STEP ?= 1
 PAUL ?= 1
 GRAMMIAN ?= 0
 
@@ -70,13 +71,17 @@ ifneq ($(GRAMMIAN),0)
   PP += -DGENMAP_GRAMMIAN
 endif
 
-ifneq ($(MPI),0)
-  PP += -DMPI
+ifneq ($(UNDERSCORE),0)
+  PP += -DGENMAP_UNDERSCORE
 endif
 
 ifneq ($(BLAS),0)
   PP += -DGENMAP_BLAS
-  LDFLAGS += -L$(BLASDIR)/lib -lblasLapack
+  LDFLAGS += -L$(BLASLIBPATH) -lblasLapack
+endif
+
+ifneq ($(MPI),0)
+  PP += -DMPI
 endif
 
 INSTALLDIR=

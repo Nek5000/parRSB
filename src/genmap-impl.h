@@ -26,12 +26,31 @@
 
 struct GenmapComm_private{
   struct comm gsc;
+  /* Un-weighted Laplacian */
   struct gs_data *gsh;
   csr_mat M;
+  /* Weighted Laplacian */
+  struct gs_data *gsw;
   buffer buf;
   GenmapScalar *b;
 };
 
+/* parRCB internals */
+struct rcb_element{
+  unsigned char type;
+  GenmapInt proc;
+  GenmapInt origin;
+  GenmapInt seq;
+  GenmapLong globalId;
+  GenmapScalar coord[MAXDIM];
+};
+
+void rcb_local(struct array *a,uint start,uint end,int ndim,buffer *buf);
+int rcb_level(struct comm *c,struct array *a,int ndim);
+int rcb(struct comm *ci,struct array *a,int ndim);
+
+/* parRSB internals */
+/* rsb_element should be a superset of rsb_element */
 struct rsb_element{
   unsigned char type;
   GenmapInt proc;
@@ -58,12 +77,12 @@ struct genmap_handle_private {
   GenmapLong start;
   int nv;
 
-  GenmapVector weights;
+  GenmapScalar *weights;
   struct array *elements;
   struct crystal cr;
 
-  int dbgLevel;
-  int printStat;
+  int verbose_level;
+  int print_stat;
 };
 
 int GenmapCreateHandle(genmap_handle h);
@@ -139,20 +158,6 @@ typedef struct{
 /* Components */
 sint is_disconnected(struct comm *c,struct gs_data *gsh,buffer *buf,
   uint nelt,uint nv);
-
-/* parRSB/parRCB internals */
-struct rcb_element{
-  unsigned char type;
-  GenmapInt proc;
-  GenmapInt origin;
-  GenmapInt seq;
-  GenmapLong globalId;
-  GenmapScalar coord[MAXDIM];
-};
-
-void rcb_local(struct array *a,uint start,uint end,int ndim,buffer *buf);
-int rcb_level(struct comm *c,struct array *a,int ndim);
-int rcb(struct comm *ci,struct array *a,int ndim);
 
 /* Matrix inverse */
 void matrix_inverse(int N,double *A);

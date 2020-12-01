@@ -31,19 +31,18 @@ int GenmapFiedlerRQI(genmap_handle h,GenmapComm c,int max_iter,int global)
     }
   }
 
-  int verbose=h->dbgLevel;
-
-  GenmapOrthogonalizebyOneVector(h,c,initVec,GenmapGetNGlobalElements(h));
-  GenmapScalar rtr=GenmapDotVector(initVec,initVec);
-  GenmapGop(c,&rtr,1,GENMAP_SCALAR,GENMAP_SUM);
-  GenmapScalar rni=1.0/sqrt(rtr);
-  GenmapScaleVector(initVec,initVec,rni);
-
+  int verbose=h->verbose_level;
   struct comm *gsc=&c->gsc;
 
-  if(verbose>1 && gsc->id==0){
-    printf("RQI, |init| = %g\n",sqrt(rtr));
-  }
+  GenmapOrthogonalizebyOneVector(c,initVec,GenmapGetNGlobalElements(h));
+
+  GenmapScalar norm=GenmapDotVector(initVec,initVec);
+  GenmapGop(c,&norm,1,GENMAP_SCALAR,GENMAP_SUM);
+  if(verbose>0 && gsc->id==0)
+    printf("RQI, |init| = %g\n",sqrt(norm));
+
+  norm=1.0/sqrt(norm);
+  GenmapScaleVector(initVec,initVec,norm);
 
   metric_tic(gsc,LAPLACIANSETUP1);
   GenmapInitLaplacian(h,c);
@@ -55,7 +54,7 @@ int GenmapFiedlerRQI(genmap_handle h,GenmapComm c,int max_iter,int global)
 
   GenmapVector y; GenmapCreateZerosVector(&y,lelt);
   metric_tic(gsc,RQI);
-  int iter=rqi(h,c,d,initVec,max_iter,0,y);
+  int iter=rqi(h,c,d,initVec,max_iter,verbose,y);
   metric_acc(NRQI,iter);
   metric_toc(gsc,RQI);
 
@@ -111,7 +110,7 @@ int GenmapFiedlerLanczos(genmap_handle h,GenmapComm c,int max_iter,
   GenmapCreateVector(&betaVec,max_iter-1);
   GenmapVector *q = NULL;
 
-  GenmapOrthogonalizebyOneVector(h,c,initVec,GenmapGetNGlobalElements(h));
+  GenmapOrthogonalizebyOneVector(c,initVec,GenmapGetNGlobalElements(h));
   GenmapScalar rtr = GenmapDotVector(initVec, initVec);
   GenmapGop(c, &rtr, 1, GENMAP_SCALAR, GENMAP_SUM);
   GenmapScalar rni = 1.0 / sqrt(rtr);

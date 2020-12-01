@@ -22,6 +22,7 @@ int inverse(double *x,int level,int iter,genmap_handle h,GenmapComm c,
     j=project_pf_lvl(h,c,d,x,iter,0,level,y);
     metric_toc(&c->gsc,PROJECTPF);
     metric_acc(NPROJECTPF,j);
+
     //TODO: 1-orthogonalize
 
     // x=y/||y||

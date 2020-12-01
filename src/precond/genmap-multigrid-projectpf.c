@@ -31,16 +31,7 @@ int project_pf(genmap_handle h,GenmapComm c,mgData d,GenmapVector ri,
   for(i=0; i<lelt; i++)
     x->data[i]=0.0,r->data[i]=ri->data[i];
 
-#if 0
-  metric_tic(&c->gsc,VCYCLE);
-  mg_vcycle(z->data,r->data,d);
-  metric_toc(&c->gsc,VCYCLE);
-#else
-  for(i=0; i<lelt; i++)
-    z->data[i]=r->data[i];
-#endif
-
-  GenmapOrthogonalizebyOneVector(h,c,z,nelg);
+  GenmapCopyVector(z,r);
   GenmapCopyVector(p,z);
 
   GenmapScalar rz1=GenmapDotVector(r,z);
@@ -52,16 +43,24 @@ int project_pf(genmap_handle h,GenmapComm c,mgData d,GenmapVector ri,
   GenmapScalar alpha,beta,rz0,rz2,scale;
 
   int rank=GenmapCommRank(c);
-  if(rank==0 && verbose)
-    printf("projectpf initial rr=%g rz1=%g\n",sqrt(rr),sqrt(rz1));
+  if(rank==0 && verbose>1)
+    printf("\t\tppf initial rr=%g rz1=%g\n",sqrt(rr),sqrt(rz1));
 
-  double tol=sqrt(rr)*1e-7;
+  double tol=1e-3;
 
   i=0; uint j,k;
   while(i<maxIter){
     metric_tic(&c->gsc,LAPLACIAN);
-    GenmapLaplacian(h,c,p,w);
+#if 0
+    GenmapLaplacianWeighted(h,c,p->data,w->data);
+#else
+    GenmapLaplacian(h,c,p->data,w->data);
+#endif
     metric_toc(&c->gsc,LAPLACIAN);
+
+    GenmapScalar normw=GenmapDotVector(w,w);
+    GenmapGop(c,&normw,1,GENMAP_SCALAR,GENMAP_SUM);
+    normw = sqrt(normw);
 
     GenmapScalar den=GenmapDotVector(p,w);
     GenmapGop(c,&den,1,GENMAP_SCALAR,GENMAP_SUM);
@@ -93,12 +92,12 @@ int project_pf(genmap_handle h,GenmapComm c,mgData d,GenmapVector ri,
     GenmapScalar norm1=GenmapDotVector(z,z);
     GenmapGop(c,&norm1,1,GENMAP_SCALAR,GENMAP_SUM);
 
-    if(rank==0 && verbose)
-      printf("vcycle i=%02d norm0=%g norm1=%g\n",i,sqrt(norm0),
+    if(rank==0 && verbose>2)
+      printf("\t\tvcycle i=%02d norm0=%g norm1=%g\n",i,sqrt(norm0),
         sqrt(norm1));
 
     rz0=rz1;
-    GenmapOrthogonalizebyOneVector(h,c,z,nelg);
+    GenmapOrthogonalizebyOneVector(c,z,nelg);
     rz1=GenmapDotVector(r,z);
     GenmapGop(c,&rz1,1,GENMAP_SCALAR,GENMAP_SUM);
 
@@ -106,9 +105,9 @@ int project_pf(genmap_handle h,GenmapComm c,mgData d,GenmapVector ri,
     rz2=GenmapDotVector(r,dz);
     GenmapGop(c,&rz2,1,GENMAP_SCALAR,GENMAP_SUM);
 
-    if(rank==0 && verbose)
-      printf("projectpf i=%d rr=%g rz1=%g rz2=%g alpha=%g\n",
-        i,sqrt(rr),sqrt(rz1),sqrt(rz2),alpha);
+    if(rank==0 && verbose>1)
+      printf("\t\tppf i=%d norm(w)= %g den=%g rr=%g rz1=%g rz2=%g alpha=%g\n",
+        i,normw,den,sqrt(rr),sqrt(rz1),sqrt(rz2),alpha);
 
     beta=rz2/rz0;
     GenmapAxpbyVector(p,z,1.0,p,beta);
@@ -171,7 +170,7 @@ int project_pf_lvl(genmap_handle h,GenmapComm c,mgData d,GenmapScalar *ri,
   metric_tic(&d->c,VCYCLE);
   mg_vcycle_lvl(z->data,r->data,d,lvl_start);
   metric_toc(&d->c,VCYCLE);
-  GenmapOrthogonalizebyOneVector(h,c,z,nelg);
+  GenmapOrthogonalizebyOneVector(c,z,nelg);
   GenmapCopyVector(p,z);
 
   GenmapScalar rz1=GenmapDotVector(r,z);
@@ -190,7 +189,7 @@ int project_pf_lvl(genmap_handle h,GenmapComm c,mgData d,GenmapScalar *ri,
   i=0;
   while(i<maxIter){
     //metric_tic(&c->gsc,LAPLACIAN);
-    //GenmapLaplacian(h,c,p,w);
+    //GenmapLaplacian(h,c,p->data,w->data);
     //metric_toc(&c->gsc,LAPLACIAN);
     metric_tic(&c->gsc,PRECONAX);
     csr_mat_gather(M,M->gsh,p->data,d->buf,&buf);
@@ -228,7 +227,7 @@ int project_pf_lvl(genmap_handle h,GenmapComm c,mgData d,GenmapScalar *ri,
     GenmapGop(c,&norm1,1,GENMAP_SCALAR,GENMAP_SUM);
 
     rz0=rz1;
-    GenmapOrthogonalizebyOneVector(h,c,z,nelg);
+    GenmapOrthogonalizebyOneVector(c,z,nelg);
     rz1=GenmapDotVector(r,z);
     GenmapGop(c,&rz1,1,GENMAP_SCALAR,GENMAP_SUM);
 

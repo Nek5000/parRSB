@@ -32,8 +32,7 @@ int set_dest(uint *proc,uint np,ulong start,uint size,ulong nelem)
   return 0;
 }
 
-int load_balance(struct array *a,size_t size,struct comm *c,
-    struct crystal *cr)
+int load_balance(struct array *a,size_t size,struct comm *c,struct crystal *cr)
 {
   slong in=a->n,out[2][1],buf[2][1];
   comm_scan(out,c,gs_long,gs_add,&in,1,buf);

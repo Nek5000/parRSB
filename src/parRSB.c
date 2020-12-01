@@ -14,7 +14,13 @@ void fparRSB_partMesh(int *part,long long *vtx,double *coord,int *nel,
   *err = parRSB_partMesh(part, vtx, coord, *nel, *nve, options, c);
 }
 
-//coord=[nel,nve,ndim]
+/*
+ * part = [nel], out,
+ * vtx = [nel x nve], in,
+ * coord = [nel x nve x ndim], in,
+ * nel = in,
+ * nve = in,
+ * options = null or [options[0]], in */
 int parRSB_partMesh(int *part,long long *vtx,double *coord,int nel,
   int nve,int *options,MPI_Comm comm)
 {
@@ -79,8 +85,6 @@ int parRSB_partMesh(int *part,long long *vtx,double *coord,int nel,
   double time2=comm_time();
 
   /* Run RSB now */
-  metric_init();
-
   struct comm comm_rsb;
   comm_ext old=c.c;
 #ifdef MPI
@@ -90,14 +94,20 @@ int parRSB_partMesh(int *part,long long *vtx,double *coord,int nel,
   comm_init(&comm_rsb,1);
 #endif
 
-  if(nel>0) {
-    genmap_handle h;
-    genmap_init(&h, comm_rsb.c);
+  int verbose_level = 0;
+  int print_stat = 0;
+  if(options!=NULL){
+    if(options[0]>0)
+      verbose_level=options[1];
+    if(options[0]>1)
+      print_stat=options[2];
+  }
 
-    if(options[0]!=0){
-      h->dbgLevel=options[1];
-      h->printStat=options[2];
-    }
+  if(nel>0) {
+    metric_init();
+
+    genmap_handle h;
+    genmap_init(&h, comm_rsb.c, options);
 
     GenmapSetArrayElements(h,&eList);
     GenmapScan(h, GenmapGetGlobalComm(h));
@@ -114,8 +124,13 @@ int parRSB_partMesh(int *part,long long *vtx,double *coord,int nel,
       return 1;
     }
 
-    genmap_rsb(h,h->dbgLevel>1);
+    genmap_rsb(h,h->verbose_level>1);
+
     genmap_finalize(h);
+
+    if(print_stat>0)
+      metric_print(&c);
+    metric_finalize();
   }
 
   double time3=comm_time();
@@ -135,24 +150,25 @@ int parRSB_partMesh(int *part,long long *vtx,double *coord,int nel,
   comm_barrier(&c);
   double time=comm_time()-time0;
 
-  /* Report time and finish */
-  double min[3],max[3],sum[3];
-  min[0]=max[0]=sum[0]=time1-time0;
-  min[1]=max[1]=sum[1]=time3-time2;
-  min[2]=max[2]=sum[2]=time5-time4;
-  comm_allreduce(&c,gs_double,gs_min,min,3,buf); // min
-  comm_allreduce(&c,gs_double,gs_max,max,3,buf); // max
-  comm_allreduce(&c,gs_double,gs_add,sum,3,buf); // sum
-  if(rank==0){
+  if(rank==0)
     printf(" finished in %g s\n",time);
-    printf("LOADBALANCE : %g/%g/%g\n",min[0],max[0],sum[0]/c.np);
-    printf("RSB         : %g/%g/%g\n",min[1],max[1],sum[1]/c.np);
-    printf("RESTORE     : %g/%g/%g\n",min[2],max[2],sum[2]/c.np);
-  }
-  fflush(stdout);
 
-  metric_print(&c);
-  metric_finalize();
+  /* Report time and finish */
+  if(print_stat>0){
+    double min[3],max[3],sum[3];
+    min[0]=max[0]=sum[0]=time1-time0;
+    min[1]=max[1]=sum[1]=time3-time2;
+    min[2]=max[2]=sum[2]=time5-time4;
+    comm_allreduce(&c,gs_double,gs_min,min,3,buf); // min
+    comm_allreduce(&c,gs_double,gs_max,max,3,buf); // max
+    comm_allreduce(&c,gs_double,gs_add,sum,3,buf); // sum
+    if(rank==0){
+      printf("LOADBALANCE : %g/%g/%g\n",min[0],max[0],sum[0]/c.np);
+      printf("RSB         : %g/%g/%g\n",min[1],max[1],sum[1]/c.np);
+      printf("RESTORE     : %g/%g/%g\n",min[2],max[2],sum[2]/c.np);
+    }
+    fflush(stdout);
+  }
 
   array_free(&eList);
   buffer_free(&bfr);

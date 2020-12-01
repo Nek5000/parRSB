@@ -1,13 +1,19 @@
 #include "genmap-impl.h"
 
-int GenmapCreateComm(GenmapComm *c_,GenmapCommExternal ce){
+int GenmapCreateComm(GenmapComm *c_,comm_ext ce){
   GenmapMalloc(1,c_);
   GenmapComm c=*c_;
   comm_init(&c->gsc, ce);
+
   c->gsh=NULL;
   c->M=NULL;
-  c->b=NULL;
+
+  c->gsw=NULL;
+
   buffer_init(&c->buf,1024);
+
+  c->b=NULL;
+
   return 0;
 }
 
@@ -18,6 +24,10 @@ int GenmapDestroyComm(GenmapComm c) {
     gs_free(c->gsh);
   if(c->M)
     csr_mat_free(c->M);
+
+  if(c->gsw)
+    gs_free(c->gsw);
+
   if(c->b)
     GenmapFree(c->b);
 
@@ -80,7 +90,7 @@ int GenmapBcast(GenmapComm c, void *in, GenmapInt count, GenmapDataType type) {
 }
 
 void GenmapSplitComm(genmap_handle h, GenmapComm *c, int bin) {
-  GenmapCommExternal local;
+  comm_ext local;
   int id = GenmapCommRank(*c);
   MPI_Comm_split((*c)->gsc.c, bin, id, &local);
   GenmapCrystalFinalize(h);

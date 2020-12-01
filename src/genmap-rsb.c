@@ -27,7 +27,7 @@ void genmap_rsb(genmap_handle h,int verbose){
   for(i=0; i<nelt; i++)
     e[i].globalId0=GenmapGetLocalStartIndex(h)+i+1;
 
-  buffer buf0=null_buffer;
+  buffer buf; buffer_init(&buf,1024);
 
   int nve=h->nv;
   int ndim=(nve==8)?3:2;
@@ -49,6 +49,7 @@ void genmap_rsb(genmap_handle h,int verbose){
     /* Run RCB pre-step */
     metric_tic(lc,RCB);
     rcb(lc,h->elements,ndim);
+    rcb_local(h->elements,0,h->elements->n,ndim,&buf);
     metric_toc(lc,RCB);
 #else
     /* Sort by global id otherwise */
@@ -57,9 +58,7 @@ void genmap_rsb(genmap_handle h,int verbose){
 
     /* Initialize the laplacian */
     metric_tic(lc,LAPLACIANSETUP0);
-    nelt=GenmapGetNLocalElements(h);
-    GenmapCreateVector(&h->weights,nelt);
-    GenmapInitLaplacianWeighted(h,local_c,h->weights);
+    GenmapInitLaplacianWeighted(h,local_c);
     metric_toc(lc,LAPLACIANSETUP0);
 
     /* Run fiedler */
@@ -82,42 +81,37 @@ void genmap_rsb(genmap_handle h,int verbose){
     int bin=1;
     if(lc->id<(np+1)/2)
       bin=0;
+    // FIXME: Ugly
     GenmapSplitComm(h,&local_c,bin);
     GenmapSetLocalComm(h,local_c);
     lc=&local_c->gsc;
     GenmapScan(h,local_c);
     metric_toc(lc,BISECT);
 
-    // FIXME: Do this only at begining of the loop
-    GenmapFree(h->weights);
     metric_push_level();
     level++;
   }
 
-#if 0
   /* Check if Fidler converged */
-  sint converged=1,buf;
+  sint converged=1;
   for(i=0; i<metric_get_levels(); i++){
     int val=(int)metric_get_value(i,NFIEDLER);
     if(val>=max_pass*max_iter){
       converged=0; break;
     }
   }
-  comm_allreduce(gc,gs_int,gs_min,&converged,1,&buf);// min
+  sint bfr;
+  comm_allreduce(gc,gs_int,gs_min,&converged,1,&bfr);// min
   if(converged==0 && gc->id==0)
     printf("\tWARNING: Lanczos failed to converge while partitioning!\n");
 
   /* Check for disconnected components */
-  nelt=GenmapGetNLocalElements(h);
-  GenmapCreateVector(&h->weights,nelt);
-  GenmapInitLaplacianWeighted(h,global_c,h->weights);
+  GenmapInitLaplacianWeighted(h,global_c);
 
-  sint discon=is_disconnected(gc,global_c->gsh,&global_c->buf,nelt,nve);
+  sint discon=is_disconnected(gc,global_c->gsw,&global_c->buf,nelt,nve);
   if(discon>0 && gc->id==0)
     printf("\tWarning: There are disconnected components!\n");
-  GenmapFree(h->weights);
-#endif
 
   crystal_free(&h->cr);
-  buffer_free(&buf0);
+  buffer_free(&buf);
 }

@@ -21,14 +21,12 @@ int parRCB_partMesh(int *part,int *seq,double *coord,int nel,int nv,
   struct comm c; comm_init(&c,comm);
   int rank=c.id,size=c.np;
 
-  comm_barrier(&c);
-  double time=comm_time();
-
-  metric_init();
-
   if(rank==0)
     printf("running RCB ... ");
   fflush(stdout);
+
+  comm_barrier(&c);
+  double time0=comm_time();
 
   /* Load balance input data */
   slong out[2][1],buf[2][1],in=nel;
@@ -76,6 +74,11 @@ int parRCB_partMesh(int *part,int *seq,double *coord,int nel,int nv,
   buffer bfr; buffer_init(&bfr,1024);
   sarray_sort(struct rcb_element,eList.ptr,(unsigned)nel,globalId,1,&bfr);
 
+  double time1=comm_time();
+  comm_barrier(&c);
+  double time2=comm_time();
+
+  /* Run RSB now */
   struct comm comm_rcb;
   comm_ext old=c.c;
 #ifdef MPI
@@ -86,6 +89,8 @@ int parRCB_partMesh(int *part,int *seq,double *coord,int nel,int nv,
 #endif
 
   if(nel>0){
+    metric_init();
+
     rcb(&comm_rcb,&eList,ndim);
 
     // Do a local RCB if seq!=NULL
@@ -96,6 +101,8 @@ int parRCB_partMesh(int *part,int *seq,double *coord,int nel,int nv,
       for(e=0; e<eList.n; e++)
         e_ptr[e].seq=e;
     }
+
+    metric_finalize();
   }
 
   /* Restore original input */
@@ -106,12 +113,15 @@ int parRCB_partMesh(int *part,int *seq,double *coord,int nel,int nv,
   e_ptr=eList.ptr;
   for(e=0;e<nel;e++)
     part[e]=e_ptr[e].origin;
+
   if(seq!=NULL)
     for(e=0;e<nel;e++)
       seq[e]=e_ptr[e].seq;
 
   comm_barrier(&c);
-  time=comm_time()-time;
+  double time=comm_time()-time0;
+
+  /* Report time and finish */
   if(c.id==0)
     printf(" finished in %g s\n",time);
   fflush(stdout);
@@ -121,8 +131,6 @@ int parRCB_partMesh(int *part,int *seq,double *coord,int nel,int nv,
   crystal_free(&cr);
   comm_free(&comm_rcb);
   comm_free(&c);
-
-  metric_finalize();
 
   return 0;
 }

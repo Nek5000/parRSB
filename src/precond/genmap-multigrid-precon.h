@@ -75,9 +75,6 @@ void mg_vcycle(GenmapScalar *u,GenmapScalar *rhs,mgData d);
 void mg_vcycle_lvl(GenmapScalar *u1,GenmapScalar *rhs,mgData d,
   int lvl_start);
 
-int ortho_one_vector(genmap_handle h,GenmapComm c,GenmapVector q1,
-  GenmapLong n);
-
 int flex_cg(genmap_handle h,GenmapComm c,mgData d,GenmapVector r,
   int maxIter,int verbose,GenmapVector x);
 

@@ -7,7 +7,9 @@ Parition mesh using Nek5000's vertex connectivity (con) file.
 #include <mpi.h>
 
 #include <gencon.h>
+#include <genmap.h>
 #include <parRSB.h>
+
 #include "quality.h"
 
 #define MAXNV 8 /* maximum number of vertices per element */
@@ -19,7 +21,7 @@ typedef struct {
 #define EXIT_ERROR() do{\
   MPI_Finalize();\
   return EXIT_FAILURE;\
-}while(0)
+} while(0)
 
 int main(int argc, char *argv[]) {
   MPI_Init(&argc, &argv);
@@ -62,22 +64,11 @@ int main(int argc, char *argv[]) {
     read_connectivity(mesh,conn_name,&comm);
     get_vertex_ids(&vl,mesh);
     get_vertex_coordinates(&coord,mesh);
-    mesh_free(mesh);
 
     ndim = get_mesh_dim(mesh);
-
-    // debug
-#if 0
     nelt = get_mesh_nel(mesh);
-    nv=(ndim==3)?8:4;
-    for(int e=0; e<nelt; e++){
-      for(int v=0; v<nv; v++){
-        printf("%lld ",vl[e*nv+v]);
-      }
-      printf("\n");
-    }
-#endif
 
+    mesh_free(mesh);
     comm_free(&comm);
   }
 
@@ -87,7 +78,7 @@ int main(int argc, char *argv[]) {
   /* Partition the mesh */
   int options[3];
   options[0] = 1; /* use custom options */
-  options[1] = 3; /* debug level        */
+  options[1] = 2; /* debug level        */
   options[2] = 0; /* not used           */
 
   int *part=(int*)calloc(nelt,sizeof(int));
