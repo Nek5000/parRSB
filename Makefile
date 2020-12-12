@@ -3,11 +3,11 @@ DEBUG ?= 0
 MPI ?= 1
 CC ?= mpicc
 CFLAGS ?= -g -O0
-BLAS ?= 0
-UNDERSCORE ?= 0
+BLAS ?= 1
+UNDERSCORE ?= 1
 
 ## Genmap algorithmic parameters ##
-# ALGO = 0 (Lanczos),1 (RQI),2 (FMG)
+# ALGO = 0 (Lanczos),1 (RQI)
 ALGO ?= 0
 RCB_PRE_STEP ?= 1
 PAUL ?= 1
@@ -77,7 +77,7 @@ endif
 
 ifneq ($(BLAS),0)
   PP += -DGENMAP_BLAS
-  LDFLAGS += -L$(BLASLIBPATH) -lblasLapack
+  LDFLAGS += -L$(BLASLIBPATH) -lblasLapack -lgfortran
 endif
 
 ifneq ($(MPI),0)

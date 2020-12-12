@@ -9,7 +9,7 @@ struct array *GenmapFindNeighbors(genmap_handle h,GenmapComm c)
   sint lelt=GenmapGetNLocalElements(h);
   sint nv  =GenmapGetNVertices(h);
 
-  GenmapScan(h,c);
+  genmap_scan(h,c);
   ulong elem_id   =GenmapGetLocalStartIndex(h)+1;
   ulong sequenceId=elem_id*nv;
 

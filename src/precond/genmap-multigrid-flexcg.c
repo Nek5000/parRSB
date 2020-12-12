@@ -11,7 +11,7 @@ int flex_cg(genmap_handle h,GenmapComm c,mgData d,GenmapVector ri,
   assert(x->size==GenmapGetNLocalElements(h));
 
   uint lelt=x->size;
-  GenmapLong nelg=GenmapGetNGlobalElements(h);
+  GenmapLong nelg=genmap_get_global_nel(h);
 
   GenmapVector z0,z,dz,w,p,r;
   GenmapCreateVector(&z ,lelt);
@@ -24,7 +24,7 @@ int flex_cg(genmap_handle h,GenmapComm c,mgData d,GenmapVector ri,
 #define PREC 1
 #define ORTH 1
 
-  int rank=GenmapCommRank(c);
+  int rank=genmap_comm_rank(c);
 
 #if PREC
   if(rank==0 && verbose) printf("Using MG Prec.\n");
@@ -43,7 +43,7 @@ int flex_cg(genmap_handle h,GenmapComm c,mgData d,GenmapVector ri,
 
   rz1=GenmapDotVector(r,z);
   GenmapGop(c,&rz1,1,GENMAP_SCALAR,GENMAP_SUM);
-  if(GenmapCommRank(c)==0 && verbose)
+  if(genmap_comm_rank(c)==0 && verbose)
     printf("rz1=%lf\n",rz1);
 
   GenmapCopyVector(p,z);

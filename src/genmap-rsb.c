@@ -7,7 +7,8 @@
 #include <sort.h>
 #include <parRSB.h>
 
-void genmap_rsb(genmap_handle h,int verbose){
+void genmap_rsb(genmap_handle h) {
+  int verbose = h->options->debug_level > 1;
   int max_iter=50;
   int max_pass=50;
 
@@ -17,10 +18,10 @@ void genmap_rsb(genmap_handle h,int verbose){
   GenmapComm global_c=GenmapGetGlobalComm(h);
   struct comm *gc=&global_c->gsc;
 
-  GenmapScan(h,local_c);
+  genmap_scan(h,local_c);
   crystal_init(&h->cr,lc);
 
-  GenmapScan(h, GenmapGetLocalComm(h));
+  genmap_scan(h, GenmapGetLocalComm(h));
   uint nelt=GenmapGetNLocalElements(h);
   GenmapElements e=GenmapGetElements(h);
   GenmapInt i;
@@ -34,7 +35,7 @@ void genmap_rsb(genmap_handle h,int verbose){
   int level=0;
   int np;
 
-  while(GenmapCommSize(GenmapGetLocalComm(h))>1){
+  while(genmap_comm_size(GenmapGetLocalComm(h))>1){
     local_c=GenmapGetLocalComm(h);
     lc=&local_c->gsc;
     np=lc->np;
@@ -47,10 +48,9 @@ void genmap_rsb(genmap_handle h,int verbose){
 
 #if defined(GENMAP_RCB_PRE_STEP)
     /* Run RCB pre-step */
-    metric_tic(lc,RCB);
-    rcb(lc,h->elements,ndim);
-    rcb_local(h->elements,0,h->elements->n,ndim,&buf);
-    metric_toc(lc,RCB);
+    metric_tic(lc, RCB);
+    rcb(lc, h->elements, ndim);
+    metric_toc(lc, RCB);
 #else
     /* Sort by global id otherwise */
     parallel_sort(struct rsb_element,h->elements,globalId0,gs_long,0,1,lc);
@@ -85,7 +85,7 @@ void genmap_rsb(genmap_handle h,int verbose){
     GenmapSplitComm(h,&local_c,bin);
     GenmapSetLocalComm(h,local_c);
     lc=&local_c->gsc;
-    GenmapScan(h,local_c);
+    genmap_scan(h,local_c);
     metric_toc(lc,BISECT);
 
     metric_push_level();

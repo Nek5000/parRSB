@@ -37,11 +37,11 @@ int GenmapDestroyComm(GenmapComm c) {
   return 0;
 }
 
-int GenmapCommSize(GenmapComm c) {
+int genmap_comm_size(GenmapComm c) {
   return (int) c->gsc.np;
 }
 
-int GenmapCommRank(GenmapComm c) {
+int genmap_comm_rank(GenmapComm c) {
   return (int) c->gsc.id;
 }
 
@@ -91,7 +91,7 @@ int GenmapBcast(GenmapComm c, void *in, GenmapInt count, GenmapDataType type) {
 
 void GenmapSplitComm(genmap_handle h, GenmapComm *c, int bin) {
   comm_ext local;
-  int id = GenmapCommRank(*c);
+  int id = genmap_comm_rank(*c);
   MPI_Comm_split((*c)->gsc.c, bin, id, &local);
   GenmapCrystalFinalize(h);
   GenmapDestroyComm(*c);

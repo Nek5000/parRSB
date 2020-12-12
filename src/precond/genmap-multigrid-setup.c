@@ -181,7 +181,7 @@ void mgLevelSetup(mgData d,uint lvl)
 void mgSetup(GenmapComm c,csr_mat M,mgData *d_){
   GenmapMalloc(1,d_); mgData d=*d_; comm_dup(&d->c,&c->gsc);
 
-  uint np=GenmapCommSize(c); uint rn=M->rn;
+  uint np=genmap_comm_size(c); uint rn=M->rn;
 
   slong out[2][1],bf[2][1],in=rn;
   comm_scan(out,&d->c,gs_long,gs_add,&in,1,bf);

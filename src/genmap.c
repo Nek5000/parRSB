@@ -3,7 +3,7 @@
 
 #include <genmap-impl.h>
 
-int genmap_init(genmap_handle *h_, comm_ext ce, int *options) {
+int genmap_init(genmap_handle *h_, comm_ext ce, parRSB_options *options) {
   GenmapMalloc(1, h_);
   genmap_handle h = *h_;
 
@@ -12,15 +12,7 @@ int genmap_init(genmap_handle *h_, comm_ext ce, int *options) {
 
   h->weights = NULL;
 
-  h->verbose_level = 0;
-  h->print_stat = 0;
-
-  if(options!=NULL){
-    if(options[0]>0)
-      h->verbose_level=options[1];
-    if(options[0]>1)
-      h->print_stat=options[2];
-  }
+  h->options = options;
 
   return 0;
 }

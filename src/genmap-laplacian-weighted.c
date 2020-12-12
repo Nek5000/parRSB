@@ -22,7 +22,7 @@ int GenmapInitLaplacianWeighted(genmap_handle h, GenmapComm c){
 
 #if defined(GENMAP_DEBUG)
   double t1 = GenmapGetMaxRss();
-  if(GenmapCommRank(GenmapGetLocalComm(h)) == 0)
+  if(genmap_comm_rank(GenmapGetLocalComm(h)) == 0)
     printf("RSS before gs_setup: %lf\n", t1);
 #endif
 
@@ -30,7 +30,7 @@ int GenmapInitLaplacianWeighted(genmap_handle h, GenmapComm c){
 
 #if defined(GENMAP_DEBUG)
   t1 = GenmapGetMaxRss();
-  if(GenmapCommRank(GenmapGetLocalComm(h)) == 0)
+  if(genmap_comm_rank(GenmapGetLocalComm(h)) == 0)
     printf("RSS after gs_setup: %lf\n", t1);
 #endif
 

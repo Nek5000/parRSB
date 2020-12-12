@@ -21,14 +21,30 @@
 #define GENMAP_RCB_ELEMENT 0
 #define GENMAP_RSB_ELEMENT 1
 
+#define GENMAP_SUM 0
+#define GENMAP_MAX 1
+#define GENMAP_MIN 2
+#define GENMAP_MUL 3
+
+#define GENMAP_ALIGN 32
+
+#define GENMAP_SP_TOL 1e-05
+#define GENMAP_DP_TOL 1e-12
+#define GENMAP_TOL GENMAP_DP_TOL
+
+#define GENMAP_READER_LEN 256
+#define GENMAP_MAX_READERS 32
+
 #define MAXDIM 3 /* Maximum dimension of the mesh */
 #define MAXNV 8 /* Maximum number of vertices per element */
 
 struct GenmapComm_private{
   struct comm gsc;
+
   /* Un-weighted Laplacian */
   struct gs_data *gsh;
   csr_mat M;
+
   /* Weighted Laplacian */
   struct gs_data *gsw;
   buffer buf;
@@ -45,12 +61,12 @@ struct rcb_element{
   GenmapScalar coord[MAXDIM];
 };
 
-void rcb_local(struct array *a,uint start,uint end,int ndim,buffer *buf);
-int rcb_level(struct comm *c,struct array *a,int ndim);
-int rcb(struct comm *ci,struct array *a,int ndim);
+void rcb_local(struct array *a, uint start, uint end, int ndim, buffer *buf);
+int rcb_level(struct comm *c, struct array *a, int ndim);
+int rcb(struct comm *c, struct array *a, int ndim);
 
 /* parRSB internals */
-/* rsb_element should be a superset of rsb_element */
+/* rsb_element should be a superset of rcb_element */
 struct rsb_element{
   unsigned char type;
   GenmapInt proc;
@@ -81,8 +97,7 @@ struct genmap_handle_private {
   struct array *elements;
   struct crystal cr;
 
-  int verbose_level;
-  int print_stat;
+  parRSB_options *options;
 };
 
 int GenmapCreateHandle(genmap_handle h);
@@ -156,8 +171,7 @@ typedef struct{
 } vertex;
 
 /* Components */
-sint is_disconnected(struct comm *c,struct gs_data *gsh,buffer *buf,
-  uint nelt,uint nv);
+sint is_disconnected(struct comm *c,struct gs_data *gsh,buffer *buf,uint nelt,uint nv);
 
 /* Matrix inverse */
 void matrix_inverse(int N,double *A);

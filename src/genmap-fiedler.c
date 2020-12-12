@@ -31,10 +31,10 @@ int GenmapFiedlerRQI(genmap_handle h,GenmapComm c,int max_iter,int global)
     }
   }
 
-  int verbose=h->verbose_level;
+  int verbose = h->options->debug_level;
   struct comm *gsc=&c->gsc;
 
-  GenmapOrthogonalizebyOneVector(c,initVec,GenmapGetNGlobalElements(h));
+  GenmapOrthogonalizebyOneVector(c,initVec,genmap_get_global_nel(h));
 
   GenmapScalar norm=GenmapDotVector(initVec,initVec);
   GenmapGop(c,&norm,1,GENMAP_SCALAR,GENMAP_SUM);
@@ -110,7 +110,7 @@ int GenmapFiedlerLanczos(genmap_handle h,GenmapComm c,int max_iter,
   GenmapCreateVector(&betaVec,max_iter-1);
   GenmapVector *q = NULL;
 
-  GenmapOrthogonalizebyOneVector(c,initVec,GenmapGetNGlobalElements(h));
+  GenmapOrthogonalizebyOneVector(c,initVec,genmap_get_global_nel(h));
   GenmapScalar rtr = GenmapDotVector(initVec, initVec);
   GenmapGop(c, &rtr, 1, GENMAP_SCALAR, GENMAP_SUM);
   GenmapScalar rni = 1.0 / sqrt(rtr);

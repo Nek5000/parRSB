@@ -23,7 +23,7 @@ int main(int argc,char *argv[]){
 
   genmap_handle gh; genmap_init(&gh,MPI_COMM_WORLD);
   GenmapSetNLocalElements(gh,mesh->nelt);
-  GenmapSetNVertices(gh,mesh->nVertex);
+  genmap_set_vertices(gh,mesh->nVertex);
 
   /* Setup mesh */
   GenmapElements e=GenmapGetElements(gh);

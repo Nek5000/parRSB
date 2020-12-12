@@ -13,7 +13,7 @@ int project_pf(genmap_handle h,GenmapComm c,mgData d,GenmapVector ri,
   assert(x->size==GenmapGetNLocalElements(h));
 
   uint lelt=x->size;
-  GenmapLong nelg=GenmapGetNGlobalElements(h);
+  GenmapLong nelg=genmap_get_global_nel(h);
 
   GenmapVector z0,z,dz,w,p,r;
   GenmapCreateVector(&z ,lelt);
@@ -42,7 +42,7 @@ int project_pf(genmap_handle h,GenmapComm c,mgData d,GenmapVector ri,
 
   GenmapScalar alpha,beta,rz0,rz2,scale;
 
-  int rank=GenmapCommRank(c);
+  int rank=genmap_comm_rank(c);
   if(rank==0 && verbose>1)
     printf("\t\tppf initial rr=%g rz1=%g\n",sqrt(rr),sqrt(rz1));
 

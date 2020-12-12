@@ -14,9 +14,9 @@ int rqi(genmap_handle h,GenmapComm c,mgData d,GenmapVector z,int max_iter,int ve
   GenmapVector err; GenmapCreateVector(&err,lelt);
 
   struct comm *gsc=&c->gsc;
-  int rank=GenmapCommRank(GenmapGetGlobalComm(h));
+  int rank=genmap_comm_rank(GenmapGetGlobalComm(h));
 
-  GenmapLong nelg=GenmapGetNGlobalElements(h);
+  GenmapLong nelg=genmap_get_global_nel(h);
 
   // Grammian
   GenmapScalar *Z, *GZ, *M, *rhs, *v, *buf;

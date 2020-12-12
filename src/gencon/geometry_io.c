@@ -75,73 +75,71 @@ int readRe2Header(Mesh *mesh_,MPI_File file,struct comm *c){
 }
 
 int readRe2Coordinates(Mesh mesh,MPI_File file,struct comm *c){
-  uint rank=c->id;
-  uint size=c->np;
-  MPI_Comm comm=c->c;
+  uint rank = c->id;
+  uint size = c->np;
+  MPI_Comm comm = c->c;
 
-  int nelt=mesh->nelt;
-  int nelgt=mesh->nelgt;
-  int nDim=mesh->nDim;
-  int nVertex=(nDim==2)?4:8;
+  int nelt = mesh->nelt;
+  int nelgt = mesh->nelgt;
+  int nDim = mesh->nDim;
+  int nVertex = (nDim == 2) ? 4 : 8;
 
   slong out[2][1],bfr[2][1];
-  slong in=nelt;
-  comm_scan(out,c,gs_long,gs_add,&in,1,bfr);
-  slong start=out[0][0];
+  slong in = nelt;
+  comm_scan(out, c, gs_long, gs_add, &in, 1, bfr);
+  slong start = out[0][0];
 
-  int elemDataSize=nVertex*nDim*sizeof(double)+sizeof(double);
-  int header_size=GC_RE2_HEADER_LEN+sizeof(float);
+  int elemDataSize = nVertex*nDim*sizeof(double) + sizeof(double);
+  int header_size = GC_RE2_HEADER_LEN + sizeof(float);
 
   /* calculate read size for element data on each MPI rank */
-  int read_size=nelt*elemDataSize;
-  if(rank==0) read_size+=header_size;
+  int read_size = nelt*elemDataSize;
+  if (rank==0)
+    read_size += header_size;
+  char *buf = (char *) calloc(read_size, sizeof(char));
 
-  char *buf=(char*)calloc(read_size,sizeof(char));
-  char *buf0=buf;
+  char *buf0 = buf;
+  if (rank == 0)
+    buf0 += header_size;
+
   MPI_Status st;
-  int err=MPI_File_read_ordered(file,buf,read_size,MPI_BYTE,&st);
-  if(err)
+  int err = MPI_File_read_ordered(file, buf, read_size, MPI_BYTE, &st);
+  if (err)
     return 1;
 
-  if(rank==0)
-    buf0+=header_size;
-
-  /* initialize array */
-  uint nUnits=nelt*nVertex;
-  array_init(struct Point_private,&mesh->elements,nUnits);
-  Point ptr=mesh->elements.ptr;
-
   /* read elements for each rank */
-  double x[GC_MAX_VERTICES],y[GC_MAX_VERTICES],z[GC_MAX_VERTICES];
-  int i,j,k;
-  for(i=0;i<nelt;i++){
+  uint n_units = nelt*nVertex;
+  double x[GC_MAX_VERTICES], y[GC_MAX_VERTICES], z[GC_MAX_VERTICES];
+  struct Point_private pnt;
+  int i, j, k;
+  for(i = 0; i < nelt; i++){
     // skip group id
     buf0+=sizeof(double);
-    READ_T(x,buf0,double,nVertex); buf0+=sizeof(double)*nVertex;
-    READ_T(y,buf0,double,nVertex); buf0+=sizeof(double)*nVertex;
-    if(nDim==3){
-      READ_T(z,buf0,double,nVertex);
-      buf0+=sizeof(double)*nVertex;
-    }
+    READ_T(x, buf0, double, nVertex); buf0+=sizeof(double)*nVertex;
+    READ_T(y, buf0, double, nVertex); buf0+=sizeof(double)*nVertex;
+    if (nDim == 3)
+      READ_T(z, buf0, double, nVertex); buf0+=sizeof(double)*nVertex;
 
-    for(k=0;k<nVertex;k++){
-      j=PRE_TO_SYM_VERTEX[k];
-      ptr->x[0]=x[j],ptr->x[1]=y[j];
-      if(nDim==3)
-        ptr->x[2]=z[j];
-      ptr->elementId =start+i;
-      ptr->sequenceId=nVertex*(start+i)+k;
-      ptr->origin    =rank;
-      ptr++;
+    for (k = 0; k < nVertex; k++) {
+      j = PRE_TO_SYM_VERTEX[k];
+      pnt.x[0] = x[j];
+      pnt.x[1] = y[j];
+      if (nDim == 3)
+        pnt.x[2] = z[j];
+      pnt.elementId = start + i;
+      pnt.sequenceId = nVertex*(start + i) + k;
+      pnt.origin = rank;
+      array_cat(struct Point_private, &mesh->elements, &pnt, 1);
     }
   }
-  mesh->elements.n=nUnits;
+  assert(mesh->elements.n == n_units);
 
 #if defined(GENMAP_DEBUG)
-  printf("io: rank=%d npts=%u\n",rank,nUnits);
+  printf("io: rank=%d npts=%u\n", rank, n_units);
 #endif
 
   free(buf);
+
   return 0;
 }
 
