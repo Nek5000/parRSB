@@ -52,17 +52,19 @@ int findSegments(Mesh mesh,struct comm *c,GenmapScalar tol,int verbose){
   int nDim=mesh->nDim,nVertex=mesh->nVertex;
   GenmapScalar tolSquared=tol*tol;
 
-  parallel_sort(struct Point_private,&mesh->elements,x[0],
-    genmap_gs_scalar,bin_sort,0,c);
+  buffer buf;
+  buffer_init(&buf,1024);
+
+  parallel_sort(struct Point_private,&mesh->elements,x[0],genmap_gs_scalar,bin_sort,0,c,&buf);
 
   uint nPoints=mesh->elements.n;
   Point points=mesh->elements.ptr;
 
-  buffer buf; buffer_init(&buf,1024);
   if(nDim==3)
     sarray_sort_2(struct Point_private,points,nPoints,x[1],3,x[2],3,&buf);
   else
     sarray_sort  (struct Point_private,points,nPoints,x[1],3,&buf);
+
   buffer_free(&buf);
 
   //TODO: load balance

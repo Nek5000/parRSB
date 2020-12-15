@@ -49,11 +49,11 @@ void genmap_rsb(genmap_handle h) {
 #if defined(GENMAP_RCB_PRE_STEP)
     /* Run RCB pre-step */
     metric_tic(lc, RCB);
-    rcb(lc, h->elements, ndim);
+    rcb(lc, h->elements, ndim, &buf);
     metric_toc(lc, RCB);
 #else
     /* Sort by global id otherwise */
-    parallel_sort(struct rsb_element,h->elements,globalId0,gs_long,0,1,lc);
+    parallel_sort(struct rsb_element,h->elements,globalId0,gs_long,0,1,lc,&buf);
 #endif
 
     /* Initialize the laplacian */
@@ -77,7 +77,7 @@ void genmap_rsb(genmap_handle h) {
 
     /* Bisect */
     metric_tic(lc,BISECT);
-    parallel_sort(struct rsb_element,h->elements,fiedler,gs_double,0,1,lc);
+    parallel_sort(struct rsb_element,h->elements,fiedler,gs_double,0,1,lc,&buf);
     int bin=1;
     if(lc->id<(np+1)/2)
       bin=0;

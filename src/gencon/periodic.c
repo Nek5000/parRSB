@@ -21,9 +21,8 @@ struct minPair_private{
 };
 typedef struct minPair_private* minPair;
 
-int compressPeriodicVertices(Mesh mesh,struct comm *c){
-  parallel_sort(struct Point_private,&mesh->elements,globalId,
-    gs_long,0,0,c);
+int compressPeriodicVertices(Mesh mesh,struct comm *c,buffer *bfr){
+  parallel_sort(struct Point_private,&mesh->elements,globalId,gs_long,0,0,c,bfr);
 
   Point points=mesh->elements.ptr;
   uint npoints=mesh->elements.n;
@@ -60,8 +59,7 @@ ulong findMinBelowI(ulong min,uint I,struct array *arr){
   return min;
 }
 
-int renumberPeriodicVertices(Mesh mesh,struct comm *c,\
-    struct array *matched)
+int renumberPeriodicVertices(Mesh mesh,struct comm *c,struct array *matched,buffer *buf)
 {
   minPair ptr=matched->ptr;
   uint size=matched->n;
@@ -75,8 +73,7 @@ int renumberPeriodicVertices(Mesh mesh,struct comm *c,\
   for(i=0;i<size;i++)
     ids[i]=ptr[i].min;
 
-  buffer buf; buffer_init(&buf,1024);
-  gs(ids,gs_long,gs_min,0,t,&buf);
+  gs(ids,gs_long,gs_min,0,t,buf);
 
   for(i=0;i<size;i++)
     ptr[i].min=ids[i];
@@ -84,7 +81,7 @@ int renumberPeriodicVertices(Mesh mesh,struct comm *c,\
   GenmapFree(ids);
   gs_free(t);
 
-  sarray_sort_2(struct minPair_private,ptr,size,orig,1,min,1,&buf);
+  sarray_sort_2(struct minPair_private,ptr,size,orig,1,min,1,buf);
 
   struct array compressed;
   array_init(struct minPair_private,&compressed,10); compressed.n=0;
@@ -106,7 +103,7 @@ int renumberPeriodicVertices(Mesh mesh,struct comm *c,\
   sint rank=c->id;
   ptr=compressed.ptr; size=compressed.n;
   if(rank==0){
-    sarray_sort_2(struct minPair_private,ptr,size,orig,1,min,1,&buf);
+    sarray_sort_2(struct minPair_private,ptr,size,orig,1,min,1,buf);
     for(i=0; i<size; i++)
       ptr[i].min=findMinBelowI(ptr[i].min,i,&compressed);
   }
@@ -126,14 +123,13 @@ int renumberPeriodicVertices(Mesh mesh,struct comm *c,\
   for(i=0;i<size ;i++) ids[i]=pnt[i].globalId;
   for(i=0;i<sizec;i++) ids[size+i]=ptr[i].min;
 
-  gs(ids,gs_long,gs_min,0,t,&buf);
+  gs(ids,gs_long,gs_min,0,t,buf);
 
   for(i=0;i<size;i++) pnt[i].globalId=ids[i];
 
   gs_free(t);
   GenmapFree(ids);
   array_free(&compressed);
-  buffer_free(&buf);
 }
 
 int findConnectedPeriodicPairs(Mesh mesh,BoundaryFace f_,BoundaryFace g_,
@@ -242,7 +238,7 @@ int gatherMatchingPeriodicFaces(Mesh mesh,struct comm *c){
   crystal_free(&cr);
 }
 
-int setPeriodicFaceCoordinates(Mesh mesh,struct comm *c){
+int setPeriodicFaceCoordinates(Mesh mesh,struct comm *c,buffer *buf){
   BoundaryFace bPtr=mesh->boundary.ptr;
   sint bSize=mesh->boundary.n;
   if(bSize==0) return 0;
@@ -251,15 +247,11 @@ int setPeriodicFaceCoordinates(Mesh mesh,struct comm *c){
   sint eSize=mesh->elements.n;
   if(eSize==0) return 0;
 
-  buffer buf; buffer_init(&buf,1024);
-
   /* Need boundary array to be sorted by elementId */
-  sarray_sort(struct Boundary_private,bPtr,bSize,elementId,1,&buf);
+  sarray_sort(struct Boundary_private,bPtr,bSize,elementId,1,buf);
 
   /* Need element array to be sorted by sequenceId */
-  sarray_sort(struct Point_private,ePtr,eSize,sequenceId,1,&buf);
-
-  buffer_free(&buf);
+  sarray_sort(struct Point_private,ePtr,eSize,sequenceId,1,buf);
 
   int faces[GC_MAX_FACES][GC_MAX_FACE_VERTICES];
   if(mesh->nDim==3)
@@ -288,17 +280,24 @@ int setPeriodicFaceCoordinates(Mesh mesh,struct comm *c){
 }
 
 int matchPeriodicFaces(Mesh mesh,struct comm *c){
-  setPeriodicFaceCoordinates(mesh,c);
-  gatherMatchingPeriodicFaces(mesh,c);
+  buffer bfr;
+  buffer_init(&bfr, 1024);
+
+  setPeriodicFaceCoordinates(mesh, c, &bfr);
+  gatherMatchingPeriodicFaces(mesh, c);
 
   struct array matched;
-  array_init(struct minPair_private,&matched,10); matched.n=0;
-  findConnectedPeriodicFaces(mesh,&matched);
-  renumberPeriodicVertices(mesh,c,&matched);
+  array_init(struct minPair_private, &matched, 10);
+  matched.n = 0;
+
+  findConnectedPeriodicFaces(mesh, &matched);
+  renumberPeriodicVertices(mesh, c, &matched, &bfr);
   array_free(&matched);
 
-  compressPeriodicVertices(mesh,c);
-  sendBack(mesh,c);
+  compressPeriodicVertices(mesh, c, &bfr);
+  sendBack(mesh, c);
+
+  buffer_free(&bfr);
 
   return 0;
 }

@@ -61,9 +61,9 @@ struct rcb_element{
   GenmapScalar coord[MAXDIM];
 };
 
-void rcb_local(struct array *a, uint start, uint end, int ndim, buffer *buf);
-int rcb_level(struct comm *c, struct array *a, int ndim);
-int rcb(struct comm *c, struct array *a, int ndim);
+int rcb(struct comm *c, struct array *a, int ndim, buffer *bfr);
+int rcb_level(struct comm *c, struct array *a, int ndim, buffer *bfr);
+void rcb_local(struct array *a, uint start, uint end, int ndim, buffer *bfr);
 
 /* parRSB internals */
 /* rsb_element should be a superset of rcb_element */

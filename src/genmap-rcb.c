@@ -55,7 +55,7 @@ void get_axis_len(double *length, struct array *a, struct comm *c, int ndim)
     length[i] = max[i] - min[i];
 }
 
-int rcb_level(struct comm *c, struct array *a, int ndim){
+int rcb_level(struct comm *c, struct array *a, int ndim, buffer *bfr){
   double length[MAXDIM];
 
   if (c->np == 1)
@@ -75,13 +75,13 @@ int rcb_level(struct comm *c, struct array *a, int ndim){
   if (*type == GENMAP_RCB_ELEMENT) {
     switch(axis1){
       case 0:
-        parallel_sort(struct rcb_element, a, coord[0], gs_double, 0, 1, c);
+        parallel_sort(struct rcb_element, a, coord[0], gs_double, 0, 1, c, bfr);
         break;
       case 1:
-        parallel_sort(struct rcb_element, a, coord[1], gs_double, 0, 1, c);
+        parallel_sort(struct rcb_element, a, coord[1], gs_double, 0, 1, c, bfr);
         break;
       case 2:
-        parallel_sort(struct rcb_element, a, coord[2], gs_double, 0, 1, c);
+        parallel_sort(struct rcb_element, a, coord[2], gs_double, 0, 1, c, bfr);
         break;
       default:
         break;
@@ -89,13 +89,13 @@ int rcb_level(struct comm *c, struct array *a, int ndim){
   } else if (*type == GENMAP_RSB_ELEMENT) {
     switch(axis1){
       case 0:
-        parallel_sort(struct rsb_element, a, coord[0], gs_double, 0, 1, c);
+        parallel_sort(struct rsb_element, a, coord[0], gs_double, 0, 1, c, bfr);
         break;
       case 1:
-        parallel_sort(struct rsb_element, a, coord[1], gs_double, 0, 1, c);
+        parallel_sort(struct rsb_element, a, coord[1], gs_double, 0, 1, c, bfr);
         break;
       case 2:
-        parallel_sort(struct rsb_element, a, coord[2], gs_double, 0, 1, c);
+        parallel_sort(struct rsb_element, a, coord[2], gs_double, 0, 1, c, bfr);
         break;
       default:
         break;
@@ -112,7 +112,12 @@ int genmap_rcb(genmap_handle h) {
 
   int ndim = (h->nv == 8) ? 3 : 2;
 
-  rcb(lc, h->elements, ndim);
+  buffer bfr;
+  buffer_init(&bfr, 1024);
+
+  rcb(lc, h->elements, ndim, &bfr);
+
+  buffer_free(&bfr);
 
   struct rcb_element *eptr = h->elements->ptr;
   int e;
@@ -122,7 +127,7 @@ int genmap_rcb(genmap_handle h) {
   return 0;
 }
 
-int rcb(struct comm *ci, struct array *elements, int ndim) {
+int rcb(struct comm *ci, struct array *elements, int ndim, buffer *bfr) {
   struct comm c;
   comm_dup(&c, ci);
 
@@ -130,7 +135,7 @@ int rcb(struct comm *ci, struct array *elements, int ndim) {
   int rank = c.id;
 
   while (size > 1) {
-    rcb_level(&c, elements, ndim);
+    rcb_level(&c, elements, ndim, bfr);
 
     int p = (size + 1) / 2;
     int bin = (rank >= p);
@@ -153,12 +158,7 @@ int rcb(struct comm *ci, struct array *elements, int ndim) {
     rank = c.id;
   }
 
-  buffer bfr;
-  buffer_init(&bfr, 1024);
-
-  rcb_local(elements, 0, elements->n, ndim, &bfr);
-
-  buffer_free(&bfr);
+  rcb_local(elements, 0, elements->n, ndim, bfr);
 
   comm_free(&c);
 
