@@ -19,7 +19,7 @@ int inverse(double *x,int level,int iter,genmap_handle h,GenmapComm c,
 
     // solve Ay=x
     metric_tic(&c->gsc,PROJECTPF);
-    j=project_pf_lvl(h,c,d,x,iter,0,level,y);
+    j=project_lvl(h,c,d,x,iter,0,level,y);
     metric_toc(&c->gsc,PROJECTPF);
     metric_acc(NPROJECTPF,j);
 

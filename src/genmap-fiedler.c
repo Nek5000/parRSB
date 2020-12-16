@@ -22,7 +22,7 @@ int GenmapFiedlerRQI(genmap_handle h,GenmapComm c,int max_iter,int global)
     }
 #else
     for(i = 0;  i < lelt; i++) {
-      initVec->data[i] = (GenmapScalar) elements[i].globalId;
+      initVec->data[i] = elements[i].globalId;
     }
 #endif
   }else{
@@ -125,7 +125,6 @@ int GenmapFiedlerLanczos(genmap_handle h,GenmapComm c,int max_iter,
   GenmapVector evLanczos, evTriDiag;
   GenmapCreateVector(&evTriDiag, iter);
 
-#if defined(GENMAP_PAUL)
   /* Use TQLI and find the minimum eigenvalue and associated vector */
   GenmapVector *eVectors, eValues;
   GenmapTQLI(h, alphaVec, betaVec, &eVectors, &eValues);
@@ -139,19 +138,6 @@ int GenmapFiedlerLanczos(genmap_handle h,GenmapComm c,int max_iter,
     }
   }
   GenmapCopyVector(evTriDiag, eVectors[eValMinI]);
-#else
-  GenmapVector init;
-  GenmapCreateVector(&init, iter);
-  for(int i = 0; i < iter; i++) {
-    init->data[i] = i + 1.0;
-  }
-  GenmapScalar avg = 0.5 * iter * (1.0 + iter) / iter;
-  for(int i = 0; i < iter; i++) {
-    init->data[i] -= avg;
-  }
-  GenmapInvPowerIter(evTriDiag, alphaVec, betaVec, init, 100);
-  GenmapDestroyVector(init);
-#endif
 
   GenmapInt j;
   GenmapCreateZerosVector(&evLanczos, lelt);

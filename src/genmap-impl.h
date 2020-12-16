@@ -51,7 +51,7 @@ struct GenmapComm_private{
   GenmapScalar *b;
 };
 
-/* parRCB internals */
+/* parRCB/parRSB internals */
 struct rcb_element{
   unsigned char type;
   GenmapInt proc;
@@ -59,13 +59,12 @@ struct rcb_element{
   GenmapInt seq;
   GenmapLong globalId;
   GenmapScalar coord[MAXDIM];
+  GenmapScalar fiedler;
 };
 
-int rcb(struct comm *c, struct array *a, int ndim, buffer *bfr);
-int rcb_level(struct comm *c, struct array *a, int ndim, buffer *bfr);
-void rcb_local(struct array *a, uint start, uint end, int ndim, buffer *bfr);
+int rcb(struct comm *ci, struct array *elements, int ndim, buffer *bfr);
+int rib(struct comm *ci, struct array *elements, int ndim, buffer *bfr);
 
-/* parRSB internals */
 /* rsb_element should be a superset of rcb_element */
 struct rsb_element{
   unsigned char type;
@@ -74,10 +73,10 @@ struct rsb_element{
   GenmapInt seq;
   GenmapLong globalId;
   GenmapScalar coord[MAXDIM];
+  GenmapScalar fiedler;
   GenmapLong vertices[8];
   GenmapInt part;
   GenmapULong globalId0;
-  GenmapScalar fiedler;
 };
 
 int GenmapCreateElements(GenmapElements *e);
@@ -153,10 +152,10 @@ typedef enum{
 
 void metric_init();
 void metric_finalize();
-void metric_acc(metric m,double count);
-void metric_tic(struct comm *c,metric m);
-void metric_toc(struct comm *c,metric m);
-double metric_get_value(int level,metric m);
+void metric_acc(metric m, double count);
+void metric_tic(struct comm *c, metric m);
+void metric_toc(struct comm *c, metric m);
+double metric_get_value(int level, metric m);
 void metric_push_level();
 uint metric_get_levels();
 void metric_print(struct comm *c);
@@ -171,9 +170,9 @@ typedef struct{
 } vertex;
 
 /* Components */
-sint is_disconnected(struct comm *c,struct gs_data *gsh,buffer *buf,uint nelt,uint nv);
+sint is_disconnected(struct comm *c, struct gs_data *gsh, buffer *buf, uint nelt, uint nv);
 
 /* Matrix inverse */
-void matrix_inverse(int N,double *A);
+void matrix_inverse(int N, double *A);
 
 #endif

@@ -96,7 +96,6 @@ int GenmapInitLaplacianWeighted(genmap_handle h, GenmapComm c);
 int GenmapLaplacianWeighted(genmap_handle h, GenmapComm c, GenmapScalar *u, GenmapScalar *v);
 
 /* Eigen */
-int GenmapInvPowerIter(GenmapVector eVector, GenmapVector alpha, GenmapVector beta, GenmapVector init, int iter);
 int GenmapTQLI(genmap_handle h, GenmapVector diag, GenmapVector upper, GenmapVector **eVec, GenmapVector *eVal);
 int genmap_inverse_power(double *y, int N, double *A, int verbose);
 int genmap_power(double *y, int N, double *A, int verbose);
@@ -119,8 +118,9 @@ int GenmapFiedlerRQI(genmap_handle h, GenmapComm c, int maxIter, int global);
 /* RSB/RCB */
 void genmap_load_balance(struct array *eList, uint nel, int nv, double *coord,
                          long long *vtx, struct crystal *cr, buffer *bfr);
-void genmap_rsb(genmap_handle h);
+int genmap_rsb(genmap_handle h);
 int genmap_rcb(genmap_handle h);
+int genmap_rib(genmap_handle h);
 
 /* Misc */
 double GenmapGetMaxRss();

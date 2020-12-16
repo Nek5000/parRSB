@@ -6,17 +6,18 @@
 
 // Input z should be orthogonal to 1-vector, have unit norm.
 // RQI should not change z.
-int rqi(genmap_handle h,GenmapComm c,mgData d,GenmapVector z,int max_iter,int verbose,GenmapVector y)
+int rqi(genmap_handle h, GenmapComm c, mgData d, GenmapVector z, int max_iter, int verbose, GenmapVector y)
 {
   assert(z->size==y->size);
 
-  uint lelt=z->size;
-  GenmapVector err; GenmapCreateVector(&err,lelt);
+  uint lelt = z->size;
+  GenmapVector err;
+  GenmapCreateVector(&err,lelt);
 
-  struct comm *gsc=&c->gsc;
-  int rank=genmap_comm_rank(GenmapGetGlobalComm(h));
+  struct comm *gsc = &c->gsc;
+  int rank = genmap_comm_rank(GenmapGetGlobalComm(h));
 
-  GenmapLong nelg=genmap_get_global_nel(h);
+  GenmapLong nelg = genmap_get_global_nel(h);
 
   // Grammian
   GenmapScalar *Z, *GZ, *M, *rhs, *v, *buf;
@@ -27,22 +28,22 @@ int rqi(genmap_handle h,GenmapComm c,mgData d,GenmapVector z,int max_iter,int ve
   GenmapMalloc(max_iter, &v);
   GenmapMalloc(max_iter*max_iter, &buf);
 
-  metric_tic(gsc,PROJECTPF);
-  int ppfi = project_pf(h, c, d, z, 20, verbose, y);
-  metric_toc(gsc,PROJECTPF);
-  metric_acc(NPROJECTPF,ppfi);
+  metric_tic(gsc, PROJECTPF);
+  int ppfi = project(h, c, d, z, 20, verbose, y);
+  metric_toc(gsc, PROJECTPF);
+  metric_acc(NPROJECTPF, ppfi);
 
-  uint i,j,k,l;
-  for(i=0; i<20; i++){
-    GenmapScalar norm=GenmapDotVector(y,y);
-    GenmapGop(c,&norm,1,GENMAP_SCALAR,GENMAP_SUM);
-    GenmapScalar normi=1.0/sqrt(norm);
+  uint i, j, k, l;
+  for (i = 0; i < 20; i++) {
+    GenmapScalar norm = GenmapDotVector(y,y);
+    comm_allreduce(gsc, gs_double, gs_add, &norm, 1, buf);
+    GenmapScalar normi = 1.0/sqrt(norm);
 
-    if(rank==0 && verbose>0)
-      printf("\ti=%02d #ppf=%02d |y|=%g\n",i,ppfi,sqrt(norm));
+    if (rank == 0 && verbose > 0)
+      printf("\ti=%02d #ppf=%02d |y|=%g\n", i, ppfi, sqrt(norm));
 
-    GenmapAxpbyVector(z,z,0.0,y,normi);
-    GenmapOrthogonalizebyOneVector(c,z,nelg);
+    GenmapAxpbyVector(z, z, 0.0, y, normi);
+    GenmapOrthogonalizebyOneVector(c, z, nelg);
 
 #if defined(GENMAP_GRAMMIAN)
     metric_tic(gsc,GRAMMIAN);
@@ -105,7 +106,7 @@ int rqi(genmap_handle h,GenmapComm c,mgData d,GenmapVector z,int max_iter,int ve
           z->data[k]+=Z[j*lelt+k]*v[j];
       }
       GenmapOrthogonalizebyOneVector(c,z,nelg);
-    }else{
+    } else {
       //Z(k,:) = z;
       for(l=0; l<lelt; l++)
         Z[i*lelt+l]=z->data[l];
@@ -113,11 +114,13 @@ int rqi(genmap_handle h,GenmapComm c,mgData d,GenmapVector z,int max_iter,int ve
     metric_toc(gsc,GRAMMIAN);
 #endif
 
-    metric_tic(gsc,PROJECTPF);
-    ppfi=project_pf(h,c,d,z,20,verbose,y);
-    metric_toc(gsc,PROJECTPF);
-    metric_acc(NPROJECTPF,ppfi);
-    GenmapOrthogonalizebyOneVector(c,y,nelg);
+    metric_tic(gsc, PROJECTPF);
+    ppfi = project(h, c, d, z, 20, verbose, y);
+    metric_toc(gsc, PROJECTPF);
+    if (ppfi == 1)
+      return i;
+    metric_acc(NPROJECTPF, ppfi);
+    GenmapOrthogonalizebyOneVector(c, y, nelg);
 
     GenmapScalar lambda=GenmapDotVector(y,z);
     GenmapGop(c,&lambda,1,GENMAP_SCALAR,GENMAP_SUM);
@@ -126,10 +129,6 @@ int rqi(genmap_handle h,GenmapComm c,mgData d,GenmapVector z,int max_iter,int ve
     GenmapScalar norme=GenmapDotVector(err,err);
     GenmapGop(c,&norme,1,GENMAP_SCALAR,GENMAP_SUM);
     norme=sqrt(norme);
-
-    GenmapScalar norm1=GenmapDotVector(y,y);
-    GenmapGop(c,&norm1,1,GENMAP_SCALAR,GENMAP_SUM);
-    GenmapScalar normi1=1.0/sqrt(norm1);
   }
 
   GenmapFree(Z);
@@ -141,5 +140,5 @@ int rqi(genmap_handle h,GenmapComm c,mgData d,GenmapVector z,int max_iter,int ve
 
   GenmapDestroyVector(err);
 
-  return i;
+  return i + 1;
 }

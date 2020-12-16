@@ -78,9 +78,9 @@ void mg_vcycle_lvl(GenmapScalar *u1,GenmapScalar *rhs,mgData d,
 int flex_cg(genmap_handle h,GenmapComm c,mgData d,GenmapVector r,
   int maxIter,int verbose,GenmapVector x);
 
-int project_pf(genmap_handle h,GenmapComm c,mgData d,GenmapVector r,
+int project(genmap_handle h,GenmapComm c,mgData d,GenmapVector r,
   int maxIter,int verbose,GenmapVector x);
-int project_pf_lvl(genmap_handle h,GenmapComm c,mgData d,GenmapScalar *ri,
+int project_lvl(genmap_handle h,GenmapComm c,mgData d,GenmapScalar *ri,
   int maxIter,int verbose,int lvl_start,GenmapScalar *xo);
 
 int rqi(genmap_handle h,GenmapComm c,mgData d,GenmapVector z,

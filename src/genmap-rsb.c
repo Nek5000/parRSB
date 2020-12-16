@@ -7,7 +7,7 @@
 #include <sort.h>
 #include <parRSB.h>
 
-void genmap_rsb(genmap_handle h) {
+int genmap_rsb(genmap_handle h) {
   int verbose = h->options->debug_level > 1;
   int max_iter=50;
   int max_pass=50;
@@ -114,4 +114,6 @@ void genmap_rsb(genmap_handle h) {
 
   crystal_free(&h->cr);
   buffer_free(&buf);
+
+  return 0;
 }

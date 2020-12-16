@@ -7,6 +7,6 @@ parRSB_options parrsb_default_options = {
   1,
   1,
   1,
-  0,
+  2,
   0
 };

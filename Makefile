@@ -11,7 +11,7 @@ UNDERSCORE ?= 1
 ALGO ?= 0
 RCB_PRE_STEP ?= 1
 PAUL ?= 1
-GRAMMIAN ?= 0
+GRAMMIAN ?= 1
 
 ## Don't touch what follows ##
 MKFILEPATH =$(abspath $(lastword $(MAKEFILE_LIST)))

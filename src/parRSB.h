@@ -20,16 +20,16 @@ extern parRSB_options parrsb_default_options;
 
 #define fparRSB_partMesh FORTRAN_UNPREFIXED(fparrsb_partmesh, FPARRSB_PARTMESH)
 void fparRSB_partMesh(int *part, int *seq, long long *vtx, double *coord, int *nel, int *nve, int *options,
-    int *comm, int *err);
+                      int *comm, int *err);
 
 int parRSB_partMesh(int *part, int *seq, long long *vtx, double *coord, int nel, int nv, parRSB_options *options,
-    MPI_Comm comm);
+                    MPI_Comm comm);
 
 #define fparRSB_findConnectivity FORTRAN_UNPREFIXED(fparrsb_findconnectivity, FPARRSB_FINDCONNECTIVITY)
 void fparRSB_findConnectivity(long long *vertexId, double *coord, int *nel, int *nDim, long long *periodicInfo,
-    int *nPeriodicFaces, double *tol, MPI_Fint *fcomm, int *verbose, int *err);
+                              int *nPeriodicFaces, double *tol, MPI_Fint *fcomm, int *verbose, int *err);
 
 int parRSB_findConnectivity(long long *vertexid, double *coord, int nel, int nDim, long long *periodicInfo,
-    int nPeriodicFaces, double tol, MPI_Comm comm, int verbose);
+                            int nPeriodicFaces, double tol, MPI_Comm comm, int verbose);
 
 #endif

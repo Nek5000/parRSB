@@ -1,9 +1,9 @@
-#include "genmap-impl.h"
-
 #include <math.h>
 #include <time.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+#include <genmap-impl.h>
 
 int GenmapSymTriDiagSolve(GenmapVector x, GenmapVector b, GenmapVector alpha, GenmapVector beta) {
   assert((x->size == b->size) && (x->size == alpha->size));
@@ -35,52 +35,14 @@ int GenmapSymTriDiagSolve(GenmapVector x, GenmapVector b, GenmapVector alpha, Ge
   return 0;
 }
 
-int GenmapInvPowerIter(GenmapVector eVector, GenmapVector alpha, GenmapVector beta, GenmapVector init, GenmapInt iter) {
-  assert(alpha->size == beta->size + 1);
-  assert(alpha->size == eVector->size);
-
-  GenmapInt n = alpha->size;
-
-  GenmapVector x, y;
-
-  if(n == 1) {
-    eVector->data[0] = alpha->data[0];
-    return 0;
-  } else {
-    GenmapCreateVector(&x, n);
-    GenmapCreateVector(&y, n);
-
-    GenmapCopyVector(x, init);
-    GenmapInt j;
-    for(j = 0; j < iter; j++) {
-      /* Ay = x */
-      GenmapSymTriDiagSolve(y, x, alpha, beta);
-
-      /* Normalize by inf-norm(y) */
-      if(j != iter - 1) {
-        GenmapScalar lambda = 1.0 / GenmapNormVector(y, -1);
-        GenmapScaleVector(y, y, lambda);
-      }
-
-      GenmapCopyVector(x, y);
-    }
-  }
-
-  GenmapCopyVector(eVector, y);
-
-  GenmapDestroyVector(x);
-  GenmapDestroyVector(y);
-
-  return 0;
-}
-
 GenmapScalar GenmapSign(GenmapScalar a, GenmapScalar b) {
   GenmapScalar m = 1.0 ? b >= 0. : -1.0;
   return fabs(a) * m;
 }
 
-int GenmapTQLI(genmap_handle h, GenmapVector diagonal, GenmapVector upper,
-               GenmapVector **eVectors, GenmapVector *eValues) {
+int GenmapTQLI(genmap_handle h, GenmapVector diagonal, GenmapVector upper, GenmapVector **eVectors,
+               GenmapVector *eValues)
+{
   assert(diagonal->size == upper->size + 1);
 
   GenmapInt n = diagonal->size;
@@ -208,13 +170,13 @@ int genmap_power(double *y, int N, double *A, int verbose){
 
   int i;
   GenmapScalar norm=0.0;
-  for(i = 0; i < N; i++){
+  for (i = 0; i < N; i++) {
     y[i] = (rand()%50)/50.0;
     norm += y[i]*y[i];
   }
 
   GenmapScalar normi = 1.0/sqrt(norm);
-  for(i=0; i<N; i++)
+  for (i = 0; i < N; i++)
     y[i] *= normi;
 
   double *Ay;
@@ -222,7 +184,7 @@ int genmap_power(double *y, int N, double *A, int verbose){
 
   int j, k, l;
   GenmapScalar err = 1.0, lambda;
-  for(i = 0; i < 100; i++){
+  for (i = 0; i < 100; i++) {
     norm = 0.0;
     for(j = 0; j < N; j++){
       Ay[j] = 0.0;
@@ -232,19 +194,15 @@ int genmap_power(double *y, int N, double *A, int verbose){
       norm += Ay[j]*Ay[j];
     }
 
-    if(i>0)
+    if (i > 0)
       err = (sqrt(norm) - lambda)/lambda;
     lambda = sqrt(norm);
-
-    if(verbose){
-      printf("\tInverse power: %02d %g\n", i, err);
-    }
 
     normi = 1.0/sqrt(norm);
     for(j = 0; j < N; j++)
       y[j] = Ay[j]*normi;
 
-    if(fabs(err)<1.e-15)
+    if (fabs(err) < 1.e-14)
       break;
   }
 

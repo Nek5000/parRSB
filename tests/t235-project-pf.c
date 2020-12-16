@@ -154,9 +154,9 @@ int main(int argc,char *argv[]){
   GenmapInitLaplacian(gh,c);
   GenmapLaplacian(gh,c,x,r);
 
-  i=project_pf(gh,c,d,r,30,1,x0);
-  if(rank==0)
-    printf("Flex-CG iterations: %d\n",i);
+  i = project(gh, c, d, r, 30, 1, x0);
+  if (rank == 0)
+    printf("Flex-CG iterations: %d\n", i);
 
   for(i=0; i<mesh->nelt; i++){
     GenmapScalar e=x->data[i]-x0->data[i];
