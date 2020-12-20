@@ -7,7 +7,7 @@
 #include <parRSB.h>
 
 void fparRSB_partMesh(int *part, int *seq, long long *vtx, double *coord, int *nel, int *nv, int *options,
-    int *comm, int *err)
+                      int *comm, int *err)
 {
   *err = 1;
   comm_ext c = MPI_Comm_f2c(*comm);
@@ -25,7 +25,7 @@ void fparRSB_partMesh(int *part, int *seq, long long *vtx, double *coord, int *n
  * nv = in,
  * options = in/out */
 int parRSB_partMesh(int *part, int *seq, long long *vtx, double *coord, int nel, int nv, parRSB_options *options,
-    MPI_Comm comm)
+                    MPI_Comm comm)
 {
   struct comm c;
   comm_init(&c, comm);
@@ -94,7 +94,7 @@ int parRSB_partMesh(int *part, int *seq, long long *vtx, double *coord, int nel,
         genmap_rcb(h);
         break;
       case 2:
-        printf("RIB\n");
+        genmap_rib(h);
         break;
       default:
         break;

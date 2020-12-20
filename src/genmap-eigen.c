@@ -64,6 +64,8 @@ int GenmapTQLI(genmap_handle h, GenmapVector diagonal, GenmapVector upper, Genma
     (*eVectors)[i]->data[i] = 1.0;
   }
 
+  parRSB_options *options = h->options;
+
   GenmapInt j, k, l, iter, m;
 
   for(l = 0; l < n; l++) {
@@ -92,31 +94,33 @@ int GenmapTQLI(genmap_handle h, GenmapVector diagonal, GenmapVector upper, Genma
         for(i = m - 1; i >= l; i--) {
           GenmapScalar f = s * e->data[i];
           GenmapScalar b = c * e->data[i];
-#if defined(GENMAP_PAUL)
-          if(fabs(f) >= fabs(g)) {
-            c = g / f;
-            r = sqrt(c * c + 1.0);
-            e->data[i + 1] = f * r;
-            s = 1.0 / r;
-            c = c * s;
-          } else {
-            s = f / g;
-            r = sqrt(s * s + 1.0);
-            e->data[i + 1] = g * r;
-            c = 1.0 / r;
-            s = s * c;
-          }
-#else
-          e->data[i + 1] = r = sqrt(f * f + g * g);
 
-          if(r < GENMAP_DP_TOL) {
-            d->data[i + 1] -= p;
-            e->data[m] = 0.0;
-            break;
+          if (options->rsb_paul == 1) {
+            if(fabs(f) >= fabs(g)) {
+              c = g / f;
+              r = sqrt(c * c + 1.0);
+              e->data[i + 1] = f * r;
+              s = 1.0 / r;
+              c = c * s;
+            } else {
+              s = f / g;
+              r = sqrt(s * s + 1.0);
+              e->data[i + 1] = g * r;
+              c = 1.0 / r;
+              s = s * c;
+            }
+          } else {
+            e->data[i + 1] = r = sqrt(f * f + g * g);
+
+            if(r < GENMAP_DP_TOL) {
+              d->data[i + 1] -= p;
+              e->data[m] = 0.0;
+              break;
+            }
+            s = f / r;
+            c = g / r;
           }
-          s = f / r;
-          c = g / r;
-#endif
+
           g = d->data[i + 1] - p;
           r = (d->data[i] - g) * s + 2.0 * c * b;
           p = s * r;

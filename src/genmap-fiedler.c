@@ -15,20 +15,17 @@ int GenmapFiedlerRQI(genmap_handle h,GenmapComm c,int max_iter,int global)
 
   GenmapElements elements = GenmapGetElements(h);
   GenmapInt i;
-  if(global>0){
-#if defined(GENMAP_PAUL)
-    for(i = 0;  i < lelt; i++) {
-      initVec->data[i] = GenmapGetLocalStartIndex(h) + i + 1;
+  if (global > 0) {
+    if (h->options->rsb_paul == 1) {
+      for(i = 0;  i < lelt; i++)
+        initVec->data[i] = GenmapGetLocalStartIndex(h) + i + 1;
+    } else {
+      for(i = 0;  i < lelt; i++)
+        initVec->data[i] = elements[i].globalId;
     }
-#else
-    for(i = 0;  i < lelt; i++) {
-      initVec->data[i] = elements[i].globalId;
-    }
-#endif
-  }else{
-    for(i = 0;  i < lelt; i++) {
+  } else {
+    for(i = 0;  i < lelt; i++)
       initVec->data[i] = elements[i].fiedler;
-    }
   }
 
   int verbose = h->options->debug_level;
@@ -84,27 +81,18 @@ int GenmapFiedlerLanczos(genmap_handle h,GenmapComm c,int max_iter,
   GenmapElements elements = GenmapGetElements(h);
 
   GenmapInt i;
-#if defined(GENMAP_PAUL)
-  if(global>0){
-    for(i = 0;  i < lelt; i++) {
-      initVec->data[i] = GenmapGetLocalStartIndex(h) + i + 1;
+  if (global > 0) {
+    if (h->options->rsb_paul == 1) {
+      for(i = 0;  i < lelt; i++)
+        initVec->data[i] = GenmapGetLocalStartIndex(h) + i + 1;
+    } else {
+      for(i = 0;  i < lelt; i++)
+        initVec->data[i] = elements[i].globalId;
     }
-  }else{
-    for(i = 0;  i < lelt; i++) {
+  } else {
+    for(i = 0;  i < lelt; i++)
       initVec->data[i] = elements[i].fiedler;
-    }
   }
-#else
-  if(global>0){
-    for(i = 0;  i < lelt; i++) {
-      initVec->data[i] = (GenmapScalar) elements[i].globalId;
-    }
-  }else{
-    for(i = 0;  i < lelt; i++) {
-      initVec->data[i] = elements[i].fiedler;
-    }
-  }
-#endif
 
   GenmapCreateVector(&alphaVec,max_iter);
   GenmapCreateVector(&betaVec,max_iter-1);
@@ -116,11 +104,11 @@ int GenmapFiedlerLanczos(genmap_handle h,GenmapComm c,int max_iter,
   GenmapScalar rni = 1.0 / sqrt(rtr);
   GenmapScaleVector(initVec, initVec, rni);
 
-#if defined(GENMAP_PAUL)
-  int iter=GenmapLanczosLegendary(h,c,initVec,max_iter,&q,alphaVec,betaVec);
-#else
-  int iter=GenmapLanczos(h,c,initVec,max_iter,&q,alphaVec,betaVec);
-#endif
+  int iter;
+  if (h->options->rsb_paul == 1)
+    iter = GenmapLanczosLegendary(h, c, initVec, max_iter, &q, alphaVec, betaVec);
+  else
+    iter = GenmapLanczos(h, c, initVec, max_iter, &q, alphaVec, betaVec);
 
   GenmapVector evLanczos, evTriDiag;
   GenmapCreateVector(&evTriDiag, iter);
@@ -163,23 +151,18 @@ int GenmapFiedlerLanczos(genmap_handle h,GenmapComm c,int max_iter,
   GenmapDestroyVector(betaVec);
   GenmapDestroyVector(evLanczos);
   GenmapDestroyVector(evTriDiag);
-#if defined(GENMAP_PAUL)
-  GenmapDestroyVector(eValues);
-  for(i = 0; i < iter; i++) {
-    GenmapDestroyVector(eVectors[i]);
-  }
-  GenmapFree(eVectors);
-#endif
 
-#if defined(GENMAP_PAUL)
-  for(i = 0; i < iter + 1; i++) {
-    GenmapDestroyVector(q[i]);
+  if (h->options->rsb_paul == 1) {
+    GenmapDestroyVector(eValues);
+    for(i = 0; i < iter; i++)
+      GenmapDestroyVector(eVectors[i]);
+    GenmapFree(eVectors);
   }
-#else
-  for(i = 0; i < iter; i++) {
+
+  for (i = 0; i < iter; i++)
     GenmapDestroyVector(q[i]);
-  }
-#endif
+  if (h->options->rsb_paul == 1)
+    GenmapDestroyVector(q[iter]);
   GenmapFree(q);
 
   return iter;

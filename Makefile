@@ -6,13 +6,6 @@ CFLAGS ?= -g -O0
 BLAS ?= 1
 UNDERSCORE ?= 1
 
-## Genmap algorithmic parameters ##
-# ALGO = 0 (Lanczos),1 (RQI)
-ALGO ?= 0
-RCB_PRE_STEP ?= 1
-PAUL ?= 1
-GRAMMIAN ?= 1
-
 ## Don't touch what follows ##
 MKFILEPATH =$(abspath $(lastword $(MAKEFILE_LIST)))
 SRCROOT_  ?=$(patsubst %/,%,$(dir $(MKFILEPATH)))
@@ -29,9 +22,8 @@ TESTDIR   =$(SRCROOT)/tests
 TARGET=parRSB
 LIB=$(BUILDDIR)/lib/lib$(TARGET).a
 
-INCFLAGS=-I$(SRCDIR) -I$(SORTDIR) -I$(PRECONDDIR) -I$(GENCONDIR) \
-	-I$(GSLIBPATH)/include
-LDFLAGS:=-L$(BUILDDIR)/lib -l$(TARGET) -L$(GSLIBPATH)/lib -lgs -lm
+INCFLAGS = -I$(SRCDIR) -I$(SORTDIR) -I$(PRECONDDIR) -I$(GENCONDIR) -I$(GSLIBPATH)/include
+LDFLAGS = -L$(BUILDDIR)/lib -l$(TARGET) -L$(GSLIBPATH)/lib -lgs -lm
 
 SRCS       =$(wildcard $(SRCDIR)/*.c)
 SORTSRCS   =$(wildcard $(SORTDIR)/*.c)
@@ -51,24 +43,6 @@ PP=
 
 ifneq ($(DEBUG),0)
   PP += -g -DGENMAP_DEBUG
-endif
-
-ifeq ($(ALGO),0)
-  PP += -DGENMAP_LANCZOS
-else ifeq ($(ALGO),1)
-  PP += -DGENMAP_RQI
-endif
-
-ifneq ($(RCB_PRE_STEP),0)
-  PP += -DGENMAP_RCB_PRE_STEP
-endif
-
-ifneq ($(PAUL),0)
-  PP += -DGENMAP_PAUL
-endif
-
-ifneq ($(GRAMMIAN),0)
-  PP += -DGENMAP_GRAMMIAN
 endif
 
 ifneq ($(UNDERSCORE),0)
@@ -95,6 +69,12 @@ default: check lib install
 .PHONY: all
 all: check lib tests examples install
 
+.PHONY: check
+check:
+ifeq ($(GSLIBPATH),)
+  $(error Specify GSLIBPATH=<path to gslib>/build)
+endif
+
 .PHONY: install
 install: lib
 ifneq ($(INSTALLDIR),)
@@ -110,12 +90,6 @@ lib: $(SRCOBJS)
 	@mkdir -p $(BUILDDIR)/lib
 	@$(AR) cr $(LIB) $(SRCOBJS)
 	@ranlib $(LIB)
-
-.PHONY: check
-check: 
-ifeq ($(GSLIBPATH),)
-  $(error Specify GSLIBPATH=<path to gslib>/build)
-endif
 
 $(BUILDDIR)/src/%.o: $(SRCROOT)/src/%.c
 	$(CC) $(CFLAGS) $(PP) $(INCFLAGS) -c $< -o $@

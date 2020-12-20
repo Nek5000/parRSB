@@ -4,16 +4,17 @@
 #include <gslib.h>
 
 typedef struct {
+  /* General options */
   int global_partitioner; // -1 - None, 0 - RSB, 1 - RCB, 2 - RIB
   int local_partitioner; // -1 - None, 0 - RSB, 1 - RCB, 2 - RIB
+  int debug_level; // 0, 1, 2, .. etc (Default 0)
+  int print_timing_info; // 0 or 1 (Default 0)
 
+  /* RSB specific */
   int rsb_algo; // 0 - Lanczos, 1 - MG (Default 0)
   int rsb_prepartition; // 0 - None, 1 - RCB , 2 - RIB (Default 1)
   int rsb_grammian; // 0 or 1 (Default 1)
   int rsb_paul; // 0 or 1 (Default 1)
-
-  int debug_level; // 0, 1, 2, .. etc (Default 0)
-  int print_timing_info; // 0 or 1 (Default 0)
 } parRSB_options;
 
 extern parRSB_options parrsb_default_options;
