@@ -6,7 +6,7 @@
 
 #define MM 505 
 
-int project(genmap_handle h, GenmapComm c, mgData d, GenmapVector ri, int max_iter, int verbose, GenmapVector x)
+int project(genmap_handle h, GenmapComm c, mgData d, GenmapVector ri, int max_iter, GenmapVector x)
 {
   assert(x->size == ri->size);
   assert(x->size == GenmapGetNLocalElements(h));
@@ -44,10 +44,6 @@ int project(genmap_handle h, GenmapComm c, mgData d, GenmapVector ri, int max_it
 
   GenmapScalar alpha, beta, rz0, rz2, scale;
 
-  int rank = genmap_comm_rank(c);
-  if (rank==0 && verbose>1)
-    printf("\t\tppf initial rr=%g rz1=%g\n",sqrt(rr),sqrt(rz1));
-
   double tol = 1e-3;
   double res_tol = rr*tol;
 
@@ -78,9 +74,6 @@ int project(genmap_handle h, GenmapComm c, mgData d, GenmapVector ri, int max_it
     rr = GenmapDotVector(r, r);
     GenmapGop(c, &rr, 1, GENMAP_SCALAR, GENMAP_SUM);
 
-    if (rank == 0 && verbose > 1)
-      printf("\t\tppf i = %d den = %g rr = %g rz1 = %g alpha = %g\n", i, den, sqrt(rr), sqrt(rz1), alpha);
-
     if (rr < res_tol || sqrt(rr) < tol)
       break;
 
@@ -95,9 +88,6 @@ int project(genmap_handle h, GenmapComm c, mgData d, GenmapVector ri, int max_it
 
     GenmapScalar norm1 = GenmapDotVector(z, z);
     GenmapGop(c, &norm1, 1, GENMAP_SCALAR, GENMAP_SUM);
-
-    if (rank == 0 && verbose > 2)
-      printf("\t\t\tvcycle i = %02d norm0 = %g norm1 = %g\n", i, sqrt(norm0), sqrt(norm1));
 
     rz0 = rz1;
     GenmapOrthogonalizebyOneVector(c, z, nelg);
@@ -144,8 +134,8 @@ int project(genmap_handle h, GenmapComm c, mgData d, GenmapVector ri, int max_it
   return i + 1;
 }
 
-int project_lvl(genmap_handle h, GenmapComm c, mgData d, GenmapScalar *ri, int max_iter, int verbose,
-                int lvl_start, GenmapScalar *xo)
+int project_lvl(genmap_handle h, GenmapComm c, mgData d, GenmapScalar *ri, int max_iter, int lvl_start,
+                GenmapScalar *xo)
 {
   assert(lvl_start<d->nlevels-1);
 
@@ -194,10 +184,8 @@ int project_lvl(genmap_handle h, GenmapComm c, mgData d, GenmapScalar *ri, int m
     //metric_tic(&c->gsc,LAPLACIAN);
     //GenmapLaplacian(h,c,p->data,w->data);
     //metric_toc(&c->gsc,LAPLACIAN);
-    metric_tic(&c->gsc,PRECONAX);
     csr_mat_gather(M,M->gsh,p->data,d->buf,&buf);
     csr_mat_apply(w->data,M,d->buf);
-    metric_toc(&c->gsc,PRECONAX);
 
     GenmapScalar den=GenmapDotVector(p,w);
     GenmapGop(c,&den,1,GENMAP_SCALAR,GENMAP_SUM);

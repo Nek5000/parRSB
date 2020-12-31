@@ -37,18 +37,12 @@ int set_bin(uint **proc_, struct sort *s, uint field, struct comm *c) {
 }
 
 int parallel_bin_sort(struct sort *s, struct comm *c) {
-  metric_acc(BINN1, s->a->n);
-
   // Local sort
-  metric_tic(c, LOCALSORT);
   sort_local(s);
-  metric_toc(c, LOCALSORT);
 
   // Set destination bin
-  metric_tic(c, SETPROC);
   uint *proc;
   set_bin(&proc, s, 0, c);
-  metric_toc(c, SETPROC);
 
   // Transfer to destination processor
   struct crystal cr; crystal_init(&cr, c);
@@ -58,9 +52,5 @@ int parallel_bin_sort(struct sort *s, struct comm *c) {
   GenmapFree(proc);
 
   // Locally sort again
-  metric_tic(c, LOCALSORT);
   sort_local(s);
-  metric_toc(c, LOCALSORT);
-
-  metric_acc(BINN2, s->a->n);
 }

@@ -77,9 +77,7 @@ struct gs_data *get_csr_top(csr_mat M,struct comm *c){
       if(M->row_start+i==M->col[j]) ids[j]=M->col[j];
       else ids[j]=-M->col[j];
 
-  metric_tic(c,GSSETUP);
   struct gs_data *gsh=gs_setup(ids,n,c,0,gs_pairwise,0);
-  metric_toc(c,GSSETUP);
 
   if(n>0) GenmapFree(ids);
 

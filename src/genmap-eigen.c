@@ -49,8 +49,9 @@ int GenmapTQLI(genmap_handle h, GenmapVector diagonal, GenmapVector upper, Genma
 
   GenmapVector d, e;
   GenmapCreateVector(&d, n);
-  GenmapCopyVector(d, diagonal);
   GenmapCreateVector(&e, n);
+
+  GenmapCopyVector(d, diagonal);
   GenmapCopyVector(e, upper);
   e->data[n - 1] = 0.0;
 
@@ -59,7 +60,7 @@ int GenmapTQLI(genmap_handle h, GenmapVector diagonal, GenmapVector upper, Genma
   /* Init to identity */
   GenmapMalloc(n, eVectors);
   GenmapInt i;
-  for(i = 0; i < n; i++) {
+  for (i = 0; i < n; i++) {
     GenmapCreateZerosVector(&(*eVectors)[i], n);
     (*eVectors)[i]->data[i] = 1.0;
   }
@@ -68,18 +69,18 @@ int GenmapTQLI(genmap_handle h, GenmapVector diagonal, GenmapVector upper, Genma
 
   GenmapInt j, k, l, iter, m;
 
-  for(l = 0; l < n; l++) {
+  for (l = 0; l < n; l++) {
     iter = 0;
     do {
-      for(m = l; m < n - 1; m++) {
+      for (m = l; m < n - 1; m++) {
         GenmapScalar dd = fabs(d->data[m]) + fabs(d->data[m + 1]);
         /* Should use a tolerance for this check */
         if(fabs(e->data[m]) / dd < GENMAP_DP_TOL) break;
       }
 
-      if(m != l) {
-        if(iter++ == 30) {
-          if(genmap_comm_rank(GenmapGetGlobalComm(h)) == 0)
+      if (m != l) {
+        if (iter++ == 30) {
+          if (genmap_comm_rank(GenmapGetGlobalComm(h)) == 0)
             printf("Too many iterations.\n");
           GenmapCopyVector(*eValues, d);
           return 1;
@@ -135,7 +136,7 @@ int GenmapTQLI(genmap_handle h, GenmapVector diagonal, GenmapVector upper, Genma
           /* Done with eigenvectors */
         }
 
-        if(r < GENMAP_DP_TOL && i >= l) continue;
+        if (r < GENMAP_DP_TOL && i >= l) continue;
 
         d->data[l] -= p;
         e->data[l] = g;
@@ -153,9 +154,10 @@ int GenmapTQLI(genmap_handle h, GenmapVector diagonal, GenmapVector upper, Genma
     }
   }
 
-  for(k = 0; k < n; k++) {
+  for (k = 0; k < n; k++) {
     e->data[k] = GenmapDotVector((*eVectors)[k], (*eVectors)[k]);
-    if(e->data[k] > 0.0) e->data[k] = sqrt(fabs(e->data[k]));
+    if (e->data[k] > 0.0)
+      e->data[k] = sqrt(fabs(e->data[k]));
     GenmapScalar scale = 1.0 / e->data[k];
     GenmapScaleVector((*eVectors)[k], (*eVectors)[k], scale);
   }
@@ -168,7 +170,7 @@ int GenmapTQLI(genmap_handle h, GenmapVector diagonal, GenmapVector upper, Genma
   return 0;
 }
 
-int genmap_power(double *y, int N, double *A, int verbose){
+int genmap_power(double *y, int N, double *A, int verbose) {
   time_t t;
   srand((unsigned)time(&t));
 
@@ -215,7 +217,7 @@ int genmap_power(double *y, int N, double *A, int verbose){
   return i;
 }
 
-int genmap_inverse_power(double *y, int N, double *A, int verbose){
+int genmap_inverse_power(double *y, int N, double *A, int verbose) {
   double *Ainv;
   GenmapCalloc(N*N, &Ainv);
 

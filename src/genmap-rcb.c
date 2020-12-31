@@ -61,16 +61,13 @@ int rcb_level(struct comm *c, struct array *a, int ndim, buffer *bfr){
 
   double length[MAXDIM];
 
-  metric_tic(c, AXISLEN);
   get_rcb_axis(length, a, c, ndim);
-  metric_toc(c, AXISLEN);
 
   int axis1 = 0, d;
   for (d = 1; d < ndim; d++)
     if (length[d] > length[axis1])
       axis1 = d;
 
-  metric_tic(c, PARSORT);
   unsigned char *type = a->ptr;
   if (*type == GENMAP_RCB_ELEMENT) {
     switch (axis1) {
@@ -101,7 +98,6 @@ int rcb_level(struct comm *c, struct array *a, int ndim, buffer *bfr){
         break;
     }
   }
-  metric_toc(c, PARSORT);
 
   return 0;
 }

@@ -128,25 +128,19 @@ int parallel_hypercube_sort(struct hypercube *data, struct comm *c) {
   if (threshold < 2)
     threshold = 2;
 
-  metric_tic(c, LOCALSORT);
   sort_local(data->data);
-  metric_toc(c, LOCALSORT);
 
   if (size == 1)
     return 0;
 
-  metric_tic(c, UPDATEPROBE);
   init_probes(data, c);
   update_probe_counts(data, c);
-  metric_toc(c, UPDATEPROBE);
 
   int max_iter = log2((data->probes[2] - data->probes[0])/GENMAP_TOL);
   int iter = 0;
   while (llabs(nelem/2 - data->probe_cnt[1]) > threshold && iter++ < max_iter) {
-    metric_tic(c, UPDATEPROBE);
     update_probes(nelem, data->probes, data->probe_cnt, threshold);
     update_probe_counts(data, c);
-    metric_toc(c, UPDATEPROBE);
   }
 
   transfer_elem(data, c);

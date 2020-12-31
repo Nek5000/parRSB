@@ -68,24 +68,18 @@ typedef struct{
 
 #define GETPTR(p,i,off)            ((char*)(p)+(off)+(i)*sizeof(entry))
 
-void setOwner(char *ptr,sint n,size_t inOffset,size_t outOffset,
-  slong lelg,sint np);
+void setOwner(char *ptr, sint n, size_t inOffset, size_t outOffset, slong lelg, sint np);
 
-void mg_vcycle(GenmapScalar *u,GenmapScalar *rhs,mgData d);
-void mg_vcycle_lvl(GenmapScalar *u1,GenmapScalar *rhs,mgData d,
-  int lvl_start);
+void mg_vcycle(GenmapScalar *u, GenmapScalar *rhs, mgData d);
+void mg_vcycle_lvl(GenmapScalar *u1, GenmapScalar *rhs, mgData d, int lvl_start);
 
-int flex_cg(genmap_handle h,GenmapComm c,mgData d,GenmapVector r,
-  int maxIter,int verbose,GenmapVector x);
+int flex_cg(genmap_handle h, GenmapComm c, mgData d, GenmapVector r, int maxIter, GenmapVector x);
 
-int project(genmap_handle h,GenmapComm c,mgData d,GenmapVector r,
-  int maxIter,int verbose,GenmapVector x);
-int project_lvl(genmap_handle h,GenmapComm c,mgData d,GenmapScalar *ri,
-  int maxIter,int verbose,int lvl_start,GenmapScalar *xo);
+int project(genmap_handle h, GenmapComm c, mgData d, GenmapVector r, int maxIter, GenmapVector x);
+int project_lvl(genmap_handle h, GenmapComm c, mgData d, GenmapScalar *ri, int maxIter, int lvl_start,
+                GenmapScalar *xo);
 
-int rqi(genmap_handle h,GenmapComm c,mgData d,GenmapVector z,
-  int maxIter,int verbose,GenmapVector fiedler);
-int fmg(genmap_handle h,GenmapComm c,mgData d,GenmapScalar *z,
-  int maxIter,int verbose,GenmapScalar *fiedler);
+int rqi(genmap_handle h, GenmapComm c, mgData d, GenmapVector z, int maxIter, GenmapVector fiedler);
+int fmg(genmap_handle h, GenmapComm c, mgData d, GenmapScalar *z, int maxIter, GenmapScalar *fiedler);
 
 #endif

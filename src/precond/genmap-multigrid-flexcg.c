@@ -4,8 +4,7 @@
 #include <genmap-impl.h>
 #include <genmap-multigrid-precon.h>
 
-int flex_cg(genmap_handle h,GenmapComm c,mgData d,GenmapVector ri,
-  int maxIter,int verbose,GenmapVector x)
+int flex_cg(genmap_handle h,GenmapComm c,mgData d,GenmapVector ri,int maxIter,GenmapVector x)
 {
   assert(x->size==ri->size);
   assert(x->size==GenmapGetNLocalElements(h));
@@ -26,10 +25,6 @@ int flex_cg(genmap_handle h,GenmapComm c,mgData d,GenmapVector ri,
 
   int rank=genmap_comm_rank(c);
 
-#if PREC
-  if(rank==0 && verbose) printf("Using MG Prec.\n");
-#endif
-
   uint i;
   for(i=0; i<lelt; i++)
     x->data[i]=0.0,r->data[i]=ri->data[i];
@@ -43,8 +38,8 @@ int flex_cg(genmap_handle h,GenmapComm c,mgData d,GenmapVector ri,
 
   rz1=GenmapDotVector(r,z);
   GenmapGop(c,&rz1,1,GENMAP_SCALAR,GENMAP_SUM);
-  if(genmap_comm_rank(c)==0 && verbose)
-    printf("rz1=%lf\n",rz1);
+  // if(genmap_comm_rank(c)==0 && verbose)
+  //   printf("rz1=%lf\n",rz1);
 
   GenmapCopyVector(p,z);
 
@@ -85,8 +80,8 @@ int flex_cg(genmap_handle h,GenmapComm c,mgData d,GenmapVector ri,
 
     rr=GenmapDotVector(r,r);
     GenmapGop(c,&rr,1,GENMAP_SCALAR,GENMAP_SUM);
-    if(rank==0 && verbose)
-      printf("i=%d rr=%1.10e\n",i,sqrt(rr));
+    // if(rank==0 && verbose)
+    //   printf("i=%d rr=%1.10e\n",i,sqrt(rr));
   }
 
   GenmapDestroyVector(z),GenmapDestroyVector(w);

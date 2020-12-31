@@ -61,9 +61,9 @@ int genmap_rsb(genmap_handle h) {
     }
 
     /* Initialize the laplacian */
-    metric_tic(lc, LAPLACIANSETUP0);
+    metric_tic(lc, WEIGHTEDLAPLACIANSETUP);
     GenmapInitLaplacianWeighted(h, local_c);
-    metric_toc(lc, LAPLACIANSETUP0);
+    metric_toc(lc, WEIGHTEDLAPLACIANSETUP);
 
     /* Run fiedler */
     metric_tic(lc, FIEDLER);
@@ -78,7 +78,10 @@ int genmap_rsb(genmap_handle h) {
     } while(++ipass < max_pass && iter == max_iter);
     metric_toc(lc, FIEDLER);
 
+    /* Sort by Fiedler vector */
+    metric_tic(lc, FIEDLERSORT);
     parallel_sort(struct rsb_element, h->elements, fiedler, gs_double, 0, 1, lc, &buf);
+    metric_toc(lc, FIEDLERSORT);
 
     /* Bisect */
     metric_tic(lc, BISECT);

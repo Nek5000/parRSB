@@ -34,10 +34,8 @@ void mg_vcycle(GenmapScalar *u1,GenmapScalar *rhs,mgData d)
       u[off+j]=sigma*r[off+j]/diag[j];
 
     // G*u
-    metric_tic(&d->c,PRECONAX);
     csr_mat_gather(M,M->gsh,u+off,d->buf,&buf);
     csr_mat_apply(Gs+off,M,d->buf);
-    metric_toc(&d->c,PRECONAX);
 
     // r=rhs-Gu
     for(j=0; j<n; j++)
@@ -52,10 +50,8 @@ void mg_vcycle(GenmapScalar *u1,GenmapScalar *rhs,mgData d)
       }
 
       //G*s
-      metric_tic(&d->c,PRECONAX);
       csr_mat_gather(M,M->gsh,s+off,d->buf,&buf);
       csr_mat_apply(Gs+off,M,d->buf);
-      metric_toc(&d->c,PRECONAX);
 
       //r=r-Gs
       for(j=0; j<n; j++)
@@ -134,10 +130,8 @@ void mg_vcycle_lvl(GenmapScalar *u1,GenmapScalar *rhs,mgData d,
       u[off+j]=sigma*r[off+j]/diag[j];
 
     // G*u
-    metric_tic(&d->c,PRECONAX);
     csr_mat_gather(M,M->gsh,u+off,d->buf,&buf);
     csr_mat_apply(Gs+off,M,d->buf);
-    metric_toc(&d->c,PRECONAX);
 
     // r=rhs-Gu
     for(j=0; j<n; j++)
@@ -152,10 +146,8 @@ void mg_vcycle_lvl(GenmapScalar *u1,GenmapScalar *rhs,mgData d,
       }
 
       //G*s
-      metric_tic(&d->c,PRECONAX);
       csr_mat_gather(M,M->gsh,s+off,d->buf,&buf);
       csr_mat_apply(Gs+off,M,d->buf);
-      metric_toc(&d->c,PRECONAX);
 
       //r=r-Gs
       for(j=0; j<n; j++)

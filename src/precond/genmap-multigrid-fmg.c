@@ -4,8 +4,7 @@
 #include <genmap-impl.h>
 #include <genmap-multigrid-precon.h>
 
-int inverse(double *x,int level,int iter,genmap_handle h,GenmapComm c,
-  mgData d)
+int inverse(double *x,int level,int iter,genmap_handle h,GenmapComm c,mgData d)
 {
   assert(level<d->nlevels-2);
 
@@ -18,10 +17,10 @@ int inverse(double *x,int level,int iter,genmap_handle h,GenmapComm c,
     //TODO: 1-orthogonalize
 
     // solve Ay=x
-    metric_tic(&c->gsc,PROJECTPF);
-    j=project_lvl(h,c,d,x,iter,0,level,y);
-    metric_toc(&c->gsc,PROJECTPF);
-    metric_acc(NPROJECTPF,j);
+    metric_tic(&c->gsc,PROJECT);
+    j=project_lvl(h,c,d,x,iter,level,y);
+    metric_toc(&c->gsc,PROJECT);
+    metric_acc(NPROJECT,j);
 
     //TODO: 1-orthogonalize
 
@@ -40,8 +39,7 @@ int inverse(double *x,int level,int iter,genmap_handle h,GenmapComm c,
   return 0;
 }
 
-int fmg(genmap_handle h,GenmapComm c,mgData d,GenmapScalar *z,
-  int iter,int verbose,GenmapScalar *y)
+int fmg(genmap_handle h,GenmapComm c,mgData d,GenmapScalar *z,int iter,GenmapScalar *y)
 {
   int   nlevels=d->nlevels;
   mgLevel *lvls=d->levels;

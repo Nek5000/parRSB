@@ -59,44 +59,47 @@ uint metric_get_levels(){
 
 void metric_print(struct comm *c){
   double *min,*max,*sum,*buf;
-  GenmapCalloc(MAXSIZE,&min);
-  GenmapCalloc(MAXSIZE,&max);
-  GenmapCalloc(MAXSIZE,&sum);
-  GenmapCalloc(MAXSIZE,&buf);
+  GenmapCalloc(MAXSIZE, &min);
+  GenmapCalloc(MAXSIZE, &max);
+  GenmapCalloc(MAXSIZE, &sum);
+  GenmapCalloc(MAXSIZE, &buf);
 
-  uint max_size=stack_size*MAXMETS;
-  assert(max_size<=MAXSIZE);
+  uint max_size = stack_size*MAXMETS;
+  assert(max_size <= MAXSIZE);
 
-  uint i; for(i=0; i<max_size; i++){
-    min[i]=max[i]=sum[i]=stack[i];
-  }
+  uint i;
+  for (i = 0; i < max_size; i++)
+    min[i] = max[i] = sum[i] = stack[i];
 
-  comm_allreduce(c,gs_double,gs_min,min,MAXSIZE,buf);// min
-  comm_allreduce(c,gs_double,gs_max,max,MAXSIZE,buf);// max
-  comm_allreduce(c,gs_double,gs_add,sum,MAXSIZE,buf);// sum
-  for(i=0; i<max_size; i++)
-    sum[i]/=c->np;
+  comm_allreduce(c, gs_double, gs_min, min, MAXSIZE, buf);// min
+  comm_allreduce(c, gs_double, gs_max, max, MAXSIZE, buf);// max
+  comm_allreduce(c, gs_double, gs_add, sum, MAXSIZE, buf);// sum
+  for (i = 0; i < max_size; i++)
+    sum[i] /= c->np;
 
 #define SUMMARY(i,m) sum[i*MAXMETS+m],min[i*MAXMETS+m],max[i*MAXMETS+m]
 
-  for(i=0; i<stack_size; i++){
+  int j;
+  for (i = 0; i < stack_size; i++) {
     if(c->id==0){
       printf("level=%02d\n",i);   
-      printf("  RCB               : %g/%g/%g\n",SUMMARY(i,RCB));
-      printf("  LAPLACIANSETUP0   : %g/%g/%g\n",SUMMARY(i,LAPLACIANSETUP0));
-      printf("  FIEDLER           : %g/%g/%g\n",SUMMARY(i,FIEDLER));
-      printf("  NFIEDLER          : %g/%g/%g\n",SUMMARY(i,NFIEDLER));
-      printf("    LAPLACIANSETUP1 : %g/%g/%g\n",SUMMARY(i,LAPLACIANSETUP1));
-      printf("    PRECONSETUP     : %g/%g/%g\n",SUMMARY(i,PRECONSETUP));
-      printf("    RQI             : %g/%g/%g\n",SUMMARY(i,RQI));
-      printf("    NRQI            : %g/%g/%g\n",SUMMARY(i,NRQI));
-      printf("      PROJECTPF     : %g/%g/%g\n",SUMMARY(i,PROJECTPF));
-      printf("      NPROJECTPF    : %g/%g/%g\n",SUMMARY(i,NPROJECTPF));
-      printf("        VCYCLE      : %g/%g/%g\n",SUMMARY(i,VCYCLE));
-      printf("        LAPLACIAN   : %g/%g/%g\n",SUMMARY(i,LAPLACIAN));
-      printf("        PROJECT     : %g/%g/%g\n",SUMMARY(i,PROJECT));
-      printf("      GRAMMIAN      : %g/%g/%g\n",SUMMARY(i,GRAMMIAN));
-      printf("  BISECT            : %g/%g/%g\n",SUMMARY(i,BISECT));
+      printf("  RCB                    : %g/%g/%g\n",SUMMARY(i, RCB));
+      printf("  WEIGHTEDLAPLACIANSETUP : %g/%g/%g\n",SUMMARY(i, WEIGHTEDLAPLACIANSETUP));
+      printf("  FIEDLER                : %g/%g/%g\n",SUMMARY(i, FIEDLER));
+      printf("  NFIEDLER               : %g/%g/%g\n",SUMMARY(i, NFIEDLER));
+      printf("    LAPLACIANSETUP       : %g/%g/%g\n",SUMMARY(i, LAPLACIANSETUP));
+      printf("    PRECONDSETUP         : %g/%g/%g\n",SUMMARY(i, PRECONDSETUP));
+      printf("    RQI                  : %g/%g/%g\n",SUMMARY(i, RQI));
+      printf("    NRQI                 : %g/%g/%g\n",SUMMARY(i, NRQI));
+      for (j = 0; j < min[i*MAXMETS + NRQI]; j++)
+        printf("      rqi=%02d             : %g/%g/%g\n", j, SUMMARY(i, END + j));
+      printf("      PROJECT            : %g/%g/%g\n",SUMMARY(i, PROJECT));
+      printf("      NPROJECT           : %g/%g/%g\n",SUMMARY(i, NPROJECT));
+      printf("        VCYCLE           : %g/%g/%g\n",SUMMARY(i, VCYCLE));
+      printf("        LAPLACIAN        : %g/%g/%g\n",SUMMARY(i, LAPLACIAN));
+      printf("        PROJECT          : %g/%g/%g\n",SUMMARY(i, PROJECT));
+      printf("      GRAMMIAN           : %g/%g/%g\n",SUMMARY(i, GRAMMIAN));
+      printf("  BISECT                 : %g/%g/%g\n",SUMMARY(i, BISECT));
     }
   }
 

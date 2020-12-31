@@ -153,14 +153,12 @@ int rib_level(struct comm *c, struct array *a, int ndim, buffer *bfr) {
 
   get_rib_axis(a, c, ndim);
 
-  metric_tic(c, PARSORT);
   unsigned char *type = a->ptr;
   if (*type == GENMAP_RCB_ELEMENT) {
     parallel_sort(struct rcb_element, a, fiedler, gs_double, 0, 1, c, bfr);
   } else if (*type == GENMAP_RSB_ELEMENT) {
     parallel_sort(struct rsb_element, a, fiedler, gs_double, 0, 1, c, bfr);
   }
-  metric_toc(c, PARSORT);
 
   return 0;
 }
