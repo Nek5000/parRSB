@@ -60,8 +60,8 @@ void genmap_load_balance(struct array *eList, uint nel, int nv, double *coord, l
   }
 
   sarray_transfer_(eList, unit_size, offsetof(struct rcb_element, proc), 1, cr);
-  nel=eList->n;
-  if(vtx != NULL) // RSB
+  nel = eList->n;
+  if (vtx != NULL) // RSB
     sarray_sort(struct rsb_element, eList->ptr, nel, globalId, 1, bfr);
   else
     sarray_sort(struct rcb_element, eList->ptr, nel, globalId, 1, bfr);

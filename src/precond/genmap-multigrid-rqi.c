@@ -130,7 +130,7 @@ int rqi(genmap_handle h, GenmapComm c, mgData d, GenmapVector z, int max_iter, G
     metric_acc(END + i, norme);
 
     if (ppfi == 1)
-      return i;
+      break;
   }
 
   GenmapFree(Z);

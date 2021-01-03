@@ -36,7 +36,7 @@ int genmap_rsb(genmap_handle h) {
   int level = 0;
   int np;
 
-  while(genmap_comm_size(GenmapGetLocalComm(h))>1){
+  while (genmap_comm_size(GenmapGetLocalComm(h)) > 1) {
     local_c = GenmapGetLocalComm(h);
     lc = &local_c->gsc;
     np = lc->np;

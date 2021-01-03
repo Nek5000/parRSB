@@ -36,11 +36,8 @@ int GenmapFiedlerRQI(genmap_handle h,GenmapComm c,int max_iter,int global)
 
   struct comm *gsc=&c->gsc;
 
-  // if(verbose>0 && gsc->id==0)
-  //   printf("RQI, |init| = %g\n",sqrt(norm));
-
   metric_tic(gsc, LAPLACIANSETUP);
-  GenmapInitLaplacian(h,c);
+  GenmapInitLaplacian(h, c);
   metric_toc(gsc, LAPLACIANSETUP);
 
   metric_tic(gsc, PRECONDSETUP);
@@ -69,6 +66,7 @@ int GenmapFiedlerRQI(genmap_handle h,GenmapComm c,int max_iter,int global)
     elements[i].fiedler = y->data[i];
 
   GenmapDestroyVector(y);
+  GenmapDestroyVector(initVec);
 
   return iter;
 }

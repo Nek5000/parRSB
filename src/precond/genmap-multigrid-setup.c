@@ -112,7 +112,9 @@ void mgLevelSetup(mgData d,uint lvl)
   }
 
   /* create the matrix */
-  GenmapMalloc(1,&d->levels[lvl]); mgLevel l=d->levels[lvl];l->data=d;
+  GenmapMalloc(1,&d->levels[lvl]);
+  mgLevel l=d->levels[lvl];
+  l->data=d;
 
   GenmapMalloc(1,&l->M); csr_mat M1 =l->M; M1->rn=nn;
   GenmapMalloc(M1->rn+1,&M1->row_off);
@@ -179,7 +181,8 @@ void mgLevelSetup(mgData d,uint lvl)
 }
 
 void mgSetup(GenmapComm c,csr_mat M,mgData *d_){
-  GenmapMalloc(1,d_); mgData d=*d_; comm_dup(&d->c,&c->gsc);
+  GenmapMalloc(1,d_); mgData d=*d_;
+  comm_dup(&d->c,&c->gsc);
 
   uint np=genmap_comm_size(c); uint rn=M->rn;
 
@@ -214,18 +217,19 @@ void mgSetup(GenmapComm c,csr_mat M,mgData *d_){
 }
 
 void mgFree(mgData d){
-  mgLevel *l=d->levels;
-  uint i,nlevels=d->nlevels;
-  for(i=0; i<nlevels; i++){
-    if(i>0)
+  mgLevel *l = d->levels;
+  uint i;
+  for (i = 0; i < d->nlevels; i++) {
+    if (i > 0)
       csr_mat_free(l[i]->M);
-    if(i<nlevels-1){
-      gs_free(l[i]->J); GenmapFree(l[i]);
-    }
+    if (i < d->nlevels-1)
+      gs_free(l[i]->J);
+    GenmapFree(l[i]);
   }
 
   GenmapFree(l);
   GenmapFree(d->level_off);
   GenmapFree(d->y); GenmapFree(d->x); GenmapFree(d->b);
   GenmapFree(d->buf); GenmapFree(d->rhs); GenmapFree(d->u);
+  GenmapFree(d);
 }
