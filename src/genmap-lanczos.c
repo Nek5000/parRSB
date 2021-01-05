@@ -4,7 +4,7 @@
 #include <stdio.h>
 
 /* Orthogonalize by 1-vector (vector of all 1's) */
-int GenmapOrthogonalizebyOneVector(GenmapComm c, GenmapVector q1, GenmapLong n)
+int GenmapOrthogonalizebyOneVector(genmap_comm c, GenmapVector q1, GenmapLong n)
 {
   GenmapInt i;
   GenmapScalar sum = 0.0;
@@ -20,7 +20,7 @@ int GenmapOrthogonalizebyOneVector(GenmapComm c, GenmapVector q1, GenmapLong n)
   return 0;
 }
 
-int GenmapLanczosLegendary(genmap_handle h, GenmapComm c, GenmapVector f, GenmapInt niter,
+int GenmapLanczosLegendary(genmap_handle h, genmap_comm c, GenmapVector f, GenmapInt niter,
                            GenmapVector **rr,GenmapVector diag,GenmapVector upper)
 {
   assert(diag->size == niter);
@@ -122,7 +122,7 @@ int GenmapLanczosLegendary(genmap_handle h, GenmapComm c, GenmapVector f, Genmap
   return iter;
 }
 
-int GenmapLanczos(genmap_handle h, GenmapComm c, GenmapVector init, GenmapInt iter, GenmapVector **q,
+int GenmapLanczos(genmap_handle h, genmap_comm c, GenmapVector init, GenmapInt iter, GenmapVector **q,
                   GenmapVector alpha, GenmapVector beta)
 {
   assert(alpha->size == iter);

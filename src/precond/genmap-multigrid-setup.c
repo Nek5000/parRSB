@@ -180,8 +180,11 @@ void mgLevelSetup(mgData d,uint lvl)
   array_free(&entries);
 }
 
-void mgSetup(GenmapComm c,csr_mat M,mgData *d_){
-  GenmapMalloc(1,d_); mgData d=*d_;
+void mgSetup(genmap_handle h, genmap_comm c, csr_mat M, mgData *d_){
+  GenmapMalloc(1, d_);
+  mgData d = *d_;
+  d->h = h;
+
   comm_dup(&d->c,&c->gsc);
 
   uint np=genmap_comm_size(c); uint rn=M->rn;
@@ -226,6 +229,8 @@ void mgFree(mgData d){
       gs_free(l[i]->J);
     GenmapFree(l[i]);
   }
+
+  // comm_free
 
   GenmapFree(l);
   GenmapFree(d->level_off);

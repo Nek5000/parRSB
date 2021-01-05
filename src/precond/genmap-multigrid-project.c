@@ -6,7 +6,7 @@
 
 #define MM 505 
 
-int project(genmap_handle h, GenmapComm c, mgData d, GenmapVector ri, int max_iter, GenmapVector x)
+int project(genmap_handle h, genmap_comm c, mgData d, GenmapVector ri, int max_iter, GenmapVector x)
 {
   assert(x->size == ri->size);
   assert(x->size == GenmapGetNLocalElements(h));
@@ -63,7 +63,7 @@ int project(genmap_handle h, GenmapComm c, mgData d, GenmapVector ri, int max_it
     alpha = rz1/den;
 
     scale = 1.0/sqrt(den);
-    for(j = 0; j < lelt; j++){
+    for (j = 0; j < lelt; j++) {
       W[i*lelt + j] = scale*w->data[j];
       P[i*lelt + j] = scale*p->data[j];
     }
@@ -134,7 +134,7 @@ int project(genmap_handle h, GenmapComm c, mgData d, GenmapVector ri, int max_it
   return i + 1;
 }
 
-int project_lvl(genmap_handle h, GenmapComm c, mgData d, GenmapScalar *ri, int max_iter, int lvl_start,
+int project_lvl(genmap_handle h, genmap_comm c, mgData d, GenmapScalar *ri, int max_iter, int lvl_start,
                 GenmapScalar *xo)
 {
   assert(lvl_start<d->nlevels-1);

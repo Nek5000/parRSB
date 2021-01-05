@@ -38,7 +38,7 @@
 #define MAXDIM 3 /* Maximum dimension of the mesh */
 #define MAXNV 8 /* Maximum number of vertices per element */
 
-struct GenmapComm_private{
+struct genmap_comm_private{
   struct comm gsc;
 
   /* Un-weighted Laplacian */
@@ -84,8 +84,8 @@ int GenmapDestroyElements(GenmapElements e);
 GenmapElements GenmapGetElements_default(genmap_handle h);
 
 struct genmap_handle_private {
-  GenmapComm global;
-  GenmapComm local;
+  genmap_comm global;
+  genmap_comm local;
 
   GenmapLong nel;
   GenmapLong Nnodes;

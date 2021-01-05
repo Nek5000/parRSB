@@ -12,10 +12,10 @@ int genmap_rsb(genmap_handle h) {
   int max_iter = 50;
   int max_pass = 50;
 
-  GenmapComm local_c = GenmapGetLocalComm(h);
+  genmap_comm local_c = GenmapGetLocalComm(h);
   struct comm *lc = &local_c->gsc;
 
-  GenmapComm global_c = GenmapGetGlobalComm(h);
+  genmap_comm global_c = GenmapGetGlobalComm(h);
   struct comm *gc = &global_c->gsc;
 
   genmap_scan(h, local_c);

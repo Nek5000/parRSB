@@ -41,7 +41,7 @@ int main(int argc,char *argv[]){
   for(i=0;i<mesh->nelt;i++)
     u->data[i]=1.0;
 
-  GenmapComm c=GenmapGetGlobalComm(gh);
+  genmap_comm c=GenmapGetGlobalComm(gh);
   GenmapInitLaplacian(gh,c);
   GenmapLaplacian(gh,c,u,v);
 

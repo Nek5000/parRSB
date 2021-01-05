@@ -4,7 +4,7 @@
 #include <genmap-impl.h>
 #include <genmap-multigrid-precon.h>
 
-int flex_cg(genmap_handle h,GenmapComm c,mgData d,GenmapVector ri,int maxIter,GenmapVector x)
+int flex_cg(genmap_handle h,genmap_comm c,mgData d,GenmapVector ri,int maxIter,GenmapVector x)
 {
   assert(x->size==ri->size);
   assert(x->size==GenmapGetNLocalElements(h));

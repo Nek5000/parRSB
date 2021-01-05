@@ -2,7 +2,7 @@
 
 #define min(a,b) ((b)<(a)?(b):(a))
 
-struct array *GenmapFindNeighbors(genmap_handle h, GenmapComm c)
+struct array *GenmapFindNeighbors(genmap_handle h, genmap_comm c)
 {
   struct comm cc = c->gsc;
 
@@ -32,6 +32,7 @@ struct array *GenmapFindNeighbors(genmap_handle h, GenmapComm c)
     }
     elem_id++;
   }
+  assert(vertices.n == lelt*nv);
 
   struct crystal cr;
   crystal_init(&cr, &cc);
@@ -67,9 +68,6 @@ struct array *GenmapFindNeighbors(genmap_handle h, GenmapComm c)
     }
     s = e;
   }
-
-  printf("r, c, size, a.n = %lu, %lu, %lu, %u\n", offsetof(csr_entry, r),
-      offsetof(csr_entry, c), sizeof(csr_entry), a.n);
 
   sarray_transfer(csr_entry, &a, proc, 1, &cr);
   sarray_sort_2(csr_entry, a.ptr, a.n, r, 1, c, 1, &buf);
@@ -113,7 +111,7 @@ struct array *GenmapFindNeighbors(genmap_handle h, GenmapComm c)
   return nbrs;
 }
 
-int GenmapInitLaplacian(genmap_handle h,GenmapComm c)
+int GenmapInitLaplacian(genmap_handle h,genmap_comm c)
 {
   struct array *entries = GenmapFindNeighbors(h, c);
   csr_mat_setup(entries, &c->gsc, &c->M);
@@ -138,7 +136,7 @@ int GenmapInitLaplacian(genmap_handle h,GenmapComm c)
   return 0;
 }
 
-int GenmapLaplacian(genmap_handle h,GenmapComm c,GenmapScalar *u, GenmapScalar *v)
+int GenmapLaplacian(genmap_handle h,genmap_comm c,GenmapScalar *u, GenmapScalar *v)
 {
   csr_mat_gather(c->M,c->gsh,u,c->b,&c->buf);
   csr_mat_apply(v,c->M,c->b);

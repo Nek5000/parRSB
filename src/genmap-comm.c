@@ -1,8 +1,8 @@
 #include "genmap-impl.h"
 
-int GenmapCreateComm(GenmapComm *c_,comm_ext ce){
+int GenmapCreateComm(genmap_comm *c_,comm_ext ce){
   GenmapMalloc(1,c_);
-  GenmapComm c=*c_;
+  genmap_comm c=*c_;
   comm_init(&c->gsc, ce);
 
   c->gsh=NULL;
@@ -17,7 +17,7 @@ int GenmapCreateComm(GenmapComm *c_,comm_ext ce){
   return 0;
 }
 
-int GenmapDestroyComm(GenmapComm c) {
+int GenmapDestroyComm(genmap_comm c) {
   buffer_free(&c->buf);
 
   if(c->gsh)
@@ -37,31 +37,31 @@ int GenmapDestroyComm(GenmapComm c) {
   return 0;
 }
 
-int genmap_comm_size(GenmapComm c) {
+int genmap_comm_size(genmap_comm c) {
   return (int) c->gsc.np;
 }
 
-int genmap_comm_rank(GenmapComm c) {
+int genmap_comm_rank(genmap_comm c) {
   return (int) c->gsc.id;
 }
 
-GenmapComm GenmapGetLocalComm(genmap_handle h) {
+genmap_comm GenmapGetLocalComm(genmap_handle h) {
   return h->local;
 }
 
-void GenmapSetLocalComm(genmap_handle h, GenmapComm c) {
+void GenmapSetLocalComm(genmap_handle h, genmap_comm c) {
   h->local = c;
 }
 
-GenmapComm GenmapGetGlobalComm(genmap_handle h) {
+genmap_comm GenmapGetGlobalComm(genmap_handle h) {
   return h->global;
 }
 
-void GenmapSetGlobalComm(genmap_handle h, GenmapComm c) {
+void GenmapSetGlobalComm(genmap_handle h, genmap_comm c) {
   h->global = c;
 }
 
-int GenmapGop(GenmapComm c, void *v, GenmapInt size,
+int GenmapGop(genmap_comm c, void *v, GenmapInt size,
               GenmapDataType type, GenmapInt op) {
   if(op == GENMAP_SUM) {
     MPI_Allreduce(MPI_IN_PLACE, v, size, type, MPI_SUM, c->gsc.c);
@@ -73,7 +73,7 @@ int GenmapGop(GenmapComm c, void *v, GenmapInt size,
   return 0;
 }
 
-int GenmapReduce(GenmapComm c, void *out, void *in, GenmapInt size,
+int GenmapReduce(genmap_comm c, void *out, void *in, GenmapInt size,
                  GenmapDataType type, GenmapInt op) {
   if(op == GENMAP_SUM) {
     MPI_Reduce(in, out, size, type, MPI_SUM, 0, c->gsc.c);
@@ -85,11 +85,11 @@ int GenmapReduce(GenmapComm c, void *out, void *in, GenmapInt size,
   return 0;
 }
 
-int GenmapBcast(GenmapComm c, void *in, GenmapInt count, GenmapDataType type) {
+int GenmapBcast(genmap_comm c, void *in, GenmapInt count, GenmapDataType type) {
   return MPI_Bcast(in, count, type, 0, c->gsc.c);
 }
 
-void GenmapSplitComm(genmap_handle h, GenmapComm *c, int bin) {
+void GenmapSplitComm(genmap_handle h, genmap_comm *c, int bin) {
   comm_ext local;
   int id = genmap_comm_rank(*c);
   MPI_Comm_split((*c)->gsc.c, bin, id, &local);
@@ -100,7 +100,7 @@ void GenmapSplitComm(genmap_handle h, GenmapComm *c, int bin) {
   GenmapCrystalInit(h, *c);
 }
 
-int GenmapCrystalInit(genmap_handle h, GenmapComm c) {
+int GenmapCrystalInit(genmap_handle h, genmap_comm c) {
   crystal_init(&(h->cr), &(c->gsc));
   return 0;
 }

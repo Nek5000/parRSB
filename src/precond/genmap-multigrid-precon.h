@@ -47,7 +47,7 @@ struct mgData_{
   GenmapScalar *y,*x,*b,*u,*rhs,*buf;
 };
 
-void mgSetup(GenmapComm c,csr_mat M,mgData *d);
+void mgSetup(genmap_handle h, genmap_comm c, csr_mat M, mgData *d);
 void mgLevelSetup(mgData data,uint level);
 void mgFree(mgData d);
 
@@ -65,21 +65,20 @@ typedef struct{
 } entry;
 
 #define GETLNG(p,i,off) (*((ulong*)((char*)(p)+(off)+(i)*sizeof(entry))))
-
-#define GETPTR(p,i,off)            ((char*)(p)+(off)+(i)*sizeof(entry))
+#define GETPTR(p,i,off) ((char*)(p)+(off)+(i)*sizeof(entry))
 
 void setOwner(char *ptr, sint n, size_t inOffset, size_t outOffset, slong lelg, sint np);
 
 void mg_vcycle(GenmapScalar *u, GenmapScalar *rhs, mgData d);
 void mg_vcycle_lvl(GenmapScalar *u1, GenmapScalar *rhs, mgData d, int lvl_start);
 
-int flex_cg(genmap_handle h, GenmapComm c, mgData d, GenmapVector r, int maxIter, GenmapVector x);
+int flex_cg(genmap_handle h, genmap_comm c, mgData d, GenmapVector r, int maxIter, GenmapVector x);
 
-int project(genmap_handle h, GenmapComm c, mgData d, GenmapVector r, int maxIter, GenmapVector x);
-int project_lvl(genmap_handle h, GenmapComm c, mgData d, GenmapScalar *ri, int maxIter, int lvl_start,
+int project(genmap_handle h, genmap_comm c, mgData d, GenmapVector r, int maxIter, GenmapVector x);
+int project_lvl(genmap_handle h, genmap_comm c, mgData d, GenmapScalar *ri, int maxIter, int lvl_start,
                 GenmapScalar *xo);
 
-int rqi(genmap_handle h, GenmapComm c, mgData d, GenmapVector z, int maxIter, GenmapVector fiedler);
-int fmg(genmap_handle h, GenmapComm c, mgData d, GenmapScalar *z, int maxIter, GenmapScalar *fiedler);
+int rqi(genmap_handle h, genmap_comm c, mgData d, GenmapVector z, int maxIter, GenmapVector fiedler);
+int fmg(genmap_handle h, genmap_comm c, mgData d, GenmapScalar *z, int maxIter, GenmapScalar *fiedler);
 
 #endif

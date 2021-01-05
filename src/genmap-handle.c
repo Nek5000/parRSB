@@ -36,7 +36,7 @@ void genmap_set_vertices(genmap_handle h, int nVertices) {
   h->nv = nVertices;
 }
 
-void genmap_scan(genmap_handle h, GenmapComm c) {
+void genmap_scan(genmap_handle h, genmap_comm c) {
   GenmapLong out[2][1], buf[2][1];
   GenmapLong lelt = GenmapGetNLocalElements(h);
   comm_scan(out,&(c->gsc),gs_long_long,gs_add,&lelt,1,buf);

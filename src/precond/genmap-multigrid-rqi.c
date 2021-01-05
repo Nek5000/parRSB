@@ -6,7 +6,7 @@
 
 // Input z should be orthogonal to 1-vector, have unit norm.
 // RQI should not change z.
-int rqi(genmap_handle h, GenmapComm c, mgData d, GenmapVector z, int max_iter, GenmapVector y)
+int rqi(genmap_handle h, genmap_comm c, mgData d, GenmapVector z, int max_iter, GenmapVector y)
 {
   assert(z->size==y->size);
 
@@ -29,12 +29,12 @@ int rqi(genmap_handle h, GenmapComm c, mgData d, GenmapVector z, int max_iter, G
   GenmapMalloc(max_iter*max_iter, &buf);
 
   metric_tic(gsc, PROJECT);
-  int ppfi = project(h, c, d, z, 10, y);
+  int ppfi = project(h, c, d, z, 100, y);
   metric_toc(gsc, PROJECT);
   metric_acc(NPROJECT, ppfi);
 
   uint i, j, k, l;
-  for (i = 0; i < 20; i++) {
+  for (i = 0; i < 50; i++) {
     GenmapScalar norm = GenmapDotVector(y,y);
     comm_allreduce(gsc, gs_double, gs_add, &norm, 1, buf);
     GenmapScalar normi = 1.0/sqrt(norm);
@@ -113,7 +113,7 @@ int rqi(genmap_handle h, GenmapComm c, mgData d, GenmapVector z, int max_iter, G
     }
 
     metric_tic(gsc, PROJECT);
-    ppfi = project(h, c, d, z, 10, y);
+    ppfi = project(h, c, d, z, 100, y);
     metric_toc(gsc, PROJECT);
     metric_acc(NPROJECT, ppfi);
 

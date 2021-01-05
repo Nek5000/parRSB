@@ -34,7 +34,7 @@ int main(int argc,char *argv[]){
       e[i].vertices[j]=me[i].vertex[j].globalId;
 
   /* Setup CSR on fine level */
-  GenmapComm c=GenmapGetGlobalComm(gh);
+  genmap_comm c=GenmapGetGlobalComm(gh);
   struct array *entries=GenmapFindNeighbors(gh,c);
   csr_mat M; csr_mat_setup(entries,&c->gsc,&M);
   array_free(entries); free(entries);

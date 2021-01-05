@@ -115,6 +115,7 @@ int parRSB_partMesh(int *part, int *seq, long long *vtx, double *coord, int nel,
   comm_barrier(&c);
   double time4 = comm_time();
 
+  // FIXME: Assumes rsb_element
   /* Restore original input */
   sarray_transfer(struct rsb_element, &eList, origin, 1, &cr);
   nel = eList.n;

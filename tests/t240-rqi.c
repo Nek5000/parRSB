@@ -130,7 +130,7 @@ int main(int argc,char *argv[]){
     for(j=0;j<mesh->nVertex;j++)
       e[i].vertices[j]=me[i*mesh->nVertex+j].globalId;
 
-  GenmapComm c=GenmapGetGlobalComm(gh);
+  genmap_comm c=GenmapGetGlobalComm(gh);
   GenmapInitLaplacian(gh,c);
 
   GenmapVector x; GenmapCreateVector(&x,mesh->nelt);

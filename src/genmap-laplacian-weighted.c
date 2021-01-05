@@ -1,6 +1,6 @@
 #include <genmap-impl.h>
 
-int GenmapInitLaplacianWeighted(genmap_handle h, GenmapComm c){
+int GenmapInitLaplacianWeighted(genmap_handle h, genmap_comm c){
   GenmapInt lelt = GenmapGetNLocalElements(h);
   GenmapInt nv = GenmapGetNVertices(h);
 
@@ -58,7 +58,7 @@ int GenmapInitLaplacianWeighted(genmap_handle h, GenmapComm c){
   return 0;
 }
 
-int GenmapLaplacianWeighted(genmap_handle h, GenmapComm c, GenmapScalar *u, GenmapScalar *v) {
+int GenmapLaplacianWeighted(genmap_handle h, genmap_comm c, GenmapScalar *u, GenmapScalar *v) {
   GenmapInt lelt = GenmapGetNLocalElements(h);
   GenmapInt nv = GenmapGetNVertices(h);
 

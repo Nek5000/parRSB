@@ -4,7 +4,7 @@
 #include <genmap-impl.h>
 #include <genmap-multigrid-precon.h>
 
-int inverse(double *x,int level,int iter,genmap_handle h,GenmapComm c,mgData d)
+int inverse(double *x,int level,int iter,genmap_handle h,genmap_comm c,mgData d)
 {
   assert(level<d->nlevels-2);
 
@@ -39,7 +39,7 @@ int inverse(double *x,int level,int iter,genmap_handle h,GenmapComm c,mgData d)
   return 0;
 }
 
-int fmg(genmap_handle h,GenmapComm c,mgData d,GenmapScalar *z,int iter,GenmapScalar *y)
+int fmg(genmap_handle h,genmap_comm c,mgData d,GenmapScalar *z,int iter,GenmapScalar *y)
 {
   int   nlevels=d->nlevels;
   mgLevel *lvls=d->levels;
