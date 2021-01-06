@@ -13,42 +13,49 @@ static double metrics[MAXMETS];
 static double *stack;
 static uint stack_size;
 
-void metric_init(){
-  uint i; for(i=0; i<MAXMETS; i++)
-    metrics[i]=0.0;
-  GenmapCalloc(MAXSIZE,&stack);
-  stack_size=0;
+void metric_init() {
+  uint i;
+  for (i = 0; i < MAXMETS; i++)
+    metrics[i] = 0.0;
+  GenmapCalloc(MAXSIZE, &stack);
+  stack_size = 0;
 }
 
-void metric_finalize(){
-  if(stack!=NULL)
+void metric_finalize() {
+  if (stack != NULL)
     GenmapFree(stack);
 }
 
-void metric_acc(metric m,double count){
-  metrics[m]+=count;
+void metric_acc(metric m, double count) {
+  metrics[m] += count;
 }
 
-void metric_tic(struct comm *c,metric m){
+void metric_tic(struct comm *c, metric m) {
   comm_barrier(c);
-  metrics[m]-=comm_time();
+  metrics[m] -= comm_time();
 }
 
-void metric_toc(struct comm *c,metric m){
-  metrics[m]+=comm_time();
+void metric_toc(struct comm *c, metric m) {
+  metrics[m] += comm_time();
   comm_barrier(c);
 }
 
-double metric_get_value(int level,metric m){
-  return stack[level*MAXMETS+m];
+double metric_get_value(int level, metric m) {
+  if (level == stack_size)
+    return metrics[m];
+  else if (level < stack_size)
+    return stack[level*MAXMETS+m];
+  else // FIXME: May be an assert failure?
+    return -1.0;
 }
 
 void metric_push_level(){
   assert(stack_size<MAXLVLS && "stack_size >= MAXLVLS");
 
-  uint i; for(i=0; i<MAXMETS; i++){
-    stack[stack_size*MAXMETS+i]=metrics[i];
-    metrics[i]=0.0;
+  uint i;
+  for (i = 0; i < MAXMETS; i++) {
+    stack[stack_size*MAXMETS+i] = metrics[i];
+    metrics[i] = 0.0;
   }
   stack_size++;
 }

@@ -32,9 +32,13 @@ int genmap_rsb(genmap_handle h) {
   buffer_init(&buf, 1024);
 
   int nv = h->nv;
-  int ndim = (nv == 8)?3:2;
-  int level = 0;
-  int np;
+  int ndim = (nv == 8) ? 3 : 2;
+
+  int np = gc->np;
+
+  int level = 0, max_levels = log2(np);
+
+  sint bfr[2];
 
   while (genmap_comm_size(GenmapGetLocalComm(h)) > 1) {
     local_c = GenmapGetLocalComm(h);
@@ -54,7 +58,7 @@ int genmap_rsb(genmap_handle h) {
       metric_toc(lc, RCB);
     } else if (h->options->rsb_prepartition == 2) { // RIB
       // metric_tic(lc, RCB);
-      // rcb(lc, h->elements, ndim, &buf);
+      // rib(lc, h->elements, ndim, &buf);
       // metric_toc(lc, RCB);
     } else {
       parallel_sort(struct rsb_element, h->elements, globalId0, gs_long, 0, 1, lc, &buf);
@@ -77,6 +81,26 @@ int genmap_rsb(genmap_handle h) {
       global = 0;
     } while(++ipass < max_pass && iter == max_iter);
     metric_toc(lc, FIEDLER);
+
+    /* Dump current partition status */
+    if (level < max_levels) {
+      sint g_nproject, nproject;
+      g_nproject = nproject = metric_get_value(level, NPROJECT);
+      comm_allreduce(gc, gs_int, gs_max, &g_nproject, 1, bfr);// max
+
+      sint g_id = (nproject == g_nproject)*gc->id;
+      comm_allreduce(gc, gs_int, gs_max, &g_id, 1, bfr);// max
+
+      sint l_id = gc->id;
+      comm_allreduce(lc, gs_int, gs_max, &l_id, 1, bfr);// max
+
+      if (g_id == l_id) {
+        // Dump the current partition
+        char fname[BUFSIZ];
+        sprintf(fname,"partition_level_%02d.dump", level);
+        GenmapCentroidDump(fname, h, lc);
+      }
+    }
 
     /* Sort by Fiedler vector */
     metric_tic(lc, FIEDLERSORT);
@@ -101,14 +125,14 @@ int genmap_rsb(genmap_handle h) {
 
   /* Check if Fidler converged */
   sint converged = 1;
-  for (i = 0; i<metric_get_levels(); i++) {
-    int val = (int)metric_get_value(i, NFIEDLER);
-    if (val>=max_pass*max_iter){
-      converged = 0; break;
+  for (i = 0; i < metric_get_levels(); i++) {
+    int val = (int) metric_get_value(i, NFIEDLER);
+    if (val >= max_pass*max_iter) {
+      converged = 0;
+      break;
     }
   }
-  sint bfr;
-  comm_allreduce(gc, gs_int, gs_min, &converged, 1, &bfr);// min
+  comm_allreduce(gc, gs_int, gs_min, &converged, 1, bfr);// min
   if (converged == 0 && gc->id == 0)
     printf("\tWARNING: Lanczos failed to converge while partitioning!\n");
 
