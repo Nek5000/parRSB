@@ -1,18 +1,18 @@
 #include "genmap-impl.h"
 
-int GenmapCreateComm(GenmapComm *c_,comm_ext ce){
-  GenmapMalloc(1,c_);
-  GenmapComm c=*c_;
+int GenmapCreateComm(GenmapComm *c_, comm_ext ce) {
+  GenmapMalloc(1, c_);
+  GenmapComm c = *c_;
   comm_init(&c->gsc, ce);
 
-  c->gsh=NULL;
-  c->M=NULL;
+  c->gsh = NULL;
+  c->M = NULL;
 
-  c->gsw=NULL;
+  c->gsw = NULL;
 
-  buffer_init(&c->buf,1024);
+  buffer_init(&c->buf, 1024);
 
-  c->b=NULL;
+  c->b = NULL;
 
   return 0;
 }
@@ -20,15 +20,15 @@ int GenmapCreateComm(GenmapComm *c_,comm_ext ce){
 int GenmapDestroyComm(GenmapComm c) {
   buffer_free(&c->buf);
 
-  if(c->gsh)
+  if (c->gsh)
     gs_free(c->gsh);
-  if(c->M)
+  if (c->M)
     csr_mat_free(c->M);
 
-  if(c->gsw)
+  if (c->gsw)
     gs_free(c->gsw);
 
-  if(c->b)
+  if (c->b)
     GenmapFree(c->b);
 
   comm_free(&c->gsc);
@@ -37,37 +37,25 @@ int GenmapDestroyComm(GenmapComm c) {
   return 0;
 }
 
-int GenmapCommSize(GenmapComm c) {
-  return (int) c->gsc.np;
-}
+int GenmapCommSize(GenmapComm c) { return (int)c->gsc.np; }
 
-int GenmapCommRank(GenmapComm c) {
-  return (int) c->gsc.id;
-}
+int GenmapCommRank(GenmapComm c) { return (int)c->gsc.id; }
 
-GenmapComm GenmapGetLocalComm(genmap_handle h) {
-  return h->local;
-}
+GenmapComm GenmapGetLocalComm(genmap_handle h) { return h->local; }
 
-void GenmapSetLocalComm(genmap_handle h, GenmapComm c) {
-  h->local = c;
-}
+void GenmapSetLocalComm(genmap_handle h, GenmapComm c) { h->local = c; }
 
-GenmapComm GenmapGetGlobalComm(genmap_handle h) {
-  return h->global;
-}
+GenmapComm GenmapGetGlobalComm(genmap_handle h) { return h->global; }
 
-void GenmapSetGlobalComm(genmap_handle h, GenmapComm c) {
-  h->global = c;
-}
+void GenmapSetGlobalComm(genmap_handle h, GenmapComm c) { h->global = c; }
 
-int GenmapGop(GenmapComm c, void *v, GenmapInt size,
-              GenmapDataType type, GenmapInt op) {
-  if(op == GENMAP_SUM) {
+int GenmapGop(GenmapComm c, void *v, GenmapInt size, GenmapDataType type,
+              GenmapInt op) {
+  if (op == GENMAP_SUM) {
     MPI_Allreduce(MPI_IN_PLACE, v, size, type, MPI_SUM, c->gsc.c);
-  } else if(op == GENMAP_MAX) {
+  } else if (op == GENMAP_MAX) {
     MPI_Allreduce(MPI_IN_PLACE, v, size, type, MPI_MAX, c->gsc.c);
-  } else if(op == GENMAP_MIN) {
+  } else if (op == GENMAP_MIN) {
     MPI_Allreduce(MPI_IN_PLACE, v, size, type, MPI_MIN, c->gsc.c);
   }
   return 0;
@@ -75,11 +63,11 @@ int GenmapGop(GenmapComm c, void *v, GenmapInt size,
 
 int GenmapReduce(GenmapComm c, void *out, void *in, GenmapInt size,
                  GenmapDataType type, GenmapInt op) {
-  if(op == GENMAP_SUM) {
+  if (op == GENMAP_SUM) {
     MPI_Reduce(in, out, size, type, MPI_SUM, 0, c->gsc.c);
-  } else if(op == GENMAP_MAX) {
+  } else if (op == GENMAP_MAX) {
     MPI_Reduce(in, out, size, type, MPI_MAX, 0, c->gsc.c);
-  } else if(op == GENMAP_MIN) {
+  } else if (op == GENMAP_MIN) {
     MPI_Reduce(in, out, size, type, MPI_MIN, 0, c->gsc.c);
   }
   return 0;
@@ -106,10 +94,10 @@ int GenmapCrystalInit(genmap_handle h, GenmapComm c) {
 }
 
 int GenmapCrystalTransfer(genmap_handle h, int field) {
-  if(field == GENMAP_ORIGIN)
-    sarray_transfer(struct rsb_element,h->elements,origin,0,&h->cr);
-  else if(field == GENMAP_PROC)
-    sarray_transfer(struct rsb_element,h->elements,proc  ,0,&h->cr);
+  if (field == GENMAP_ORIGIN)
+    sarray_transfer(struct rsb_element, h->elements, origin, 0, &h->cr);
+  else if (field == GENMAP_PROC)
+    sarray_transfer(struct rsb_element, h->elements, proc, 0, &h->cr);
   return 0;
 }
 

@@ -1,5 +1,5 @@
-#include <stdlib.h>
 #include <math.h>
+#include <stdlib.h>
 
 #include <gencon-impl.h>
 #include <sort.h>
@@ -11,21 +11,22 @@ static int sortSegments(Mesh mesh, struct comm *c, int dim, buffer *bfr) {
   sint s = 0, e;
   while (s < nPoints) {
     // find the length of the segment
-    for (e = s + 1; e < nPoints && points[e].ifSegment == 0; e++);
+    for (e = s + 1; e < nPoints && points[e].ifSegment == 0; e++)
+      ;
 
     // sort start to end based on dim
     switch (dim) {
-      case 0:
-        sarray_sort(struct Point_private, &points[s], e - s, x[0], 3, bfr);
-        break;
-      case 1:
-        sarray_sort(struct Point_private, &points[s], e - s, x[1], 3, bfr);
-        break;
-      case 2:
-        sarray_sort(struct Point_private, &points[s], e - s, x[2], 3, bfr);
-        break;
-      default:
-        break;
+    case 0:
+      sarray_sort(struct Point_private, &points[s], e - s, x[0], 3, bfr);
+      break;
+    case 1:
+      sarray_sort(struct Point_private, &points[s], e - s, x[1], 3, bfr);
+      break;
+    case 2:
+      sarray_sort(struct Point_private, &points[s], e - s, x[2], 3, bfr);
+      break;
+    default:
+      break;
     }
 
     points[s].ifSegment = 1;
@@ -41,31 +42,27 @@ static int findLocalSegments(Mesh mesh, int i, GenmapScalar tolSquared) {
   sint npts = mesh->elements.n;
   int nDim = mesh->nDim;
 
-  //if (npts > 0)
-  //  printf("%d %d %0.12lf %0.12lf %0.12lf %llu\n", 0, pts[0].ifSegment, pts[0].x[0], pts[0].x[1], pts[0].x[2], pts[0].globalId);
-
   sint j;
   for (j = 1; j < npts; j++) {
     GenmapScalar d = sqrDiff(pts[j].x[i], pts[j - 1].x[i]);
 
-    GenmapScalar dx = min(pts[j].dx, pts[j - 1].dx)*tolSquared;
+    GenmapScalar dx = min(pts[j].dx, pts[j - 1].dx) * tolSquared;
 
     if (d > dx)
       pts[j].ifSegment = 1;
-
-    //printf("%d %d %0.12lf %0.12lf %0.12lf %llu\n", j, pts[j].ifSegment, pts[j].x[0], pts[j].x[1], pts[j].x[2], pts[j].globalId);
   }
 }
 
-static int mergeSegments(Mesh mesh, struct comm *c, int i, GenmapScalar tolSquared, buffer *bfr) {
+static int mergeSegments(Mesh mesh, struct comm *c, int i,
+                         GenmapScalar tolSquared, buffer *bfr) {
   uint nPoints = mesh->elements.n;
   Point points = mesh->elements.ptr;
 
   sint rank = c->id;
   sint size = c->np;
 
-  struct Point_private lastp = points[nPoints-1];
-  lastp.proc = (rank + 1)%size;
+  struct Point_private lastp = points[nPoints - 1];
+  lastp.proc = (rank + 1) % size;
 
   struct array arr;
   array_init(struct Point_private, &arr, 1);
@@ -77,12 +74,12 @@ static int mergeSegments(Mesh mesh, struct comm *c, int i, GenmapScalar tolSquar
 
   uint n = arr.n;
   assert(n == 1);
-  lastp = ((struct Point_private *) arr.ptr)[0];
+  lastp = ((struct Point_private *)arr.ptr)[0];
 
   if (rank > 0) {
     GenmapScalar d = sqrDiff(lastp.x[i], points->x[i]);
 
-    GenmapScalar dx = min(lastp.dx, points->dx)*tolSquared;
+    GenmapScalar dx = min(lastp.dx, points->dx) * tolSquared;
 
     if (d > dx)
       points->ifSegment = 1;
@@ -100,27 +97,31 @@ static int mergeSegments(Mesh mesh, struct comm *c, int i, GenmapScalar tolSquar
   sarray_transfer(struct Point_private, &mesh->elements, proc, 0, &cr);
   crystal_free(&cr);
 
-  sarray_sort(struct Point_private, mesh->elements.ptr, mesh->elements.n, globalId, 1, bfr);
+  sarray_sort(struct Point_private, mesh->elements.ptr, mesh->elements.n,
+              globalId, 1, bfr);
 
   return 0;
 }
 
-int findSegments(Mesh mesh, struct comm *c, GenmapScalar tol, int verbose, buffer *bfr) {
+int findSegments(Mesh mesh, struct comm *c, GenmapScalar tol, int verbose,
+                 buffer *bfr) {
   int nDim = mesh->nDim;
   int nVertex = mesh->nVertex;
-  GenmapScalar tolSquared = tol*tol;
+  GenmapScalar tolSquared = tol * tol;
 
-  parallel_sort(struct Point_private, &mesh->elements, x[0], genmap_gs_scalar, bin_sort, 0, c);
+  parallel_sort(struct Point_private, &mesh->elements, x[0], genmap_gs_scalar,
+                bin_sort, 0, c);
 
   uint nPoints = mesh->elements.n;
   Point points = mesh->elements.ptr;
 
   if (nDim == 3)
-    sarray_sort_3(struct Point_private, points, nPoints, x[0], 3, x[1], 3, x[2], 3, bfr);
+    sarray_sort_3(struct Point_private, points, nPoints, x[0], 3, x[1], 3, x[2],
+                  3, bfr);
   else
     sarray_sort_2(struct Point_private, points, nPoints, x[0], 3, x[1], 3, bfr);
 
-  //TODO: load balance
+  // TODO: load balance
 
   // Initialize globalId and ifSegment
   slong out[2][1], buf[2][1], in[1];
@@ -133,7 +134,7 @@ int findSegments(Mesh mesh, struct comm *c, GenmapScalar tol, int verbose, buffe
     points[i].globalId = start + i;
   }
 
-  //FIXME: first rank with nPoints>0 should do this
+  // FIXME: first rank with nPoints>0 should do this
   if (c->id == 0 && nPoints > 0)
     points[0].ifSegment = 1;
 

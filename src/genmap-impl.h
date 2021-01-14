@@ -1,17 +1,17 @@
 #ifndef _GENMAP_IMPL_H_
 #define _GENMAP_IMPL_H_
 
-#include <stddef.h>
-#include <stdlib.h>
 #include <assert.h>
 #include <math.h>
+#include <stddef.h>
+#include <stdlib.h>
 
 #ifdef GENMAP_DEBUG
 #include <stdio.h>
 #endif
 
-#include <genmap.h>
 #include <genmap-multigrid-precon.h>
+#include <genmap.h>
 
 #define GENMAP_FIEDLER 0
 #define GENMAP_GLOBALID 1
@@ -22,9 +22,9 @@
 #define GENMAP_RSB_ELEMENT 1
 
 #define MAXDIM 3 /* Maximum dimension of the mesh */
-#define MAXNV 8 /* Maximum number of vertices per element */
+#define MAXNV 8  /* Maximum number of vertices per element */
 
-struct GenmapComm_private{
+struct GenmapComm_private {
   struct comm gsc;
   /* Un-weighted Laplacian */
   struct gs_data *gsh;
@@ -36,7 +36,7 @@ struct GenmapComm_private{
 };
 
 /* parRCB internals */
-struct rcb_element{
+struct rcb_element {
   unsigned char type;
   GenmapInt proc;
   GenmapInt origin;
@@ -45,13 +45,13 @@ struct rcb_element{
   GenmapScalar coord[MAXDIM];
 };
 
-void rcb_local(struct array *a,uint start,uint end,int ndim,buffer *buf);
-int rcb_level(struct comm *c,struct array *a,int ndim);
-int rcb(struct comm *ci,struct array *a,int ndim);
+void rcb_local(struct array *a, uint start, uint end, int ndim, buffer *buf);
+int rcb_level(struct comm *c, struct array *a, int ndim);
+int rcb(struct comm *ci, struct array *a, int ndim);
 
 /* parRSB internals */
 /* rsb_element should be a superset of rsb_element */
-struct rsb_element{
+struct rsb_element {
   unsigned char type;
   GenmapInt proc;
   GenmapInt origin;
@@ -93,13 +93,13 @@ struct GenmapVector_private {
   GenmapScalar *data;
 };
 
-#define GenmapMalloc(n, p) GenmapMallocArray ((n), sizeof(**(p)), p)
-#define GenmapCalloc(n, p) GenmapCallocArray ((n), sizeof(**(p)), p)
+#define GenmapMalloc(n, p) GenmapMallocArray((n), sizeof(**(p)), p)
+#define GenmapCalloc(n, p) GenmapCallocArray((n), sizeof(**(p)), p)
 #define GenmapRealloc(n, p) GenmapReallocArray((n), sizeof(**(p)), p)
 
 /* Genmap Metrics */
-typedef enum{
-  ALLREDUCE=0,
+typedef enum {
+  ALLREDUCE = 0,
   AXISLEN,
   BINN1,
   BINN2,
@@ -138,16 +138,16 @@ typedef enum{
 
 void metric_init();
 void metric_finalize();
-void metric_acc(metric m,double count);
-void metric_tic(struct comm *c,metric m);
-void metric_toc(struct comm *c,metric m);
-double metric_get_value(int level,metric m);
+void metric_acc(metric m, double count);
+void metric_tic(struct comm *c, metric m);
+void metric_toc(struct comm *c, metric m);
+double metric_get_value(int level, metric m);
 void metric_push_level();
 uint metric_get_levels();
 void metric_print(struct comm *c);
 
 /* genCon */
-typedef struct{
+typedef struct {
   GenmapULong sequenceId;
   int nNeighbors;
   GenmapULong elementId;
@@ -156,10 +156,10 @@ typedef struct{
 } vertex;
 
 /* Components */
-sint is_disconnected(struct comm *c,struct gs_data *gsh,buffer *buf,
-  uint nelt,uint nv);
+sint is_disconnected(struct comm *c, struct gs_data *gsh, buffer *buf,
+                     uint nelt, uint nv);
 
 /* Matrix inverse */
-void matrix_inverse(int N,double *A);
+void matrix_inverse(int N, double *A);
 
 #endif

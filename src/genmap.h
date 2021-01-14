@@ -1,8 +1,7 @@
 #ifndef _GENMAP_H_
 #define _GENMAP_H_
 
-#include "genmap-types.h"
-#include "genmap-gslib.h"
+#include <genmap-types.h>
 #include <mpi.h>
 
 #define GENMAP_SUM 0
@@ -100,38 +99,42 @@ int GenmapPrintVector(GenmapVector x);
 int GenmapDestroyVector(GenmapVector x);
 
 /* Laplacian */
-struct array *GenmapFindNeighbors(genmap_handle h,GenmapComm c);
+struct array *GenmapFindNeighbors(genmap_handle h, GenmapComm c);
 
 int GenmapInitLaplacian(genmap_handle h, GenmapComm c);
-int GenmapLaplacian(genmap_handle h, GenmapComm c, GenmapScalar *u, GenmapScalar *v);
+int GenmapLaplacian(genmap_handle h, GenmapComm c, GenmapScalar *u,
+                    GenmapScalar *v);
 int GenmapInitLaplacianWeighted(genmap_handle h, GenmapComm c);
-int GenmapLaplacianWeighted(genmap_handle h, GenmapComm c, GenmapScalar *u, GenmapScalar *v);
+int GenmapLaplacianWeighted(genmap_handle h, GenmapComm c, GenmapScalar *u,
+                            GenmapScalar *v);
 
 /* Eigen */
-int GenmapInvPowerIter(GenmapVector eVector, GenmapVector alpha, GenmapVector beta, GenmapVector init, int iter);
-int GenmapTQLI(genmap_handle h, GenmapVector diag, GenmapVector upper, GenmapVector **eVec, GenmapVector *eVal);
+int GenmapInvPowerIter(GenmapVector eVector, GenmapVector alpha,
+                       GenmapVector beta, GenmapVector init, int iter);
+int GenmapTQLI(genmap_handle h, GenmapVector diag, GenmapVector upper,
+               GenmapVector **eVec, GenmapVector *eVal);
 int genmap_inverse_power(double *y, int N, double *A, int verbose);
 int genmap_power(double *y, int N, double *A, int verbose);
 
 /* Lanczos */
 int GenmapLanczosLegendary(genmap_handle h, GenmapComm c, GenmapVector f,
-                           GenmapInt niter, GenmapVector **rr, GenmapVector diag,
-                           GenmapVector upper);
+                           GenmapInt niter, GenmapVector **rr,
+                           GenmapVector diag, GenmapVector upper);
 int GenmapLanczos(genmap_handle h, GenmapComm c, GenmapVector init,
                   GenmapInt iter, GenmapVector **q, GenmapVector alpha,
                   GenmapVector beta);
 
 /* Fiedler */
-int GenmapFiedlerLanczos(genmap_handle h,GenmapComm c,int maxIter,
-  int global);
-int GenmapFiedlerRQI(genmap_handle h,GenmapComm c,int maxIter,int global);
+int GenmapFiedlerLanczos(genmap_handle h, GenmapComm c, int maxIter,
+                         int global);
+int GenmapFiedlerRQI(genmap_handle h, GenmapComm c, int maxIter, int global);
 
 /* RSB */
-void genmap_rsb(genmap_handle h,int verbose);
+void genmap_rsb(genmap_handle h, int verbose);
 
 double GenmapGetMaxRss();
 void GenmapPrintStack();
 
-void matrix_inverse(int N,double *A);
+void matrix_inverse(int N, double *A);
 
 #endif
