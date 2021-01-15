@@ -34,7 +34,7 @@ int rqi(genmap_handle h, genmap_comm c, mgData d, GenmapVector z, int max_iter,
   metric_acc(NPROJECT, ppfi);
 
   uint i, j, k, l;
-  for (i = 0; i < 50; i++) {
+  for (i = 0; i < max_iter; i++) {
     GenmapScalar norm = GenmapDotVector(y, y);
     comm_allreduce(gsc, gs_double, gs_add, &norm, 1, buf);
     GenmapScalar normi = 1.0 / sqrt(norm);

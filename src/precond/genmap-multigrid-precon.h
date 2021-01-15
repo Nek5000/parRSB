@@ -1,7 +1,7 @@
 #ifndef _GENMAP_PRECON_H_
 #define _GENMAP_PRECON_H_
 
-#include <genmap-impl.h>
+#include <genmap.h>
 
 typedef struct csr_mat_ *csr_mat;
 typedef struct mgData_ *mgData;

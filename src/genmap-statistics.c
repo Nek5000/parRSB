@@ -5,7 +5,7 @@
 
 #include <genmap-impl.h>
 
-#define MAXMETS 50
+#define MAXMETS 100
 #define MAXLVLS 30
 #define MAXSIZE (MAXMETS * MAXLVLS)
 
