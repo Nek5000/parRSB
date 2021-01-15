@@ -2,9 +2,9 @@
 Parition mesh using Nek5000's vertex connectivity (con) file.
 */
 
+#include <mpi.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <mpi.h>
 
 #include <gencon.h>
 #include <genmap.h>
@@ -18,10 +18,11 @@ typedef struct {
   long long vtx[MAXNV];
 } elm_data;
 
-#define EXIT_ERROR() do{\
-  MPI_Finalize();\
-  return EXIT_FAILURE;\
-} while(0)
+#define EXIT_ERROR()                                                           \
+  do {                                                                         \
+    MPI_Finalize();                                                            \
+    return EXIT_FAILURE;                                                       \
+  } while (0)
 
 int main(int argc, char *argv[]) {
   MPI_Init(&argc, &argv);
@@ -32,12 +33,12 @@ int main(int argc, char *argv[]) {
 
   if (argc != 3) {
     if (rank == 0)
-      printf("Usage: %s <#nread> <mesh file>\n",argv[0]);
+      printf("Usage: %s <#nread> <mesh file>\n", argv[0]);
     EXIT_ERROR();
   }
 
   int n_read = atoi(argv[1]);
-  char* mesh_name = argv[2];
+  char *mesh_name = argv[2];
 
   char geom_name[BUFSIZ];
   strncpy(geom_name, mesh_name, BUFSIZ);
@@ -81,13 +82,17 @@ int main(int argc, char *argv[]) {
 
   /* Partition the mesh */
   parRSB_options options = parrsb_default_options;
-  int *part = (int *) calloc(nelt, sizeof(int));
-  int ierr = parRSB_partMesh(part, NULL, vl, coord, nelt, nv, &options, MPI_COMM_WORLD);
+  int *part = (int *)calloc(nelt, sizeof(int));
+  int ierr = parRSB_partMesh(part, NULL, vl, coord, nelt, nv, &options,
+                             MPI_COMM_WORLD);
 
   if (ierr) {
-    if (vl) free(vl);
-    if (coord) free(coord);
-    if (part) free(part);
+    if (vl)
+      free(vl);
+    if (coord)
+      free(coord);
+    if (part)
+      free(part);
     EXIT_ERROR();
   }
 
@@ -98,8 +103,8 @@ int main(int argc, char *argv[]) {
   int e, n;
   for (data = elements.ptr, e = 0; e < nelt; ++e) {
     data[e].proc = part[e];
-    for(n = 0; n < nv; ++n)
-      data[e].vtx[n] = vl[e*nv + n];
+    for (n = 0; n < nv; ++n)
+      data[e].vtx[n] = vl[e * nv + n];
   }
   elements.n = nelt;
 
@@ -115,18 +120,21 @@ int main(int argc, char *argv[]) {
   comm_free(&comm);
 
   nelt = elements.n;
-  vl = (long long *) realloc(vl, nv*nelt*sizeof(long long));
-  for(data = elements.ptr, e = 0; e < nelt; ++e) {
-    for(n = 0; n < nv; ++n)
-      vl[e*nv + n] = data[e].vtx[n];
+  vl = (long long *)realloc(vl, nv * nelt * sizeof(long long));
+  for (data = elements.ptr, e = 0; e < nelt; ++e) {
+    for (n = 0; n < nv; ++n)
+      vl[e * nv + n] = data[e].vtx[n];
   }
   array_free(&elements);
 
   printPartStat(vl, nelt, nv, MPI_COMM_WORLD);
 
-  if(part != NULL) free(part);
-  if(vl != NULL) free(vl);
-  if(coord != NULL) free(coord);
+  if (part != NULL)
+    free(part);
+  if (vl != NULL)
+    free(vl);
+  if (coord != NULL)
+    free(coord);
 
   return 0;
 }

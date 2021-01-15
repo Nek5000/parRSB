@@ -1,6 +1,6 @@
-#include <sort.h>
 #include <float.h>
 #include <genmap-impl.h>
+#include <sort.h>
 
 void get_rib_axis_local(void *elems, uint nel, int ndim) {
   // TODO: Get rid of this
@@ -8,7 +8,7 @@ void get_rib_axis_local(void *elems, uint nel, int ndim) {
   unsigned char *type = elems;
   if (*type == GENMAP_RCB_ELEMENT) {
     unit_size = sizeof(struct rcb_element);
-  } else if(*type == GENMAP_RSB_ELEMENT) {
+  } else if (*type == GENMAP_RSB_ELEMENT) {
     unit_size = sizeof(struct rsb_element);
   }
 
@@ -18,7 +18,7 @@ void get_rib_axis_local(void *elems, uint nel, int ndim) {
   double avg[3];
   avg[0] = avg[1] = avg[2] = 0.0;
   for (i = 0; i < nel; i++) {
-    elem = (struct rcb_element *) ((char *)elems + i*unit_size);
+    elem = (struct rcb_element *)((char *)elems + i * unit_size);
     avg[0] += elem->coord[0];
     avg[1] += elem->coord[1];
     avg[2] += elem->coord[2];
@@ -34,24 +34,24 @@ void get_rib_axis_local(void *elems, uint nel, int ndim) {
 
   double x, y, z;
   for (i = 0; i < nel; i++) {
-    elem = (struct rcb_element *) ((char *)elems + i*unit_size);
+    elem = (struct rcb_element *)((char *)elems + i * unit_size);
     x = elem->coord[0] - avg[0];
     y = elem->coord[1] - avg[1];
     z = elem->coord[2] - avg[2];
-    I[0][0] += x*x, I[0][1] += x*y, I[0][2] += x*z;
-    I[1][0] += y*x, I[1][1] += y*y, I[1][2] += y*z;
-    I[2][0] += z*x, I[2][1] += z*y, I[2][2] += z*z;
+    I[0][0] += x * x, I[0][1] += x * y, I[0][2] += x * z;
+    I[1][0] += y * x, I[1][1] += y * y, I[1][2] += y * z;
+    I[2][0] += z * x, I[2][1] += z * y, I[2][2] += z * z;
   }
 
-  double ev[3]; // ev[2] = 0 if 2D
+  double ev[3];                           // ev[2] = 0 if 2D
   genmap_power(ev, ndim, (double *)I, 0); // FIXME: 2D does not work
 
   for (i = 0; i < nel; i++) {
-    elem = (struct rcb_element *) ((char *)elems + i*unit_size);
+    elem = (struct rcb_element *)((char *)elems + i * unit_size);
     x = elem->coord[0] - avg[0];
     y = elem->coord[1] - avg[1];
     z = elem->coord[2] - avg[2];
-    elem->fiedler =  x*ev[0] + y*ev[1] + z*ev[2];
+    elem->fiedler = x * ev[0] + y * ev[1] + z * ev[2];
   }
 }
 
@@ -63,7 +63,7 @@ void get_rib_axis(struct array *a, struct comm *c, int ndim) {
   unsigned char *type = elems;
   if (*type == GENMAP_RCB_ELEMENT) {
     unit_size = sizeof(struct rcb_element);
-  } else if(*type == GENMAP_RSB_ELEMENT) {
+  } else if (*type == GENMAP_RSB_ELEMENT) {
     unit_size = sizeof(struct rsb_element);
   }
 
@@ -74,7 +74,7 @@ void get_rib_axis(struct array *a, struct comm *c, int ndim) {
   double avg[4];
   avg[0] = avg[1] = avg[2] = 0.0;
   for (i = 0; i < nel; i++) {
-    elem = (struct rcb_element *) ((char *)elems + i*unit_size);
+    elem = (struct rcb_element *)((char *)elems + i * unit_size);
     avg[0] += elem->coord[0];
     avg[1] += elem->coord[1];
     avg[2] += elem->coord[2];
@@ -94,26 +94,26 @@ void get_rib_axis(struct array *a, struct comm *c, int ndim) {
 
   double x, y, z;
   for (i = 0; i < nel; i++) {
-    elem = (struct rcb_element *) ((char *)elems + i*unit_size);
+    elem = (struct rcb_element *)((char *)elems + i * unit_size);
     x = elem->coord[0] - avg[0];
     y = elem->coord[1] - avg[1];
     z = elem->coord[2] - avg[2];
-    I[0][0] += x*x, I[0][1] += x*y, I[0][2] += x*z;
-    I[1][0] += y*x, I[1][1] += y*y, I[1][2] += y*z;
-    I[2][0] += z*x, I[2][1] += z*y, I[2][2] += z*z;
+    I[0][0] += x * x, I[0][1] += x * y, I[0][2] += x * z;
+    I[1][0] += y * x, I[1][1] += y * y, I[1][2] += y * z;
+    I[2][0] += z * x, I[2][1] += z * y, I[2][2] += z * z;
   }
 
   comm_allreduce(c, gs_double, gs_add, I, 9, buf);
 
-  double ev[3]; // ev[2] = 0 if 2D
+  double ev[3];                           // ev[2] = 0 if 2D
   genmap_power(ev, ndim, (double *)I, 0); // FIXME: 2D does not work
 
   for (i = 0; i < nel; i++) {
-    elem = (struct rcb_element *) ((char *)elems + i*unit_size);
+    elem = (struct rcb_element *)((char *)elems + i * unit_size);
     x = elem->coord[0] - avg[0];
     y = elem->coord[1] - avg[1];
     z = elem->coord[2] - avg[2];
-    elem->fiedler =  x*ev[0] + y*ev[1] + z*ev[2];
+    elem->fiedler = x * ev[0] + y * ev[1] + z * ev[2];
   }
 }
 
@@ -129,22 +129,22 @@ void rib_local(struct array *a, uint start, uint end, int ndim, buffer *buf) {
   unsigned char *type = a->ptr;
   if (*type == GENMAP_RCB_ELEMENT) {
     unit_size = sizeof(struct rcb_element);
-  } else if(*type==GENMAP_RSB_ELEMENT) {
+  } else if (*type == GENMAP_RSB_ELEMENT) {
     unit_size = sizeof(struct rsb_element);
   }
 
-  void *st = (void *)a->ptr + unit_size*start;
+  void *st = (void *)a->ptr + unit_size * start;
   get_rib_axis_local(st, size, ndim);
 
   if (*type == GENMAP_RCB_ELEMENT) {
     sarray_sort(struct rcb_element, st, size, fiedler, 3, buf);
-  } else if (*type==GENMAP_RSB_ELEMENT) {
+  } else if (*type == GENMAP_RSB_ELEMENT) {
     sarray_sort(struct rsb_element, st, size, fiedler, 3, buf);
   }
 
-  uint mid = (start+end)/2;
+  uint mid = (start + end) / 2;
   rib_local(a, start, mid, ndim, buf);
-  rib_local(a, mid  , end, ndim, buf);
+  rib_local(a, mid, end, ndim, buf);
 }
 
 int rib_level(struct comm *c, struct array *a, int ndim, buffer *bfr) {
@@ -216,7 +216,7 @@ int genmap_rib(genmap_handle h) {
 
   struct rcb_element *eptr = h->elements->ptr;
   int e;
-  for(e = 0; e < h->elements->n; e++)
+  for (e = 0; e < h->elements->n; e++)
     eptr[e].seq = e;
 
   return 0;

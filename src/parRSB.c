@@ -1,14 +1,13 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 #include <time.h>
 
 #include <genmap-impl.h>
 #include <parRSB.h>
 
-void fparRSB_partMesh(int *part, int *seq, long long *vtx, double *coord, int *nel, int *nv, int *options,
-                      int *comm, int *err)
-{
+void fparRSB_partMesh(int *part, int *seq, long long *vtx, double *coord,
+                      int *nel, int *nv, int *options, int *comm, int *err) {
   *err = 1;
   comm_ext c = MPI_Comm_f2c(*comm);
   // TODO: Convert int options to parRSB_options instead of default options
@@ -24,9 +23,8 @@ void fparRSB_partMesh(int *part, int *seq, long long *vtx, double *coord, int *n
  * nel = in,
  * nv = in,
  * options = in/out */
-int parRSB_partMesh(int *part, int *seq, long long *vtx, double *coord, int nel, int nv, parRSB_options *options,
-                    MPI_Comm comm)
-{
+int parRSB_partMesh(int *part, int *seq, long long *vtx, double *coord, int nel,
+                    int nv, parRSB_options *options, MPI_Comm comm) {
   struct comm c;
   comm_init(&c, comm);
 
@@ -79,25 +77,25 @@ int parRSB_partMesh(int *part, int *seq, long long *vtx, double *coord, int nel,
     if (size_ > nelg) {
       if (id == 0) {
         printf("Total number of elements is smaller than the "
-          "number of processors.\n"
-          "Run with smaller number of processors.\n");
+               "number of processors.\n"
+               "Run with smaller number of processors.\n");
       }
       // This is wrong
       return 1;
     }
 
     switch (options->global_partitioner) {
-      case 0:
-        genmap_rsb(h);
-        break;
-      case 1:
-        genmap_rcb(h);
-        break;
-      case 2:
-        genmap_rib(h);
-        break;
-      default:
-        break;
+    case 0:
+      genmap_rsb(h);
+      break;
+    case 1:
+      genmap_rcb(h);
+      break;
+    case 2:
+      genmap_rib(h);
+      break;
+    default:
+      break;
     }
 
     genmap_finalize(h);
@@ -132,11 +130,11 @@ int parRSB_partMesh(int *part, int *seq, long long *vtx, double *coord, int nel,
 
   double time5 = comm_time();
   comm_barrier(&c);
-  double time = comm_time()-time0;
+  double time = comm_time() - time0;
 
   /* Report time and finish */
   if (rank == 0)
-    printf(" finished in %g s\n",time);
+    printf(" finished in %g s\n", time);
 
   if (options->print_timing_info > 0) {
     double min[3], max[3], sum[3], buf[3];
@@ -147,9 +145,9 @@ int parRSB_partMesh(int *part, int *seq, long long *vtx, double *coord, int nel,
     comm_allreduce(&c, gs_double, gs_max, max, 3, buf); // max
     comm_allreduce(&c, gs_double, gs_add, sum, 3, buf); // sum
     if (rank == 0) {
-      printf("LOADBALANCE : %g/%g/%g\n", min[0], max[0], sum[0]/c.np);
-      printf("RSB         : %g/%g/%g\n", min[1], max[1], sum[1]/c.np);
-      printf("RESTORE     : %g/%g/%g\n", min[2], max[2], sum[2]/c.np);
+      printf("LOADBALANCE : %g/%g/%g\n", min[0], max[0], sum[0] / c.np);
+      printf("RSB         : %g/%g/%g\n", min[1], max[1], sum[1] / c.np);
+      printf("RESTORE     : %g/%g/%g\n", min[2], max[2], sum[2] / c.np);
     }
     fflush(stdout);
   }

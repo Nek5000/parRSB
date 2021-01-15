@@ -1,11 +1,11 @@
+#include <limits.h>
 #include <math.h>
 #include <stdio.h>
 #include <time.h>
-#include <limits.h>
 
 #include <genmap-impl.h>
-#include <sort.h>
 #include <parRSB.h>
+#include <sort.h>
 
 int genmap_rsb(genmap_handle h) {
   int verbose = h->options->debug_level > 1;
@@ -25,8 +25,8 @@ int genmap_rsb(genmap_handle h) {
   uint nelt = GenmapGetNLocalElements(h);
   GenmapElements e = GenmapGetElements(h);
   GenmapInt i;
-  for (i = 0; i<nelt; i++)
-    e[i].globalId0 = GenmapGetLocalStartIndex(h)+i+1;
+  for (i = 0; i < nelt; i++)
+    e[i].globalId0 = GenmapGetLocalStartIndex(h) + i + 1;
 
   buffer buf;
   buffer_init(&buf, 1024);
@@ -61,7 +61,8 @@ int genmap_rsb(genmap_handle h) {
       // rib(lc, h->elements, ndim, &buf);
       // metric_toc(lc, RCB);
     } else {
-      parallel_sort(struct rsb_element, h->elements, globalId0, gs_long, 0, 1, lc, &buf);
+      parallel_sort(struct rsb_element, h->elements, globalId0, gs_long, 0, 1,
+                    lc, &buf);
     }
 
     /* Initialize the laplacian */
@@ -79,38 +80,39 @@ int genmap_rsb(genmap_handle h) {
         iter = GenmapFiedlerRQI(h, local_c, max_iter, global);
       metric_acc(NFIEDLER, iter);
       global = 0;
-    } while(++ipass < max_pass && iter == max_iter);
+    } while (++ipass < max_pass && iter == max_iter);
     metric_toc(lc, FIEDLER);
 
     /* Dump current partition status */
     if (level < max_levels) {
       sint g_nproject, nproject;
       g_nproject = nproject = metric_get_value(level, NPROJECT);
-      comm_allreduce(gc, gs_int, gs_max, &g_nproject, 1, bfr);// max
+      comm_allreduce(gc, gs_int, gs_max, &g_nproject, 1, bfr); // max
 
-      sint g_id = (nproject == g_nproject)*gc->id;
-      comm_allreduce(gc, gs_int, gs_max, &g_id, 1, bfr);// max
+      sint g_id = (nproject == g_nproject) * gc->id;
+      comm_allreduce(gc, gs_int, gs_max, &g_id, 1, bfr); // max
 
       sint l_id = gc->id;
-      comm_allreduce(lc, gs_int, gs_max, &l_id, 1, bfr);// max
+      comm_allreduce(lc, gs_int, gs_max, &l_id, 1, bfr); // max
 
       if (g_id == l_id) {
         // Dump the current partition
         char fname[BUFSIZ];
-        sprintf(fname,"partition_level_%02d.dump", level);
+        sprintf(fname, "partition_level_%02d.dump", level);
         GenmapCentroidDump(fname, h, lc);
       }
     }
 
     /* Sort by Fiedler vector */
     metric_tic(lc, FIEDLERSORT);
-    parallel_sort(struct rsb_element, h->elements, fiedler, gs_double, 0, 1, lc, &buf);
+    parallel_sort(struct rsb_element, h->elements, fiedler, gs_double, 0, 1, lc,
+                  &buf);
     metric_toc(lc, FIEDLERSORT);
 
     /* Bisect */
     metric_tic(lc, BISECT);
     int bin = 1;
-    if (lc->id<(np+1)/2)
+    if (lc->id < (np + 1) / 2)
       bin = 0;
     // FIXME: Ugly
     GenmapSplitComm(h, &local_c, bin);
@@ -126,13 +128,13 @@ int genmap_rsb(genmap_handle h) {
   /* Check if Fidler converged */
   sint converged = 1;
   for (i = 0; i < metric_get_levels(); i++) {
-    int val = (int) metric_get_value(i, NFIEDLER);
-    if (val >= max_pass*max_iter) {
+    int val = (int)metric_get_value(i, NFIEDLER);
+    if (val >= max_pass * max_iter) {
       converged = 0;
       break;
     }
   }
-  comm_allreduce(gc, gs_int, gs_min, &converged, 1, bfr);// min
+  comm_allreduce(gc, gs_int, gs_min, &converged, 1, bfr); // min
   if (converged == 0 && gc->id == 0)
     printf("\tWARNING: Lanczos failed to converge while partitioning!\n");
 
@@ -140,7 +142,7 @@ int genmap_rsb(genmap_handle h) {
   GenmapInitLaplacianWeighted(h, global_c);
 
   sint discon = is_disconnected(gc, global_c->gsw, &global_c->buf, nelt, nv);
-  if (discon>0 && gc->id == 0)
+  if (discon > 0 && gc->id == 0)
     printf("\tWarning: There are disconnected components!\n");
 
   crystal_free(&h->cr);

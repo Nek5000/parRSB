@@ -1,8 +1,8 @@
 #ifndef _GENMAP_TYPES_H_
 #define _GENMAP_TYPES_H_
 
-#include <genmap-gslib.h>
 #include <float.h>
+#include <genmap-gslib.h>
 
 typedef long long GenmapLong;
 typedef unsigned long long GenmapULong;

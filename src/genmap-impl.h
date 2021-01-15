@@ -1,17 +1,17 @@
 #ifndef _GENMAP_IMPL_H_
 #define _GENMAP_IMPL_H_
 
-#include <stddef.h>
-#include <stdlib.h>
 #include <assert.h>
 #include <math.h>
+#include <stddef.h>
+#include <stdlib.h>
 
 #ifdef GENMAP_DEBUG
 #include <stdio.h>
 #endif
 
-#include <genmap.h>
 #include <genmap-multigrid-precon.h>
+#include <genmap.h>
 
 #define GENMAP_FIEDLER 0
 #define GENMAP_GLOBALID 1
@@ -36,9 +36,9 @@
 #define GENMAP_MAX_READERS 32
 
 #define MAXDIM 3 /* Maximum dimension of the mesh */
-#define MAXNV 8 /* Maximum number of vertices per element */
+#define MAXNV 8  /* Maximum number of vertices per element */
 
-struct genmap_comm_private{
+struct genmap_comm_private {
   struct comm gsc;
 
   /* Un-weighted Laplacian */
@@ -52,7 +52,7 @@ struct genmap_comm_private{
 };
 
 /* parRCB/parRSB internals */
-struct rcb_element{
+struct rcb_element {
   unsigned char type;
   GenmapInt proc;
   GenmapInt origin;
@@ -66,7 +66,7 @@ int rcb(struct comm *ci, struct array *elements, int ndim, buffer *bfr);
 int rib(struct comm *ci, struct array *elements, int ndim, buffer *bfr);
 
 /* rsb_element should be a superset of rcb_element */
-struct rsb_element{
+struct rsb_element {
   unsigned char type;
   GenmapInt proc;
   GenmapInt origin;
@@ -107,8 +107,8 @@ struct GenmapVector_private {
   GenmapScalar *data;
 };
 
-#define GenmapMalloc(n, p) GenmapMallocArray ((n), sizeof(**(p)), p)
-#define GenmapCalloc(n, p) GenmapCallocArray ((n), sizeof(**(p)), p)
+#define GenmapMalloc(n, p) GenmapMallocArray((n), sizeof(**(p)), p)
+#define GenmapCalloc(n, p) GenmapCallocArray((n), sizeof(**(p)), p)
 #define GenmapRealloc(n, p) GenmapReallocArray((n), sizeof(**(p)), p)
 
 /* Genmap Metrics */
@@ -146,7 +146,7 @@ uint metric_get_levels();
 void metric_print(struct comm *c);
 
 /* genCon */
-typedef struct{
+typedef struct {
   GenmapULong sequenceId;
   int nNeighbors;
   GenmapULong elementId;
@@ -155,14 +155,16 @@ typedef struct{
 } vertex;
 
 /* Components */
-sint is_disconnected(struct comm *c, struct gs_data *gsh, buffer *buf, uint nelt, uint nv);
+sint is_disconnected(struct comm *c, struct gs_data *gsh, buffer *buf,
+                     uint nelt, uint nv);
 
 /* Matrix inverse */
 void matrix_inverse(int N, double *A);
 
 /* Dump data */
 int GenmapFiedlerDump(const char *fname, genmap_handle h, struct comm *c);
-int GenmapVectorDump(const char *fname, GenmapScalar *y, uint size, struct comm *c);
+int GenmapVectorDump(const char *fname, GenmapScalar *y, uint size,
+                     struct comm *c);
 int GenmapCentroidDump(const char *fname, genmap_handle h, struct comm *c);
 
 #endif

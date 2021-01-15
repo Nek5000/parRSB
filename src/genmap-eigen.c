@@ -1,11 +1,12 @@
 #include <math.h>
-#include <time.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 #include <genmap-impl.h>
 
-int GenmapSymTriDiagSolve(GenmapVector x, GenmapVector b, GenmapVector alpha, GenmapVector beta) {
+int GenmapSymTriDiagSolve(GenmapVector x, GenmapVector b, GenmapVector alpha,
+                          GenmapVector beta) {
   assert((x->size == b->size) && (x->size == alpha->size));
   assert(alpha->size == beta->size + 1);
   assert(b->size > 0);
@@ -19,7 +20,7 @@ int GenmapSymTriDiagSolve(GenmapVector x, GenmapVector b, GenmapVector alpha, Ge
   GenmapCopyVector(x, b);
 
   GenmapInt i;
-  for(i = 0; i < n - 1; i++) {
+  for (i = 0; i < n - 1; i++) {
     GenmapScalar m = (beta->data[i] / diag->data[i]);
     x->data[i + 1] = x->data[i + 1] - m * x->data[i];
     diag->data[i + 1] = diag->data[i + 1] - m * beta->data[i];
@@ -27,7 +28,7 @@ int GenmapSymTriDiagSolve(GenmapVector x, GenmapVector b, GenmapVector alpha, Ge
 
   x->data[n - 1] = x->data[n - 1] / diag->data[n - 1];
 
-  for(i = n - 2; i >= 0; i--) {
+  for (i = n - 2; i >= 0; i--) {
     x->data[i] = (x->data[i] - beta->data[i] * x->data[i + 1]) / diag->data[i];
   }
 
@@ -40,9 +41,8 @@ GenmapScalar GenmapSign(GenmapScalar a, GenmapScalar b) {
   return fabs(a) * m;
 }
 
-int GenmapTQLI(genmap_handle h, GenmapVector diagonal, GenmapVector upper, GenmapVector **eVectors,
-               GenmapVector *eValues)
-{
+int GenmapTQLI(genmap_handle h, GenmapVector diagonal, GenmapVector upper,
+               GenmapVector **eVectors, GenmapVector *eValues) {
   assert(diagonal->size == upper->size + 1);
 
   GenmapInt n = diagonal->size;
@@ -75,7 +75,8 @@ int GenmapTQLI(genmap_handle h, GenmapVector diagonal, GenmapVector upper, Genma
       for (m = l; m < n - 1; m++) {
         GenmapScalar dd = fabs(d->data[m]) + fabs(d->data[m + 1]);
         /* Should use a tolerance for this check */
-        if(fabs(e->data[m]) / dd < GENMAP_DP_TOL) break;
+        if (fabs(e->data[m]) / dd < GENMAP_DP_TOL)
+          break;
       }
 
       if (m != l) {
@@ -92,12 +93,12 @@ int GenmapTQLI(genmap_handle h, GenmapVector diagonal, GenmapVector upper, Genma
         g = d->data[m] - d->data[l] + e->data[l] / (g + GenmapSign(r, g));
         GenmapScalar s = 1.0, c = 1.0, p = 0.0;
 
-        for(i = m - 1; i >= l; i--) {
+        for (i = m - 1; i >= l; i--) {
           GenmapScalar f = s * e->data[i];
           GenmapScalar b = c * e->data[i];
 
           if (options->rsb_paul == 1) {
-            if(fabs(f) >= fabs(g)) {
+            if (fabs(f) >= fabs(g)) {
               c = g / f;
               r = sqrt(c * c + 1.0);
               e->data[i + 1] = f * r;
@@ -113,7 +114,7 @@ int GenmapTQLI(genmap_handle h, GenmapVector diagonal, GenmapVector upper, Genma
           } else {
             e->data[i + 1] = r = sqrt(f * f + g * g);
 
-            if(r < GENMAP_DP_TOL) {
+            if (r < GENMAP_DP_TOL) {
               d->data[i + 1] -= p;
               e->data[m] = 0.0;
               break;
@@ -128,7 +129,7 @@ int GenmapTQLI(genmap_handle h, GenmapVector diagonal, GenmapVector upper, Genma
           d->data[i + 1] = g + p;
           g = c * r - b;
           /* Find eigenvectors */
-          for(k = 0; k < n; k++) {
+          for (k = 0; k < n; k++) {
             f = (*eVectors)[k]->data[i + 1];
             (*eVectors)[k]->data[i + 1] = s * (*eVectors)[k]->data[i] + c * f;
             (*eVectors)[k]->data[i] = c * (*eVectors)[k]->data[i] - s * f;
@@ -136,18 +137,19 @@ int GenmapTQLI(genmap_handle h, GenmapVector diagonal, GenmapVector upper, Genma
           /* Done with eigenvectors */
         }
 
-        if (r < GENMAP_DP_TOL && i >= l) continue;
+        if (r < GENMAP_DP_TOL && i >= l)
+          continue;
 
         d->data[l] -= p;
         e->data[l] = g;
         e->data[m] = 0.0;
       }
-    } while(m != l);
+    } while (m != l);
   }
 
   /* Orthnormalize eigenvectors -- Just normalize? */
-  for(i = 0; i < n; i++) {
-    for(j = 0; j < i; j++) {
+  for (i = 0; i < n; i++) {
+    for (j = 0; j < i; j++) {
       GenmapScalar tmp = (*eVectors)[i]->data[j];
       (*eVectors)[i]->data[j] = (*eVectors)[j]->data[i];
       (*eVectors)[j]->data[i] = tmp;
@@ -175,13 +177,13 @@ int genmap_power(double *y, int N, double *A, int verbose) {
   srand((unsigned)time(&t));
 
   int i;
-  GenmapScalar norm=0.0;
+  GenmapScalar norm = 0.0;
   for (i = 0; i < N; i++) {
-    y[i] = (rand()%50)/50.0;
-    norm += y[i]*y[i];
+    y[i] = (rand() % 50) / 50.0;
+    norm += y[i] * y[i];
   }
 
-  GenmapScalar normi = 1.0/sqrt(norm);
+  GenmapScalar normi = 1.0 / sqrt(norm);
   for (i = 0; i < N; i++)
     y[i] *= normi;
 
@@ -192,21 +194,21 @@ int genmap_power(double *y, int N, double *A, int verbose) {
   GenmapScalar err = 1.0, lambda;
   for (i = 0; i < 100; i++) {
     norm = 0.0;
-    for(j = 0; j < N; j++){
+    for (j = 0; j < N; j++) {
       Ay[j] = 0.0;
-      for(k = 0; k < N; k++){
-        Ay[j] += A[j*N + k]*y[k];
+      for (k = 0; k < N; k++) {
+        Ay[j] += A[j * N + k] * y[k];
       }
-      norm += Ay[j]*Ay[j];
+      norm += Ay[j] * Ay[j];
     }
 
     if (i > 0)
-      err = (sqrt(norm) - lambda)/lambda;
+      err = (sqrt(norm) - lambda) / lambda;
     lambda = sqrt(norm);
 
-    normi = 1.0/sqrt(norm);
-    for(j = 0; j < N; j++)
-      y[j] = Ay[j]*normi;
+    normi = 1.0 / sqrt(norm);
+    for (j = 0; j < N; j++)
+      y[j] = Ay[j] * normi;
 
     if (fabs(err) < 1.e-14)
       break;
@@ -219,19 +221,19 @@ int genmap_power(double *y, int N, double *A, int verbose) {
 
 int genmap_inverse_power(double *y, int N, double *A, int verbose) {
   double *Ainv;
-  GenmapCalloc(N*N, &Ainv);
+  GenmapCalloc(N * N, &Ainv);
 
   int j, k;
-  for(j = 0; j < N; j++){
-    for(k = 0; k < N; k++)
-      Ainv[j*N + k] = A[k*N + j];
+  for (j = 0; j < N; j++) {
+    for (k = 0; k < N; k++)
+      Ainv[j * N + k] = A[k * N + j];
   }
 
   matrix_inverse(N, Ainv);
 
-  for(j = 0; j<N; j++){
-    for(k = 0; k<N; k++)
-      A[j*N + k] = Ainv[k*N + j];
+  for (j = 0; j < N; j++) {
+    for (k = 0; k < N; k++)
+      A[j * N + k] = Ainv[k * N + j];
   }
 
   j = genmap_power(y, N, Ainv, verbose);

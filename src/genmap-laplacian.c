@@ -1,9 +1,8 @@
 #include <genmap-impl.h>
 
-#define min(a,b) ((b)<(a)?(b):(a))
+#define min(a, b) ((b) < (a) ? (b) : (a))
 
-struct array *GenmapFindNeighbors(genmap_handle h, genmap_comm c)
-{
+struct array *GenmapFindNeighbors(genmap_handle h, genmap_comm c) {
   struct comm cc = c->gsc;
 
   sint lelt = GenmapGetNLocalElements(h);
@@ -11,28 +10,27 @@ struct array *GenmapFindNeighbors(genmap_handle h, genmap_comm c)
 
   genmap_scan(h, c);
   ulong elem_id = GenmapGetLocalStartIndex(h) + 1;
-  ulong sequenceId = elem_id*nv;
+  ulong sequenceId = elem_id * nv;
 
-  size_t size = lelt*nv;
+  size_t size = lelt * nv;
   struct array vertices;
   array_init(vertex, &vertices, size);
 
   GenmapElements elems = GenmapGetElements(h);
   sint i, j;
-  for (i=0; i<lelt; i++) {
-    for (j=0; j<nv; j++) {
-      vertex vrt = { .sequenceId = sequenceId,
-                     .nNeighbors = 0,
-                     .elementId = elem_id,
-                     .vertexId = elems[i].vertices[j],
-                     .workProc = elems[i].vertices[j]%cc.np
-      };
+  for (i = 0; i < lelt; i++) {
+    for (j = 0; j < nv; j++) {
+      vertex vrt = {.sequenceId = sequenceId,
+                    .nNeighbors = 0,
+                    .elementId = elem_id,
+                    .vertexId = elems[i].vertices[j],
+                    .workProc = elems[i].vertices[j] % cc.np};
       array_cat(vertex, &vertices, &vrt, 1);
       sequenceId++;
     }
     elem_id++;
   }
-  assert(vertices.n == lelt*nv);
+  assert(vertices.n == lelt * nv);
 
   struct crystal cr;
   crystal_init(&cr, &cc);
@@ -49,7 +47,7 @@ struct array *GenmapFindNeighbors(genmap_handle h, genmap_comm c)
   struct array a;
   array_init(csr_entry, &a, 10);
 
-  //FIXME: Assumes quads or hexes
+  // FIXME: Assumes quads or hexes
   sint s = 0, e;
   csr_entry t;
   while (s < size) {
@@ -61,7 +59,7 @@ struct array *GenmapFindNeighbors(genmap_handle h, genmap_comm c)
     for (i = s; i < min(e, size); i++) {
       t.r = vPtr[i].elementId;
       t.proc = vPtr[i].workProc;
-      for(j = 0; j < n_neighbors; j++){
+      for (j = 0; j < n_neighbors; j++) {
         t.c = vPtr[s + j].elementId;
         array_cat(csr_entry, &a, &t, 1);
       }
@@ -87,12 +85,12 @@ struct array *GenmapFindNeighbors(genmap_handle h, genmap_comm c)
   csr_entry *aptr = a.ptr;
   entry *nptr = nbrs->ptr;
 
-  entry ee =  {0, 0, 0, 0, 0, 0.0}, ep = {0, 0, 0, 0, 0.0};
+  entry ee = {0, 0, 0, 0, 0, 0.0}, ep = {0, 0, 0, 0, 0.0};
   ep.r = aptr[0].r;
   ep.c = aptr[0].c;
   array_cat(entry, nbrs, &ep, 1);
 
-  for(i = 1; i < a.n; i++){
+  for (i = 1; i < a.n; i++) {
     ee.r = aptr[i].r;
     ee.c = aptr[i].c;
     if (ee.r != ep.r || ee.c != ep.c) {
@@ -111,8 +109,7 @@ struct array *GenmapFindNeighbors(genmap_handle h, genmap_comm c)
   return nbrs;
 }
 
-int GenmapInitLaplacian(genmap_handle h,genmap_comm c)
-{
+int GenmapInitLaplacian(genmap_handle h, genmap_comm c) {
   struct array *entries = GenmapFindNeighbors(h, c);
   csr_mat_setup(entries, &c->gsc, &c->M);
   array_free(entries);
@@ -124,9 +121,9 @@ int GenmapInitLaplacian(genmap_handle h,genmap_comm c)
 #if defined(GENMAP_DEBUG)
   int nnz = c->M->row_off[c->M->rn];
   double fro[2] = {0.0, 0.0}, buf[2];
-  for(int i=0; i<nnz; i++){
+  for (int i = 0; i < nnz; i++) {
     fro[0] += c->M->v[i];
-    fro[1] += c->M->v[i]*c->M->v[i];
+    fro[1] += c->M->v[i] * c->M->v[i];
   }
   comm_allreduce(&c->gsc, gs_double, gs_add, &fro, 2, &buf);
   if (c->gsc.id == 0)
@@ -136,10 +133,10 @@ int GenmapInitLaplacian(genmap_handle h,genmap_comm c)
   return 0;
 }
 
-int GenmapLaplacian(genmap_handle h,genmap_comm c,GenmapScalar *u, GenmapScalar *v)
-{
-  csr_mat_gather(c->M,c->gsh,u,c->b,&c->buf);
-  csr_mat_apply(v,c->M,c->b);
+int GenmapLaplacian(genmap_handle h, genmap_comm c, GenmapScalar *u,
+                    GenmapScalar *v) {
+  csr_mat_gather(c->M, c->gsh, u, c->b, &c->buf);
+  csr_mat_apply(v, c->M, c->b);
 
   return 0;
 }

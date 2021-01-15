@@ -1,34 +1,33 @@
-#include <sort-impl.h>
 #include <float.h>
-#include <genmap-impl.h>  //FIXME - include genmap-statistics
+#include <genmap-impl.h> //FIXME - include genmap-statistics
+#include <sort-impl.h>
 
-int set_dest(uint *proc, uint np, ulong start, uint size, ulong nelem)
-{
-  uint psize = nelem/np, i;
+int set_dest(uint *proc, uint np, ulong start, uint size, ulong nelem) {
+  uint psize = nelem / np, i;
   if (psize == 0) {
     for (i = 0; i < size; i++)
       proc[i] = start + i;
     return 0;
   }
 
-  uint nrem = nelem - np*psize;
-  uint lower = nrem*(psize + 1);
+  uint nrem = nelem - np * psize;
+  uint lower = nrem * (psize + 1);
 
   uint id1, id2;
   if (start < lower)
-    id1 = start/(psize + 1);
+    id1 = start / (psize + 1);
   else
-    id1 = nrem + (start - lower)/psize;
+    id1 = nrem + (start - lower) / psize;
 
   if (start + size < lower)
-    id2 = (start + size)/(psize + 1);
+    id2 = (start + size) / (psize + 1);
   else
-    id2 = nrem + (start + size - lower)/psize;
+    id2 = nrem + (start + size - lower) / psize;
 
-  i=0;
+  i = 0;
   while (id1 <= id2 && i < size) {
-    ulong s = id1*psize + min(id1, nrem);
-    ulong e = (id1 + 1)*psize + min(id1 + 1, nrem);
+    ulong s = id1 * psize + min(id1, nrem);
+    ulong e = (id1 + 1) * psize + min(id1 + 1, nrem);
     e = min(e, nelem);
     while (s <= start + i && start + i < e && i < size)
       proc[i++] = id1;
@@ -38,8 +37,8 @@ int set_dest(uint *proc, uint np, ulong start, uint size, ulong nelem)
   return 0;
 }
 
-int load_balance(struct array *a, size_t size, struct comm *c, struct crystal *cr)
-{
+int load_balance(struct array *a, size_t size, struct comm *c,
+                 struct crystal *cr) {
   slong in = a->n, out[2][1], buf[2][1];
   comm_scan(out, c, gs_long, gs_add, &in, 1, buf);
   ulong start = out[0][0];
@@ -56,30 +55,30 @@ int load_balance(struct array *a, size_t size, struct comm *c, struct crystal *c
   return 0;
 }
 
-double get_scalar(struct array *a, uint i, uint offset, uint usize, gs_dom type)
-{
-  char* v = (char*)a->ptr + i*usize + offset;
+double get_scalar(struct array *a, uint i, uint offset, uint usize,
+                  gs_dom type) {
+  char *v = (char *)a->ptr + i * usize + offset;
 
   double data;
   switch (type) {
-    case gs_int:
-      data = *((uint*)v);
-      break;
-    case gs_long:
-      data = *((ulong*)v);
-      break;
-    case gs_double:
-      data = *((double*)v);
-      break;
-    default:
-      break;
+  case gs_int:
+    data = *((uint *)v);
+    break;
+  case gs_long:
+    data = *((ulong *)v);
+    break;
+  case gs_double:
+    data = *((double *)v);
+    break;
+  default:
+    break;
   }
 
   return data;
 }
 
-void get_extrema(void *extrema_, struct sort *data, uint field, struct comm* c)
-{
+void get_extrema(void *extrema_, struct sort *data, uint field,
+                 struct comm *c) {
   struct array *a = data->a;
   uint usize = data->unit_size;
   uint offset = data->offset[field];
@@ -87,7 +86,7 @@ void get_extrema(void *extrema_, struct sort *data, uint field, struct comm* c)
 
   double *extrema = extrema_;
   sint size = a->n;
-  if (size==0) {
+  if (size == 0) {
     extrema[0] = -DBL_MAX;
     extrema[1] = -DBL_MAX;
   } else {
@@ -100,7 +99,7 @@ void get_extrema(void *extrema_, struct sort *data, uint field, struct comm* c)
   extrema[0] *= -1;
 }
 
-int parallel_sort_private(struct sort *data,struct comm *c){
+int parallel_sort_private(struct sort *data, struct comm *c) {
   struct comm dup;
   comm_dup(&dup, c);
 
@@ -113,19 +112,19 @@ int parallel_sort_private(struct sort *data,struct comm *c){
   struct hypercube hdata;
 
   switch (algo) {
-    case bin_sort:
-      parallel_bin_sort(data, c);
-      break;
-    case hypercube_sort:
-      hdata.data = data;
-      hdata.probes = NULL;
-      hdata.probe_cnt = NULL;
-      parallel_hypercube_sort(&hdata, &dup);
-      free(hdata.probes);
-      free(hdata.probe_cnt);
-      break;
-    default:
-      break;
+  case bin_sort:
+    parallel_bin_sort(data, c);
+    break;
+  case hypercube_sort:
+    hdata.data = data;
+    hdata.probes = NULL;
+    hdata.probe_cnt = NULL;
+    parallel_hypercube_sort(&hdata, &dup);
+    free(hdata.probes);
+    free(hdata.probe_cnt);
+    break;
+  default:
+    break;
   }
 
   if (balance) {

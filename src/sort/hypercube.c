@@ -1,8 +1,7 @@
-#include <sort-impl.h>
 #include <math.h>
+#include <sort-impl.h>
 
-int init_probes(struct hypercube *data, struct comm *c)
-{
+int init_probes(struct hypercube *data, struct comm *c) {
   /* get input data */
   struct sort *input = data->data;
 
@@ -16,7 +15,7 @@ int init_probes(struct hypercube *data, struct comm *c)
   double extrema[2];
   get_extrema((void *)extrema, data->data, 0, c);
   double range = extrema[1] - extrema[0];
-  double delta = range/(nprobes - 1);
+  double delta = range / (nprobes - 1);
 
   data->probes[0] = extrema[0];
   data->probes[1] = extrema[0] + delta;
@@ -25,8 +24,7 @@ int init_probes(struct hypercube *data, struct comm *c)
   return 0;
 }
 
-int update_probe_counts(struct hypercube *data, struct comm *c)
-{
+int update_probe_counts(struct hypercube *data, struct comm *c) {
   struct sort *input = data->data;
   uint offset = input->offset[0];
   gs_dom t = input->t[0];
@@ -51,8 +49,9 @@ int update_probe_counts(struct hypercube *data, struct comm *c)
   return 0;
 }
 
-int update_probes(slong nelem, double *probes, ulong *probe_cnt, uint threshold) {
-  slong expected = nelem/2;
+int update_probes(slong nelem, double *probes, ulong *probe_cnt,
+                  uint threshold) {
+  slong expected = nelem / 2;
   if (llabs(expected - probe_cnt[1]) < threshold)
     return 0;
 
@@ -61,7 +60,7 @@ int update_probes(slong nelem, double *probes, ulong *probe_cnt, uint threshold)
   else
     probes[2] = probes[1];
 
-  probes[1] = probes[0] + (probes[2] - probes[0])/2.0;
+  probes[1] = probes[0] + (probes[2] - probes[0]) / 2.0;
 
   return 0;
 }
@@ -85,12 +84,12 @@ int transfer_elem(struct hypercube *data, struct comm *c) {
   }
 
   slong out[2][2], in[2], buf[2][2];
-  in[0]=lown, in[1]=uppern;
+  in[0] = lown, in[1] = uppern;
   comm_scan(out, c, gs_long, gs_add, in, 2, buf);
 
   ulong lstart = out[0][0], ustart = out[0][1];
   ulong lelem = out[1][0], uelem = out[1][1];
-  uint np = c->np, lnp = np/2, unp = np - lnp;
+  uint np = c->np, lnp = np / 2, unp = np - lnp;
 
   uint *proc;
   GenmapCalloc(size, &proc);
@@ -124,7 +123,7 @@ int parallel_hypercube_sort(struct hypercube *data, struct comm *c) {
   slong start = out[0][0];
   slong nelem = out[1][0];
 
-  uint threshold = nelem/(10*size);
+  uint threshold = nelem / (10 * size);
   if (threshold < 2)
     threshold = 2;
 
@@ -136,9 +135,10 @@ int parallel_hypercube_sort(struct hypercube *data, struct comm *c) {
   init_probes(data, c);
   update_probe_counts(data, c);
 
-  int max_iter = log2((data->probes[2] - data->probes[0])/GENMAP_TOL);
+  int max_iter = log2((data->probes[2] - data->probes[0]) / GENMAP_TOL);
   int iter = 0;
-  while (llabs(nelem/2 - data->probe_cnt[1]) > threshold && iter++ < max_iter) {
+  while (llabs(nelem / 2 - data->probe_cnt[1]) > threshold &&
+         iter++ < max_iter) {
     update_probes(nelem, data->probes, data->probe_cnt, threshold);
     update_probe_counts(data, c);
   }
@@ -147,7 +147,7 @@ int parallel_hypercube_sort(struct hypercube *data, struct comm *c) {
 
   // split the communicator
   struct comm nc;
-  sint lower = (rank < size/2) ? 1 : 0;
+  sint lower = (rank < size / 2) ? 1 : 0;
 #if defined(MPI)
   MPI_Comm nc_;
   MPI_Comm_split(c->c, lower, rank, &nc_);

@@ -112,6 +112,10 @@ $(BUILDDIR)/tests/%: $(SRCROOT)/tests/%.c
 clean:
 	@rm -rf $(BUILDDIR) $(EXAMPLE) $(EXAMPLE).o
 
+.PHONY: format
+format:
+	find . -iname *.h -o -iname *.c | xargs clang-format -i
+
 print-%:
 	$(info [ variable name]: $*)
 	$(info [        origin]: $(origin $*))
