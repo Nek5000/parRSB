@@ -64,7 +64,7 @@ ifneq (,$(strip $(DESTDIR)))
 endif
 
 .PHONY: default
-default: check lib install
+default: check lib examples install
 
 .PHONY: all
 all: check lib tests examples install

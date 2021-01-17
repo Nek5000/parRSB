@@ -1,3 +1,5 @@
+#include <genmap-quality.h>
+
 void printPartStat(long long *vtx, int nel, int nv, comm_ext ce) {
   int i, j;
 
@@ -89,3 +91,4 @@ void printPartStat(long long *vtx, int nel, int nv, comm_ext ce) {
   free(Ncomm);
   comm_free(&comm);
 }
+

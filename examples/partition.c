@@ -8,21 +8,14 @@ Parition mesh using Nek5000's vertex connectivity (con) file.
 
 #include <gencon.h>
 #include <genmap.h>
+#include <genmap-quality.h>
 #include <parRSB.h>
-
-#include "quality.h"
 
 #define MAXNV 8 /* maximum number of vertices per element */
 typedef struct {
   int proc;
   long long vtx[MAXNV];
 } elm_data;
-
-#define EXIT_ERROR()                                                           \
-  do {                                                                         \
-    MPI_Finalize();                                                            \
-    return EXIT_FAILURE;                                                       \
-  } while (0)
 
 int main(int argc, char *argv[]) {
   MPI_Init(&argc, &argv);
@@ -34,7 +27,8 @@ int main(int argc, char *argv[]) {
   if (argc != 3) {
     if (rank == 0)
       printf("Usage: %s <#nread> <mesh file>\n", argv[0]);
-    EXIT_ERROR();
+    MPI_Finalize();
+    return EXIT_FAILURE;
   }
 
   int n_read = atoi(argv[1]);
@@ -80,20 +74,24 @@ int main(int argc, char *argv[]) {
   MPI_Bcast(&ndim, 1, MPI_INT, 0, MPI_COMM_WORLD);
   nv = (ndim == 3) ? 8 : 4;
 
+  printPartStat(vl, nelt, nv, MPI_COMM_WORLD);
+
   /* Partition the mesh */
   parRSB_options options = parrsb_default_options;
+  options.print_timing_info = 1;
   int *part = (int *)calloc(nelt, sizeof(int));
   int ierr = parRSB_partMesh(part, NULL, vl, coord, nelt, nv, &options,
                              MPI_COMM_WORLD);
 
   if (ierr) {
-    if (vl)
+    if (vl != NULL)
       free(vl);
-    if (coord)
+    if (coord != NULL)
       free(coord);
-    if (part)
+    if (part != NULL)
       free(part);
-    EXIT_ERROR();
+    MPI_Finalize();
+    return EXIT_FAILURE;
   }
 
   /* Redistribute data */
@@ -135,6 +133,10 @@ int main(int argc, char *argv[]) {
     free(vl);
   if (coord != NULL)
     free(coord);
+
+  MPI_Comm_free(&comm_read);
+
+  MPI_Finalize();
 
   return 0;
 }
