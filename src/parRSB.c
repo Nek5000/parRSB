@@ -55,9 +55,11 @@ int parRSB_partMesh(int *part, int *seq, long long *vtx, double *coord, int nel,
 
   /* Run RSB now */
   comm_ext comm_rsb;
+  struct comm rsbbb;
 #ifdef MPI
   MPI_Comm_split(c.c, nel > 0, rank, &comm_rsb);
 #endif
+  comm_init(&rsbbb, comm_rsb);
 
   // TODO: Move this into another file
   if (nel > 0) {
@@ -84,6 +86,8 @@ int parRSB_partMesh(int *part, int *seq, long long *vtx, double *coord, int nel,
       return 1;
     }
 
+    GenmapCentroidDump("pre_rcb.dump", h, rsbbb.id, &rsbbb);
+
     switch (options->global_partitioner) {
     case 0:
       genmap_rsb(h);
@@ -98,12 +102,16 @@ int parRSB_partMesh(int *part, int *seq, long long *vtx, double *coord, int nel,
       break;
     }
 
+    GenmapCentroidDump("post_rcb.dump", h, rsbbb.id, &rsbbb);
+
     genmap_finalize(h);
 
     if (options->print_timing_info > 0)
       metric_print(&c);
     metric_finalize();
   }
+
+  comm_free(&rsbbb);
 
 #ifdef MPI
   MPI_Comm_free(&comm_rsb);

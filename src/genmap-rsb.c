@@ -57,9 +57,9 @@ int genmap_rsb(genmap_handle h) {
       rcb(lc, h->elements, ndim, &buf);
       metric_toc(lc, RCB);
     } else if (h->options->rsb_prepartition == 2) { // RIB
-      // metric_tic(lc, RCB);
-      // rib(lc, h->elements, ndim, &buf);
-      // metric_toc(lc, RCB);
+      metric_tic(lc, RCB);
+      rib(lc, h->elements, ndim, &buf);
+      metric_toc(lc, RCB);
     } else {
       parallel_sort(struct rsb_element, h->elements, globalId0, gs_long, 0, 1,
                     lc, &buf);
@@ -96,10 +96,12 @@ int genmap_rsb(genmap_handle h) {
       comm_allreduce(lc, gs_int, gs_max, &l_id, 1, bfr); // max
 
       if (g_id == l_id) {
+        if (lc->id == 0)
+          printf("NPROJECT=%d\n", nproject);
         // Dump the current partition
         char fname[BUFSIZ];
         sprintf(fname, "partition_level_%02d.dump", level);
-        GenmapCentroidDump(fname, h, lc);
+        GenmapCentroidDump(fname, h, lc->id, lc);
       }
     }
 

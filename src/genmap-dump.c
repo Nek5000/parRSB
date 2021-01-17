@@ -105,7 +105,7 @@ int GenmapVectorDump(const char *fname, GenmapScalar *y, uint size,
   return err;
 }
 
-int GenmapCentroidDump(const char *fname, genmap_handle h, struct comm *c) {
+int GenmapCentroidDump(const char *fname, genmap_handle h, sint g_id, struct comm *c) {
   int rank = c->id;
   int size = c->np;
 
@@ -140,7 +140,7 @@ int GenmapCentroidDump(const char *fname, genmap_handle h, struct comm *c) {
   uint i;
   for (i = 0; i < nelt; i++) {
     write_T(pbuf0, elm[i].coord[0], double, ndim);
-    write_T(pbuf0, rank, int, 1);
+    write_T(pbuf0, g_id, int, 1);
   }
 
   MPI_Status st;
