@@ -100,8 +100,10 @@ int genmap_rsb(genmap_handle h) {
           printf("NPROJECT=%d\n", nproject);
         // Dump the current partition
         char fname[BUFSIZ];
-        sprintf(fname, "partition_level_%02d.dump", level);
+        sprintf(fname, "partition_level_%02d.centroids", level);
         GenmapCentroidDump(fname, h, lc->id, lc);
+        sprintf(fname, "partition_level_%02d.elements", level);
+        GenmapElementIdDump(fname, h, lc);
       }
     }
 

@@ -157,4 +157,53 @@ int GenmapCentroidDump(const char *fname, genmap_handle h, sint g_id, struct com
   return err;
 }
 
+int GenmapElementIdDump(const char *fname, genmap_handle h, struct comm *c) {
+  int rank = c->id;
+  int size = c->np;
+
+  MPI_File file;
+  int err = MPI_File_open(c->c, fname, MPI_MODE_CREATE | MPI_MODE_WRONLY,
+                          MPI_INFO_NULL, &file);
+  if (err != 0 && rank == 0)
+    fprintf(stderr, "%s:%d Error opening file %s for writing.\n", __FILE__,
+            __LINE__, fname);
+  if (err != 0)
+    return err;
+
+  slong nelt = GenmapGetNLocalElements(h);
+  slong out[2][1], buf[2][1];
+  comm_scan(out, c, gs_long, gs_add, &nelt, 1, buf);
+  slong start = out[0][0];
+  slong nelgt = out[1][0];
+
+  int ndim = (h->nv == 8) ? 3 : 2;
+  uint write_size = sizeof(GenmapLong) * nelt;
+  if (rank == 0)
+    write_size += sizeof(slong) + sizeof(int); // for nelgt and ndim
+
+  char *pbuf, *pbuf0;
+  pbuf = pbuf0 = (char *)calloc(write_size, sizeof(char));
+  if (rank == 0) {
+    write_T(pbuf0, nelgt, slong, 1);
+    write_T(pbuf0, ndim, int, 1);
+  }
+
+  GenmapElements elm = GenmapGetElements(h);
+  uint i;
+  for (i = 0; i < nelt; i++)
+    write_T(pbuf0, elm[i].globalId, GenmapLong, 1);
+
+  MPI_Status st;
+  err = MPI_File_write_ordered(file, pbuf, write_size, MPI_BYTE, &st);
+  if (err != 0 && rank == 0)
+    fprintf(stderr, "%s:%d Error opening file %s for writing.\n", __FILE__,
+            __LINE__, fname);
+
+  err += MPI_File_close(&file);
+  MPI_Barrier(c->c);
+
+  free(pbuf);
+
+  return err;
+}
 #undef write_T
