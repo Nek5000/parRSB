@@ -6,6 +6,16 @@
 #include <gencon-impl.h>
 #include <parRSB.h>
 
+#define check_error(err) \
+  do { \
+    if (err > 0) { \
+      buffer_free(&bfr); \
+      mesh_free(mesh); \
+      comm_free(&c); \
+      return err; \
+    } \
+  } while(0)
+
 void fparRSB_findConnectivity(long long *vertexId, double *coord, int *nelt, int *ndim,
                               long long *periodicInfo, int *nPeriodicFaces, double *tol, MPI_Fint *fcomm,
                               int *verbose, int *err) {
@@ -84,22 +94,20 @@ int parRSB_findConnectivity(long long *vertexid, double *coord, int nelt, int nd
   buffer bfr;
   buffer_init(&bfr, 1024);
 
-  findSegments(mesh, &c, tol, verbose, &bfr);
+  sint buf;
+  sint err = findSegments(mesh, &c, tol, verbose, &bfr);
+  comm_allreduce(&c, gs_int, gs_max, &err, 1, &buf);
+  check_error(err);
 
   setGlobalID(mesh, &c);
   sendBack(mesh, &c, &bfr);
 
-  sint buf;
-  sint err = faceCheck(mesh, &c);
+  err = faceCheck(mesh, &c);
   comm_allreduce(&c, gs_int, gs_max, &err, 1, &buf);
-  if (err > 0) {
-    buffer_free(&bfr);
-    mesh_free(mesh);
-    comm_free(&c);
-    return err;
-  }
+  check_error(err);
 
-  matchPeriodicFaces(mesh, &c, &bfr);
+  err = matchPeriodicFaces(mesh, &c, &bfr);
+  check_error(err);
 
   // Copy output
   Point ptr = mesh->elements.ptr;
