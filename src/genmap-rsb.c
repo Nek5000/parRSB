@@ -104,6 +104,10 @@ int genmap_rsb(genmap_handle h) {
         GenmapCentroidDump(fname, h, lc->id, lc);
         sprintf(fname, "partition_level_%02d.elements", level);
         GenmapElementIdDump(fname, h, lc);
+
+        sint discon = is_disconnected(lc, local_c->gsw, &local_c->buf, nelt, nv);
+        if (discon > 0 && lc->id == 0)
+          printf("\tWarning: There are disconnected components!\n");
       }
     }
 
