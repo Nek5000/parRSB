@@ -34,3 +34,10 @@ double GenmapGetMaxRss() {
   return (double)(r_usage.ru_maxrss * 1024L);
 #endif
 }
+
+void genmap_exit_error(genmap_handle h) {
+  GenmapComm c = GenmapGetGlobalComm(h);
+  int rank = GenmapCommRank(c);
+
+  genmap_finalize(h);
+}

@@ -55,7 +55,7 @@ static int sortSegments(Mesh mesh, struct comm *c, int dim, buffer *bfr) {
     }
 
     sint i, sum = 0;
-    for (i = s + 1; i < e; i++) {
+    for (i = s; i < e; i++) {
         sum += points[i].ifSegment;
         points[i].ifSegment = 0;
     }
@@ -69,7 +69,7 @@ static int sortSegments(Mesh mesh, struct comm *c, int dim, buffer *bfr) {
   return 0;
 }
 
-static int findLocalSegments(Mesh mesh, int i, GenmapScalar tolSquared) {
+static int findLocalSegments(Mesh mesh, struct comm *c, int i, GenmapScalar tolSquared) {
   Point pts = mesh->elements.ptr;
   sint npts = mesh->elements.n;
   int nDim = mesh->nDim;
@@ -83,16 +83,11 @@ static int findLocalSegments(Mesh mesh, int i, GenmapScalar tolSquared) {
     if (d > dx)
       pts[j].ifSegment = 1;
   }
-}
-
-static int mergeSegments(Mesh mesh, struct comm *c, int i, GenmapScalar tolSquared, int transfer, buffer *bfr) {
-  uint nPoints = mesh->elements.n;
-  Point points = mesh->elements.ptr;
 
   sint rank = c->id;
   sint size = c->np;
 
-  struct Point_private lastp = points[nPoints-1];
+  struct Point_private lastp = pts[npts - 1];
   lastp.proc = (rank + 1)%size;
 
   struct array arr;
@@ -102,40 +97,63 @@ static int mergeSegments(Mesh mesh, struct comm *c, int i, GenmapScalar tolSquar
   struct crystal cr;
   crystal_init(&cr, c);
   sarray_transfer(struct Point_private, &arr, proc, 1, &cr);
+  crystal_free(&cr);
 
   uint n = arr.n;
   assert(n == 1);
   lastp = ((struct Point_private *) arr.ptr)[0];
 
   if (rank > 0) {
-    GenmapScalar d = sqrDiff(lastp.x[i], points->x[i]);
+    GenmapScalar d = sqrDiff(lastp.x[i], pts->x[i]);
 
-    GenmapScalar dx = min(lastp.dx, points->dx)*tolSquared;
+    GenmapScalar dx = min(lastp.dx, pts->dx)*tolSquared;
 
     if (d > dx)
-      points->ifSegment = 1;
+      pts->ifSegment = 1;
   }
 
   array_free(&arr);
 
-  if (transfer > 0) {
-    // If rank > 0, send i = 0,... n-1 where points[i].ifSegment == 0 to rank - 1
-    n = 0;
-    for (; n < nPoints && points[n].ifSegment == 0; n++)
-      points[n].proc = rank - 1;
-    for (; n < nPoints; n++)
-      points[n].proc = rank;
+  return 0;
+}
 
-    sarray_transfer(struct Point_private, &mesh->elements, proc, 0, &cr);
-    crystal_free(&cr);
+static int mergeSegments(Mesh mesh, struct comm *c, buffer *bfr) {
+  uint npoints = mesh->elements.n;
+  Point points = mesh->elements.ptr;
 
-    sarray_sort(struct Point_private, mesh->elements.ptr, mesh->elements.n, globalId, 1, bfr);
-  }
+  int n, ifseg = 0;
+  uint sendn = 0;
+  for (n = 0; n < npoints; n++)
+    if (points[n].ifSegment == 1) {
+      ifseg = 1;
+      sendn = n;
+      break;
+    }
+
+  //TODO: comm_scan
+  sint out[2][1], buf[2][1], in[1];
+  in[0] = ifseg * c->id;
+  comm_scan(out, c, gs_int, gs_max, in, 1, buf);
+  sint rank = out[0][0];
+
+  // If rank > 0, send i = 0,... n-1 where points[i].ifSegment == 0 to
+  // rank with previous ifSegment == 1 
+  for (n = 0; n < sendn; n++)
+    points[n].proc = rank;
+  for (; n < npoints; n++)
+    points[n].proc = c->id;
+
+  struct crystal cr;
+  crystal_init(&cr, c);
+  sarray_transfer(struct Point_private, &mesh->elements, proc, 0, &cr);
+  crystal_free(&cr);
+
+  sarray_sort(struct Point_private, mesh->elements.ptr, mesh->elements.n, globalId, 1, bfr);
 
   return 0;
 }
 
-static slong countSegments(Mesh mesh, struct comm *c) {
+slong countSegments(Mesh mesh, struct comm *c) {
   uint nPoints = mesh->elements.n;
   Point points = mesh->elements.ptr;
 
@@ -155,90 +173,117 @@ struct schedule {
   slong segments;
 };
 
-int findSegments(Mesh mesh, struct comm *c, GenmapScalar tol, int verbose, buffer *bfr) {
-  // TODO: load balance
-  parallel_sort(struct Point_private, &mesh->elements, x[0], genmap_gs_scalar, bin_sort, 0, c);
+#define sort_by_coord(mesh, c, xa, xb, xc, bfr) do { \
+  parallel_sort(struct Point_private, &(mesh->elements), x[xa], genmap_gs_scalar, bin_sort, 0, c); \
+  uint nPoints = mesh->elements.n; \
+  Point points = mesh->elements.ptr; \
+  \
+  int nDim = mesh->nDim; \
+  if (nDim == 3) \
+    sarray_sort_3(struct Point_private, points, nPoints, x[xa], 3, x[xb], 3, x[xc], 3, bfr); \
+  else if (nDim == 2) \
+    sarray_sort_2(struct Point_private, points, nPoints, x[xa], 3, x[xb], 3, bfr); \
+} while(0)
 
+#define segments_by_coord(cnt, sched, mesh, c, xa, tolSquared, bfr) do { \
+    sched[cnt].dim = xa; \
+    initSegments(mesh, c); \
+    findLocalSegments(mesh, c, xa, tolSquared); \
+    sched[cnt].segments = -countSegments(mesh, c); \
+} while(0)
+
+int findScheduleAndSort(struct schedule sched[3], Mesh mesh, struct comm *c, GenmapScalar tolSquared, int verbose, buffer *bfr) {
+  sort_by_coord(mesh, c, 0, 1, 2, bfr);
+  segments_by_coord(0, sched, mesh, c, 0, tolSquared, bfr);
+
+  int nDim = mesh->nDim;
+
+  if (nDim == 3) {
+    sort_by_coord(mesh, c, 1, 2, 0, bfr);
+    segments_by_coord(1, sched, mesh, c, 1, tolSquared, bfr);
+
+    sort_by_coord(mesh, c, 2, 0, 1, bfr);
+    segments_by_coord(2, sched, mesh, c, 2, tolSquared, bfr);
+  } else {
+    sort_by_coord(mesh, c, 1, 0, 2, bfr);
+    segments_by_coord(0, sched, mesh, c, 1, tolSquared, bfr);
+  }
+
+  sarray_sort(struct schedule, sched, nDim, segments, 1, bfr);
+
+  if (nDim == 2) {
+    printf("Not implemented.\n");
+    exit(1);
+  } else {
+    switch (sched[0].dim) {
+      case 0:
+        sort_by_coord(mesh, c, 0, 1, 2, bfr);
+        break;
+      case 1:
+        sort_by_coord(mesh, c, 1, 2, 0, bfr);
+        break;
+      case 2:
+        sort_by_coord(mesh, c, 2, 0, 1, bfr);
+        break;
+      default:
+        break;
+    }
+  }
+
+  int i;
+  for (i = 1; i < nDim; i++)
+    sched[i].dim = (sched[0].dim + i) % nDim;
+
+  return 0;
+}
+
+int findSegments(Mesh mesh, struct comm *c, GenmapScalar tol, int verbose, buffer *bfr) {
   uint nPoints = mesh->elements.n;
   Point points = mesh->elements.ptr;
   int nDim = mesh->nDim;
 
-  if (nDim == 3)
-    sarray_sort_3(struct Point_private, points, nPoints, x[0], 3, x[1], 3, x[2], 3, bfr);
-  else
-    sarray_sort_2(struct Point_private, points, nPoints, x[0], 3, x[1], 3, bfr);
-
-  comm_ext orig;
-#ifdef MPI
-  MPI_Comm_dup(c->c, &orig);
-#endif
-
-  struct comm nonZeroRanks;
-
   int bin = (nPoints > 0);
-#ifdef MPI
-  MPI_Comm new;
-  MPI_Comm_split(orig, bin, c->id, &new);
-  comm_init(&nonZeroRanks, new);
-  MPI_Comm_free(&new);
-#else
-  comm_init(&nonZeroRanks, 1);
-#endif
 
-  struct schedule sched[3];
+  struct comm nonZeroRanks, dup;
+  comm_split(c, bin, c->id, &nonZeroRanks);
+  comm_dup(&dup, &nonZeroRanks);
+
   GenmapScalar tolSquared = tol*tol;
-
-  int t;
-  for (t = 0; t < nDim; t++){
-    sched[t].dim = t;
-    initSegments(mesh, &nonZeroRanks);
-    findLocalSegments(mesh, t, tolSquared);
-    mergeSegments(mesh, &nonZeroRanks, t, tolSquared, 0, bfr);
-    sched[t].segments = countSegments(mesh, &nonZeroRanks);
-  }
-
-  sarray_sort(struct schedule, sched, 3, segments, 1, bfr);
-
+  struct schedule sched[3];
+  sched[0].dim = 0, sched[1].dim = 1, sched[2].dim = 2;
+  sort_by_coord(mesh, c, 0, 1, 2, bfr);
   initSegments(mesh, c);
 
-  int d, merge = 1, err = 0;
-
+  int t, d, merge = 1, err = 0;
   for (t = 0; t < nDim && err == 0; t++) {
-    for (d = nDim - 1; d >= 0; d--) {
+    for (d = 0; d < nDim; d++) {
       int dim = sched[d].dim;
+
       if (bin > 0) {
         sortSegments(mesh, &nonZeroRanks, dim, bfr);
-        findLocalSegments(mesh, dim, tolSquared);
+        findLocalSegments(mesh, &nonZeroRanks, dim, tolSquared);
 
         slong segments = countSegments(mesh, &nonZeroRanks);
-
         int rank = nonZeroRanks.id;
         if (rank == 0 && verbose > 0)
           printf("\tlocglob: %d %d %lld\n", t + 1, dim + 1, segments);
 
-        mergeSegments(mesh, &nonZeroRanks, dim, tolSquared, merge, bfr);
-        merge = 0;
+        if (merge > 0) {
+          mergeSegments(mesh, &nonZeroRanks, bfr);
+          merge = 0;
+
+          nPoints = mesh->elements.n;
+          bin = (nPoints > 0);
+
+          comm_free(&nonZeroRanks);
+          comm_split(&dup, bin, nonZeroRanks.id, &nonZeroRanks);
+        }
       }
-
-      comm_free(&nonZeroRanks);
-
-      nPoints = mesh->elements.n;
-      bin = (nPoints > 0);
-#ifdef MPI
-      MPI_Comm new;
-      MPI_Comm_split(orig, bin, nonZeroRanks.id, &new);
-      comm_init(&nonZeroRanks, new);
-      MPI_Comm_free(&new);
-#else
-      comm_init(&nonZeroRanks, 1);
-#endif
     }
   }
 
+  comm_free(&dup);
   comm_free(&nonZeroRanks);
-#ifdef MPI
-  MPI_Comm_free(&orig);
-#endif
 
   return err;
 }

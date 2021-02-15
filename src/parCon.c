@@ -106,6 +106,10 @@ int parRSB_findConnectivity(long long *vertexid, double *coord, int nelt, int nd
   comm_allreduce(&c, gs_int, gs_max, &err, 1, &buf);
   check_error(err);
 
+  err = elementCheck(mesh, &c);
+  comm_allreduce(&c, gs_int, gs_max, &err, 1, &buf);
+  check_error(err);
+
   err = matchPeriodicFaces(mesh, &c, &bfr);
   check_error(err);
 

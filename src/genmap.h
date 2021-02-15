@@ -55,9 +55,13 @@ void GenmapSetNVertices(genmap_handle h, int nVertices);
 
 void GenmapScan(genmap_handle h, GenmapComm c);
 
+/* GenmapComm */
 int GenmapCreateComm(GenmapComm *c, comm_ext ce);
 int GenmapCommSize(GenmapComm c);
 int GenmapCommRank(GenmapComm c);
+void GenmapCommSplit(genmap_handle h, GenmapComm *c, int bin);
+void comm_split(struct comm *old, int bin, int key, struct comm *new_);
+int GenmapDestroyComm(GenmapComm c);
 
 int GenmapGop(GenmapComm c, void *v, GenmapInt size, GenmapDataType type,
               GenmapInt op);
@@ -65,14 +69,13 @@ int GenmapReduce(GenmapComm c, void *out, void *in, GenmapInt size,
                  GenmapDataType type, GenmapInt op);
 int GenmapBcast(GenmapComm c, void *in, GenmapInt count, GenmapDataType type);
 
-int GenmapDestroyComm(GenmapComm c);
-void GenmapSplitComm(genmap_handle h, GenmapComm *c, int bin);
+int GenmapRead(genmap_handle h, void *data);
+
 int GenmapCrystalInit(genmap_handle h, GenmapComm c);
 int GenmapCrystalTransfer(genmap_handle h, int field);
 int GenmapCrystalFinalize(genmap_handle h);
 
-int GenmapRead(genmap_handle h, void *data);
-
+/* Genamp Vector */
 int GenmapCreateVector(GenmapVector *x, GenmapInt size);
 int GenmapSetVector(GenmapVector x, GenmapScalar *array);
 int GenmapGetVector(GenmapVector x, GenmapScalar *array);
