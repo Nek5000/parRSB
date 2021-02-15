@@ -11,8 +11,8 @@ typedef struct{
 } VToEMap;
 
 typedef struct{
-  ulong elementId;
-} ElementID;
+  ulong id;
+} LongID;
 
 typedef struct{
   ulong procId;
@@ -51,8 +51,7 @@ VToEMap *getVToEMap(Mesh m,struct comm *c)
   }
 
   buffer bfr; buffer_init(&bfr,1024);
-  sarray_sort_2(vertex,vertices.ptr,vertices.n,vertexId,1,
-                                               elementId,1,&bfr);
+  sarray_sort_2(vertex,vertices.ptr,vertices.n,vertexId,1,elementId,1,&bfr);
 
   struct array vtcsCmpct; array_init(vertex,&vtcsCmpct,10);
   vertex* vPtr=vertices.ptr;
@@ -62,8 +61,7 @@ VToEMap *getVToEMap(Mesh m,struct comm *c)
     array_cat(vertex,&vtcsCmpct,&prev,1);
 
     for(i=1; i<vertices.n; i++){
-      if((vPtr[i].elementId!=prev.elementId) ||
-          (vPtr[i].vertexId!=prev.vertexId)){
+      if((vPtr[i].elementId!=prev.elementId) || (vPtr[i].vertexId!=prev.vertexId)){
         prev=vPtr[i];
         array_cat(vertex,&vtcsCmpct,&prev,1);
       }
@@ -71,7 +69,8 @@ VToEMap *getVToEMap(Mesh m,struct comm *c)
   }
   array_free(&vertices);
 
-  struct crystal cr; crystal_init(&cr,c);
+  struct crystal cr;
+  crystal_init(&cr,c);
   sarray_transfer(vertex,&vtcsCmpct,workProc,1,&cr);
 
   // Find all the elements which share globalId and send the union
@@ -186,24 +185,27 @@ void freeVToEMap(VToEMap *map){
 
 int faceCheck(Mesh mesh,struct comm *c)
 {
-  VToEMap *map=getVToEMap(mesh,c);
+  VToEMap *map = getVToEMap(mesh, c);
 
-  sint nelt=mesh->nelt;
-  sint ndim=mesh->nDim;
+  sint nelt = mesh->nelt;
+  sint ndim = mesh->nDim;
 
   int faces[GC_MAX_FACES][GC_MAX_FACE_VERTICES];
-  if(ndim==3)
-    memcpy(faces,faces3D,GC_MAX_FACES*GC_MAX_FACE_VERTICES*sizeof(int));
+  if (ndim == 3)
+    memcpy(faces, faces3D, GC_MAX_FACES*GC_MAX_FACE_VERTICES*sizeof(int));
   else
-    memcpy(faces,faces2D,GC_MAX_FACES*GC_MAX_FACE_VERTICES*sizeof(int));
+    memcpy(faces, faces2D, GC_MAX_FACES*GC_MAX_FACE_VERTICES*sizeof(int));
 
-  Point ptr=mesh->elements.ptr;
-  int nf =(ndim==3)?6:4;
-  int nfv=(ndim==3)?4:2;
-  int nv =(ndim==3)?8:4;
+  Point ptr = mesh->elements.ptr;
+  int nf = (ndim==3) ? 6 : 4;
+  int nfv = (ndim==3) ? 4 : 2;
+  int nv = (ndim==3) ? 8 : 4;
 
-  struct array shared; array_init(ElementID,&shared,200);
-  buffer bfr; buffer_init(&bfr,1024);
+  struct array shared;
+  array_init(LongID, &shared, 200);
+
+  buffer bfr;
+  buffer_init(&bfr, 1024);
 
   int err = 0;
 
@@ -215,22 +217,21 @@ int faceCheck(Mesh mesh,struct comm *c)
       for (k = 0; k < nfv; k++) {
         ulong globalId = ptr[i*nv + faces[j][k] - 1].globalId + 1;
         int indx = getPosition(map, globalId);
-        assert(indx < map->size && "Return index out of bounds");
 
-        ElementID elemId;
+        LongID elemId;
         for (l = map->offsets[indx]; l < map->offsets[indx + 1]; l++) {
-          elemId.elementId = map->elements[l];
-          array_cat(ElementID, &shared, &elemId, 1);
+          elemId.id = map->elements[l];
+          array_cat(LongID, &shared, &elemId, 1);
         }
       }
 
-      sarray_sort(ElementID, shared.ptr, shared.n, elementId, 1, &bfr);
+      sarray_sort(LongID, shared.ptr, shared.n, id, 1, &bfr);
 
       ulong prev = 0;
       int ncount = 1;
-      ElementID *ptr = shared.ptr;
+      LongID *ptr = shared.ptr;
       for (l = 1; l < shared.n; l++) {
-        if (ptr[l].elementId != ptr[prev].elementId) {
+        if (ptr[l].id != ptr[prev].id) {
           if (ncount == 3) err = 1;
           prev = l;
           ncount = 1;
@@ -246,6 +247,37 @@ int faceCheck(Mesh mesh,struct comm *c)
   buffer_free(&bfr);
   array_free(&shared);
   freeVToEMap(map);
+
+  return err;
+}
+
+int elementCheck(Mesh mesh, struct comm *c) {
+  uint nelt = mesh->nelt;
+  uint ndim = mesh->nDim;
+  int nv = (ndim==3) ? 8 : 4;
+
+  buffer bfr;
+  buffer_init(&bfr, 1024);
+
+  LongID globalIds[8];
+  Point ptr = mesh->elements.ptr;
+  uint i, j;
+  int err = 0;
+  for (i = 0; i < nelt && err == 0; i++) {
+    for (j = 0; j < nv; j++)
+      globalIds[j].id = ptr[i*nv + j].globalId + 1;
+
+    sarray_sort(LongID, globalIds, nv, id, 1, &bfr);
+
+    for (j = 0; j < nv - 1; j++) {
+      if (globalIds[j].id == globalIds[j + 1].id) {
+        err = 1;
+        break;
+      }
+    }
+  }
+
+  buffer_free(&bfr);
 
   return err;
 }

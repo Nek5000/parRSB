@@ -82,7 +82,7 @@ void genmap_rsb(genmap_handle h,int verbose){
     if(lc->id<(np+1)/2)
       bin=0;
     // FIXME: Ugly
-    GenmapSplitComm(h,&local_c,bin);
+    GenmapCommSplit(h,&local_c,bin);
     GenmapSetLocalComm(h,local_c);
     lc=&local_c->gsc;
     GenmapScan(h,local_c);
