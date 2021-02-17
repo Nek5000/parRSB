@@ -32,7 +32,7 @@ int parRSB_partMesh(int *part, int *seq, long long *vtx, double *coord, int nel,
   int size = c.np;
 
   if (rank == 0)
-    printf("running parRSB ...");
+    printf("running parRSB ...\n");
   fflush(stdout);
 
   comm_barrier(&c);
@@ -86,8 +86,6 @@ int parRSB_partMesh(int *part, int *seq, long long *vtx, double *coord, int nel,
       return 1;
     }
 
-    GenmapCentroidDump("pre_rcb.dump", h, rsbbb.id, &rsbbb);
-
     switch (options->global_partitioner) {
     case 0:
       genmap_rsb(h);
@@ -101,8 +99,6 @@ int parRSB_partMesh(int *part, int *seq, long long *vtx, double *coord, int nel,
     default:
       break;
     }
-
-    GenmapCentroidDump("post_rcb.dump", h, rsbbb.id, &rsbbb);
 
     genmap_finalize(h);
 

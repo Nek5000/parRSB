@@ -4,11 +4,12 @@
 
 #define write_T(dest, val, T, nunits)                                          \
   do {                                                                         \
-    memcpy(dest, &(val), sizeof(T) * nunits);                                  \
+    T v = val;                                                                 \
+    memcpy(dest, &(v), sizeof(T) * nunits);                                    \
     dest += sizeof(T) * nunits;                                                \
   } while (0)
 
-int GenmapFiedlerDump(const char *fname, genmap_handle h, struct comm *c) {
+int GenmapFiedlerDump(const char *fname, genmap_handle h, slong g_start, struct comm *c) {
   uint rank = c->id;
 
   MPI_File file;
@@ -27,7 +28,7 @@ int GenmapFiedlerDump(const char *fname, genmap_handle h, struct comm *c) {
   slong nelgt = out[1][0];
 
   int ndim = (h->nv == 8) ? 3 : 2;
-  uint write_size = (ndim + 1) * nelt * sizeof(double);
+  uint write_size = ((ndim + 1) * sizeof(double) + 1 * sizeof(slong)) * nelt;
   if (rank == 0)
     write_size += sizeof(long) + sizeof(int); // for nelgt and ndim
 
@@ -41,6 +42,7 @@ int GenmapFiedlerDump(const char *fname, genmap_handle h, struct comm *c) {
   GenmapElements elm = GenmapGetElements(h);
   uint i;
   for (i = 0; i < nelt; i++) {
+    write_T(pbuf0, g_start + i, long, 1);
     write_T(pbuf0, elm[i].coord[0], double, ndim);
     write_T(pbuf0, elm[i].fiedler, double, 1);
   }
