@@ -5,7 +5,7 @@
 #define write_T(dest, val, T, nunits)                                          \
   do {                                                                         \
     T v = val;                                                                 \
-    memcpy(dest, &(v), sizeof(T) * nunits);                                    \
+    memcpy(dest, &(val), sizeof(T) * nunits);                                  \
     dest += sizeof(T) * nunits;                                                \
   } while (0)
 
@@ -42,7 +42,8 @@ int GenmapFiedlerDump(const char *fname, genmap_handle h, slong g_start, struct 
   GenmapElements elm = GenmapGetElements(h);
   uint i;
   for (i = 0; i < nelt; i++) {
-    write_T(pbuf0, g_start + i, long, 1);
+    slong id = g_start + i;
+    write_T(pbuf0, id, long, 1);
     write_T(pbuf0, elm[i].coord[0], double, ndim);
     write_T(pbuf0, elm[i].fiedler, double, 1);
   }

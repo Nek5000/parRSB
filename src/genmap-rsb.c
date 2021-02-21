@@ -7,6 +7,49 @@
 #include <parRSB.h>
 #include <sort.h>
 
+
+static int dump_fiedler_if_discon(genmap_handle h, int level, int max_levels) {
+  genmap_comm local_c = GenmapGetLocalComm(h);
+  struct comm *lc = &local_c->gsc;
+
+  genmap_comm global_c = GenmapGetGlobalComm(h);
+  struct comm *gc = &global_c->gsc;
+
+  int nv = h->nv;
+  int ndim = (nv == 8) ? 3 : 2;
+
+  sint bfr[2];
+
+  /* Dump current partition status */
+  if (level > 0 && level < max_levels) {
+    slong nelt = GenmapGetNLocalElements(h);
+    slong out[2][1], buf[2][1];
+    comm_scan(out, gc, gs_long, gs_add, &nelt, 1, buf); // max
+    slong start = out[0][0];
+
+    sint discon = is_disconnected(lc, local_c->gsw, &local_c->buf, nelt, nv);
+    comm_allreduce(lc, gs_int, gs_max, &discon, 1, bfr); // max
+
+    sint g_id = (discon > 0) * gc->id;
+    comm_allreduce(gc, gs_int, gs_max, &g_id, 1, bfr); // max
+
+    sint l_id = gc->id;
+    comm_allreduce(lc, gs_int, gs_max, &l_id, 1, bfr); // max
+
+    if (g_id == l_id && discon > 0) {
+      if (lc->id == 0)
+        printf("\tLevel %02d PRERCB: There are disconnected components!\n", level);
+      if (discon > 0) {
+        // Dump the current partition
+        char fname[BUFSIZ];
+        sprintf(fname, "fiedler_%02d.dump", level);
+        GenmapFiedlerDump(fname, h, start, lc);
+      }
+    }
+  }
+}
+
+
 int genmap_rsb(genmap_handle h) {
   int verbose = h->options->debug_level > 1;
   int max_iter = 50;
@@ -51,34 +94,6 @@ int genmap_rsb(genmap_handle h) {
     else
       global = (np == gc->np);
 
-    /* Dump current partition status */
-    if (level > 0 && level < max_levels) {
-      slong nelt = GenmapGetNLocalElements(h);
-      slong out[2][1], buf[2][1];
-      comm_scan(out, gc, gs_long, gs_add, &nelt, 1, buf); // max
-      slong start = out[0][0];
-
-      sint discon = is_disconnected(lc, local_c->gsw, &local_c->buf, nelt, nv);
-      comm_allreduce(lc, gs_int, gs_max, &discon, 1, bfr); // max
-
-      sint g_id = (discon > 0) * gc->id;
-      comm_allreduce(gc, gs_int, gs_max, &g_id, 1, bfr); // max
-
-      sint l_id = gc->id;
-      comm_allreduce(lc, gs_int, gs_max, &l_id, 1, bfr); // max
-
-      if (g_id == l_id && discon > 0) {
-        if (lc->id == 0)
-          printf("\tLevel %02d PRERCB: There are disconnected components!\n", level);
-        if (discon > 0) {
-          // Dump the current partition
-          char fname[BUFSIZ];
-          sprintf(fname, "e062k_fiedler_%02d_prercb.dump", level);
-          GenmapFiedlerDump(fname, h, start, lc);
-        }
-      }
-    }
-
     /* Run RCB, RIB pre-step or just sort by global id */
     if (h->options->rsb_prepartition == 1) { // RCB
       metric_tic(lc, RCB);
@@ -89,41 +104,13 @@ int genmap_rsb(genmap_handle h) {
       rib(lc, h->elements, ndim, &buf);
       metric_toc(lc, RCB);
     } else {
-      parallel_sort(struct rsb_element, h->elements, globalId0, gs_long, 0, 1,
-                    lc, &buf);
+      parallel_sort(struct rsb_element, h->elements, globalId0, gs_long, 0, 1, lc, &buf);
     }
 
     /* Initialize the laplacian */
     metric_tic(lc, WEIGHTEDLAPLACIANSETUP);
     GenmapInitLaplacianWeighted(h, local_c);
     metric_toc(lc, WEIGHTEDLAPLACIANSETUP);
-
-    if (level < max_levels) {
-      slong nelt = GenmapGetNLocalElements(h);
-      slong out[2][1], buf[2][1];
-      comm_scan(out, gc, gs_long, gs_add, &nelt, 1, buf); // max
-      slong start = out[0][0];
-
-      sint discon = is_disconnected(lc, local_c->gsw, &local_c->buf, nelt, nv);
-      comm_allreduce(lc, gs_int, gs_max, &discon, 1, bfr); // max
-
-      sint l_id = gc->id;
-      comm_allreduce(lc, gs_int, gs_max, &l_id, 1, bfr); // max
-
-      sint g_id = (discon > 0) * gc->id;
-      comm_allreduce(gc, gs_int, gs_max, &g_id, 1, bfr); // max
-
-      if (g_id == l_id && discon > 0) {
-        if (lc->id == 0)
-          printf("\tLevel %02d POSTRCB: There are disconnected components!\n", level);
-        if (discon > 0) {
-          // Dump the current partition
-          char fname[BUFSIZ];
-          sprintf(fname, "e062k_fiedler_%02d_postrcb.dump", level);
-          GenmapFiedlerDump(fname, h, start, lc);
-        }
-      }
-    }
 
     /* Run fiedler */
     metric_tic(lc, FIEDLER);
@@ -140,8 +127,7 @@ int genmap_rsb(genmap_handle h) {
 
     /* Sort by Fiedler vector */
     metric_tic(lc, FIEDLERSORT);
-    parallel_sort(struct rsb_element, h->elements, fiedler, gs_double, 0, 1, lc,
-                  &buf);
+    parallel_sort(struct rsb_element, h->elements, fiedler, gs_double, 0, 1, lc, &buf);
     metric_toc(lc, FIEDLERSORT);
 
     /* Bisect */
@@ -156,38 +142,6 @@ int genmap_rsb(genmap_handle h) {
     genmap_scan(h, local_c);
     metric_toc(lc, BISECT);
 
-    /* Initialize the laplacian */
-    metric_tic(lc, WEIGHTEDLAPLACIANSETUP);
-    GenmapInitLaplacianWeighted(h, local_c);
-    metric_toc(lc, WEIGHTEDLAPLACIANSETUP);
-
-    if (level < max_levels) {
-      slong nelt = GenmapGetNLocalElements(h);
-      slong out[2][1], buf[2][1];
-      comm_scan(out, gc, gs_long, gs_add, &nelt, 1, buf); // max
-      slong start = out[0][0];
-
-      sint discon = is_disconnected(lc, local_c->gsw, &local_c->buf, nelt, nv);
-      comm_allreduce(lc, gs_int, gs_max, &discon, 1, bfr); // max
-
-      sint g_id = (discon > 0) * gc->id;
-      comm_allreduce(gc, gs_int, gs_max, &g_id, 1, bfr); // max
-
-      sint l_id = gc->id;
-      comm_allreduce(lc, gs_int, gs_max, &l_id, 1, bfr); // max
-
-      if (g_id == l_id && discon > 0) {
-        if (lc->id == 0)
-          printf("\tLevel %02d POSTRSB: There are disconnected components!\n", level);
-        if (discon > 0) {
-          // Dump the current partition
-          char fname[BUFSIZ];
-          sprintf(fname, "e062k_fiedler_%02d_postrsb.dump", level);
-          GenmapFiedlerDump(fname, h, start, lc);
-        }
-      }
-    }
-
     metric_push_level();
     level++;
   }
@@ -198,12 +152,13 @@ int genmap_rsb(genmap_handle h) {
     int val = (int)metric_get_value(i, NFIEDLER);
     if (val >= max_pass * max_iter) {
       converged = 0;
+      level = i;
       break;
     }
   }
   comm_allreduce(gc, gs_int, gs_min, &converged, 1, bfr); // min
   if (converged == 0 && gc->id == 0)
-    printf("\tWARNING: Lanczos failed to converge while partitioning!\n");
+    printf("\tWARNING: Lanczos failed to converge while partitioning, Level=%d!\n", level);
 
   /* Check for disconnected components */
   GenmapInitLaplacianWeighted(h, global_c);
