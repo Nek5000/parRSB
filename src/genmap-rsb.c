@@ -20,6 +20,8 @@ static int dump_fiedler_if_discon(genmap_handle h, int level, int max_levels) {
 
   sint bfr[2];
 
+  GenmapElements elements = GenmapGetElements(h);
+
   /* Dump current partition status */
   if (level > 0 && level < max_levels) {
     slong nelt = GenmapGetNLocalElements(h);
@@ -27,19 +29,19 @@ static int dump_fiedler_if_discon(genmap_handle h, int level, int max_levels) {
     comm_scan(out, gc, gs_long, gs_add, &nelt, 1, buf); // max
     slong start = out[0][0];
 
-    sint discon = is_disconnected(lc, local_c->gsw, &local_c->buf, nelt, nv);
-    comm_allreduce(lc, gs_int, gs_max, &discon, 1, bfr); // max
+    sint components = get_components(NULL, elements, lc, &local_c->buf, nelt, nv);
+    comm_allreduce(lc, gs_int, gs_max, &components, 1, bfr); // max
 
-    sint g_id = (discon > 0) * gc->id;
+    sint g_id = (components > 1) * gc->id;
     comm_allreduce(gc, gs_int, gs_max, &g_id, 1, bfr); // max
 
     sint l_id = gc->id;
     comm_allreduce(lc, gs_int, gs_max, &l_id, 1, bfr); // max
 
-    if (g_id == l_id && discon > 0) {
+    if (g_id == l_id && components > 1) {
       if (lc->id == 0)
         printf("\tLevel %02d PRERCB: There are disconnected components!\n", level);
-      if (discon > 0) {
+      if (components > 1) {
         // Dump the current partition
         char fname[BUFSIZ];
         sprintf(fname, "fiedler_%02d.dump", level);
@@ -144,8 +146,16 @@ int genmap_rsb(genmap_handle h) {
 
     metric_push_level();
     level++;
+
+    /* Check for disconnected components */
+    GenmapInitLaplacianWeighted(h, local_c);
+    e = GenmapGetElements(h);
+    sint components = get_components(NULL, e, lc, &local_c->buf, nelt, nv);
+    if (components > 1 && lc->id == 0)
+      printf("\tWarning: There are %d disconnected components in level = %d!\n", components, level);
   }
 
+#if 0
   /* Check if Fidler converged */
   sint converged = 1;
   for (i = 0; i < metric_get_levels(); i++) {
@@ -159,13 +169,7 @@ int genmap_rsb(genmap_handle h) {
   comm_allreduce(gc, gs_int, gs_min, &converged, 1, bfr); // min
   if (converged == 0 && gc->id == 0)
     printf("\tWARNING: Lanczos failed to converge while partitioning, Level=%d!\n", level);
-
-  /* Check for disconnected components */
-  GenmapInitLaplacianWeighted(h, global_c);
-
-  sint discon = is_disconnected(gc, global_c->gsw, &global_c->buf, nelt, nv);
-  if (discon > 0 && gc->id == 0)
-    printf("\tWarning: There are disconnected components!\n");
+#endif
 
   crystal_free(&h->cr);
   buffer_free(&buf);

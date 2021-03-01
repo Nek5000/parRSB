@@ -42,8 +42,11 @@ int GenmapGetNVertices(genmap_handle h);
 void genmap_set_vertices(genmap_handle h, int nVertices);
 
 void genmap_scan(genmap_handle h, genmap_comm c);
+void genmap_comm_scan(genmap_handle h, struct comm *c);
 
 int GenmapCreateComm(genmap_comm *c, comm_ext ce);
+int GenmapDestroyComm(genmap_comm c);
+
 int genmap_comm_size(genmap_comm c);
 int genmap_comm_rank(genmap_comm c);
 
@@ -53,8 +56,9 @@ int GenmapReduce(genmap_comm c, void *out, void *in, GenmapInt size,
                  GenmapDataType type, GenmapInt op);
 int GenmapBcast(genmap_comm c, void *in, GenmapInt count, GenmapDataType type);
 
-int GenmapDestroyComm(genmap_comm c);
+void comm_split(struct comm *old, int bin, int key, struct comm *new_);
 void GenmapSplitComm(genmap_handle h, genmap_comm *c, int bin);
+
 int GenmapCrystalInit(genmap_handle h, genmap_comm c);
 int GenmapCrystalTransfer(genmap_handle h, int field);
 int GenmapCrystalFinalize(genmap_handle h);

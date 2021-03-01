@@ -155,8 +155,7 @@ typedef struct {
 } vertex;
 
 /* Components */
-sint is_disconnected(struct comm *c, struct gs_data *gsh, buffer *buf,
-                     uint nelt, uint nv);
+sint get_components(sint *component, GenmapElements elements, struct comm *c, buffer *buf, uint nelt, uint nv);
 
 /* Matrix inverse */
 void matrix_inverse(int N, double *A);
