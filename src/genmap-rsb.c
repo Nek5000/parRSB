@@ -29,7 +29,7 @@ static int dump_fiedler_if_discon(genmap_handle h, int level, int max_levels) {
     comm_scan(out, gc, gs_long, gs_add, &nelt, 1, buf); // max
     slong start = out[0][0];
 
-    sint components = get_components(NULL, elements, lc, &local_c->buf, nelt, nv);
+    sint components = get_components(NULL, elements, lc, &h->buf, nelt, nv);
     comm_allreduce(lc, gs_int, gs_max, &components, 1, bfr); // max
 
     sint g_id = (components > 1) * gc->id;
@@ -150,7 +150,7 @@ int genmap_rsb(genmap_handle h) {
     /* Check for disconnected components */
     GenmapInitLaplacianWeighted(h, local_c);
     e = GenmapGetElements(h);
-    sint components = get_components(NULL, e, lc, &local_c->buf, nelt, nv);
+    sint components = get_components(NULL, e, lc, &h->buf, nelt, nv);
     if (components > 1 && lc->id == 0)
       printf("\tWarning: There are %d disconnected components in level = %d!\n", components, level);
   }

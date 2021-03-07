@@ -10,7 +10,12 @@ int genmap_init(genmap_handle *h_, comm_ext ce, parRSB_options *options) {
   GenmapCreateComm(&h->global, ce);
   GenmapCreateComm(&h->local, ce);
 
+  /* Weighted Laplacian */
   h->weights = NULL;
+  h->gsw = NULL;
+  buffer_init(&h->buf, 1024);
+
+  h->b = NULL;
 
   h->options = options;
 
@@ -18,8 +23,16 @@ int genmap_init(genmap_handle *h_, comm_ext ce, parRSB_options *options) {
 }
 
 int genmap_finalize(genmap_handle h) {
+  /* Weighted Laplacian */
   if (h->weights != NULL)
     GenmapFree(h->weights);
+  if (h->gsw != NULL)
+    gs_free(h->gsw);
+  buffer_free(&h->buf);
+
+  if (h->b != NULL)
+    GenmapFree(h->b);
+
   if (GenmapGetGlobalComm(h))
     GenmapDestroyComm(GenmapGetGlobalComm(h));
   if (GenmapGetLocalComm(h))

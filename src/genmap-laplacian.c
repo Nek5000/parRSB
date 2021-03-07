@@ -116,7 +116,7 @@ int GenmapInitLaplacian(genmap_handle h, genmap_comm c) {
   free(entries);
 
   c->gsh = get_csr_top(c->M, &c->gsc);
-  GenmapMalloc(c->M->row_off[c->M->rn], &c->b);
+  GenmapRealloc(c->M->row_off[c->M->rn], &h->b);
 
 #if defined(GENMAP_DEBUG)
   int nnz = c->M->row_off[c->M->rn];
@@ -135,8 +135,8 @@ int GenmapInitLaplacian(genmap_handle h, genmap_comm c) {
 
 int GenmapLaplacian(genmap_handle h, genmap_comm c, GenmapScalar *u,
                     GenmapScalar *v) {
-  csr_mat_gather(c->M, c->gsh, u, c->b, &c->buf);
-  csr_mat_apply(v, c->M, c->b);
+  csr_mat_gather(c->M, c->gsh, u, h->b, &h->buf);
+  csr_mat_apply(v, c->M, h->b);
 
   return 0;
 }

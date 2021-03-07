@@ -44,11 +44,6 @@ struct genmap_comm_private {
   /* Un-weighted Laplacian */
   struct gs_data *gsh;
   csr_mat M;
-
-  /* Weighted Laplacian */
-  struct gs_data *gsw;
-  buffer buf;
-  GenmapScalar *b;
 };
 
 /* parRCB/parRSB internals */
@@ -92,9 +87,15 @@ struct genmap_handle_private {
   GenmapLong start;
   int nv;
 
-  GenmapScalar *weights;
   struct array *elements;
   struct crystal cr;
+
+  /* Weighted Laplacian */
+  struct gs_data *gsw;
+  GenmapScalar *weights;
+  buffer buf;
+
+  GenmapScalar *b;
 
   parRSB_options *options;
 };

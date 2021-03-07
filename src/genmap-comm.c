@@ -8,28 +8,14 @@ int GenmapCreateComm(genmap_comm *c_, comm_ext ce) {
   c->gsh = NULL;
   c->M = NULL;
 
-  c->gsw = NULL;
-
-  buffer_init(&c->buf, 1024);
-
-  c->b = NULL;
-
   return 0;
 }
 
 int GenmapDestroyComm(genmap_comm c) {
-  buffer_free(&c->buf);
-
   if (c->gsh)
     gs_free(c->gsh);
   if (c->M)
     csr_mat_free(c->M);
-
-  if (c->gsw)
-    gs_free(c->gsw);
-
-  if (c->b)
-    GenmapFree(c->b);
 
   comm_free(&c->gsc);
   GenmapFree(c);
