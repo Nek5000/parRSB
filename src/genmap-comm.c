@@ -102,3 +102,14 @@ int GenmapCrystalFinalize(genmap_handle h) {
   crystal_free(&(h->cr));
   return 0;
 }
+
+void comm_split(struct comm *old, int bin, int key, struct comm *new) {
+#ifdef MPI
+  MPI_Comm new_comm;
+  MPI_Comm_split(old->c, bin, key, &new_comm);
+  comm_init(new, new_comm);
+  MPI_Comm_free(&new_comm);
+#else
+  comm_init(new, 1);
+#endif
+}

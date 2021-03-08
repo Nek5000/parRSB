@@ -111,21 +111,7 @@ void csr_mat_gather(csr_mat M, struct gs_data *gsh, GenmapScalar *x,
       else
         buf[j] = 0.0;
 
-#if defined(GENMAP_DEBUG)
-        // printf("buf(before): ");
-        // for(i=0;i<M->row_off[M->rn];i++)
-        //   printf("%lf ",buf[i]);
-        // printf("\n");
-#endif
-
   gs(buf, genmap_gs_scalar, gs_add, 0, gsh, bfr);
-
-#if defined(GENMAP_DEBUG)
-  // printf("buf(after): ");
-  // for(i=0;i<M->row_off[M->rn];i++)
-  //   printf("%lf ",buf[i]);
-  // printf("\n");
-#endif
 }
 
 void csr_mat_apply(GenmapScalar *y, csr_mat M, GenmapScalar *x) {

@@ -54,6 +54,19 @@ ifneq ($(BLAS),0)
   LDFLAGS += -L$(BLASLIBPATH) -lblasLapack -lgfortran
 endif
 
+ifneq ($(GRAMMIAN),0)
+  PP += -DGENMAP_GRAMMIAN
+endif
+
+ifneq ($(UNDERSCORE),0)
+  PP += -DGENMAP_UNDERSCORE
+endif
+
+ifneq ($(BLAS),0)
+  PP += -DGENMAP_BLAS
+  LDFLAGS += -L$(BLASLIBPATH) -lblasLapack
+endif
+
 ifneq ($(MPI),0)
   PP += -DMPI
 endif

@@ -38,8 +38,6 @@ int flex_cg(genmap_handle h, genmap_comm c, mgData d, GenmapVector ri,
 
   rz1 = GenmapDotVector(r, z);
   GenmapGop(c, &rz1, 1, GENMAP_SCALAR, GENMAP_SUM);
-  // if(genmap_comm_rank(c)==0 && verbose)
-  //   printf("rz1=%lf\n",rz1);
 
   GenmapCopyVector(p, z);
 
@@ -80,8 +78,6 @@ int flex_cg(genmap_handle h, genmap_comm c, mgData d, GenmapVector ri,
 
     rr = GenmapDotVector(r, r);
     GenmapGop(c, &rr, 1, GENMAP_SCALAR, GENMAP_SUM);
-    // if(rank==0 && verbose)
-    //   printf("i=%d rr=%1.10e\n",i,sqrt(rr));
   }
 
   GenmapDestroyVector(z), GenmapDestroyVector(w);

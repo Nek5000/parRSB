@@ -11,7 +11,9 @@ int mesh_init(Mesh *m_, int nel, int nDim) {
   m->nVertex = (nDim == 2) ? 4 : 8;
 
   array_init(struct Point_private, &m->elements, 10);
+  m->elements.n = 0;
   array_init(struct Boundary_private, &m->boundary, 10);
+  m->boundary.n = 0;
 
   return 0;
 }
@@ -37,8 +39,10 @@ void get_vertex_ids(long long **vertex_ids_, Mesh mesh) {
   Point ptr = mesh->elements.ptr;
   int e, v, count = 0;
   for (e = 0; e < nelt; e++) {
-    for (v = 0; v < nv; v++)
-      vertex_ids[count++] = ptr[e * nv + v].globalId;
+    for (v = 0; v < nv; v++) {
+      vertex_ids[count] = ptr[count].globalId;
+      count++;
+    }
   }
 }
 
@@ -54,8 +58,9 @@ void get_vertex_coordinates(double **coords_, Mesh mesh) {
   int e, v, d, count = 0;
   for (e = 0; e < nelt; e++) {
     for (v = 0; v < nv; v++) {
-      for (d = 0; d < ndim; d++)
+      for (d = 0; d < ndim; d++) {
         coords[count++] = ptr[e * nv + v].x[d];
+      }
     }
   }
 }

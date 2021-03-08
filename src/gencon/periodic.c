@@ -306,11 +306,8 @@ int setPeriodicFaceCoordinates(Mesh mesh, struct comm *c, buffer *buf) {
   }
 }
 
-int matchPeriodicFaces(Mesh mesh, struct comm *c) {
-  buffer bfr;
-  buffer_init(&bfr, 1024);
-
-  setPeriodicFaceCoordinates(mesh, c, &bfr);
+int matchPeriodicFaces(Mesh mesh, struct comm *c, buffer *bfr) {
+  setPeriodicFaceCoordinates(mesh, c, bfr);
   gatherMatchingPeriodicFaces(mesh, c);
 
   struct array matched;
@@ -318,13 +315,11 @@ int matchPeriodicFaces(Mesh mesh, struct comm *c) {
   matched.n = 0;
 
   findConnectedPeriodicFaces(mesh, &matched);
-  renumberPeriodicVertices(mesh, c, &matched, &bfr);
+  renumberPeriodicVertices(mesh, c, &matched, bfr);
   array_free(&matched);
 
-  compressPeriodicVertices(mesh, c, &bfr);
-  sendBack(mesh, c);
-
-  buffer_free(&bfr);
+  compressPeriodicVertices(mesh, c, bfr);
+  sendBack(mesh, c, bfr);
 
   return 0;
 }

@@ -65,6 +65,7 @@ int GenmapCrystalFinalize(genmap_handle h);
 
 int GenmapRead(genmap_handle h, void *data);
 
+/* Genamp Vector */
 int GenmapCreateVector(GenmapVector *x, GenmapInt size);
 int GenmapSetVector(GenmapVector x, GenmapScalar *array);
 int GenmapGetVector(GenmapVector x, GenmapScalar *array);

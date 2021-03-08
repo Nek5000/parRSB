@@ -46,11 +46,14 @@ int read_connectivity(Mesh mesh, char *fname, struct comm *c);
 int write_connectivity(Mesh mesh, char *fname, struct comm *c);
 int read_co2_mesh(Mesh *mesh, char *fname, struct comm *c);
 
+/* Connectivity */
 int findMinNeighborDistance(Mesh mesh);
-int findSegments(Mesh mesh, struct comm *c, GenmapScalar tol, int verbose);
+int findSegments(Mesh mesh, struct comm *c, GenmapScalar tol, int verbose,
+                 buffer *bfr);
 int faceCheck(Mesh mesh, struct comm *c);
+int elementCheck(Mesh mesh, struct comm *c);
 int setGlobalID(Mesh mesh, struct comm *c);
-int sendBack(Mesh mesh, struct comm *c);
-int matchPeriodicFaces(Mesh mesh, struct comm *c);
+int sendBack(Mesh mesh, struct comm *c, buffer *bfr);
+int matchPeriodicFaces(Mesh mesh, struct comm *c, buffer *bfr);
 
 #endif

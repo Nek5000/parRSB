@@ -17,6 +17,12 @@ typedef struct {
   long long vtx[MAXNV];
 } elm_data;
 
+#define EXIT_ERROR()                                                           \
+  do {                                                                         \
+    MPI_Finalize();                                                            \
+    return EXIT_FAILURE;                                                       \
+  } while (0)
+
 int main(int argc, char *argv[]) {
   MPI_Init(&argc, &argv);
 

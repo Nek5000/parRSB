@@ -266,6 +266,7 @@ void mgFree(mgData d) {
   }
 
   // comm_free
+  comm_free(&d->c);
 
   GenmapFree(l);
   GenmapFree(d->level_off);
