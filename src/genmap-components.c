@@ -11,7 +11,8 @@ struct unmarked {
 };
 
 /* Find the number of disconnected components */
-sint get_components(sint *component, GenmapElements elements, struct comm *c, buffer *buf, uint nelt, uint nv) {
+sint get_components(sint *component, GenmapElements elements, struct comm *c,
+                    buffer *buf, uint nelt, uint nv) {
   slong nelt_ = nelt;
   slong out[2][1], buff[2][1];
   comm_scan(out, c, gs_long, gs_add, &nelt_, 1, buff);
@@ -70,7 +71,7 @@ sint get_components(sint *component, GenmapElements elements, struct comm *c, bu
           p[e * nv + d] = 0;
 
       // Mark the first non-marked element as seed
-      struct unmarked *ptr = (struct unmarked *) arr.ptr;
+      struct unmarked *ptr = (struct unmarked *)arr.ptr;
       slong first = start + ptr[0].index;
       slong first_ = first;
       comm_allreduce(&cc, gs_long, gs_min, &first_, 1, buff);

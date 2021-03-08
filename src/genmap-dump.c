@@ -9,7 +9,8 @@
     dest += sizeof(T) * nunits;                                                \
   } while (0)
 
-int GenmapFiedlerDump(const char *fname, genmap_handle h, slong g_start, struct comm *c) {
+int GenmapFiedlerDump(const char *fname, genmap_handle h, slong g_start,
+                      struct comm *c) {
   uint rank = c->id;
 
   MPI_File file;
@@ -108,7 +109,8 @@ int GenmapVectorDump(const char *fname, GenmapScalar *y, uint size,
   return err;
 }
 
-int GenmapCentroidDump(const char *fname, genmap_handle h, sint g_id, struct comm *c) {
+int GenmapCentroidDump(const char *fname, genmap_handle h, sint g_id,
+                       struct comm *c) {
   int rank = c->id;
   int size = c->np;
 

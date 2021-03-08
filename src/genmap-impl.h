@@ -156,16 +156,19 @@ typedef struct {
 } vertex;
 
 /* Components */
-sint get_components(sint *component, GenmapElements elements, struct comm *c, buffer *buf, uint nelt, uint nv);
+sint get_components(sint *component, GenmapElements elements, struct comm *c,
+                    buffer *buf, uint nelt, uint nv);
 
 /* Matrix inverse */
 void matrix_inverse(int N, double *A);
 
 /* Dump data */
-int GenmapFiedlerDump(const char *fname, genmap_handle h, slong start, struct comm *c);
+int GenmapFiedlerDump(const char *fname, genmap_handle h, slong start,
+                      struct comm *c);
 int GenmapVectorDump(const char *fname, GenmapScalar *y, uint size,
                      struct comm *c);
-int GenmapCentroidDump(const char *fname, genmap_handle h, sint g_id, struct comm *c);
+int GenmapCentroidDump(const char *fname, genmap_handle h, sint g_id,
+                       struct comm *c);
 int GenmapElementIdDump(const char *fname, genmap_handle h, struct comm *c);
 
 #endif

@@ -70,7 +70,6 @@ struct array *GenmapFindNeighbors(genmap_handle h, genmap_comm c) {
   sarray_sort_2(csr_entry, a.ptr, a.n, r, 1, c, 1, &buf);
   sarray_sort(csr_entry, a.ptr, a.n, r, 1, &buf);
 
-
   struct array *nbrs = tmalloc(struct array, 1);
   array_init(entry, nbrs, lelt);
 

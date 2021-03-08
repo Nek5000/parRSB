@@ -7,7 +7,6 @@
 #include <parRSB.h>
 #include <sort.h>
 
-
 static int dump_fiedler_if_discon(genmap_handle h, int level, int max_levels) {
   genmap_comm local_c = GenmapGetLocalComm(h);
   struct comm *lc = &local_c->gsc;
@@ -40,7 +39,8 @@ static int dump_fiedler_if_discon(genmap_handle h, int level, int max_levels) {
 
     if (g_id == l_id && components > 1) {
       if (lc->id == 0)
-        printf("\tLevel %02d PRERCB: There are disconnected components!\n", level);
+        printf("\tLevel %02d PRERCB: There are disconnected components!\n",
+               level);
       if (components > 1) {
         // Dump the current partition
         char fname[BUFSIZ];
@@ -50,7 +50,6 @@ static int dump_fiedler_if_discon(genmap_handle h, int level, int max_levels) {
     }
   }
 }
-
 
 int genmap_rsb(genmap_handle h) {
   int verbose = h->options->debug_level > 1;
@@ -106,7 +105,8 @@ int genmap_rsb(genmap_handle h) {
       rib(lc, h->elements, ndim, &buf);
       metric_toc(lc, RCB);
     } else {
-      parallel_sort(struct rsb_element, h->elements, globalId0, gs_long, 0, 1, lc, &buf);
+      parallel_sort(struct rsb_element, h->elements, globalId0, gs_long, 0, 1,
+                    lc, &buf);
     }
 
     /* Initialize the laplacian */
@@ -129,7 +129,8 @@ int genmap_rsb(genmap_handle h) {
 
     /* Sort by Fiedler vector */
     metric_tic(lc, FIEDLERSORT);
-    parallel_sort(struct rsb_element, h->elements, fiedler, gs_double, 0, 1, lc, &buf);
+    parallel_sort(struct rsb_element, h->elements, fiedler, gs_double, 0, 1, lc,
+                  &buf);
     metric_toc(lc, FIEDLERSORT);
 
     /* Bisect */
@@ -152,7 +153,8 @@ int genmap_rsb(genmap_handle h) {
     e = GenmapGetElements(h);
     sint components = get_components(NULL, e, lc, &h->buf, nelt, nv);
     if (components > 1 && lc->id == 0)
-      printf("\tWarning: There are %d disconnected components in level = %d!\n", components, level);
+      printf("\tWarning: There are %d disconnected components in level = %d!\n",
+             components, level);
   }
 
 #if 0

@@ -7,8 +7,8 @@ Parition mesh using Nek5000's vertex connectivity (con) file.
 #include <stdlib.h>
 
 #include <gencon.h>
-#include <genmap.h>
 #include <genmap-quality.h>
+#include <genmap.h>
 #include <parRSB.h>
 
 #define MAXNV 8 /* maximum number of vertices per element */

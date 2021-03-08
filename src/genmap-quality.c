@@ -91,4 +91,3 @@ void printPartStat(long long *vtx, int nel, int nv, comm_ext ce) {
   free(Ncomm);
   comm_free(&comm);
 }
-
