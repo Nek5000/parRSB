@@ -22,10 +22,15 @@ int main(int argc, char *argv[]) {
 
   double tol = (argc > 2) ? atof(argv[2]) : 0.2;
 
-  findSegments(mesh, &comm, tol, 0);
+  buffer bfr;
+  buffer_init(&bfr, 1024);
+
+  findSegments(mesh, &comm, tol, 0, &bfr);
   setGlobalID(mesh, &comm);
-  sendBack(mesh, &comm);
-  matchPeriodicFaces(mesh, &comm);
+  sendBack(mesh, &comm, &bfr);
+  matchPeriodicFaces(mesh, &comm, &bfr);
+
+  buffer_free(&bfr);
 
   char co2FileName[BUFSIZ];
   strncpy(co2FileName, argv[1], BUFSIZ);

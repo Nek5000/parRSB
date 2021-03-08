@@ -63,17 +63,6 @@ int GenmapBcast(genmap_comm c, void *in, GenmapInt count, GenmapDataType type) {
   return MPI_Bcast(in, count, type, 0, c->gsc.c);
 }
 
-void comm_split(struct comm *old, int bin, int key, struct comm *new_) {
-#ifdef MPI
-  MPI_Comm new_comm;
-  MPI_Comm_split(old->c, bin, key, &new_comm);
-  comm_init(new_, new_comm);
-  MPI_Comm_free(&new_comm);
-#else
-  comm_init(new_, 1);
-#endif
-}
-
 void GenmapSplitComm(genmap_handle h, genmap_comm *c, int bin) {
   comm_ext local;
   int id = genmap_comm_rank(*c);
@@ -103,13 +92,13 @@ int GenmapCrystalFinalize(genmap_handle h) {
   return 0;
 }
 
-void comm_split(struct comm *old, int bin, int key, struct comm *new) {
+void comm_split(struct comm *old, int bin, int key, struct comm *new_) {
 #ifdef MPI
   MPI_Comm new_comm;
   MPI_Comm_split(old->c, bin, key, &new_comm);
-  comm_init(new, new_comm);
+  comm_init(new_, new_comm);
   MPI_Comm_free(&new_comm);
 #else
-  comm_init(new, 1);
+  comm_init(new_, 1);
 #endif
 }

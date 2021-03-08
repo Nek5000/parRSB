@@ -158,7 +158,6 @@ int parRSB_partMesh(int *part, int *seq, long long *vtx, double *coord, int nel,
   array_free(&eList);
   buffer_free(&bfr);
   crystal_free(&cr);
-  comm_free(&comm_rsb);
   comm_free(&c);
 
   return 0;
