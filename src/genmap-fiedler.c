@@ -39,7 +39,7 @@ int GenmapFiedlerRQI(genmap_handle h, genmap_comm c, int max_iter, int global) {
 
   metric_tic(gsc, PRECONDSETUP);
   mgData d;
-  mgSetup(h, c, c->M, &d);
+  mgSetup(h, c, h->M, &d);
   metric_toc(gsc, PRECONDSETUP);
 
   GenmapVector y;

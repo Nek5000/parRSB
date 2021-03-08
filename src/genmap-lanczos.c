@@ -77,7 +77,7 @@ int GenmapLanczosLegendary(genmap_handle h, genmap_comm c, GenmapVector f,
     GenmapOrthogonalizebyOneVector(c, p, genmap_get_global_nel(h));
 
     metric_tic(&c->gsc, WEIGHTEDLAPLACIAN);
-    GenmapLaplacianWeighted(h, c, p->data, w->data);
+    GenmapLaplacianWeighted(h, p->data, w->data);
     metric_tic(&c->gsc, WEIGHTEDLAPLACIAN);
 
     GenmapScaleVector(w, w, -1.0);
@@ -168,7 +168,7 @@ int GenmapLanczos(genmap_handle h, genmap_comm c, GenmapVector init,
     GenmapCopyVector((*q)[k], q1);
 
     metric_tic(&c->gsc, WEIGHTEDLAPLACIAN);
-    GenmapLaplacianWeighted(h, c, q1->data, u->data);
+    GenmapLaplacianWeighted(h, q1->data, u->data);
     metric_toc(&c->gsc, WEIGHTEDLAPLACIAN);
 
     alpha->data[k] = GenmapDotVector(q1, u);

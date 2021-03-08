@@ -1,6 +1,6 @@
 #include <genmap-impl.h>
 
-int GenmapInitLaplacianWeighted(genmap_handle h, genmap_comm c) {
+int GenmapInitLaplacianWeighted(genmap_handle h, struct comm *c) {
   GenmapInt lelt = GenmapGetNLocalElements(h);
   GenmapInt nv = GenmapGetNVertices(h);
 
@@ -22,15 +22,15 @@ int GenmapInitLaplacianWeighted(genmap_handle h, genmap_comm c) {
 
 #if defined(GENMAP_DEBUG)
   double t1 = GenmapGetMaxRss();
-  if (genmap_comm_rank(GenmapGetLocalComm(h)) == 0)
+  if (c->id == 0)
     printf("RSS before gs_setup: %lf\n", t1);
 #endif
 
-  h->gsw = gs_setup(vertices, numPoints, &c->gsc, 0, gs_crystal_router, 0);
+  h->gsw = gs_setup(vertices, numPoints, c, 0, gs_crystal_router, 0);
 
 #if defined(GENMAP_DEBUG)
   t1 = GenmapGetMaxRss();
-  if (genmap_comm_rank(GenmapGetLocalComm(h)) == 0)
+  if (c->id == 0)
     printf("RSS after gs_setup: %lf\n", t1);
 #endif
 
@@ -58,8 +58,7 @@ int GenmapInitLaplacianWeighted(genmap_handle h, genmap_comm c) {
   return 0;
 }
 
-int GenmapLaplacianWeighted(genmap_handle h, genmap_comm c, GenmapScalar *u,
-                            GenmapScalar *v) {
+int GenmapLaplacianWeighted(genmap_handle h, GenmapScalar *u, GenmapScalar *v) {
   GenmapInt lelt = GenmapGetNLocalElements(h);
   GenmapInt nv = GenmapGetNVertices(h);
 

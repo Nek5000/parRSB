@@ -54,7 +54,7 @@ int project(genmap_handle h, genmap_comm c, mgData d, GenmapVector ri,
 #if 0
     GenmapLaplacianWeighted(h, c, p->data, w->data);
 #else
-    GenmapLaplacian(h, c, p->data, w->data);
+    GenmapLaplacian(h, p->data, w->data);
 #endif
     metric_toc(&c->gsc, LAPLACIAN);
 

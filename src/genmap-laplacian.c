@@ -2,13 +2,11 @@
 
 #define min(a, b) ((b) < (a) ? (b) : (a))
 
-struct array *GenmapFindNeighbors(genmap_handle h, genmap_comm c) {
-  struct comm cc = c->gsc;
-
+static void GenmapFindNeighbors(struct array *nbrs, genmap_handle h, struct comm *cc) {
   sint lelt = GenmapGetNLocalElements(h);
   sint nv = GenmapGetNVertices(h);
 
-  genmap_scan(h, c);
+  genmap_comm_scan(h, cc);
   ulong elem_id = GenmapGetLocalStartIndex(h) + 1;
   ulong sequenceId = elem_id * nv;
 
@@ -24,7 +22,7 @@ struct array *GenmapFindNeighbors(genmap_handle h, genmap_comm c) {
                     .nNeighbors = 0,
                     .elementId = elem_id,
                     .vertexId = elems[i].vertices[j],
-                    .workProc = elems[i].vertices[j] % cc.np};
+                    .workProc = elems[i].vertices[j] % cc->np};
       array_cat(vertex, &vertices, &vrt, 1);
       sequenceId++;
     }
@@ -33,7 +31,7 @@ struct array *GenmapFindNeighbors(genmap_handle h, genmap_comm c) {
   assert(vertices.n == lelt * nv);
 
   struct crystal cr;
-  crystal_init(&cr, &cc);
+  crystal_init(&cr, cc);
 
   sarray_transfer(vertex, &vertices, workProc, 1, &cr);
   size = vertices.n;
@@ -67,10 +65,10 @@ struct array *GenmapFindNeighbors(genmap_handle h, genmap_comm c) {
   }
 
   sarray_transfer(csr_entry, &a, proc, 1, &cr);
+  // TODO: Check if the last line is redundant
   sarray_sort_2(csr_entry, a.ptr, a.n, r, 1, c, 1, &buf);
   sarray_sort(csr_entry, a.ptr, a.n, r, 1, &buf);
 
-  struct array *nbrs = tmalloc(struct array, 1);
   array_init(entry, nbrs, lelt);
 
   if (a.n == 0) {
@@ -78,7 +76,6 @@ struct array *GenmapFindNeighbors(genmap_handle h, genmap_comm c) {
     buffer_free(&buf);
     array_free(&vertices);
     array_free(&a);
-    return nbrs;
   }
 
   csr_entry *aptr = a.ptr;
@@ -104,27 +101,25 @@ struct array *GenmapFindNeighbors(genmap_handle h, genmap_comm c) {
   buffer_free(&buf);
   array_free(&vertices);
   array_free(&a);
-
-  return nbrs;
 }
 
-int GenmapInitLaplacian(genmap_handle h, genmap_comm c) {
-  struct array *entries = GenmapFindNeighbors(h, c);
-  csr_mat_setup(entries, &c->gsc, &c->M);
-  array_free(entries);
-  free(entries);
+int GenmapInitLaplacian(genmap_handle h, struct comm *c) {
+  struct array entries;
+  GenmapFindNeighbors(&entries, h, c);
+  csr_mat_setup(&entries, c, &h->M);
+  array_free(&entries);
 
-  c->gsh = get_csr_top(c->M, &c->gsc);
-  GenmapRealloc(c->M->row_off[c->M->rn], &h->b);
+  h->gsh = get_csr_top(h->M, c);
+  GenmapRealloc(h->M->row_off[h->M->rn], &h->b);
 
 #if defined(GENMAP_DEBUG)
-  int nnz = c->M->row_off[c->M->rn];
+  int nnz = h->M->row_off[h->M->rn];
   double fro[2] = {0.0, 0.0}, buf[2];
   for (int i = 0; i < nnz; i++) {
-    fro[0] += c->M->v[i];
-    fro[1] += c->M->v[i] * c->M->v[i];
+    fro[0] += h->M->v[i];
+    fro[1] += h->M->v[i] * h->M->v[i];
   }
-  comm_allreduce(&c->gsc, gs_double, gs_add, &fro, 2, &buf);
+  comm_allreduce(c, gs_double, gs_add, &fro, 2, &buf);
   if (c->gsc.id == 0)
     printf("nrom(G,'1')=%g\nnorm(G,'fro')=%g\n", fro[0], fro[1]);
 #endif
@@ -132,10 +127,9 @@ int GenmapInitLaplacian(genmap_handle h, genmap_comm c) {
   return 0;
 }
 
-int GenmapLaplacian(genmap_handle h, genmap_comm c, GenmapScalar *u,
-                    GenmapScalar *v) {
-  csr_mat_gather(c->M, c->gsh, u, h->b, &h->buf);
-  csr_mat_apply(v, c->M, h->b);
+int GenmapLaplacian(genmap_handle h, GenmapScalar *u, GenmapScalar *v) {
+  csr_mat_gather(h->M, h->gsh, u, h->b, &h->buf);
+  csr_mat_apply(v, h->M, h->b);
 
   return 0;
 }

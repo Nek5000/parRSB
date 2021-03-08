@@ -5,18 +5,10 @@ int GenmapCreateComm(genmap_comm *c_, comm_ext ce) {
   genmap_comm c = *c_;
   comm_init(&c->gsc, ce);
 
-  c->gsh = NULL;
-  c->M = NULL;
-
   return 0;
 }
 
 int GenmapDestroyComm(genmap_comm c) {
-  if (c->gsh)
-    gs_free(c->gsh);
-  if (c->M)
-    csr_mat_free(c->M);
-
   comm_free(&c->gsc);
   GenmapFree(c);
 
@@ -67,11 +59,9 @@ void GenmapSplitComm(genmap_handle h, genmap_comm *c, int bin) {
   comm_ext local;
   int id = genmap_comm_rank(*c);
   MPI_Comm_split((*c)->gsc.c, bin, id, &local);
-  GenmapCrystalFinalize(h);
   GenmapDestroyComm(*c);
   GenmapCreateComm(c, local);
   MPI_Comm_free(&local);
-  GenmapCrystalInit(h, *c);
 }
 
 int GenmapCrystalInit(genmap_handle h, genmap_comm c) {
@@ -88,7 +78,7 @@ int GenmapCrystalTransfer(genmap_handle h, int field) {
 }
 
 int GenmapCrystalFinalize(genmap_handle h) {
-  crystal_free(&(h->cr));
+  crystal_free(&h->cr);
   return 0;
 }
 

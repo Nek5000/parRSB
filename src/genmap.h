@@ -94,14 +94,11 @@ int GenmapPrintVector(GenmapVector x);
 int GenmapDestroyVector(GenmapVector x);
 
 /* Laplacian */
-struct array *GenmapFindNeighbors(genmap_handle h, genmap_comm c);
-int GenmapInitLaplacian(genmap_handle h, genmap_comm c);
-int GenmapLaplacian(genmap_handle h, genmap_comm c, GenmapScalar *u,
-                    GenmapScalar *v);
+int GenmapInitLaplacian(genmap_handle h, struct comm *c);
+int GenmapLaplacian(genmap_handle h, GenmapScalar *u, GenmapScalar *v);
 
-int GenmapInitLaplacianWeighted(genmap_handle h, genmap_comm c);
-int GenmapLaplacianWeighted(genmap_handle h, genmap_comm c, GenmapScalar *u,
-                            GenmapScalar *v);
+int GenmapInitLaplacianWeighted(genmap_handle h, struct comm *c);
+int GenmapLaplacianWeighted(genmap_handle h, GenmapScalar *u, GenmapScalar *v);
 
 /* Eigen */
 int GenmapTQLI(genmap_handle h, GenmapVector diag, GenmapVector upper,

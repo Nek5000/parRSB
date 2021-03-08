@@ -63,17 +63,12 @@ int genmap_rsb(genmap_handle h) {
   struct comm *gc = &global_c->gsc;
 
   genmap_scan(h, local_c);
-  crystal_init(&h->cr, lc);
 
-  genmap_scan(h, GenmapGetLocalComm(h));
   uint nelt = GenmapGetNLocalElements(h);
   GenmapElements e = GenmapGetElements(h);
   GenmapInt i;
   for (i = 0; i < nelt; i++)
     e[i].globalId0 = GenmapGetLocalStartIndex(h) + i + 1;
-
-  buffer buf;
-  buffer_init(&buf, 1024);
 
   int nv = h->nv;
   int ndim = (nv == 8) ? 3 : 2;
@@ -98,20 +93,20 @@ int genmap_rsb(genmap_handle h) {
     /* Run RCB, RIB pre-step or just sort by global id */
     if (h->options->rsb_prepartition == 1) { // RCB
       metric_tic(lc, RCB);
-      rcb(lc, h->elements, ndim, &buf);
+      rcb(lc, h->elements, ndim, &h->buf);
       metric_toc(lc, RCB);
     } else if (h->options->rsb_prepartition == 2) { // RIB
       metric_tic(lc, RCB);
-      rib(lc, h->elements, ndim, &buf);
+      rib(lc, h->elements, ndim, &h->buf);
       metric_toc(lc, RCB);
     } else {
       parallel_sort(struct rsb_element, h->elements, globalId0, gs_long, 0, 1,
-                    lc, &buf);
+                    lc, &h->buf);
     }
 
     /* Initialize the laplacian */
     metric_tic(lc, WEIGHTEDLAPLACIANSETUP);
-    GenmapInitLaplacianWeighted(h, local_c);
+    GenmapInitLaplacianWeighted(h, lc);
     metric_toc(lc, WEIGHTEDLAPLACIANSETUP);
 
     /* Run fiedler */
@@ -130,7 +125,7 @@ int genmap_rsb(genmap_handle h) {
     /* Sort by Fiedler vector */
     metric_tic(lc, FIEDLERSORT);
     parallel_sort(struct rsb_element, h->elements, fiedler, gs_double, 0, 1, lc,
-                  &buf);
+                  &h->buf);
     metric_toc(lc, FIEDLERSORT);
 
     /* Bisect */
@@ -149,7 +144,7 @@ int genmap_rsb(genmap_handle h) {
     level++;
 
     /* Check for disconnected components */
-    GenmapInitLaplacianWeighted(h, local_c);
+    GenmapInitLaplacianWeighted(h, lc);
     e = GenmapGetElements(h);
     sint components = get_components(NULL, e, lc, &h->buf, nelt, nv);
     if (components > 1 && lc->id == 0)
@@ -172,9 +167,6 @@ int genmap_rsb(genmap_handle h) {
   if (converged == 0 && gc->id == 0)
     printf("\tWARNING: Lanczos failed to converge while partitioning, Level=%d!\n", level);
 #endif
-
-  crystal_free(&h->cr);
-  buffer_free(&buf);
 
   return 0;
 }

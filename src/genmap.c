@@ -15,6 +15,9 @@ int genmap_init(genmap_handle *h_, comm_ext ce, parRSB_options *options) {
   h->gsw = NULL;
   buffer_init(&h->buf, 1024);
 
+  /* Un-weighted Laplacian */
+  h->gsh = NULL;
+  h->M = NULL;
   h->b = NULL;
 
   h->options = options;
@@ -30,6 +33,11 @@ int genmap_finalize(genmap_handle h) {
     gs_free(h->gsw);
   buffer_free(&h->buf);
 
+  /* Un-weighted Laplacian */
+  if (h->gsh)
+    gs_free(h->gsh);
+  if (h->M)
+    csr_mat_free(h->M);
   if (h->b != NULL)
     GenmapFree(h->b);
 

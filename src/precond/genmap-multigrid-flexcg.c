@@ -43,7 +43,7 @@ int flex_cg(genmap_handle h, genmap_comm c, mgData d, GenmapVector ri,
 
   i = 0;
   while (i < maxIter && sqrt(rz1) > GENMAP_TOL) {
-    GenmapLaplacian(h, c, p->data, w->data);
+    GenmapLaplacian(h, p->data, w->data);
 
     den = GenmapDotVector(p, w);
     GenmapGop(c, &den, 1, GENMAP_SCALAR, GENMAP_SUM);

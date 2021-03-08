@@ -82,7 +82,7 @@ int rqi(genmap_handle h, genmap_comm c, mgData d, GenmapVector z, int max_iter,
 
         // M=Z(1:k,:)*G*Z(1:k,:);
         for (j = 0; j < N; j++) {
-          GenmapLaplacian(h, c, &Z[j * lelt], GZ);
+          GenmapLaplacian(h, &Z[j * lelt], GZ);
           for (k = 0; k < N; k++) {
             M[k * N + j] = 0.0;
             for (l = 0; l < lelt; l++)
