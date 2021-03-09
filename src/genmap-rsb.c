@@ -134,7 +134,7 @@ int genmap_rsb(genmap_handle h) {
     comm_dup(lc, &tc);
     comm_free(&tc);
 
-    genmap_scan(h, lc);
+    genmap_comm_scan(h, lc);
     metric_push_level();
     level++;
 
