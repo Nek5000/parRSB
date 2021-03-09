@@ -41,6 +41,7 @@ void GenmapSetLocalStartIndex(genmap_handle h, GenmapLong localStart);
 int GenmapGetNVertices(genmap_handle h);
 void genmap_set_vertices(genmap_handle h, int nVertices);
 
+/* genmap_comm */
 void genmap_scan(genmap_handle h, genmap_comm c);
 void genmap_comm_scan(genmap_handle h, struct comm *c);
 
@@ -50,14 +51,7 @@ int GenmapDestroyComm(genmap_comm c);
 int genmap_comm_size(genmap_comm c);
 int genmap_comm_rank(genmap_comm c);
 
-int GenmapGop(genmap_comm c, void *v, GenmapInt size, GenmapDataType type,
-              GenmapInt op);
-int GenmapReduce(genmap_comm c, void *out, void *in, GenmapInt size,
-                 GenmapDataType type, GenmapInt op);
-int GenmapBcast(genmap_comm c, void *in, GenmapInt count, GenmapDataType type);
-
 void comm_split(struct comm *old, int bin, int key, struct comm *new_);
-void GenmapSplitComm(genmap_handle h, genmap_comm *c, int bin);
 
 int GenmapRead(genmap_handle h, void *data);
 
