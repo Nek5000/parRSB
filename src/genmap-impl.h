@@ -13,18 +13,8 @@
 #include <genmap-multigrid-precon.h>
 #include <genmap.h>
 
-#define GENMAP_FIEDLER 0
-#define GENMAP_GLOBALID 1
-#define GENMAP_PROC 2
-#define GENMAP_ORIGIN 3
-
 #define GENMAP_RCB_ELEMENT 0
 #define GENMAP_RSB_ELEMENT 1
-
-#define GENMAP_SUM 0
-#define GENMAP_MAX 1
-#define GENMAP_MIN 2
-#define GENMAP_MUL 3
 
 #define GENMAP_ALIGN 32
 
@@ -32,15 +22,8 @@
 #define GENMAP_DP_TOL 1e-12
 #define GENMAP_TOL GENMAP_DP_TOL
 
-#define GENMAP_READER_LEN 256
-#define GENMAP_MAX_READERS 32
-
 #define MAXDIM 3 /* Maximum dimension of the mesh */
 #define MAXNV 8  /* Maximum number of vertices per element */
-
-struct genmap_comm_private {
-  struct comm gsc;
-};
 
 /* parRCB/parRSB internals */
 struct rcb_element {

@@ -202,17 +202,11 @@ int rib(struct comm *ci, struct array *elements, int ndim, buffer *bfr) {
 }
 
 int genmap_rib(genmap_handle h) {
-  genmap_comm local_c = GenmapGetLocalComm(h);
-  struct comm *lc = &local_c->gsc;
+  struct comm *lc = h->local;
 
   int ndim = (h->nv == 8) ? 3 : 2;
 
-  buffer bfr;
-  buffer_init(&bfr, 1024);
-
-  rib(lc, h->elements, ndim, &bfr);
-
-  buffer_free(&bfr);
+  rib(lc, h->elements, ndim, &h->buf);
 
   struct rcb_element *eptr = h->elements->ptr;
   int e;

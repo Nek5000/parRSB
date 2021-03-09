@@ -7,8 +7,11 @@ int genmap_init(genmap_handle *h_, comm_ext ce, parRSB_options *options) {
   GenmapMalloc(1, h_);
   genmap_handle h = *h_;
 
-  GenmapCreateComm(&h->global, ce);
-  GenmapCreateComm(&h->local, ce);
+  GenmapMalloc(1, &h->global);
+  comm_init(h->global, ce);
+
+  GenmapMalloc(1, &h->local);
+  comm_init(h->local, ce);
 
   /* Weighted Laplacian */
   h->weights = NULL;
@@ -41,10 +44,15 @@ int genmap_finalize(genmap_handle h) {
   if (h->b != NULL)
     GenmapFree(h->b);
 
-  if (GenmapGetGlobalComm(h))
-    GenmapDestroyComm(GenmapGetGlobalComm(h));
-  if (GenmapGetLocalComm(h))
-    GenmapDestroyComm(h->local);
+  if (h->global != NULL) {
+    comm_free(h->global);
+    GenmapFree(h->global);
+  }
+
+  if (h->local != NULL) {
+    comm_free(h->local);
+    GenmapFree(h->local);
+  }
 
   GenmapFree(h);
 

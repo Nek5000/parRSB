@@ -8,7 +8,7 @@
 #include <parRSB.h>
 
 typedef MPI_Datatype GenmapDataType;
-typedef struct genmap_comm_private *genmap_comm;
+typedef struct comm *genmap_comm;
 typedef struct genmap_handle_private *genmap_handle;
 typedef struct GenmapVector_private *GenmapVector;
 typedef struct rsb_element *GenmapElements;
@@ -42,12 +42,7 @@ int GenmapGetNVertices(genmap_handle h);
 void genmap_set_vertices(genmap_handle h, int nVertices);
 
 /* genmap_comm */
-void genmap_scan(genmap_handle h, genmap_comm c);
-void genmap_comm_scan(genmap_handle h, struct comm *c);
-
-int GenmapCreateComm(genmap_comm *c, comm_ext ce);
-int GenmapDestroyComm(genmap_comm c);
-
+void genmap_comm_scan(genmap_handle h, genmap_comm c);
 int genmap_comm_size(genmap_comm c);
 int genmap_comm_rank(genmap_comm c);
 

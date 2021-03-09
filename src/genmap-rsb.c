@@ -8,11 +8,8 @@
 #include <sort.h>
 
 static int dump_fiedler_if_discon(genmap_handle h, int level, int max_levels) {
-  genmap_comm local_c = GenmapGetLocalComm(h);
-  struct comm *lc = &local_c->gsc;
-
-  genmap_comm global_c = GenmapGetGlobalComm(h);
-  struct comm *gc = &global_c->gsc;
+  struct comm *lc = h->local;
+  struct comm *gc = h->global;
 
   int nv = h->nv;
   int ndim = (nv == 8) ? 3 : 2;
@@ -56,11 +53,8 @@ int genmap_rsb(genmap_handle h) {
   int max_iter = 50;
   int max_pass = 50;
 
-  genmap_comm local_c = GenmapGetLocalComm(h);
-  struct comm *lc = &local_c->gsc;
-
-  genmap_comm global_c = GenmapGetGlobalComm(h);
-  struct comm *gc = &global_c->gsc;
+  struct comm *lc = h->local;
+  struct comm *gc = h->global;
 
   genmap_comm_scan(h, lc);
 
