@@ -4,7 +4,8 @@
 #include <stdio.h>
 
 /* Orthogonalize by 1-vector (vector of all 1's) */
-int GenmapOrthogonalizebyOneVector(struct comm *c, GenmapVector q1, GenmapULong n) {
+int GenmapOrthogonalizebyOneVector(struct comm *c, GenmapVector q1,
+                                   GenmapULong n) {
   GenmapInt i;
   GenmapScalar sum = 0.0, buf;
   for (i = 0; i < q1->size; i++)

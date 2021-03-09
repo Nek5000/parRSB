@@ -73,11 +73,14 @@ void setOwner(char *ptr, sint n, size_t inOffset, size_t outOffset, slong lelg,
 
 void mg_vcycle(GenmapScalar *u, GenmapScalar *rhs, mgData d);
 
-int flex_cg(genmap_handle h, struct comm *c, mgData d, GenmapVector r, int maxIter, GenmapVector x);
+int flex_cg(genmap_handle h, struct comm *c, mgData d, GenmapVector r,
+            int maxIter, GenmapVector x);
 
-int project(genmap_handle h, struct comm *c, mgData d, GenmapVector r, int maxIter, GenmapVector x);
+int project(genmap_handle h, struct comm *c, mgData d, GenmapVector r,
+            int maxIter, GenmapVector x);
 
-int rqi(genmap_handle h, struct comm *gsc, mgData d, GenmapVector z, int maxIter, GenmapVector fiedler);
+int rqi(genmap_handle h, struct comm *gsc, mgData d, GenmapVector z,
+        int maxIter, GenmapVector fiedler);
 
 #if 0
 void mg_vcycle_lvl(GenmapScalar *u1, GenmapScalar *rhs, mgData d,

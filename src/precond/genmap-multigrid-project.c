@@ -6,7 +6,8 @@
 
 #define MM 505
 
-int project(genmap_handle h, struct comm *gsc, mgData d, GenmapVector ri, int max_iter, GenmapVector x) {
+int project(genmap_handle h, struct comm *gsc, mgData d, GenmapVector ri,
+            int max_iter, GenmapVector x) {
   assert(x->size == ri->size);
   assert(x->size == GenmapGetNLocalElements(h));
 

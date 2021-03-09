@@ -83,7 +83,8 @@ GenmapScalar GenmapAbsMinVector(GenmapVector x);
 GenmapScalar GenmapMinVector(GenmapVector x);
 GenmapScalar GenmapNormVector(GenmapVector x, GenmapInt p);
 
-int GenmapOrthogonalizebyOneVector(struct comm *c, GenmapVector q1, GenmapULong n);
+int GenmapOrthogonalizebyOneVector(struct comm *c, GenmapVector q1,
+                                   GenmapULong n);
 
 int GenmapPrintVector(GenmapVector x);
 int GenmapDestroyVector(GenmapVector x);

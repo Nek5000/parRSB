@@ -2,7 +2,8 @@
 
 #define min(a, b) ((b) < (a) ? (b) : (a))
 
-static void GenmapFindNeighbors(struct array *nbrs, genmap_handle h, struct comm *cc) {
+static void GenmapFindNeighbors(struct array *nbrs, genmap_handle h,
+                                struct comm *cc) {
   sint lelt = GenmapGetNLocalElements(h);
   sint nv = GenmapGetNVertices(h);
 
