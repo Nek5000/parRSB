@@ -24,10 +24,7 @@ int GenmapFree(void *p);
 GenmapElements GenmapGetElements(genmap_handle h);
 
 genmap_comm genmap_local_comm(genmap_handle h);
-void GenmapSetLocalComm(genmap_handle h, genmap_comm c);
-
 genmap_comm genmap_global_comm(genmap_handle h);
-void GenmapSetGlobalComm(genmap_handle h, genmap_comm c);
 
 GenmapInt GenmapGetNLocalElements(genmap_handle h);
 void genmap_set_elements(genmap_handle h, struct array *localElements);
@@ -46,7 +43,7 @@ void genmap_comm_scan(genmap_handle h, genmap_comm c);
 int genmap_comm_size(genmap_comm c);
 int genmap_comm_rank(genmap_comm c);
 
-void comm_split(struct comm *old, int bin, int key, struct comm *new_);
+void genmap_comm_split(struct comm *old, int bin, int key, struct comm *new_);
 
 int GenmapRead(genmap_handle h, void *data);
 

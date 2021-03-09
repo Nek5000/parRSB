@@ -253,7 +253,7 @@ int findSegments(Mesh mesh, struct comm *c, GenmapScalar tol, int verbose,
   int bin = (nPoints > 0);
 
   struct comm nonZeroRanks, dup;
-  comm_split(c, bin, c->id, &nonZeroRanks);
+  genmap_comm_split(c, bin, c->id, &nonZeroRanks);
   comm_dup(&dup, &nonZeroRanks);
 
   GenmapScalar tolSquared = tol * tol;
@@ -284,7 +284,7 @@ int findSegments(Mesh mesh, struct comm *c, GenmapScalar tol, int verbose,
           bin = (nPoints > 0);
 
           comm_free(&nonZeroRanks);
-          comm_split(&dup, bin, nonZeroRanks.id, &nonZeroRanks);
+          genmap_comm_split(&dup, bin, nonZeroRanks.id, &nonZeroRanks);
         }
       }
     }

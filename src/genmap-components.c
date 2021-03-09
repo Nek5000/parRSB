@@ -60,7 +60,7 @@ sint get_components(sint *component, GenmapElements elements, struct comm *c,
     if (arr.n > 0)
       bin = 1;
 
-    comm_split(c, bin, c->id, &cc);
+    genmap_comm_split(c, bin, c->id, &cc);
 
     nnz1 = nnzg = nnzg0 = 0;
 

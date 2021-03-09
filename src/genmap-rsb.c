@@ -123,7 +123,7 @@ int genmap_rsb(genmap_handle h) {
       bin = 0;
 
     struct comm tc;
-    comm_split(lc, bin, lc->id, &tc);
+    genmap_comm_split(lc, bin, lc->id, &tc);
     comm_free(lc);
     comm_dup(lc, &tc);
     comm_free(&tc);
