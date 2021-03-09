@@ -81,7 +81,7 @@ int GenmapTQLI(genmap_handle h, GenmapVector diagonal, GenmapVector upper,
 
       if (m != l) {
         if (iter++ == 30) {
-          if (genmap_comm_rank(GenmapGetGlobalComm(h)) == 0)
+          if (genmap_comm_rank(genmap_global_comm(h)) == 0)
             printf("Too many iterations.\n");
           GenmapCopyVector(*eValues, d);
           return 1;

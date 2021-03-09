@@ -4,11 +4,11 @@ int genmap_comm_size(genmap_comm c) { return (int)c->np; }
 
 int genmap_comm_rank(genmap_comm c) { return (int)c->id; }
 
-genmap_comm GenmapGetLocalComm(genmap_handle h) { return h->local; }
+genmap_comm genmap_local_comm(genmap_handle h) { return h->local; }
 
 void GenmapSetLocalComm(genmap_handle h, genmap_comm c) { h->local = c; }
 
-genmap_comm GenmapGetGlobalComm(genmap_handle h) { return h->global; }
+genmap_comm genmap_global_comm(genmap_handle h) { return h->global; }
 
 void GenmapSetGlobalComm(genmap_handle h, genmap_comm c) { h->global = c; }
 

@@ -67,12 +67,12 @@ int parRSB_partMesh(int *part, int *seq, long long *vtx, double *coord, int nel,
     genmap_init(&h, comm_rsb, options);
 
     genmap_set_elements(h, &eList);
-    genmap_comm_scan(h, GenmapGetGlobalComm(h));
+    genmap_comm_scan(h, genmap_global_comm(h));
     genmap_set_vertices(h, nv);
 
     GenmapLong nelg = genmap_get_global_nel(h);
-    GenmapInt id = genmap_comm_rank(GenmapGetGlobalComm(h));
-    GenmapInt size_ = genmap_comm_size(GenmapGetGlobalComm(h));
+    GenmapInt id = genmap_comm_rank(genmap_global_comm(h));
+    GenmapInt size_ = genmap_comm_size(genmap_global_comm(h));
 
     if (size_ > nelg) {
       if (id == 0) {

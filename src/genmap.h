@@ -23,10 +23,10 @@ int GenmapFree(void *p);
 
 GenmapElements GenmapGetElements(genmap_handle h);
 
-genmap_comm GenmapGetLocalComm(genmap_handle h);
+genmap_comm genmap_local_comm(genmap_handle h);
 void GenmapSetLocalComm(genmap_handle h, genmap_comm c);
 
-genmap_comm GenmapGetGlobalComm(genmap_handle h);
+genmap_comm genmap_global_comm(genmap_handle h);
 void GenmapSetGlobalComm(genmap_handle h, genmap_comm c);
 
 GenmapInt GenmapGetNLocalElements(genmap_handle h);

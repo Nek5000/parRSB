@@ -37,7 +37,7 @@ double GenmapGetMaxRss() {
 }
 
 void genmap_exit_error(genmap_handle h) {
-  genmap_comm c = GenmapGetGlobalComm(h);
+  genmap_comm c = genmap_global_comm(h);
   int rank = genmap_comm_rank(c);
 
   genmap_finalize(h);

@@ -5,7 +5,8 @@
 //
 // TODO: use a separate function to generate init vector
 //
-int GenmapFiedlerRQI(genmap_handle h, struct comm *gsc, int max_iter, int global) {
+int GenmapFiedlerRQI(genmap_handle h, struct comm *gsc, int max_iter,
+                     int global) {
   GenmapInt lelt = GenmapGetNLocalElements(h);
   GenmapVector initVec;
   GenmapCreateVector(&initVec, lelt);
@@ -101,8 +102,8 @@ int GenmapFiedlerLanczos(genmap_handle h, struct comm *gsc, int max_iter,
   int iter;
   metric_tic(gsc, LANCZOS);
   if (h->options->rsb_paul == 1)
-    iter =
-        GenmapLanczosLegendary(h, gsc, initVec, max_iter, &q, alphaVec, betaVec);
+    iter = GenmapLanczosLegendary(h, gsc, initVec, max_iter, &q, alphaVec,
+                                  betaVec);
   else
     iter = GenmapLanczos(h, gsc, initVec, max_iter, &q, alphaVec, betaVec);
   metric_toc(gsc, LANCZOS);
