@@ -74,16 +74,11 @@ int genmap_rsb(genmap_handle h) {
   int ndim = (nv == 8) ? 3 : 2;
 
   int np = gc->np;
-
   int level = 0, max_levels = log2(np);
 
   sint bfr[2];
 
-  while (genmap_comm_size(GenmapGetLocalComm(h)) > 1) {
-    local_c = GenmapGetLocalComm(h);
-    lc = &local_c->gsc;
-    np = lc->np;
-
+  while ((np = lc->np) > 1) {
     int global;
     if (h->options->rsb_paul == 1)
       global = 1;
@@ -114,9 +109,9 @@ int genmap_rsb(genmap_handle h) {
     int ipass = 0, iter;
     do {
       if (h->options->rsb_algo == 0)
-        iter = GenmapFiedlerLanczos(h, local_c, max_iter, global);
+        iter = GenmapFiedlerLanczos(h, lc, max_iter, global);
       else if (h->options->rsb_algo == 1)
-        iter = GenmapFiedlerRQI(h, local_c, max_iter, global);
+        iter = GenmapFiedlerRQI(h, lc, max_iter, global);
       metric_acc(NFIEDLER, iter);
       global = 0;
     } while (++ipass < max_pass && iter == max_iter);
@@ -129,17 +124,17 @@ int genmap_rsb(genmap_handle h) {
     metric_toc(lc, FIEDLERSORT);
 
     /* Bisect */
-    metric_tic(lc, BISECT);
     int bin = 1;
     if (lc->id < (np + 1) / 2)
       bin = 0;
-    // FIXME: Ugly
-    GenmapSplitComm(h, &local_c, bin);
-    GenmapSetLocalComm(h, local_c);
-    lc = &local_c->gsc;
-    genmap_scan(h, local_c);
-    metric_toc(lc, BISECT);
 
+    struct comm tc;
+    comm_split(lc, bin, lc->id, &tc);
+    comm_free(lc);
+    comm_dup(lc, &tc);
+    comm_free(&tc);
+
+    genmap_scan(h, lc);
     metric_push_level();
     level++;
 

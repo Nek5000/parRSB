@@ -5,8 +5,7 @@
 //
 // TODO: use a separate function to generate init vector
 //
-int GenmapFiedlerRQI(genmap_handle h, genmap_comm c, int max_iter, int global) {
-  struct comm *gsc = &c->gsc;
+int GenmapFiedlerRQI(genmap_handle h, struct comm *gsc, int max_iter, int global) {
   GenmapInt lelt = GenmapGetNLocalElements(h);
   GenmapVector initVec;
   GenmapCreateVector(&initVec, lelt);
@@ -46,7 +45,7 @@ int GenmapFiedlerRQI(genmap_handle h, genmap_comm c, int max_iter, int global) {
   GenmapCreateZerosVector(&y, lelt);
 
   metric_tic(gsc, RQI);
-  int iter = rqi(h, c, d, initVec, max_iter, y);
+  int iter = rqi(h, gsc, d, initVec, max_iter, y);
   metric_toc(gsc, RQI);
   metric_acc(NRQI, iter);
 
@@ -67,9 +66,8 @@ int GenmapFiedlerRQI(genmap_handle h, genmap_comm c, int max_iter, int global) {
   return iter;
 }
 
-int GenmapFiedlerLanczos(genmap_handle h, genmap_comm c, int max_iter,
+int GenmapFiedlerLanczos(genmap_handle h, struct comm *gsc, int max_iter,
                          int global) {
-  struct comm *gsc = &c->gsc;
   GenmapInt lelt = GenmapGetNLocalElements(h);
   GenmapVector initVec, alphaVec, betaVec;
 
@@ -95,18 +93,18 @@ int GenmapFiedlerLanczos(genmap_handle h, genmap_comm c, int max_iter,
   GenmapVector *q = NULL;
 
   GenmapOrthogonalizebyOneVector(gsc, initVec, genmap_get_global_nel(h));
-  GenmapScalar rtr = GenmapDotVector(initVec, initVec);
-  GenmapGop(c, &rtr, 1, GENMAP_SCALAR, GENMAP_SUM);
-  GenmapScalar rni = 1.0 / sqrt(rtr);
+  GenmapScalar rtr = GenmapDotVector(initVec, initVec), rni;
+  comm_allreduce(gsc, gs_double, gs_add, &rtr, 1, &rni);
+  rni = 1.0 / sqrt(rtr);
   GenmapScaleVector(initVec, initVec, rni);
 
   int iter;
   metric_tic(gsc, LANCZOS);
   if (h->options->rsb_paul == 1)
     iter =
-        GenmapLanczosLegendary(h, c, initVec, max_iter, &q, alphaVec, betaVec);
+        GenmapLanczosLegendary(h, gsc, initVec, max_iter, &q, alphaVec, betaVec);
   else
-    iter = GenmapLanczos(h, c, initVec, max_iter, &q, alphaVec, betaVec);
+    iter = GenmapLanczos(h, gsc, initVec, max_iter, &q, alphaVec, betaVec);
   metric_toc(gsc, LANCZOS);
   metric_acc(NLANCZOS, iter);
 
@@ -136,12 +134,12 @@ int GenmapFiedlerLanczos(genmap_handle h, genmap_comm c, int max_iter,
       evLanczos->data[i] += q[j]->data[i] * evTriDiag->data[j];
   }
 
-  GenmapScalar lNorm = 0;
+  GenmapScalar norm = 0, normi;
   for (i = 0; i < lelt; i++)
-    lNorm += evLanczos->data[i] * evLanczos->data[i];
+    norm += evLanczos->data[i] * evLanczos->data[i];
 
-  GenmapGop(c, &lNorm, 1, GENMAP_SCALAR, GENMAP_SUM);
-  GenmapScaleVector(evLanczos, evLanczos, 1. / sqrt(lNorm));
+  comm_allreduce(gsc, gs_double, gs_add, &norm, 1, &normi);
+  GenmapScaleVector(evLanczos, evLanczos, 1. / sqrt(norm));
   for (i = 0; i < lelt; i++)
     elements[i].fiedler = evLanczos->data[i];
 

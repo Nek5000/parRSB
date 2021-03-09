@@ -242,3 +242,20 @@ int GenmapPrintVector(GenmapVector x) {
 
   return 0;
 }
+
+/* Orthogonalize by 1-vector (vector of all 1's) */
+int GenmapOrthogonalizebyOneVector(struct comm *c, GenmapVector q1,
+                                   GenmapULong n) {
+  GenmapInt i;
+  GenmapScalar sum = 0.0, buf;
+  for (i = 0; i < q1->size; i++)
+    sum += q1->data[i];
+
+  comm_allreduce(c, gs_double, gs_add, &sum, 1, &buf);
+  sum /= n;
+
+  for (i = 0; i < q1->size; i++)
+    q1->data[i] -= sum;
+
+  return 0;
+}

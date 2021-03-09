@@ -106,17 +106,17 @@ int genmap_power(double *y, int N, double *A, int verbose);
 void matrix_inverse(int N, double *A);
 
 /* Lanczos */
-int GenmapLanczosLegendary(genmap_handle h, genmap_comm c, GenmapVector f,
+int GenmapLanczosLegendary(genmap_handle h, struct comm *c, GenmapVector f,
                            GenmapInt niter, GenmapVector **rr,
                            GenmapVector diag, GenmapVector upper);
-int GenmapLanczos(genmap_handle h, genmap_comm c, GenmapVector init,
+int GenmapLanczos(genmap_handle h, struct comm *c, GenmapVector init,
                   GenmapInt iter, GenmapVector **q, GenmapVector alpha,
                   GenmapVector beta);
 
 /* Fiedler */
-int GenmapFiedlerLanczos(genmap_handle h, genmap_comm c, int maxIter,
+int GenmapFiedlerLanczos(genmap_handle h, struct comm *c, int maxIter,
                          int global);
-int GenmapFiedlerRQI(genmap_handle h, genmap_comm c, int maxIter, int global);
+int GenmapFiedlerRQI(genmap_handle h, struct comm *c, int maxIter, int global);
 
 /* RSB/RCB */
 void genmap_load_balance(struct array *eList, uint nel, int nv, double *coord,
