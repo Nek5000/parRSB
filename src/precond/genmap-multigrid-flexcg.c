@@ -4,7 +4,7 @@
 #include <genmap-impl.h>
 #include <genmap-multigrid-precon.h>
 
-int flex_cg(genmap_handle h, genmap_comm c, mgData d, GenmapVector ri,
+int flex_cg(genmap_handle h, struct comm *gsc, mgData d, GenmapVector ri,
             int maxIter, GenmapVector x) {
   assert(x->size == ri->size);
   assert(x->size == GenmapGetNLocalElements(h));
@@ -23,7 +23,7 @@ int flex_cg(genmap_handle h, genmap_comm c, mgData d, GenmapVector ri,
 #define PREC 1
 #define ORTH 1
 
-  int rank = genmap_comm_rank(c);
+  int rank = gsc->id;
 
   uint i;
   for (i = 0; i < lelt; i++)
@@ -31,13 +31,13 @@ int flex_cg(genmap_handle h, genmap_comm c, mgData d, GenmapVector ri,
 
   GenmapCopyVector(z, r);
 #if ORTH
-  GenmapOrthogonalizebyOneVector(c, z, nelg);
+  GenmapOrthogonalizebyOneVector(gsc, z, nelg);
 #endif
 
-  GenmapScalar den, alpha, beta, rz0, rz1 = 0, rz2, rr;
+  GenmapScalar den, alpha, beta, rz0, rz1, rz2, rr, buf;
 
   rz1 = GenmapDotVector(r, z);
-  GenmapGop(c, &rz1, 1, GENMAP_SCALAR, GENMAP_SUM);
+  comm_allreduce(gsc, gs_double, gs_add, &rz1, 1, &buf);
 
   GenmapCopyVector(p, z);
 
@@ -46,7 +46,7 @@ int flex_cg(genmap_handle h, genmap_comm c, mgData d, GenmapVector ri,
     GenmapLaplacian(h, p->data, w->data);
 
     den = GenmapDotVector(p, w);
-    GenmapGop(c, &den, 1, GENMAP_SCALAR, GENMAP_SUM);
+    comm_allreduce(gsc, gs_double, gs_add, &den, 1, &buf);
 
     alpha = rz1 / den;
 
@@ -60,30 +60,32 @@ int flex_cg(genmap_handle h, genmap_comm c, mgData d, GenmapVector ri,
     GenmapCopyVector(z, r);
 #endif
 #if ORTH
-    GenmapOrthogonalizebyOneVector(c, z, nelg);
+    GenmapOrthogonalizebyOneVector(gsc, z, nelg);
 #endif
 
     rz0 = rz1;
 
     rz1 = GenmapDotVector(r, z);
-    GenmapGop(c, &rz1, 1, GENMAP_SCALAR, GENMAP_SUM);
+    comm_allreduce(gsc, gs_double, gs_add, &rz1, 1, &buf);
 
     GenmapAxpbyVector(dz, z, 1.0, z0, -1.0);
     rz2 = GenmapDotVector(r, dz);
-    GenmapGop(c, &rz2, 1, GENMAP_SCALAR, GENMAP_SUM);
+    comm_allreduce(gsc, gs_double, gs_add, &rz2, 1, &buf);
     beta = rz2 / rz0;
 
     GenmapAxpbyVector(p, z, 1.0, p, beta);
     i++;
 
     rr = GenmapDotVector(r, r);
-    GenmapGop(c, &rr, 1, GENMAP_SCALAR, GENMAP_SUM);
+    comm_allreduce(gsc, gs_double, gs_add, &rr, 1, &buf);
   }
 
-  GenmapDestroyVector(z), GenmapDestroyVector(w);
+  GenmapDestroyVector(z);
+  GenmapDestroyVector(w);
   GenmapDestroyVector(p);
   GenmapDestroyVector(r);
-  GenmapDestroyVector(z0), GenmapDestroyVector(dz);
+  GenmapDestroyVector(z0);
+  GenmapDestroyVector(dz);
 
   return i;
 }

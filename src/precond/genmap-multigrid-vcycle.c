@@ -104,6 +104,7 @@ void mg_vcycle(GenmapScalar *u1, GenmapScalar *rhs, mgData d) {
   buffer_free(&buf);
 }
 
+#if 0
 void mg_vcycle_lvl(GenmapScalar *u1, GenmapScalar *rhs, mgData d,
                    int lvl_start) {
   assert(lvl_start < d->nlevels - 1);
@@ -209,3 +210,4 @@ void mg_vcycle_lvl(GenmapScalar *u1, GenmapScalar *rhs, mgData d,
 
   buffer_free(&buf);
 }
+#endif

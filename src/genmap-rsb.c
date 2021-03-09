@@ -62,7 +62,7 @@ int genmap_rsb(genmap_handle h) {
   genmap_comm global_c = GenmapGetGlobalComm(h);
   struct comm *gc = &global_c->gsc;
 
-  genmap_scan(h, local_c);
+  genmap_comm_scan(h, lc);
 
   uint nelt = GenmapGetNLocalElements(h);
   GenmapElements e = GenmapGetElements(h);

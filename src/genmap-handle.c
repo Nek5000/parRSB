@@ -10,9 +10,9 @@ void genmap_set_elements(genmap_handle h, struct array *localElements) {
   h->elements = localElements;
 }
 
-GenmapLong genmap_get_global_nel(genmap_handle h) { return h->nel; }
+GenmapULong genmap_get_global_nel(genmap_handle h) { return h->nel; }
 
-void GenmapSetNGlobalElements(genmap_handle h, GenmapLong globalElements) {
+void GenmapSetNGlobalElements(genmap_handle h, GenmapULong globalElements) {
   h->nel = globalElements;
 }
 

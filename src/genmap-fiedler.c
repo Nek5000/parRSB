@@ -6,6 +6,7 @@
 // TODO: use a separate function to generate init vector
 //
 int GenmapFiedlerRQI(genmap_handle h, genmap_comm c, int max_iter, int global) {
+  struct comm *gsc = &c->gsc;
   GenmapInt lelt = GenmapGetNLocalElements(h);
   GenmapVector initVec;
   GenmapCreateVector(&initVec, lelt);
@@ -25,21 +26,20 @@ int GenmapFiedlerRQI(genmap_handle h, genmap_comm c, int max_iter, int global) {
       initVec->data[i] = elements[i].fiedler;
   }
 
-  GenmapOrthogonalizebyOneVector(c, initVec, genmap_get_global_nel(h));
-  GenmapScalar norm = GenmapDotVector(initVec, initVec);
-  GenmapGop(c, &norm, 1, GENMAP_SCALAR, GENMAP_SUM);
-  GenmapScalar normi = 1.0 / sqrt(norm);
+  GenmapOrthogonalizebyOneVector(gsc, initVec, genmap_get_global_nel(h));
+
+  GenmapScalar norm = GenmapDotVector(initVec, initVec), normi;
+  comm_allreduce(gsc, gs_double, gs_add, &norm, 1, &normi);
+  normi = 1.0 / sqrt(norm);
   GenmapScaleVector(initVec, initVec, normi);
 
-  struct comm *gsc = &c->gsc;
-
   metric_tic(gsc, LAPLACIANSETUP);
-  GenmapInitLaplacian(h, c);
+  GenmapInitLaplacian(h, gsc);
   metric_toc(gsc, LAPLACIANSETUP);
 
   metric_tic(gsc, PRECONDSETUP);
   mgData d;
-  mgSetup(h, c, h->M, &d);
+  mgSetup(h, gsc, h->M, &d);
   metric_toc(gsc, PRECONDSETUP);
 
   GenmapVector y;
@@ -52,12 +52,12 @@ int GenmapFiedlerRQI(genmap_handle h, genmap_comm c, int max_iter, int global) {
 
   mgFree(d);
 
-  GenmapScalar lNorm = 0;
+  norm = 0;
   for (i = 0; i < lelt; i++)
-    lNorm += y->data[i] * y->data[i];
-  GenmapGop(c, &lNorm, 1, GENMAP_SCALAR, GENMAP_SUM);
+    norm += y->data[i] * y->data[i];
+  comm_allreduce(gsc, gs_double, gs_add, &norm, 1, &normi);
 
-  GenmapScaleVector(y, y, 1. / sqrt(lNorm));
+  GenmapScaleVector(y, y, 1. / sqrt(norm));
   for (i = 0; i < lelt; i++)
     elements[i].fiedler = y->data[i];
 
@@ -69,6 +69,7 @@ int GenmapFiedlerRQI(genmap_handle h, genmap_comm c, int max_iter, int global) {
 
 int GenmapFiedlerLanczos(genmap_handle h, genmap_comm c, int max_iter,
                          int global) {
+  struct comm *gsc = &c->gsc;
   GenmapInt lelt = GenmapGetNLocalElements(h);
   GenmapVector initVec, alphaVec, betaVec;
 
@@ -93,21 +94,20 @@ int GenmapFiedlerLanczos(genmap_handle h, genmap_comm c, int max_iter,
   GenmapCreateVector(&betaVec, max_iter - 1);
   GenmapVector *q = NULL;
 
-  GenmapOrthogonalizebyOneVector(c, initVec, genmap_get_global_nel(h));
+  GenmapOrthogonalizebyOneVector(gsc, initVec, genmap_get_global_nel(h));
   GenmapScalar rtr = GenmapDotVector(initVec, initVec);
   GenmapGop(c, &rtr, 1, GENMAP_SCALAR, GENMAP_SUM);
   GenmapScalar rni = 1.0 / sqrt(rtr);
   GenmapScaleVector(initVec, initVec, rni);
 
   int iter;
-  struct comm *lc = &c->gsc;
-  metric_tic(lc, LANCZOS);
+  metric_tic(gsc, LANCZOS);
   if (h->options->rsb_paul == 1)
     iter =
         GenmapLanczosLegendary(h, c, initVec, max_iter, &q, alphaVec, betaVec);
   else
     iter = GenmapLanczos(h, c, initVec, max_iter, &q, alphaVec, betaVec);
-  metric_toc(lc, LANCZOS);
+  metric_toc(gsc, LANCZOS);
   metric_acc(NLANCZOS, iter);
 
   GenmapVector evLanczos, evTriDiag;
@@ -115,9 +115,9 @@ int GenmapFiedlerLanczos(genmap_handle h, genmap_comm c, int max_iter,
 
   /* Use TQLI and find the minimum eigenvalue and associated vector */
   GenmapVector *eVectors, eValues;
-  metric_tic(lc, TQLI);
+  metric_tic(gsc, TQLI);
   GenmapTQLI(h, alphaVec, betaVec, &eVectors, &eValues);
-  metric_toc(lc, TQLI);
+  metric_toc(gsc, TQLI);
 
   GenmapScalar eValMin = fabs(eValues->data[0]);
   GenmapInt eValMinI = 0;

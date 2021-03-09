@@ -4,14 +4,13 @@
 #include <stdio.h>
 
 /* Orthogonalize by 1-vector (vector of all 1's) */
-int GenmapOrthogonalizebyOneVector(genmap_comm c, GenmapVector q1,
-                                   GenmapLong n) {
+int GenmapOrthogonalizebyOneVector(struct comm *c, GenmapVector q1, GenmapULong n) {
   GenmapInt i;
-  GenmapScalar sum = 0.0;
+  GenmapScalar sum = 0.0, buf;
   for (i = 0; i < q1->size; i++)
     sum += q1->data[i];
 
-  GenmapGop(c, &sum, 1, GENMAP_SCALAR, GENMAP_SUM);
+  comm_allreduce(c, gs_double, gs_add, &sum, 1, &buf);
   sum /= n;
 
   for (i = 0; i < q1->size; i++)
@@ -48,7 +47,7 @@ int GenmapLanczosLegendary(genmap_handle h, genmap_comm c, GenmapVector f,
 
   GenmapCreateVector(&r, lelt);
   GenmapCopyVector(r, f);
-  GenmapOrthogonalizebyOneVector(c, r, genmap_get_global_nel(h));
+  GenmapOrthogonalizebyOneVector(&c->gsc, r, genmap_get_global_nel(h));
   rtr = GenmapDotVector(r, r);
   GenmapGop(c, &rtr, 1, GENMAP_SCALAR, GENMAP_SUM);
   rnorm = sqrt(rtr);
@@ -74,7 +73,7 @@ int GenmapLanczosLegendary(genmap_handle h, genmap_comm c, GenmapVector f,
       beta = 0.0;
 
     GenmapAxpbyVector(p, p, beta, r, 1.0);
-    GenmapOrthogonalizebyOneVector(c, p, genmap_get_global_nel(h));
+    GenmapOrthogonalizebyOneVector(&c->gsc, p, genmap_get_global_nel(h));
 
     metric_tic(&c->gsc, WEIGHTEDLAPLACIAN);
     GenmapLaplacianWeighted(h, p->data, w->data);
@@ -143,7 +142,7 @@ int GenmapLanczos(genmap_handle h, genmap_comm c, GenmapVector init,
 
   GenmapCreateVector(&q1, lelt);
   GenmapCopyVector(q1, init);
-  GenmapOrthogonalizebyOneVector(c, q1, genmap_get_global_nel(h));
+  GenmapOrthogonalizebyOneVector(&c->gsc, q1, genmap_get_global_nel(h));
   normq1 = GenmapDotVector(q1, q1);
   GenmapGop(c, &normq1, 1, GENMAP_SCALAR, GENMAP_SUM);
   normq1 = sqrt(normq1);

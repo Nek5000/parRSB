@@ -32,8 +32,8 @@ void GenmapSetGlobalComm(genmap_handle h, genmap_comm c);
 GenmapInt GenmapGetNLocalElements(genmap_handle h);
 void genmap_set_elements(genmap_handle h, struct array *localElements);
 
-GenmapLong genmap_get_global_nel(genmap_handle h);
-void GenmapSetNGlobalElements(genmap_handle h, GenmapLong globalElements);
+GenmapULong genmap_get_global_nel(genmap_handle h);
+void GenmapSetNGlobalElements(genmap_handle h, GenmapULong globalElements);
 
 GenmapLong GenmapGetLocalStartIndex(genmap_handle h);
 void GenmapSetLocalStartIndex(genmap_handle h, GenmapLong localStart);
@@ -59,10 +59,6 @@ int GenmapBcast(genmap_comm c, void *in, GenmapInt count, GenmapDataType type);
 void comm_split(struct comm *old, int bin, int key, struct comm *new_);
 void GenmapSplitComm(genmap_handle h, genmap_comm *c, int bin);
 
-int GenmapCrystalInit(genmap_handle h, genmap_comm c);
-int GenmapCrystalTransfer(genmap_handle h, int field);
-int GenmapCrystalFinalize(genmap_handle h);
-
 int GenmapRead(genmap_handle h, void *data);
 
 /* Genamp Vector */
@@ -87,8 +83,7 @@ GenmapScalar GenmapAbsMinVector(GenmapVector x);
 GenmapScalar GenmapMinVector(GenmapVector x);
 GenmapScalar GenmapNormVector(GenmapVector x, GenmapInt p);
 
-int GenmapOrthogonalizebyOneVector(genmap_comm c, GenmapVector q1,
-                                   GenmapLong n);
+int GenmapOrthogonalizebyOneVector(struct comm *c, GenmapVector q1, GenmapULong n);
 
 int GenmapPrintVector(GenmapVector x);
 int GenmapDestroyVector(GenmapVector x);

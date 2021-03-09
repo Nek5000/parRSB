@@ -210,14 +210,14 @@ void mgLevelSetup(mgData d, uint lvl) {
   array_free(&entries);
 }
 
-void mgSetup(genmap_handle h, genmap_comm c, csr_mat M, mgData *d_) {
+void mgSetup(genmap_handle h, struct comm *gsc, csr_mat M, mgData *d_) {
   GenmapMalloc(1, d_);
   mgData d = *d_;
   d->h = h;
 
-  comm_dup(&d->c, &c->gsc);
+  comm_dup(&d->c, gsc);
 
-  uint np = genmap_comm_size(c);
+  uint np = gsc->np;
   uint rn = M->rn;
 
   slong out[2][1], bf[2][1], in = rn;

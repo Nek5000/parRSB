@@ -64,24 +64,6 @@ void GenmapSplitComm(genmap_handle h, genmap_comm *c, int bin) {
   MPI_Comm_free(&local);
 }
 
-int GenmapCrystalInit(genmap_handle h, genmap_comm c) {
-  crystal_init(&(h->cr), &(c->gsc));
-  return 0;
-}
-
-int GenmapCrystalTransfer(genmap_handle h, int field) {
-  if (field == GENMAP_ORIGIN)
-    sarray_transfer(struct rsb_element, h->elements, origin, 0, &h->cr);
-  else if (field == GENMAP_PROC)
-    sarray_transfer(struct rsb_element, h->elements, proc, 0, &h->cr);
-  return 0;
-}
-
-int GenmapCrystalFinalize(genmap_handle h) {
-  crystal_free(&h->cr);
-  return 0;
-}
-
 void comm_split(struct comm *old, int bin, int key, struct comm *new_) {
 #ifdef MPI
   MPI_Comm new_comm;
