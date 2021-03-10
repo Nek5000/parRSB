@@ -135,7 +135,7 @@ int main(int argc, char *argv[]) {
   genmap_set_nvertices(gh, mesh->nVertex);
 
   /* Setup mesh */
-  struct rsb_element * e = genmap_get_elements(gh);
+  struct rsb_element *e = genmap_get_elements(gh);
   me = (Point)MeshGetElements(mesh);
   for (i = 0; i < mesh->nelt; i++)
     for (j = 0; j < mesh->nVertex; j++)

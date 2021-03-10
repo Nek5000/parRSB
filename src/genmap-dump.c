@@ -40,7 +40,7 @@ int GenmapFiedlerDump(const char *fname, genmap_handle h, slong g_start,
     write_T(pbuf0, ndim, int, 1);
   }
 
-  struct rsb_element * elm = genmap_get_elements(h);
+  struct rsb_element *elm = genmap_get_elements(h);
   uint i;
   for (i = 0; i < nelt; i++) {
     slong id = g_start + i;
@@ -141,7 +141,7 @@ int GenmapCentroidDump(const char *fname, genmap_handle h, sint g_id,
     write_T(pbuf0, ndim, int, 1);
   }
 
-  struct rsb_element * elm = genmap_get_elements(h);
+  struct rsb_element *elm = genmap_get_elements(h);
   uint i;
   for (i = 0; i < nelt; i++) {
     write_T(pbuf0, elm[i].coord[0], double, ndim);
@@ -193,7 +193,7 @@ int GenmapElementIdDump(const char *fname, genmap_handle h, struct comm *c) {
     write_T(pbuf0, ndim, int, 1);
   }
 
-  struct rsb_element * elm = genmap_get_elements(h);
+  struct rsb_element *elm = genmap_get_elements(h);
   uint i;
   for (i = 0; i < nelt; i++)
     write_T(pbuf0, elm[i].globalId, GenmapLong, 1);

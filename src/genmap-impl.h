@@ -136,8 +136,8 @@ typedef struct {
 } vertex;
 
 /* Components */
-sint get_components(sint *component, struct rsb_element * elements, struct comm *c,
-                    buffer *buf, uint nelt, uint nv);
+sint get_components(sint *component, struct rsb_element *elements,
+                    struct comm *c, buffer *buf, uint nelt, uint nv);
 
 /* Matrix inverse */
 void matrix_inverse(int N, double *A);

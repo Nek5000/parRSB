@@ -1,6 +1,6 @@
 #include "genmap-impl.h"
 
-struct rsb_element * genmap_get_elements(genmap_handle h) {
+struct rsb_element *genmap_get_elements(genmap_handle h) {
   return (struct rsb_element *)h->elements->ptr;
 }
 void genmap_set_elements(genmap_handle h, struct array *elements) {
