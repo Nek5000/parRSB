@@ -11,7 +11,7 @@ int GenmapFiedlerRQI(genmap_handle h, struct comm *gsc, int max_iter,
   genmap_vector initVec;
   GenmapCreateVector(&initVec, lelt);
 
-  genmap_element elements = genmap_get_elements(h);
+  struct rsb_element * elements = genmap_get_elements(h);
   GenmapInt i;
   if (global > 0) {
     if (h->options->rsb_paul == 1) {
@@ -73,7 +73,7 @@ int GenmapFiedlerLanczos(genmap_handle h, struct comm *gsc, int max_iter,
   genmap_vector initVec, alphaVec, betaVec;
 
   GenmapCreateVector(&initVec, genmap_get_nel(h));
-  genmap_element elements = genmap_get_elements(h);
+  struct rsb_element * elements = genmap_get_elements(h);
 
   GenmapInt i;
   if (global > 0) {

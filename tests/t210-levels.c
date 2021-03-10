@@ -29,7 +29,7 @@ int main(int argc, char *argv[]) {
   genmap_set_nvertices(gh, mesh->nVertex);
 
   /* Setup mesh */
-  genmap_element e = genmap_get_elements(gh);
+  struct rsb_element * e = genmap_get_elements(gh);
   Element me = MeshGetElements(mesh);
   GenmapInt i, j;
   for (i = 0; i < mesh->nelt; i++)

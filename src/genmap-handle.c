@@ -1,14 +1,14 @@
 #include "genmap-impl.h"
 
-genmap_element genmap_get_elements(genmap_handle h) {
-  return (genmap_element)h->elements->ptr;
+struct rsb_element * genmap_get_elements(genmap_handle h) {
+  return (struct rsb_element *)h->elements->ptr;
 }
-void genmap_set_elements(genmap_handle h, struct array *localElements) {
-  h->elements = localElements;
+void genmap_set_elements(genmap_handle h, struct array *elements) {
+  h->elements = elements;
 }
 
 int genmap_get_nvertices(genmap_handle h) { return h->nv; }
-void genmap_set_nvertices(genmap_handle h, int nVertices) { h->nv = nVertices; }
+void genmap_set_nvertices(genmap_handle h, int nv) { h->nv = nv; }
 
 GenmapInt genmap_get_nel(genmap_handle h) { return h->elements->n; }
 

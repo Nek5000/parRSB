@@ -10,17 +10,16 @@
 typedef struct comm *genmap_comm;
 typedef struct genmap_handle_private *genmap_handle;
 typedef struct genmap_vector_private *genmap_vector;
-typedef struct rsb_element *genmap_element;
 
 int genmap_init(genmap_handle *h, comm_ext ce, parRSB_options *options);
 
-genmap_element genmap_get_elements(genmap_handle h);
+struct rsb_element * genmap_get_elements(genmap_handle h);
+void genmap_set_elements(genmap_handle h, struct array *elements);
 
 genmap_comm genmap_local_comm(genmap_handle h);
 genmap_comm genmap_global_comm(genmap_handle h);
 
-void genmap_set_nvertices(genmap_handle h, int nVertices);
-void genmap_set_elements(genmap_handle h, struct array *localElements);
+void genmap_set_nvertices(genmap_handle h, int nv);
 
 GenmapULong genmap_get_partition_nel(genmap_handle h);
 void genmap_set_partition_nel(genmap_handle h, GenmapULong globalElements);
