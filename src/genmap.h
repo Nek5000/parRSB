@@ -13,7 +13,7 @@ typedef struct genmap_vector_private *genmap_vector;
 
 int genmap_init(genmap_handle *h, comm_ext ce, parRSB_options *options);
 
-struct rsb_element *genmap_get_elements(genmap_handle h);
+void *genmap_get_elements(genmap_handle h);
 void genmap_set_elements(genmap_handle h, struct array *elements);
 
 genmap_comm genmap_local_comm(genmap_handle h);
