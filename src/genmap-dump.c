@@ -22,7 +22,7 @@ int GenmapFiedlerDump(const char *fname, genmap_handle h, slong g_start,
   if (err != 0)
     return err;
 
-  slong nelt =genmap_get_nel(h);
+  slong nelt = genmap_get_nel(h);
   slong out[2][1], buf[2][1];
   comm_scan(out, c, gs_long, gs_add, &nelt, 1, buf);
   slong start = out[0][0];
@@ -123,7 +123,7 @@ int GenmapCentroidDump(const char *fname, genmap_handle h, sint g_id,
   if (err != 0)
     return err;
 
-  slong nelt =genmap_get_nel(h);
+  slong nelt = genmap_get_nel(h);
   slong out[2][1], buf[2][1];
   comm_scan(out, c, gs_long, gs_add, &nelt, 1, buf);
   slong start = out[0][0];
@@ -175,7 +175,7 @@ int GenmapElementIdDump(const char *fname, genmap_handle h, struct comm *c) {
   if (err != 0)
     return err;
 
-  slong nelt =genmap_get_nel(h);
+  slong nelt = genmap_get_nel(h);
   slong out[2][1], buf[2][1];
   comm_scan(out, c, gs_long, gs_add, &nelt, 1, buf);
   slong start = out[0][0];

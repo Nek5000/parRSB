@@ -4,7 +4,7 @@
 
 static void GenmapFindNeighbors(struct array *nbrs, genmap_handle h,
                                 struct comm *cc) {
-  sint lelt =genmap_get_nel(h);
+  sint lelt = genmap_get_nel(h);
   sint nv = genmap_get_nvertices(h);
 
   genmap_comm_scan(h, cc);

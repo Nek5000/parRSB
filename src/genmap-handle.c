@@ -24,7 +24,7 @@ void genmap_set_local_start_index(genmap_handle h, GenmapLong localStart) {
 
 void genmap_comm_scan(genmap_handle h, struct comm *c) {
   GenmapLong out[2][1], buf[2][1];
-  GenmapLong lelt =genmap_get_nel(h);
+  GenmapLong lelt = genmap_get_nel(h);
   comm_scan(out, c, gs_long_long, gs_add, &lelt, 1, buf);
   genmap_set_local_start_index(h, out[0][0]);
   genmap_set_partition_nel(h, out[1][0]);

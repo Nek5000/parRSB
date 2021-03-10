@@ -8,7 +8,7 @@ int GenmapLanczosLegendary(genmap_handle h, struct comm *gsc, GenmapVector f,
                            GenmapVector diag, GenmapVector upper) {
   assert(diag->size == niter);
   assert(diag->size == upper->size + 1);
-  assert(f->size ==genmap_get_nel(h));
+  assert(f->size == genmap_get_nel(h));
 
   if (genmap_get_partition_nel(h) < niter) {
     niter = genmap_get_partition_nel(h);
@@ -23,7 +23,7 @@ int GenmapLanczosLegendary(genmap_handle h, struct comm *gsc, GenmapVector f,
 
   rtz1 = 1.0;
   pap = 0.0;
-  GenmapInt lelt =genmap_get_nel(h);
+  GenmapInt lelt = genmap_get_nel(h);
 
   GenmapCreateZerosVector(&p, lelt);
   GenmapCreateVector(&w, lelt);
@@ -107,7 +107,7 @@ int GenmapLanczos(genmap_handle h, struct comm *gsc, GenmapVector init,
                   GenmapVector beta) {
   assert(alpha->size == iter);
   assert(alpha->size == beta->size + 1);
-  assert(init->size ==genmap_get_nel(h));
+  assert(init->size == genmap_get_nel(h));
 
   if (genmap_get_partition_nel(h) < iter) {
     iter = genmap_get_partition_nel(h);
@@ -115,7 +115,7 @@ int GenmapLanczos(genmap_handle h, struct comm *gsc, GenmapVector init,
     beta->size = iter - 1;
   }
 
-  GenmapInt lelt =genmap_get_nel(h);
+  GenmapInt lelt = genmap_get_nel(h);
 
   GenmapVector q1;
   GenmapCreateVector(&q1, lelt);

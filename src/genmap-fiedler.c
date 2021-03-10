@@ -7,7 +7,7 @@
 //
 int GenmapFiedlerRQI(genmap_handle h, struct comm *gsc, int max_iter,
                      int global) {
-  GenmapInt lelt =genmap_get_nel(h);
+  GenmapInt lelt = genmap_get_nel(h);
   GenmapVector initVec;
   GenmapCreateVector(&initVec, lelt);
 
@@ -69,10 +69,10 @@ int GenmapFiedlerRQI(genmap_handle h, struct comm *gsc, int max_iter,
 
 int GenmapFiedlerLanczos(genmap_handle h, struct comm *gsc, int max_iter,
                          int global) {
-  GenmapInt lelt =genmap_get_nel(h);
+  GenmapInt lelt = genmap_get_nel(h);
   GenmapVector initVec, alphaVec, betaVec;
 
-  GenmapCreateVector(&initVec,genmap_get_nel(h));
+  GenmapCreateVector(&initVec, genmap_get_nel(h));
   GenmapElements elements = GenmapGetElements(h);
 
   GenmapInt i;
