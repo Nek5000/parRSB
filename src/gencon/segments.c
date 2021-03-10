@@ -177,7 +177,7 @@ struct schedule {
 #define sort_by_coord(mesh, c, xa, xb, xc, bfr)                                \
   do {                                                                         \
     parallel_sort(struct Point_private, &(mesh->elements), x[xa],              \
-                  genmap_gs_scalar, bin_sort, 0, c, bfr);                      \
+                  gs_scalar, bin_sort, 0, c, bfr);                      \
     uint nPoints = mesh->elements.n;                                           \
     Point points = mesh->elements.ptr;                                         \
                                                                                \

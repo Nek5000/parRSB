@@ -36,9 +36,9 @@ int main(int argc, char *argv[]) {
       e[i].vertices[j] = me[i].vertex[j].globalId;
 
   genmap_vector weights, u, v;
-  GenmapCreateVector(&weights, mesh->nelt);
-  GenmapCreateVector(&u, mesh->nelt);
-  GenmapCreateVector(&v, mesh->nelt);
+  genmap_vector_create(&weights, mesh->nelt);
+  genmap_vector_create(&u, mesh->nelt);
+  genmap_vector_create(&v, mesh->nelt);
 
   for (i = 0; i < mesh->nelt; i++)
     u->data[i] = 1.0;

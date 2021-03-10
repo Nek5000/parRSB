@@ -155,16 +155,16 @@ int main(int argc, char *argv[]) {
   d->h = gh;
 
   genmap_vector r, x, x0;
-  GenmapCreateVector(&r, mesh->nelt);
-  GenmapCreateVector(&x, mesh->nelt);
-  GenmapCreateVector(&x0, mesh->nelt);
+  genmap_vector_create(&r, mesh->nelt);
+  genmap_vector_create(&x, mesh->nelt);
+  genmap_vector_create(&x0, mesh->nelt);
 
   srand(time(0));
   for (i = 0; i < mesh->nelt; i++)
     x->data[i] = rand() % 100 / 50., x0->data[i] = 0.0;
 
   GenmapLong nelg = genmap_get_partition_nel(gh);
-  GenmapOrthogonalizebyOneVector(gh, c, x, nelg);
+  genmap_vector_ortho_one(gh, c, x, nelg);
 
   GenmapInitLaplacian(gh, c);
   GenmapLaplacian(gh, c, x, r);

@@ -9,7 +9,7 @@ int GenmapFiedlerRQI(genmap_handle h, struct comm *gsc, int max_iter,
                      int global) {
   GenmapInt lelt = genmap_get_nel(h);
   genmap_vector initVec;
-  GenmapCreateVector(&initVec, lelt);
+  genmap_vector_create(&initVec, lelt);
 
   struct rsb_element *elements = genmap_get_elements(h);
   GenmapInt i;
@@ -26,12 +26,12 @@ int GenmapFiedlerRQI(genmap_handle h, struct comm *gsc, int max_iter,
       initVec->data[i] = elements[i].fiedler;
   }
 
-  GenmapOrthogonalizebyOneVector(gsc, initVec, genmap_get_partition_nel(h));
+  genmap_vector_ortho_one(gsc, initVec, genmap_get_partition_nel(h));
 
-  GenmapScalar norm = GenmapDotVector(initVec, initVec), normi;
+  GenmapScalar norm = genmap_vector_dot(initVec, initVec), normi;
   comm_allreduce(gsc, gs_double, gs_add, &norm, 1, &normi);
   normi = 1.0 / sqrt(norm);
-  GenmapScaleVector(initVec, initVec, normi);
+  genmap_vector_scale(initVec, initVec, normi);
 
   metric_tic(gsc, LAPLACIANSETUP);
   GenmapInitLaplacian(h, gsc);
@@ -43,7 +43,7 @@ int GenmapFiedlerRQI(genmap_handle h, struct comm *gsc, int max_iter,
   metric_toc(gsc, PRECONDSETUP);
 
   genmap_vector y;
-  GenmapCreateZerosVector(&y, lelt);
+  genmap_vector_create_zeros(&y, lelt);
 
   metric_tic(gsc, RQI);
   int iter = rqi(h, gsc, d, initVec, max_iter, y);
@@ -57,7 +57,7 @@ int GenmapFiedlerRQI(genmap_handle h, struct comm *gsc, int max_iter,
     norm += y->data[i] * y->data[i];
   comm_allreduce(gsc, gs_double, gs_add, &norm, 1, &normi);
 
-  GenmapScaleVector(y, y, 1. / sqrt(norm));
+  genmap_vector_scale(y, y, 1. / sqrt(norm));
   for (i = 0; i < lelt; i++)
     elements[i].fiedler = y->data[i];
 
@@ -72,7 +72,7 @@ int GenmapFiedlerLanczos(genmap_handle h, struct comm *gsc, int max_iter,
   GenmapInt lelt = genmap_get_nel(h);
   genmap_vector initVec, alphaVec, betaVec;
 
-  GenmapCreateVector(&initVec, genmap_get_nel(h));
+  genmap_vector_create(&initVec, genmap_get_nel(h));
   struct rsb_element *elements = genmap_get_elements(h);
 
   GenmapInt i;
@@ -89,15 +89,15 @@ int GenmapFiedlerLanczos(genmap_handle h, struct comm *gsc, int max_iter,
       initVec->data[i] = elements[i].fiedler;
   }
 
-  GenmapCreateVector(&alphaVec, max_iter);
-  GenmapCreateVector(&betaVec, max_iter - 1);
+  genmap_vector_create(&alphaVec, max_iter);
+  genmap_vector_create(&betaVec, max_iter - 1);
   genmap_vector *q = NULL;
 
-  GenmapOrthogonalizebyOneVector(gsc, initVec, genmap_get_partition_nel(h));
-  GenmapScalar rtr = GenmapDotVector(initVec, initVec), rni;
+  genmap_vector_ortho_one(gsc, initVec, genmap_get_partition_nel(h));
+  GenmapScalar rtr = genmap_vector_dot(initVec, initVec), rni;
   comm_allreduce(gsc, gs_double, gs_add, &rtr, 1, &rni);
   rni = 1.0 / sqrt(rtr);
-  GenmapScaleVector(initVec, initVec, rni);
+  genmap_vector_scale(initVec, initVec, rni);
 
   int iter;
   metric_tic(gsc, LANCZOS);
@@ -110,7 +110,7 @@ int GenmapFiedlerLanczos(genmap_handle h, struct comm *gsc, int max_iter,
   metric_acc(NLANCZOS, iter);
 
   genmap_vector evLanczos, evTriDiag;
-  GenmapCreateVector(&evTriDiag, iter);
+  genmap_vector_create(&evTriDiag, iter);
 
   /* Use TQLI and find the minimum eigenvalue and associated vector */
   genmap_vector *eVectors, eValues;
@@ -126,10 +126,10 @@ int GenmapFiedlerLanczos(genmap_handle h, struct comm *gsc, int max_iter,
       eValMinI = i;
     }
   }
-  GenmapCopyVector(evTriDiag, eVectors[eValMinI]);
+  genmap_vector_copy(evTriDiag, eVectors[eValMinI]);
 
   GenmapInt j;
-  GenmapCreateZerosVector(&evLanczos, lelt);
+  genmap_vector_create_zeros(&evLanczos, lelt);
   for (i = 0; i < lelt; i++) {
     for (j = 0; j < iter; j++)
       evLanczos->data[i] += q[j]->data[i] * evTriDiag->data[j];
@@ -140,7 +140,7 @@ int GenmapFiedlerLanczos(genmap_handle h, struct comm *gsc, int max_iter,
     norm += evLanczos->data[i] * evLanczos->data[i];
 
   comm_allreduce(gsc, gs_double, gs_add, &norm, 1, &normi);
-  GenmapScaleVector(evLanczos, evLanczos, 1. / sqrt(norm));
+  genmap_vector_scale(evLanczos, evLanczos, 1. / sqrt(norm));
   for (i = 0; i < lelt; i++)
     elements[i].fiedler = evLanczos->data[i];
 

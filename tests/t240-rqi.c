@@ -145,9 +145,9 @@ int main(int argc, char *argv[]) {
   GenmapInitLaplacian(gh, c);
 
   genmap_vector x;
-  GenmapCreateVector(&x, mesh->nelt);
+  genmap_vector_create(&x, mesh->nelt);
   genmap_vector r;
-  GenmapCreateVector(&r, mesh->nelt);
+  genmap_vector_create(&r, mesh->nelt);
 
   srand(time(0));
   for (i = 0; i < mesh->nelt; i++) {
@@ -155,15 +155,15 @@ int main(int argc, char *argv[]) {
   }
 
   GenmapLong nelg = genmap_get_partition_nel(gh);
-  GenmapOrthogonalizebyOneVector(gh, c, x, nelg);
+  genmap_vector_ortho_one(gh, c, x, nelg);
 
-  GenmapScalar norm = GenmapDotVector(x, x);
+  GenmapScalar norm = genmap_vector_dot(x, x);
   GenmapGop(c, &norm, 1, GENMAP_SCALAR, GENMAP_SUM);
 
   GenmapScalar normi = 1.0 / sqrt(norm);
-  GenmapAxpbyVector(x, x, 0.0, x, normi);
+  genmap_vector_axpby(x, x, 0.0, x, normi);
 
-  norm = GenmapDotVector(x, x);
+  norm = genmap_vector_dot(x, x);
   GenmapGop(c, &norm, 1, GENMAP_SCALAR, GENMAP_SUM);
 
   mgData d;

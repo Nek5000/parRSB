@@ -11,6 +11,7 @@ typedef struct comm *genmap_comm;
 typedef struct genmap_handle_private *genmap_handle;
 typedef struct genmap_vector_private *genmap_vector;
 
+/* genmap_handle */
 int genmap_init(genmap_handle *h, comm_ext ce, parRSB_options *options);
 
 void *genmap_get_elements(genmap_handle h);
@@ -37,26 +38,20 @@ int genmap_comm_size(genmap_comm c);
 int genmap_comm_rank(genmap_comm c);
 void genmap_comm_split(struct comm *old, int bin, int key, struct comm *new_);
 
-/* Genamp Vector */
-int GenmapCreateVector(genmap_vector *x, GenmapInt size);
-int GenmapSetVector(genmap_vector x, GenmapScalar *array);
-int GenmapGetVector(genmap_vector x, GenmapScalar *array);
+/* genmap_vector */
+int genmap_vector_create(genmap_vector *x, GenmapInt size);
+int genmap_vector_create_zeros(genmap_vector *x, GenmapInt size);
+int genmap_vector_copy(genmap_vector x, genmap_vector y);
 
-int GenmapCreateRandomVector(genmap_vector *x, GenmapInt size, GenmapInt seed);
-int GenmapCreateOnesVector(genmap_vector *x, GenmapInt size);
-int GenmapCreateZerosVector(genmap_vector *x, GenmapInt size);
-
-int GenmapScaleVector(genmap_vector y, genmap_vector x, GenmapScalar alpha);
-int GenmapAxpbyVector(genmap_vector z, genmap_vector x, GenmapScalar alpha,
+int genmap_vector_scale(genmap_vector y, genmap_vector x, GenmapScalar alpha);
+int genmap_vector_axpby(genmap_vector z, genmap_vector x, GenmapScalar alpha,
                       genmap_vector y, GenmapScalar beta);
 
-int GenmapCopyVector(genmap_vector x, genmap_vector y);
-GenmapScalar GenmapDotVector(genmap_vector x, genmap_vector y);
+GenmapScalar genmap_vector_dot(genmap_vector x, genmap_vector y);
 
-int GenmapOrthogonalizebyOneVector(struct comm *c, genmap_vector q1,
+int genmap_vector_ortho_one(struct comm *c, genmap_vector q1,
                                    GenmapULong n);
 
-int GenmapPrintVector(genmap_vector x);
 int GenmapDestroyVector(genmap_vector x);
 
 /* Laplacian */

@@ -15,12 +15,12 @@ int project(genmap_handle h, struct comm *gsc, mgData d, genmap_vector ri,
   GenmapLong nelg = genmap_get_partition_nel(h);
 
   genmap_vector z0, z, dz, w, p, r;
-  GenmapCreateVector(&z, lelt);
-  GenmapCreateVector(&w, lelt);
-  GenmapCreateVector(&r, lelt);
-  GenmapCreateVector(&p, lelt);
-  GenmapCreateVector(&z0, lelt);
-  GenmapCreateVector(&dz, lelt);
+  genmap_vector_create(&z, lelt);
+  genmap_vector_create(&w, lelt);
+  genmap_vector_create(&r, lelt);
+  genmap_vector_create(&p, lelt);
+  genmap_vector_create(&z0, lelt);
+  genmap_vector_create(&dz, lelt);
 
   assert(max_iter < MM);
   double *P, *W;
@@ -33,13 +33,13 @@ int project(genmap_handle h, struct comm *gsc, mgData d, genmap_vector ri,
     r->data[i] = ri->data[i];
   }
 
-  GenmapCopyVector(z, r);
-  GenmapCopyVector(p, z);
+  genmap_vector_copy(z, r);
+  genmap_vector_copy(p, z);
 
-  GenmapScalar rz1 = GenmapDotVector(r, z), buf;
+  GenmapScalar rz1 = genmap_vector_dot(r, z), buf;
   comm_allreduce(gsc, gs_double, gs_add, &rz1, 1, &buf);
 
-  GenmapScalar rr = GenmapDotVector(r, r);
+  GenmapScalar rr = genmap_vector_dot(r, r);
   comm_allreduce(gsc, gs_double, gs_add, &rr, 1, &buf);
 
   GenmapScalar alpha, beta, rz0, rz2, scale;
@@ -58,7 +58,7 @@ int project(genmap_handle h, struct comm *gsc, mgData d, genmap_vector ri,
 #endif
     metric_toc(gsc, LAPLACIAN);
 
-    GenmapScalar den = GenmapDotVector(p, w);
+    GenmapScalar den = genmap_vector_dot(p, w);
     comm_allreduce(gsc, gs_double, gs_add, &den, 1, &buf);
     alpha = rz1 / den;
 
@@ -68,38 +68,38 @@ int project(genmap_handle h, struct comm *gsc, mgData d, genmap_vector ri,
       P[i * lelt + j] = scale * p->data[j];
     }
 
-    GenmapAxpbyVector(x, x, 1.0, p, alpha);
-    GenmapAxpbyVector(r, r, 1.0, w, -alpha);
+    genmap_vector_axpby(x, x, 1.0, p, alpha);
+    genmap_vector_axpby(r, r, 1.0, w, -alpha);
 
-    rr = GenmapDotVector(r, r);
+    rr = genmap_vector_dot(r, r);
     comm_allreduce(gsc, gs_double, gs_add, &rr, 1, &buf);
 
     if (rr < res_tol || sqrt(rr) < tol)
       break;
 
-    GenmapScalar norm0 = GenmapDotVector(z, z);
+    GenmapScalar norm0 = genmap_vector_dot(z, z);
     comm_allreduce(gsc, gs_double, gs_add, &norm0, 1, &buf);
 
-    GenmapCopyVector(z0, z);
+    genmap_vector_copy(z0, z);
 
     metric_tic(gsc, VCYCLE);
     mg_vcycle(z->data, r->data, d);
     metric_toc(gsc, VCYCLE);
 
-    GenmapScalar norm1 = GenmapDotVector(z, z);
+    GenmapScalar norm1 = genmap_vector_dot(z, z);
     comm_allreduce(gsc, gs_double, gs_add, &norm1, 1, &buf);
 
     rz0 = rz1;
-    GenmapOrthogonalizebyOneVector(gsc, z, nelg);
-    rz1 = GenmapDotVector(r, z);
+    genmap_vector_ortho_one(gsc, z, nelg);
+    rz1 = genmap_vector_dot(r, z);
     comm_allreduce(gsc, gs_double, gs_add, &rz1, 1, &buf);
 
-    GenmapAxpbyVector(dz, z, 1.0, z0, -1.0);
-    rz2 = GenmapDotVector(r, dz);
+    genmap_vector_axpby(dz, z, 1.0, z0, -1.0);
+    rz2 = genmap_vector_dot(r, dz);
     comm_allreduce(gsc, gs_double, gs_add, &rz2, 1, &buf);
 
     beta = rz2 / rz0;
-    GenmapAxpbyVector(p, z, 1.0, p, beta);
+    genmap_vector_axpby(p, z, 1.0, p, beta);
 
     i++;
 
@@ -145,13 +145,13 @@ int project_lvl(genmap_handle h, genmap_comm c, mgData d, GenmapScalar *ri,
   GenmapGop(c, &nelg, 1, GENMAP_LONG, GENMAP_SUM);
 
   genmap_vector z0, z, dz, w, p, r, x;
-  GenmapCreateVector(&z, lelt);
-  GenmapCreateVector(&w, lelt);
-  GenmapCreateVector(&r, lelt);
-  GenmapCreateVector(&x, lelt);
-  GenmapCreateVector(&p, lelt);
-  GenmapCreateVector(&z0, lelt);
-  GenmapCreateVector(&dz, lelt);
+  genmap_vector_create(&z, lelt);
+  genmap_vector_create(&w, lelt);
+  genmap_vector_create(&r, lelt);
+  genmap_vector_create(&x, lelt);
+  genmap_vector_create(&p, lelt);
+  genmap_vector_create(&z0, lelt);
+  genmap_vector_create(&dz, lelt);
 
   assert(max_iter < MM);
   double *P;
@@ -166,13 +166,13 @@ int project_lvl(genmap_handle h, genmap_comm c, mgData d, GenmapScalar *ri,
   metric_tic(&d->c, VCYCLE);
   mg_vcycle_lvl(z->data, r->data, d, lvl_start);
   metric_toc(&d->c, VCYCLE);
-  GenmapOrthogonalizebyOneVector(gsc, z, nelg);
-  GenmapCopyVector(p, z);
+  genmap_vector_ortho_one(gsc, z, nelg);
+  genmap_vector_copy(p, z);
 
-  GenmapScalar rz1 = GenmapDotVector(r, z);
+  GenmapScalar rz1 = genmap_vector_dot(r, z);
   GenmapGop(c, &rz1, 1, GENMAP_SCALAR, GENMAP_SUM);
 
-  GenmapScalar rr = GenmapDotVector(r, r);
+  GenmapScalar rr = genmap_vector_dot(r, r);
   GenmapGop(c, &rr, 1, GENMAP_SCALAR, GENMAP_SUM);
   double tol = sqrt(rr) * 1e-7;
 
@@ -191,7 +191,7 @@ int project_lvl(genmap_handle h, genmap_comm c, mgData d, GenmapScalar *ri,
     csr_mat_gather(M, M->gsh, p->data, d->buf, &buf);
     csr_mat_apply(w->data, M, d->buf);
 
-    GenmapScalar den = GenmapDotVector(p, w);
+    GenmapScalar den = genmap_vector_dot(p, w);
     GenmapGop(c, &den, 1, GENMAP_SCALAR, GENMAP_SUM);
     alpha = rz1 / den;
 
@@ -201,37 +201,37 @@ int project_lvl(genmap_handle h, genmap_comm c, mgData d, GenmapScalar *ri,
       P[i * lelt + j] = scale * p->data[j];
     }
 
-    GenmapAxpbyVector(x, x, 1.0, p, alpha);
-    GenmapAxpbyVector(r, r, 1.0, w, -alpha);
+    genmap_vector_axpby(x, x, 1.0, p, alpha);
+    genmap_vector_axpby(r, r, 1.0, w, -alpha);
 
-    rr = GenmapDotVector(r, r);
+    rr = genmap_vector_dot(r, r);
     GenmapGop(c, &rr, 1, GENMAP_SCALAR, GENMAP_SUM);
     if (sqrt(rr) < tol)
       break;
 
-    GenmapCopyVector(z0, z);
+    genmap_vector_copy(z0, z);
 
-    GenmapScalar norm0 = GenmapDotVector(z, z);
+    GenmapScalar norm0 = genmap_vector_dot(z, z);
     GenmapGop(c, &norm0, 1, GENMAP_SCALAR, GENMAP_SUM);
 
     metric_tic(&c->gsc, VCYCLE);
     mg_vcycle_lvl(z->data, r->data, d, lvl_start);
     metric_toc(&c->gsc, VCYCLE);
 
-    GenmapScalar norm1 = GenmapDotVector(z, z);
+    GenmapScalar norm1 = genmap_vector_dot(z, z);
     GenmapGop(c, &norm1, 1, GENMAP_SCALAR, GENMAP_SUM);
 
     rz0 = rz1;
-    GenmapOrthogonalizebyOneVector(gsc, z, nelg);
-    rz1 = GenmapDotVector(r, z);
+    genmap_vector_ortho_one(gsc, z, nelg);
+    rz1 = genmap_vector_dot(r, z);
     GenmapGop(c, &rz1, 1, GENMAP_SCALAR, GENMAP_SUM);
 
-    GenmapAxpbyVector(dz, z, 1.0, z0, -1.0);
-    rz2 = GenmapDotVector(r, dz);
+    genmap_vector_axpby(dz, z, 1.0, z0, -1.0);
+    rz2 = genmap_vector_dot(r, dz);
     GenmapGop(c, &rz2, 1, GENMAP_SCALAR, GENMAP_SUM);
 
     beta = rz2 / rz0;
-    GenmapAxpbyVector(p, z, 1.0, p, beta);
+    genmap_vector_axpby(p, z, 1.0, p, beta);
 
     i++;
 

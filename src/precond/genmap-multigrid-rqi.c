@@ -12,7 +12,7 @@ int rqi(genmap_handle h, struct comm *gsc, mgData d, genmap_vector z,
 
   uint lelt = z->size;
   genmap_vector err;
-  GenmapCreateVector(&err, lelt);
+  genmap_vector_create(&err, lelt);
 
   int rank = genmap_comm_rank(genmap_global_comm(h));
   GenmapLong nelg = genmap_get_partition_nel(h);
@@ -33,12 +33,12 @@ int rqi(genmap_handle h, struct comm *gsc, mgData d, genmap_vector z,
 
   uint i, j, k, l;
   for (i = 0; i < max_iter; i++) {
-    GenmapScalar norm = GenmapDotVector(y, y);
+    GenmapScalar norm = genmap_vector_dot(y, y);
     comm_allreduce(gsc, gs_double, gs_add, &norm, 1, buf);
     GenmapScalar normi = 1.0 / sqrt(norm);
 
-    GenmapAxpbyVector(z, z, 0.0, y, normi);
-    GenmapOrthogonalizebyOneVector(gsc, z, nelg);
+    genmap_vector_axpby(z, z, 0.0, y, normi);
+    genmap_vector_ortho_one(gsc, z, nelg);
 
     int N = i + 1;
 
@@ -101,7 +101,7 @@ int rqi(genmap_handle h, struct comm *gsc, mgData d, genmap_vector z,
           for (k = 0; k < lelt; k++)
             z->data[k] += Z[j * lelt + k] * v[j];
         }
-        GenmapOrthogonalizebyOneVector(gsc, z, nelg);
+        genmap_vector_ortho_one(gsc, z, nelg);
       } else {
         // Z(k,:) = z;
         for (l = 0; l < lelt; l++)
@@ -115,13 +115,13 @@ int rqi(genmap_handle h, struct comm *gsc, mgData d, genmap_vector z,
     metric_toc(gsc, PROJECT);
     metric_acc(NPROJECT, ppfi);
 
-    GenmapOrthogonalizebyOneVector(gsc, y, nelg);
+    genmap_vector_ortho_one(gsc, y, nelg);
 
-    GenmapScalar lambda = GenmapDotVector(y, z);
+    GenmapScalar lambda = genmap_vector_dot(y, z);
     comm_allreduce(gsc, gs_double, gs_add, &lambda, 1, buf);
 
-    GenmapAxpbyVector(err, y, 1.0, z, -lambda);
-    GenmapScalar norme = GenmapDotVector(err, err);
+    genmap_vector_axpby(err, y, 1.0, z, -lambda);
+    GenmapScalar norme = genmap_vector_dot(err, err);
     comm_allreduce(gsc, gs_double, gs_add, &norme, 1, buf);
     norme = sqrt(norme);
 

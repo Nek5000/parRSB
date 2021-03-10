@@ -111,7 +111,7 @@ void csr_mat_gather(csr_mat M, struct gs_data *gsh, GenmapScalar *x,
       else
         buf[j] = 0.0;
 
-  gs(buf, genmap_gs_scalar, gs_add, 0, gsh, bfr);
+  gs(buf, gs_scalar, gs_add, 0, gsh, bfr);
 }
 
 void csr_mat_apply(GenmapScalar *y, csr_mat M, GenmapScalar *x) {

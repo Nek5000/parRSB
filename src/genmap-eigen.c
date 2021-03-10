@@ -14,10 +14,10 @@ int GenmapSymTriDiagSolve(genmap_vector x, genmap_vector b, genmap_vector alpha,
   GenmapInt n = b->size;
 
   genmap_vector diag;
-  GenmapCreateVector(&diag, n);
-  GenmapCopyVector(diag, alpha);
+  genmap_vector_create(&diag, n);
+  genmap_vector_copy(diag, alpha);
 
-  GenmapCopyVector(x, b);
+  genmap_vector_copy(x, b);
 
   GenmapInt i;
   for (i = 0; i < n - 1; i++) {
@@ -48,20 +48,20 @@ int GenmapTQLI(genmap_handle h, genmap_vector diagonal, genmap_vector upper,
   GenmapInt n = diagonal->size;
 
   genmap_vector d, e;
-  GenmapCreateVector(&d, n);
-  GenmapCreateVector(&e, n);
+  genmap_vector_create(&d, n);
+  genmap_vector_create(&e, n);
 
-  GenmapCopyVector(d, diagonal);
-  GenmapCopyVector(e, upper);
+  genmap_vector_copy(d, diagonal);
+  genmap_vector_copy(e, upper);
   e->data[n - 1] = 0.0;
 
   /* Create the vector to store eigenvalues */
-  GenmapCreateVector(eValues, n);
+  genmap_vector_create(eValues, n);
   /* Init to identity */
   GenmapMalloc(n, eVectors);
   GenmapInt i;
   for (i = 0; i < n; i++) {
-    GenmapCreateZerosVector(&(*eVectors)[i], n);
+    genmap_vector_create_zeros(&(*eVectors)[i], n);
     (*eVectors)[i]->data[i] = 1.0;
   }
 
@@ -83,7 +83,7 @@ int GenmapTQLI(genmap_handle h, genmap_vector diagonal, genmap_vector upper,
         if (iter++ == 30) {
           if (genmap_comm_rank(genmap_global_comm(h)) == 0)
             printf("Too many iterations.\n");
-          GenmapCopyVector(*eValues, d);
+          genmap_vector_copy(*eValues, d);
           return 1;
         }
 
@@ -157,14 +157,14 @@ int GenmapTQLI(genmap_handle h, genmap_vector diagonal, genmap_vector upper,
   }
 
   for (k = 0; k < n; k++) {
-    e->data[k] = GenmapDotVector((*eVectors)[k], (*eVectors)[k]);
+    e->data[k] = genmap_vector_dot((*eVectors)[k], (*eVectors)[k]);
     if (e->data[k] > 0.0)
       e->data[k] = sqrt(fabs(e->data[k]));
     GenmapScalar scale = 1.0 / e->data[k];
-    GenmapScaleVector((*eVectors)[k], (*eVectors)[k], scale);
+    genmap_vector_scale((*eVectors)[k], (*eVectors)[k], scale);
   }
 
-  GenmapCopyVector(*eValues, d);
+  genmap_vector_copy(*eValues, d);
 
   GenmapDestroyVector(d);
   GenmapDestroyVector(e);
