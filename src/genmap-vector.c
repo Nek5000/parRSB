@@ -107,7 +107,7 @@ GenmapScalar genmap_vector_dot(genmap_vector y, genmap_vector x) {
 }
 
 int genmap_vector_axpby(genmap_vector z, genmap_vector x, GenmapScalar alpha,
-                      genmap_vector y, GenmapScalar beta) {
+                        genmap_vector y, GenmapScalar beta) {
   assert(z->size == x->size);
   assert(z->size == y->size);
 
@@ -121,8 +121,7 @@ int genmap_vector_axpby(genmap_vector z, genmap_vector x, GenmapScalar alpha,
 }
 
 /* Orthogonalize by 1-vector (vector of all 1's) */
-int genmap_vector_ortho_one(struct comm *c, genmap_vector q1,
-                                   GenmapULong n) {
+int genmap_vector_ortho_one(struct comm *c, genmap_vector q1, GenmapULong n) {
   GenmapInt i;
   GenmapScalar sum = 0.0, buf;
   for (i = 0; i < q1->size; i++)

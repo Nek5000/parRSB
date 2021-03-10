@@ -45,12 +45,11 @@ int genmap_vector_copy(genmap_vector x, genmap_vector y);
 
 int genmap_vector_scale(genmap_vector y, genmap_vector x, GenmapScalar alpha);
 int genmap_vector_axpby(genmap_vector z, genmap_vector x, GenmapScalar alpha,
-                      genmap_vector y, GenmapScalar beta);
+                        genmap_vector y, GenmapScalar beta);
 
 GenmapScalar genmap_vector_dot(genmap_vector x, genmap_vector y);
 
-int genmap_vector_ortho_one(struct comm *c, genmap_vector q1,
-                                   GenmapULong n);
+int genmap_vector_ortho_one(struct comm *c, genmap_vector q1, GenmapULong n);
 
 int GenmapDestroyVector(genmap_vector x);
 
