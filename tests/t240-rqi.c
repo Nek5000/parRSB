@@ -135,7 +135,7 @@ int main(int argc, char *argv[]) {
   genmap_set_nvertices(gh, mesh->nVertex);
 
   /* Setup mesh */
-  GenmapElements e = GenmapGetElements(gh);
+  genmap_element e = genmap_get_elements(gh);
   me = (Point)MeshGetElements(mesh);
   for (i = 0; i < mesh->nelt; i++)
     for (j = 0; j < mesh->nVertex; j++)
@@ -144,9 +144,9 @@ int main(int argc, char *argv[]) {
   genmap_comm c = genmap_global_comm(gh);
   GenmapInitLaplacian(gh, c);
 
-  GenmapVector x;
+  genmap_vector x;
   GenmapCreateVector(&x, mesh->nelt);
-  GenmapVector r;
+  genmap_vector r;
   GenmapCreateVector(&r, mesh->nelt);
 
   srand(time(0));

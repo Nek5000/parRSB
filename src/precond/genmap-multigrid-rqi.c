@@ -6,12 +6,12 @@
 
 // Input z should be orthogonal to 1-vector, have unit norm.
 // RQI should not change z.
-int rqi(genmap_handle h, struct comm *gsc, mgData d, GenmapVector z,
-        int max_iter, GenmapVector y) {
+int rqi(genmap_handle h, struct comm *gsc, mgData d, genmap_vector z,
+        int max_iter, genmap_vector y) {
   assert(z->size == y->size);
 
   uint lelt = z->size;
-  GenmapVector err;
+  genmap_vector err;
   GenmapCreateVector(&err, lelt);
 
   int rank = genmap_comm_rank(genmap_global_comm(h));

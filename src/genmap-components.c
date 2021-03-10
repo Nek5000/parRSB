@@ -11,7 +11,7 @@ struct unmarked {
 };
 
 /* Find the number of disconnected components */
-sint get_components(sint *component, GenmapElements elements, struct comm *c,
+sint get_components(sint *component, genmap_element elements, struct comm *c,
                     buffer *buf, uint nelt, uint nv) {
   slong nelt_ = nelt;
   slong out[2][1], buff[2][1];

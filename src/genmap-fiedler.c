@@ -8,10 +8,10 @@
 int GenmapFiedlerRQI(genmap_handle h, struct comm *gsc, int max_iter,
                      int global) {
   GenmapInt lelt = genmap_get_nel(h);
-  GenmapVector initVec;
+  genmap_vector initVec;
   GenmapCreateVector(&initVec, lelt);
 
-  GenmapElements elements = GenmapGetElements(h);
+  genmap_element elements = genmap_get_elements(h);
   GenmapInt i;
   if (global > 0) {
     if (h->options->rsb_paul == 1) {
@@ -42,7 +42,7 @@ int GenmapFiedlerRQI(genmap_handle h, struct comm *gsc, int max_iter,
   mgSetup(h, gsc, h->M, &d);
   metric_toc(gsc, PRECONDSETUP);
 
-  GenmapVector y;
+  genmap_vector y;
   GenmapCreateZerosVector(&y, lelt);
 
   metric_tic(gsc, RQI);
@@ -70,10 +70,10 @@ int GenmapFiedlerRQI(genmap_handle h, struct comm *gsc, int max_iter,
 int GenmapFiedlerLanczos(genmap_handle h, struct comm *gsc, int max_iter,
                          int global) {
   GenmapInt lelt = genmap_get_nel(h);
-  GenmapVector initVec, alphaVec, betaVec;
+  genmap_vector initVec, alphaVec, betaVec;
 
   GenmapCreateVector(&initVec, genmap_get_nel(h));
-  GenmapElements elements = GenmapGetElements(h);
+  genmap_element elements = genmap_get_elements(h);
 
   GenmapInt i;
   if (global > 0) {
@@ -91,7 +91,7 @@ int GenmapFiedlerLanczos(genmap_handle h, struct comm *gsc, int max_iter,
 
   GenmapCreateVector(&alphaVec, max_iter);
   GenmapCreateVector(&betaVec, max_iter - 1);
-  GenmapVector *q = NULL;
+  genmap_vector *q = NULL;
 
   GenmapOrthogonalizebyOneVector(gsc, initVec, genmap_get_partition_nel(h));
   GenmapScalar rtr = GenmapDotVector(initVec, initVec), rni;
@@ -109,11 +109,11 @@ int GenmapFiedlerLanczos(genmap_handle h, struct comm *gsc, int max_iter,
   metric_toc(gsc, LANCZOS);
   metric_acc(NLANCZOS, iter);
 
-  GenmapVector evLanczos, evTriDiag;
+  genmap_vector evLanczos, evTriDiag;
   GenmapCreateVector(&evTriDiag, iter);
 
   /* Use TQLI and find the minimum eigenvalue and associated vector */
-  GenmapVector *eVectors, eValues;
+  genmap_vector *eVectors, eValues;
   metric_tic(gsc, TQLI);
   GenmapTQLI(h, alphaVec, betaVec, &eVectors, &eValues);
   metric_toc(gsc, TQLI);

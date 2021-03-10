@@ -28,14 +28,14 @@ int main(int argc, char *argv[]) {
   GenmapSetNLocalElements(gh, mesh->nelt);
   genmap_set_nvertices(gh, mesh->nVertex);
 
-  GenmapElements e = GenmapGetElements(gh);
+  genmap_element e = genmap_get_elements(gh);
   Element me = MeshGetElements(mesh);
   GenmapInt i, j;
   for (i = 0; i < mesh->nelt; i++)
     for (j = 0; j < mesh->nVertex; j++)
       e[i].vertices[j] = me[i].vertex[j].globalId;
 
-  GenmapVector weights, u, v;
+  genmap_vector weights, u, v;
   GenmapCreateVector(&weights, mesh->nelt);
   GenmapCreateVector(&u, mesh->nelt);
   GenmapCreateVector(&v, mesh->nelt);

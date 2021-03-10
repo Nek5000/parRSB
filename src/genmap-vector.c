@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 
-int GenmapCreateVector(GenmapVector *x, GenmapInt size) {
+int GenmapCreateVector(genmap_vector *x, GenmapInt size) {
   /* Asserts:
        - size > 0
   */
@@ -27,33 +27,12 @@ int GenmapCreateVector(GenmapVector *x, GenmapInt size) {
   return 0;
 }
 
-int GenmapVectorsEqual(GenmapVector x, GenmapVector y, GenmapScalar tol) {
-  /* Asserts:
-       - size of y == size of x
-  */
-  assert(x->size == y->size);
-
-  GenmapInt i;
-  for (i = 0; i < x->size; i++) {
-    assert(!isnan(x->data[i]) && !isnan(y->data[i]));
-  }
-
-  GenmapInt n = x->size;
-  for (i = 0; i < n; i++) {
-    if (fabs(x->data[i] - y->data[i]) > tol) {
-      return 0;
-    }
-  }
-
-  return 1;
-}
-
-int GenmapSetVector(GenmapVector x, GenmapScalar *array) {
+int GenmapSetVector(genmap_vector x, GenmapScalar *array) {
   memcpy(x->data, array, sizeof(GenmapScalar) * (size_t)x->size);
   return 0;
 }
 
-int GenmapDestroyVector(GenmapVector x) {
+int GenmapDestroyVector(genmap_vector x) {
   if (x->data) {
     GenmapFree(x->data);
   }
@@ -65,7 +44,7 @@ int GenmapDestroyVector(GenmapVector x) {
   return 0;
 }
 
-int GenmapCopyVector(GenmapVector y, GenmapVector x) {
+int GenmapCopyVector(genmap_vector y, genmap_vector x) {
   /* Asserts:
        - size y = size x
   */
@@ -80,35 +59,7 @@ int GenmapCopyVector(GenmapVector y, GenmapVector x) {
   return 0;
 }
 
-GenmapScalar GenmapNormVector(GenmapVector x, GenmapInt p) {
-  assert(x->size > 0);
-
-  GenmapInt n = x->size;
-  GenmapScalar norm = 0;
-
-  GenmapInt i;
-  if (p == 1) {
-    for (i = 0; i < n; i++) {
-      norm += fabs(x->data[i]);
-    }
-  } else if (p == 2) {
-    for (i = 0; i < n; i++) {
-      norm += x->data[i] * x->data[i];
-    }
-    norm = sqrt(norm);
-  } else if (p == -1) {
-    norm = fabs(x->data[0]);
-
-    for (i = 1; i < n; i++) {
-      if (fabs(x->data[i]) > norm)
-        norm = fabs(x->data[i]);
-    }
-  }
-
-  return norm;
-}
-
-int GenmapScaleVector(GenmapVector y, GenmapVector x, GenmapScalar alpha) {
+int GenmapScaleVector(genmap_vector y, genmap_vector x, GenmapScalar alpha) {
   /* asserts:
        - size x = size y
   */
@@ -123,7 +74,7 @@ int GenmapScaleVector(GenmapVector y, GenmapVector x, GenmapScalar alpha) {
   return 0;
 }
 
-int GenmapCreateOnesVector(GenmapVector *x, GenmapInt size) {
+int GenmapCreateOnesVector(genmap_vector *x, GenmapInt size) {
   GenmapCreateVector(x, size);
 
   GenmapInt i;
@@ -134,7 +85,7 @@ int GenmapCreateOnesVector(GenmapVector *x, GenmapInt size) {
   return 0;
 }
 
-int GenmapCreateZerosVector(GenmapVector *x, GenmapInt size) {
+int GenmapCreateZerosVector(genmap_vector *x, GenmapInt size) {
   GenmapCreateVector(x, size);
 
   GenmapInt i;
@@ -145,7 +96,7 @@ int GenmapCreateZerosVector(GenmapVector *x, GenmapInt size) {
   return 0;
 }
 
-GenmapScalar GenmapDotVector(GenmapVector y, GenmapVector x) {
+GenmapScalar GenmapDotVector(genmap_vector y, genmap_vector x) {
   /* asserts:
        - size x = size y
   */
@@ -160,56 +111,8 @@ GenmapScalar GenmapDotVector(GenmapVector y, GenmapVector x) {
   return result;
 }
 
-GenmapScalar GenmapAbsMaxVector(GenmapVector x) {
-  GenmapScalar result = 0.0;
-  GenmapInt i;
-  for (i = 0; i < x->size; i++) {
-    if (fabs(x->data[i]) > result) {
-      result = fabs(x->data[i]);
-    }
-  }
-
-  return result;
-}
-
-GenmapScalar GenmapMaxVector(GenmapVector x) {
-  GenmapScalar result = -DBL_MAX;
-  GenmapInt i;
-  for (i = 0; i < x->size; i++) {
-    if (x->data[i] > result) {
-      result = x->data[i];
-    }
-  }
-
-  return result;
-}
-
-GenmapScalar GenmapAbsMinVector(GenmapVector x) {
-  GenmapScalar result = DBL_MAX;
-  GenmapInt i;
-  for (i = 0; i < x->size; i++) {
-    if (fabs(x->data[i]) < result) {
-      result = fabs(x->data[i]);
-    }
-  }
-
-  return result;
-}
-
-GenmapScalar GenmapMinVector(GenmapVector x) {
-  GenmapScalar result = DBL_MAX;
-  GenmapInt i;
-  for (i = 0; i < x->size; i++) {
-    if (x->data[i] < result) {
-      result = x->data[i];
-    }
-  }
-
-  return result;
-}
-
-int GenmapAxpbyVector(GenmapVector z, GenmapVector x, GenmapScalar alpha,
-                      GenmapVector y, GenmapScalar beta) {
+int GenmapAxpbyVector(genmap_vector z, genmap_vector x, GenmapScalar alpha,
+                      genmap_vector y, GenmapScalar beta) {
   assert(z->size == x->size);
   assert(z->size == y->size);
 
@@ -222,7 +125,7 @@ int GenmapAxpbyVector(GenmapVector z, GenmapVector x, GenmapScalar alpha,
   return 0;
 }
 
-int GenmapPrintVector(GenmapVector x) {
+int GenmapPrintVector(genmap_vector x) {
   /* Asserts:
        - size x > 0
   */
@@ -244,7 +147,7 @@ int GenmapPrintVector(GenmapVector x) {
 }
 
 /* Orthogonalize by 1-vector (vector of all 1's) */
-int GenmapOrthogonalizebyOneVector(struct comm *c, GenmapVector q1,
+int GenmapOrthogonalizebyOneVector(struct comm *c, genmap_vector q1,
                                    GenmapULong n) {
   GenmapInt i;
   GenmapScalar sum = 0.0, buf;

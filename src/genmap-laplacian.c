@@ -15,7 +15,7 @@ static void GenmapFindNeighbors(struct array *nbrs, genmap_handle h,
   struct array vertices;
   array_init(vertex, &vertices, size);
 
-  GenmapElements elems = GenmapGetElements(h);
+  genmap_element elems = genmap_get_elements(h);
   sint i, j;
   for (i = 0; i < lelt; i++) {
     for (j = 0; j < nv; j++) {

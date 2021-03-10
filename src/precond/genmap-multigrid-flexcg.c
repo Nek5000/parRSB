@@ -4,15 +4,15 @@
 #include <genmap-impl.h>
 #include <genmap-multigrid-precon.h>
 
-int flex_cg(genmap_handle h, struct comm *gsc, mgData d, GenmapVector ri,
-            int maxIter, GenmapVector x) {
+int flex_cg(genmap_handle h, struct comm *gsc, mgData d, genmap_vector ri,
+            int maxIter, genmap_vector x) {
   assert(x->size == ri->size);
   assert(x->size == genmap_get_nel(h));
 
   uint lelt = x->size;
   GenmapLong nelg = genmap_get_partition_nel(h);
 
-  GenmapVector z0, z, dz, w, p, r;
+  genmap_vector z0, z, dz, w, p, r;
   GenmapCreateVector(&z, lelt);
   GenmapCreateVector(&w, lelt);
   GenmapCreateVector(&r, lelt);

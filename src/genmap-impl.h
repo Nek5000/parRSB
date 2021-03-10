@@ -78,7 +78,7 @@ struct genmap_handle_private {
   parRSB_options *options;
 };
 
-struct GenmapVector_private {
+struct genmap_vector_private {
   GenmapInt size;
   GenmapScalar *data;
 };
@@ -136,7 +136,7 @@ typedef struct {
 } vertex;
 
 /* Components */
-sint get_components(sint *component, GenmapElements elements, struct comm *c,
+sint get_components(sint *component, genmap_element elements, struct comm *c,
                     buffer *buf, uint nelt, uint nv);
 
 /* Matrix inverse */
@@ -145,7 +145,7 @@ void matrix_inverse(int N, double *A);
 /* Dump data */
 int GenmapFiedlerDump(const char *fname, genmap_handle h, slong start,
                       struct comm *c);
-int GenmapVectorDump(const char *fname, GenmapScalar *y, uint size,
+int genmap_vectorDump(const char *fname, GenmapScalar *y, uint size,
                      struct comm *c);
 int GenmapCentroidDump(const char *fname, genmap_handle h, sint g_id,
                        struct comm *c);

@@ -3,9 +3,9 @@
 #include <math.h>
 #include <stdio.h>
 
-int GenmapLanczosLegendary(genmap_handle h, struct comm *gsc, GenmapVector f,
-                           GenmapInt niter, GenmapVector **rr,
-                           GenmapVector diag, GenmapVector upper) {
+int GenmapLanczosLegendary(genmap_handle h, struct comm *gsc, genmap_vector f,
+                           GenmapInt niter, genmap_vector **rr,
+                           genmap_vector diag, genmap_vector upper) {
   assert(diag->size == niter);
   assert(diag->size == upper->size + 1);
   assert(f->size == genmap_get_nel(h));
@@ -19,7 +19,7 @@ int GenmapLanczosLegendary(genmap_handle h, struct comm *gsc, GenmapVector f,
   GenmapScalar eps = 1.e-5;
   GenmapScalar alpha, beta;
   GenmapScalar rnorm, rtol, rni, rtr, rtz1, rtz2, pap, pap_old;
-  GenmapVector r, p, w;
+  genmap_vector r, p, w;
 
   rtz1 = 1.0;
   pap = 0.0;
@@ -102,9 +102,9 @@ int GenmapLanczosLegendary(genmap_handle h, struct comm *gsc, GenmapVector f,
   return iter;
 }
 
-int GenmapLanczos(genmap_handle h, struct comm *gsc, GenmapVector init,
-                  GenmapInt iter, GenmapVector **q, GenmapVector alpha,
-                  GenmapVector beta) {
+int GenmapLanczos(genmap_handle h, struct comm *gsc, genmap_vector init,
+                  GenmapInt iter, genmap_vector **q, genmap_vector alpha,
+                  genmap_vector beta) {
   assert(alpha->size == iter);
   assert(alpha->size == beta->size + 1);
   assert(init->size == genmap_get_nel(h));
@@ -117,7 +117,7 @@ int GenmapLanczos(genmap_handle h, struct comm *gsc, GenmapVector init,
 
   GenmapInt lelt = genmap_get_nel(h);
 
-  GenmapVector q1;
+  genmap_vector q1;
   GenmapCreateVector(&q1, lelt);
   GenmapCopyVector(q1, init);
 
@@ -128,11 +128,11 @@ int GenmapLanczos(genmap_handle h, struct comm *gsc, GenmapVector init,
   GenmapScaleVector(q1, q1, 1. / normq1);
 
   /* Set q_0 and beta_0 to zero (both uses 0-indexing) */
-  GenmapVector q0;
+  genmap_vector q0;
   GenmapCreateZerosVector(&q0, lelt);
   beta->data[0] = 0.;
 
-  GenmapVector u;
+  genmap_vector u;
   GenmapCreateVector(&u, lelt);
 
   if (*q == NULL) {

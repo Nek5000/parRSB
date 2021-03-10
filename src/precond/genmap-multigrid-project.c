@@ -6,15 +6,15 @@
 
 #define MM 505
 
-int project(genmap_handle h, struct comm *gsc, mgData d, GenmapVector ri,
-            int max_iter, GenmapVector x) {
+int project(genmap_handle h, struct comm *gsc, mgData d, genmap_vector ri,
+            int max_iter, genmap_vector x) {
   assert(x->size == ri->size);
   assert(x->size == genmap_get_nel(h));
 
   uint lelt = x->size;
   GenmapLong nelg = genmap_get_partition_nel(h);
 
-  GenmapVector z0, z, dz, w, p, r;
+  genmap_vector z0, z, dz, w, p, r;
   GenmapCreateVector(&z, lelt);
   GenmapCreateVector(&w, lelt);
   GenmapCreateVector(&r, lelt);
@@ -144,7 +144,7 @@ int project_lvl(genmap_handle h, genmap_comm c, mgData d, GenmapScalar *ri,
   slong nelg = lelt;
   GenmapGop(c, &nelg, 1, GENMAP_LONG, GENMAP_SUM);
 
-  GenmapVector z0, z, dz, w, p, r, x;
+  genmap_vector z0, z, dz, w, p, r, x;
   GenmapCreateVector(&z, lelt);
   GenmapCreateVector(&w, lelt);
   GenmapCreateVector(&r, lelt);

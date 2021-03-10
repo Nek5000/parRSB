@@ -135,7 +135,7 @@ int main(int argc, char *argv[]) {
   genmap_set_nvertices(gh, mesh->nVertex);
 
   /* Setup mesh */
-  GenmapElements e = GenmapGetElements(gh);
+  genmap_element e = genmap_get_elements(gh);
   me = (Point)MeshGetElements(mesh);
   for (i = 0; i < mesh->nelt; i++)
     for (j = 0; j < mesh->nVertex; j++)
@@ -154,7 +154,7 @@ int main(int argc, char *argv[]) {
   mgSetup(c, M, &d);
   d->h = gh;
 
-  GenmapVector r, x, x0;
+  genmap_vector r, x, x0;
   GenmapCreateVector(&r, mesh->nelt);
   GenmapCreateVector(&x, mesh->nelt);
   GenmapCreateVector(&x0, mesh->nelt);

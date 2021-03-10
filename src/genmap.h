@@ -7,15 +7,14 @@
 
 #include <parRSB.h>
 
-typedef MPI_Datatype GenmapDataType;
 typedef struct comm *genmap_comm;
 typedef struct genmap_handle_private *genmap_handle;
-typedef struct GenmapVector_private *GenmapVector;
-typedef struct rsb_element *GenmapElements;
+typedef struct genmap_vector_private *genmap_vector;
+typedef struct rsb_element *genmap_element;
 
 int genmap_init(genmap_handle *h, comm_ext ce, parRSB_options *options);
 
-GenmapElements GenmapGetElements(genmap_handle h);
+genmap_element genmap_get_elements(genmap_handle h);
 
 genmap_comm genmap_local_comm(genmap_handle h);
 genmap_comm genmap_global_comm(genmap_handle h);
@@ -40,32 +39,26 @@ int genmap_comm_rank(genmap_comm c);
 void genmap_comm_split(struct comm *old, int bin, int key, struct comm *new_);
 
 /* Genamp Vector */
-int GenmapCreateVector(GenmapVector *x, GenmapInt size);
-int GenmapSetVector(GenmapVector x, GenmapScalar *array);
-int GenmapGetVector(GenmapVector x, GenmapScalar *array);
+int GenmapCreateVector(genmap_vector *x, GenmapInt size);
+int GenmapSetVector(genmap_vector x, GenmapScalar *array);
+int GenmapGetVector(genmap_vector x, GenmapScalar *array);
 
-int GenmapCreateRandomVector(GenmapVector *x, GenmapInt size, GenmapInt seed);
-int GenmapCreateOnesVector(GenmapVector *x, GenmapInt size);
-int GenmapCreateZerosVector(GenmapVector *x, GenmapInt size);
+int GenmapCreateRandomVector(genmap_vector *x, GenmapInt size, GenmapInt seed);
+int GenmapCreateOnesVector(genmap_vector *x, GenmapInt size);
+int GenmapCreateZerosVector(genmap_vector *x, GenmapInt size);
 
-int GenmapScaleVector(GenmapVector y, GenmapVector x, GenmapScalar alpha);
-int GenmapAxpbyVector(GenmapVector z, GenmapVector x, GenmapScalar alpha,
-                      GenmapVector y, GenmapScalar beta);
+int GenmapScaleVector(genmap_vector y, genmap_vector x, GenmapScalar alpha);
+int GenmapAxpbyVector(genmap_vector z, genmap_vector x, GenmapScalar alpha,
+                      genmap_vector y, GenmapScalar beta);
 
-int GenmapVectorsEqual(GenmapVector x, GenmapVector y, GenmapScalar tol);
-int GenmapCopyVector(GenmapVector x, GenmapVector y);
-GenmapScalar GenmapDotVector(GenmapVector x, GenmapVector y);
-GenmapScalar GenmapAbsMaxVector(GenmapVector x);
-GenmapScalar GenmapMaxVector(GenmapVector x);
-GenmapScalar GenmapAbsMinVector(GenmapVector x);
-GenmapScalar GenmapMinVector(GenmapVector x);
-GenmapScalar GenmapNormVector(GenmapVector x, GenmapInt p);
+int GenmapCopyVector(genmap_vector x, genmap_vector y);
+GenmapScalar GenmapDotVector(genmap_vector x, genmap_vector y);
 
-int GenmapOrthogonalizebyOneVector(struct comm *c, GenmapVector q1,
+int GenmapOrthogonalizebyOneVector(struct comm *c, genmap_vector q1,
                                    GenmapULong n);
 
-int GenmapPrintVector(GenmapVector x);
-int GenmapDestroyVector(GenmapVector x);
+int GenmapPrintVector(genmap_vector x);
+int GenmapDestroyVector(genmap_vector x);
 
 /* Laplacian */
 int GenmapInitLaplacian(genmap_handle h, struct comm *c);
@@ -75,8 +68,8 @@ int GenmapInitLaplacianWeighted(genmap_handle h, struct comm *c);
 int GenmapLaplacianWeighted(genmap_handle h, GenmapScalar *u, GenmapScalar *v);
 
 /* Eigen */
-int GenmapTQLI(genmap_handle h, GenmapVector diag, GenmapVector upper,
-               GenmapVector **eVec, GenmapVector *eVal);
+int GenmapTQLI(genmap_handle h, genmap_vector diag, genmap_vector upper,
+               genmap_vector **eVec, genmap_vector *eVal);
 int genmap_inverse_power(double *y, int N, double *A, int verbose);
 int genmap_power(double *y, int N, double *A, int verbose);
 
@@ -84,12 +77,12 @@ int genmap_power(double *y, int N, double *A, int verbose);
 void matrix_inverse(int N, double *A);
 
 /* Lanczos */
-int GenmapLanczosLegendary(genmap_handle h, struct comm *c, GenmapVector f,
-                           GenmapInt niter, GenmapVector **rr,
-                           GenmapVector diag, GenmapVector upper);
-int GenmapLanczos(genmap_handle h, struct comm *c, GenmapVector init,
-                  GenmapInt iter, GenmapVector **q, GenmapVector alpha,
-                  GenmapVector beta);
+int GenmapLanczosLegendary(genmap_handle h, struct comm *c, genmap_vector f,
+                           GenmapInt niter, genmap_vector **rr,
+                           genmap_vector diag, genmap_vector upper);
+int GenmapLanczos(genmap_handle h, struct comm *c, genmap_vector init,
+                  GenmapInt iter, genmap_vector **q, genmap_vector alpha,
+                  genmap_vector beta);
 
 /* Fiedler */
 int GenmapFiedlerLanczos(genmap_handle h, struct comm *c, int maxIter,

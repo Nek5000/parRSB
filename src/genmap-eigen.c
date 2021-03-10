@@ -5,15 +5,15 @@
 
 #include <genmap-impl.h>
 
-int GenmapSymTriDiagSolve(GenmapVector x, GenmapVector b, GenmapVector alpha,
-                          GenmapVector beta) {
+int GenmapSymTriDiagSolve(genmap_vector x, genmap_vector b, genmap_vector alpha,
+                          genmap_vector beta) {
   assert((x->size == b->size) && (x->size == alpha->size));
   assert(alpha->size == beta->size + 1);
   assert(b->size > 0);
 
   GenmapInt n = b->size;
 
-  GenmapVector diag;
+  genmap_vector diag;
   GenmapCreateVector(&diag, n);
   GenmapCopyVector(diag, alpha);
 
@@ -41,13 +41,13 @@ GenmapScalar GenmapSign(GenmapScalar a, GenmapScalar b) {
   return fabs(a) * m;
 }
 
-int GenmapTQLI(genmap_handle h, GenmapVector diagonal, GenmapVector upper,
-               GenmapVector **eVectors, GenmapVector *eValues) {
+int GenmapTQLI(genmap_handle h, genmap_vector diagonal, genmap_vector upper,
+               genmap_vector **eVectors, genmap_vector *eValues) {
   assert(diagonal->size == upper->size + 1);
 
   GenmapInt n = diagonal->size;
 
-  GenmapVector d, e;
+  genmap_vector d, e;
   GenmapCreateVector(&d, n);
   GenmapCreateVector(&e, n);
 

@@ -16,7 +16,7 @@ static int dump_fiedler_if_discon(genmap_handle h, int level, int max_levels) {
 
   sint bfr[2];
 
-  GenmapElements elements = GenmapGetElements(h);
+  genmap_element elements = genmap_get_elements(h);
 
   /* Dump current partition status */
   if (level > 0 && level < max_levels) {
@@ -59,7 +59,7 @@ int genmap_rsb(genmap_handle h) {
   genmap_comm_scan(h, lc);
 
   uint nelt = genmap_get_nel(h);
-  GenmapElements e = GenmapGetElements(h);
+  genmap_element e = genmap_get_elements(h);
   GenmapInt i;
   for (i = 0; i < nelt; i++)
     e[i].globalId0 = genmap_get_local_start_index(h) + i + 1;
@@ -134,7 +134,7 @@ int genmap_rsb(genmap_handle h) {
 
     /* Check for disconnected components */
     GenmapInitLaplacianWeighted(h, lc);
-    e = GenmapGetElements(h);
+    e = genmap_get_elements(h);
     sint components = get_components(NULL, e, lc, &h->buf, nelt, nv);
     if (components > 1 && lc->id == 0)
       printf("\tWarning: There are %d disconnected components in level = %d!\n",

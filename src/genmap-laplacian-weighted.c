@@ -10,7 +10,7 @@ int GenmapInitLaplacianWeighted(genmap_handle h, struct comm *c) {
   GenmapLong *vertices;
   GenmapMalloc(numPoints, &vertices);
 
-  GenmapElements elements = GenmapGetElements(h);
+  genmap_element elements = genmap_get_elements(h);
   GenmapInt i, j;
   for (i = 0; i < lelt; i++) {
     for (j = 0; j < nv; j++)
