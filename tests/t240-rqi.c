@@ -132,7 +132,7 @@ int main(int argc, char *argv[]) {
   genmap_handle gh;
   genmap_init(&gh, MPI_COMM_WORLD);
   GenmapSetNLocalElements(gh, mesh->nelt);
-  genmap_set_vertices(gh, mesh->nVertex);
+  genmap_set_nvertices(gh, mesh->nVertex);
 
   /* Setup mesh */
   GenmapElements e = GenmapGetElements(gh);
@@ -154,7 +154,7 @@ int main(int argc, char *argv[]) {
     x->data[i] = rand() % 100 / 50.;
   }
 
-  GenmapLong nelg = genmap_get_global_nel(gh);
+  GenmapLong nelg = genmap_get_partition_nel(gh);
   GenmapOrthogonalizebyOneVector(gh, c, x, nelg);
 
   GenmapScalar norm = GenmapDotVector(x, x);

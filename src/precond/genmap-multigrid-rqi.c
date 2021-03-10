@@ -15,7 +15,7 @@ int rqi(genmap_handle h, struct comm *gsc, mgData d, GenmapVector z,
   GenmapCreateVector(&err, lelt);
 
   int rank = genmap_comm_rank(genmap_global_comm(h));
-  GenmapLong nelg = genmap_get_global_nel(h);
+  GenmapLong nelg = genmap_get_partition_nel(h);
 
   // Grammian
   GenmapScalar *Z, *GZ, *M, *rhs, *v, *buf;

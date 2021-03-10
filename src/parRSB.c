@@ -68,9 +68,9 @@ int parRSB_partMesh(int *part, int *seq, long long *vtx, double *coord, int nel,
 
     genmap_set_elements(h, &eList);
     genmap_comm_scan(h, genmap_global_comm(h));
-    genmap_set_vertices(h, nv);
+    genmap_set_nvertices(h, nv);
 
-    GenmapLong nelg = genmap_get_global_nel(h);
+    GenmapLong nelg = genmap_get_partition_nel(h);
     GenmapInt id = genmap_comm_rank(genmap_global_comm(h));
     GenmapInt size_ = genmap_comm_size(genmap_global_comm(h));
 

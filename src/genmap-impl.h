@@ -25,7 +25,7 @@
 #define MAXDIM 3 /* Maximum dimension of the mesh */
 #define MAXNV 8  /* Maximum number of vertices per element */
 
-/* parRCB/parRSB internals */
+/* rcb_element is used for rcb and rib */
 struct rcb_element {
   unsigned char type;
   GenmapInt proc;
@@ -35,9 +35,6 @@ struct rcb_element {
   GenmapScalar coord[MAXDIM];
   GenmapScalar fiedler;
 };
-
-int rcb(struct comm *ci, struct array *elements, int ndim, buffer *bfr);
-int rib(struct comm *ci, struct array *elements, int ndim, buffer *bfr);
 
 /* rsb_element should be a superset of rcb_element */
 struct rsb_element {
@@ -53,9 +50,8 @@ struct rsb_element {
   GenmapULong globalId0;
 };
 
-int GenmapCreateElements(GenmapElements *e);
-int GenmapDestroyElements(GenmapElements e);
-GenmapElements GenmapGetElements_default(genmap_handle h);
+int rcb(struct comm *ci, struct array *elements, int ndim, buffer *bfr);
+int rib(struct comm *ci, struct array *elements, int ndim, buffer *bfr);
 
 struct genmap_handle_private {
   genmap_comm global;
@@ -82,13 +78,15 @@ struct genmap_handle_private {
   parRSB_options *options;
 };
 
-int GenmapCreateHandle(genmap_handle h);
-int GenmapDestroyHandle(genmap_handle h);
-
 struct GenmapVector_private {
   GenmapInt size;
   GenmapScalar *data;
 };
+
+int GenmapMallocArray(size_t n, size_t unit, void *p);
+int GenmapCallocArray(size_t n, size_t unit, void *p);
+int GenmapReallocArray(size_t n, size_t unit, void *p);
+int GenmapFree(void *p);
 
 #define GenmapMalloc(n, p) GenmapMallocArray((n), sizeof(**(p)), p)
 #define GenmapCalloc(n, p) GenmapCallocArray((n), sizeof(**(p)), p)
@@ -119,7 +117,6 @@ typedef enum {
 } metric;
 
 void metric_init();
-void metric_finalize();
 void metric_acc(metric m, double count);
 void metric_tic(struct comm *c, metric m);
 void metric_toc(struct comm *c, metric m);
@@ -127,6 +124,7 @@ double metric_get_value(int level, metric m);
 void metric_push_level();
 uint metric_get_levels();
 void metric_print(struct comm *c);
+void metric_finalize();
 
 /* genCon */
 typedef struct {

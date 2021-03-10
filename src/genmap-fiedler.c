@@ -7,7 +7,7 @@
 //
 int GenmapFiedlerRQI(genmap_handle h, struct comm *gsc, int max_iter,
                      int global) {
-  GenmapInt lelt = GenmapGetNLocalElements(h);
+  GenmapInt lelt =genmap_get_nel(h);
   GenmapVector initVec;
   GenmapCreateVector(&initVec, lelt);
 
@@ -16,7 +16,7 @@ int GenmapFiedlerRQI(genmap_handle h, struct comm *gsc, int max_iter,
   if (global > 0) {
     if (h->options->rsb_paul == 1) {
       for (i = 0; i < lelt; i++)
-        initVec->data[i] = GenmapGetLocalStartIndex(h) + i + 1;
+        initVec->data[i] = genmap_get_local_start_index(h) + i + 1;
     } else {
       for (i = 0; i < lelt; i++)
         initVec->data[i] = elements[i].globalId;
@@ -26,7 +26,7 @@ int GenmapFiedlerRQI(genmap_handle h, struct comm *gsc, int max_iter,
       initVec->data[i] = elements[i].fiedler;
   }
 
-  GenmapOrthogonalizebyOneVector(gsc, initVec, genmap_get_global_nel(h));
+  GenmapOrthogonalizebyOneVector(gsc, initVec, genmap_get_partition_nel(h));
 
   GenmapScalar norm = GenmapDotVector(initVec, initVec), normi;
   comm_allreduce(gsc, gs_double, gs_add, &norm, 1, &normi);
@@ -69,17 +69,17 @@ int GenmapFiedlerRQI(genmap_handle h, struct comm *gsc, int max_iter,
 
 int GenmapFiedlerLanczos(genmap_handle h, struct comm *gsc, int max_iter,
                          int global) {
-  GenmapInt lelt = GenmapGetNLocalElements(h);
+  GenmapInt lelt =genmap_get_nel(h);
   GenmapVector initVec, alphaVec, betaVec;
 
-  GenmapCreateVector(&initVec, GenmapGetNLocalElements(h));
+  GenmapCreateVector(&initVec,genmap_get_nel(h));
   GenmapElements elements = GenmapGetElements(h);
 
   GenmapInt i;
   if (global > 0) {
     if (h->options->rsb_paul == 1) {
       for (i = 0; i < lelt; i++)
-        initVec->data[i] = GenmapGetLocalStartIndex(h) + i + 1;
+        initVec->data[i] = genmap_get_local_start_index(h) + i + 1;
     } else {
       for (i = 0; i < lelt; i++)
         initVec->data[i] = elements[i].globalId;
@@ -93,7 +93,7 @@ int GenmapFiedlerLanczos(genmap_handle h, struct comm *gsc, int max_iter,
   GenmapCreateVector(&betaVec, max_iter - 1);
   GenmapVector *q = NULL;
 
-  GenmapOrthogonalizebyOneVector(gsc, initVec, genmap_get_global_nel(h));
+  GenmapOrthogonalizebyOneVector(gsc, initVec, genmap_get_partition_nel(h));
   GenmapScalar rtr = GenmapDotVector(initVec, initVec), rni;
   comm_allreduce(gsc, gs_double, gs_add, &rtr, 1, &rni);
   rni = 1.0 / sqrt(rtr);

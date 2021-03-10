@@ -14,38 +14,30 @@ typedef struct GenmapVector_private *GenmapVector;
 typedef struct rsb_element *GenmapElements;
 
 int genmap_init(genmap_handle *h, comm_ext ce, parRSB_options *options);
-int genmap_finalize(genmap_handle h);
-
-int GenmapMallocArray(size_t n, size_t unit, void *p);
-int GenmapCallocArray(size_t n, size_t unit, void *p);
-int GenmapReallocArray(size_t n, size_t unit, void *p);
-int GenmapFree(void *p);
 
 GenmapElements GenmapGetElements(genmap_handle h);
 
 genmap_comm genmap_local_comm(genmap_handle h);
 genmap_comm genmap_global_comm(genmap_handle h);
 
-GenmapInt GenmapGetNLocalElements(genmap_handle h);
+void genmap_set_nvertices(genmap_handle h, int nVertices);
 void genmap_set_elements(genmap_handle h, struct array *localElements);
 
-GenmapULong genmap_get_global_nel(genmap_handle h);
-void GenmapSetNGlobalElements(genmap_handle h, GenmapULong globalElements);
+GenmapULong genmap_get_partition_nel(genmap_handle h);
+void genmap_set_partition_nel(genmap_handle h, GenmapULong globalElements);
 
-GenmapLong GenmapGetLocalStartIndex(genmap_handle h);
-void GenmapSetLocalStartIndex(genmap_handle h, GenmapLong localStart);
+GenmapLong genmap_get_local_start_index(genmap_handle h);
+void genmap_set_local_start_index(genmap_handle h, GenmapLong localStart);
 
-int GenmapGetNVertices(genmap_handle h);
-void genmap_set_vertices(genmap_handle h, int nVertices);
+GenmapInt genmap_get_nel(genmap_handle h);
+
+int genmap_finalize(genmap_handle h);
 
 /* genmap_comm */
 void genmap_comm_scan(genmap_handle h, genmap_comm c);
 int genmap_comm_size(genmap_comm c);
 int genmap_comm_rank(genmap_comm c);
-
 void genmap_comm_split(struct comm *old, int bin, int key, struct comm *new_);
-
-int GenmapRead(genmap_handle h, void *data);
 
 /* Genamp Vector */
 int GenmapCreateVector(GenmapVector *x, GenmapInt size);

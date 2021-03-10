@@ -7,10 +7,10 @@
 int flex_cg(genmap_handle h, struct comm *gsc, mgData d, GenmapVector ri,
             int maxIter, GenmapVector x) {
   assert(x->size == ri->size);
-  assert(x->size == GenmapGetNLocalElements(h));
+  assert(x->size ==genmap_get_nel(h));
 
   uint lelt = x->size;
-  GenmapLong nelg = genmap_get_global_nel(h);
+  GenmapLong nelg = genmap_get_partition_nel(h);
 
   GenmapVector z0, z, dz, w, p, r;
   GenmapCreateVector(&z, lelt);

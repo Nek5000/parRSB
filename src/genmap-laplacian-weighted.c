@@ -1,8 +1,8 @@
 #include <genmap-impl.h>
 
 int GenmapInitLaplacianWeighted(genmap_handle h, struct comm *c) {
-  GenmapInt lelt = GenmapGetNLocalElements(h);
-  GenmapInt nv = GenmapGetNVertices(h);
+  GenmapInt lelt =genmap_get_nel(h);
+  GenmapInt nv = genmap_get_nvertices(h);
 
   GenmapRealloc(lelt, &h->weights);
   GenmapUInt numPoints = (GenmapUInt)nv * lelt;
@@ -59,8 +59,8 @@ int GenmapInitLaplacianWeighted(genmap_handle h, struct comm *c) {
 }
 
 int GenmapLaplacianWeighted(genmap_handle h, GenmapScalar *u, GenmapScalar *v) {
-  GenmapInt lelt = GenmapGetNLocalElements(h);
-  GenmapInt nv = GenmapGetNVertices(h);
+  GenmapInt lelt =genmap_get_nel(h);
+  GenmapInt nv = genmap_get_nvertices(h);
 
   GenmapScalar *ucv;
   GenmapMalloc((size_t)(nv * lelt), &ucv);

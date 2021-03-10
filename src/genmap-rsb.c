@@ -20,7 +20,7 @@ static int dump_fiedler_if_discon(genmap_handle h, int level, int max_levels) {
 
   /* Dump current partition status */
   if (level > 0 && level < max_levels) {
-    slong nelt = GenmapGetNLocalElements(h);
+    slong nelt =genmap_get_nel(h);
     slong out[2][1], buf[2][1];
     comm_scan(out, gc, gs_long, gs_add, &nelt, 1, buf); // max
     slong start = out[0][0];
@@ -58,11 +58,11 @@ int genmap_rsb(genmap_handle h) {
 
   genmap_comm_scan(h, lc);
 
-  uint nelt = GenmapGetNLocalElements(h);
+  uint nelt =genmap_get_nel(h);
   GenmapElements e = GenmapGetElements(h);
   GenmapInt i;
   for (i = 0; i < nelt; i++)
-    e[i].globalId0 = GenmapGetLocalStartIndex(h) + i + 1;
+    e[i].globalId0 = genmap_get_local_start_index(h) + i + 1;
 
   int nv = h->nv;
   int ndim = (nv == 8) ? 3 : 2;

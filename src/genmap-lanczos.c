@@ -8,10 +8,10 @@ int GenmapLanczosLegendary(genmap_handle h, struct comm *gsc, GenmapVector f,
                            GenmapVector diag, GenmapVector upper) {
   assert(diag->size == niter);
   assert(diag->size == upper->size + 1);
-  assert(f->size == GenmapGetNLocalElements(h));
+  assert(f->size ==genmap_get_nel(h));
 
-  if (genmap_get_global_nel(h) < niter) {
-    niter = genmap_get_global_nel(h);
+  if (genmap_get_partition_nel(h) < niter) {
+    niter = genmap_get_partition_nel(h);
     diag->size = niter;
     upper->size = niter - 1;
   }
@@ -23,7 +23,7 @@ int GenmapLanczosLegendary(genmap_handle h, struct comm *gsc, GenmapVector f,
 
   rtz1 = 1.0;
   pap = 0.0;
-  GenmapInt lelt = GenmapGetNLocalElements(h);
+  GenmapInt lelt =genmap_get_nel(h);
 
   GenmapCreateZerosVector(&p, lelt);
   GenmapCreateVector(&w, lelt);
@@ -31,7 +31,7 @@ int GenmapLanczosLegendary(genmap_handle h, struct comm *gsc, GenmapVector f,
 
   GenmapCopyVector(r, f);
 
-  GenmapOrthogonalizebyOneVector(gsc, r, genmap_get_global_nel(h));
+  GenmapOrthogonalizebyOneVector(gsc, r, genmap_get_partition_nel(h));
   rtr = GenmapDotVector(r, r);
   comm_allreduce(gsc, gs_double, gs_add, &rtr, 1, &rni);
   rnorm = sqrt(rtr);
@@ -57,7 +57,7 @@ int GenmapLanczosLegendary(genmap_handle h, struct comm *gsc, GenmapVector f,
       beta = 0.0;
 
     GenmapAxpbyVector(p, p, beta, r, 1.0);
-    GenmapOrthogonalizebyOneVector(gsc, p, genmap_get_global_nel(h));
+    GenmapOrthogonalizebyOneVector(gsc, p, genmap_get_partition_nel(h));
 
     metric_tic(gsc, WEIGHTEDLAPLACIAN);
     GenmapLaplacianWeighted(h, p->data, w->data);
@@ -107,21 +107,21 @@ int GenmapLanczos(genmap_handle h, struct comm *gsc, GenmapVector init,
                   GenmapVector beta) {
   assert(alpha->size == iter);
   assert(alpha->size == beta->size + 1);
-  assert(init->size == GenmapGetNLocalElements(h));
+  assert(init->size ==genmap_get_nel(h));
 
-  if (genmap_get_global_nel(h) < iter) {
-    iter = genmap_get_global_nel(h);
+  if (genmap_get_partition_nel(h) < iter) {
+    iter = genmap_get_partition_nel(h);
     alpha->size = iter;
     beta->size = iter - 1;
   }
 
-  GenmapInt lelt = GenmapGetNLocalElements(h);
+  GenmapInt lelt =genmap_get_nel(h);
 
   GenmapVector q1;
   GenmapCreateVector(&q1, lelt);
   GenmapCopyVector(q1, init);
 
-  GenmapOrthogonalizebyOneVector(gsc, q1, genmap_get_global_nel(h));
+  GenmapOrthogonalizebyOneVector(gsc, q1, genmap_get_partition_nel(h));
   GenmapScalar normq1 = GenmapDotVector(q1, q1), buf;
   comm_allreduce(gsc, gs_double, gs_add, &normq1, 1, &buf);
   normq1 = sqrt(normq1);

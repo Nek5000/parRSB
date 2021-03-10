@@ -4,11 +4,11 @@
 
 static void GenmapFindNeighbors(struct array *nbrs, genmap_handle h,
                                 struct comm *cc) {
-  sint lelt = GenmapGetNLocalElements(h);
-  sint nv = GenmapGetNVertices(h);
+  sint lelt =genmap_get_nel(h);
+  sint nv = genmap_get_nvertices(h);
 
   genmap_comm_scan(h, cc);
-  ulong elem_id = GenmapGetLocalStartIndex(h) + 1;
+  ulong elem_id = genmap_get_local_start_index(h) + 1;
   ulong sequenceId = elem_id * nv;
 
   size_t size = lelt * nv;
