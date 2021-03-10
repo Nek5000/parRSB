@@ -63,7 +63,7 @@ int GenmapFiedlerDump(const char *fname, genmap_handle h, slong g_start,
   return err;
 }
 
-int genmap_vectorDump(const char *fname, GenmapScalar *y, uint size,
+int GenmapVectorDump(const char *fname, GenmapScalar *y, uint size,
                      struct comm *c) {
   MPI_File file;
   int err = MPI_File_open(c->c, fname, MPI_MODE_CREATE | MPI_MODE_WRONLY,

@@ -145,7 +145,7 @@ void matrix_inverse(int N, double *A);
 /* Dump data */
 int GenmapFiedlerDump(const char *fname, genmap_handle h, slong start,
                       struct comm *c);
-int genmap_vectorDump(const char *fname, GenmapScalar *y, uint size,
+int GenmapVectorDump(const char *fname, GenmapScalar *y, uint size,
                      struct comm *c);
 int GenmapCentroidDump(const char *fname, genmap_handle h, sint g_id,
                        struct comm *c);
