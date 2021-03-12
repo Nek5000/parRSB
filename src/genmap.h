@@ -21,6 +21,7 @@ genmap_comm genmap_local_comm(genmap_handle h);
 genmap_comm genmap_global_comm(genmap_handle h);
 
 void genmap_set_nvertices(genmap_handle h, int nv);
+int genmap_get_nvertices(genmap_handle h);
 
 GenmapULong genmap_get_partition_nel(genmap_handle h);
 void genmap_set_partition_nel(genmap_handle h, GenmapULong globalElements);

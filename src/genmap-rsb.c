@@ -48,6 +48,66 @@ static int dump_fiedler_if_discon(genmap_handle h, int level, int max_levels) {
   }
 }
 
+static void split_and_repair_partitions(genmap_handle h, struct comm *lc, int level) {
+  /* Check for disconnected components */
+  sint np = lc->np;
+  int bin = 1;
+  if (lc->id < (np + 1) / 2)
+    bin = 0;
+
+  struct comm tc;
+  genmap_comm_split(lc, bin, lc->id, &tc);
+
+  GenmapInitLaplacianWeighted(h, &tc);
+
+  struct rsb_element *e = genmap_get_elements(h);
+  uint nelt = genmap_get_nel(h);
+  int nv = genmap_get_nvertices(h);
+
+  sint *comp_ids;
+  GenmapMalloc(nelt, &comp_ids);
+
+  sint ncomp = get_components(comp_ids, e, &tc, &h->buf, nelt, nv);
+
+  sint ncomp_global = ncomp, buf;
+  comm_allreduce(lc, gs_int, gs_max, &ncomp_global, 1, &buf);
+  if (ncomp_global > 1 && lc->id == 0) {
+    printf("\tWarning: There are %d disconnected components in level = %d!\n",
+           ncomp, level);
+    fflush(stdout);
+  }
+
+  sint *comp_count;
+  GenmapCalloc(2*ncomp, &comp_count);
+  uint i;
+  for (i = 0; i < nelt; i++)
+    comp_count[comp_ids[i]]++;
+  comm_allreduce(&tc, gs_int, gs_add, comp_count, ncomp, &comp_count[ncomp]);
+
+  sint min_count = INT_MAX, min_id = -1;
+  for (i = 0; i < ncomp; i++)
+    if (comp_count[i] < min_count)
+      min_count = comp_count[i], min_id = i;
+  sint min_count_global = min_count;
+  comm_allreduce(lc, gs_int, gs_min, &min_count_global, 1, buf);
+
+  sint low_np = (np + 1)/2;
+  sint high_np = np - (np + 1)/2;
+
+  struct crystal cr;
+  crystal_init(&cr, lc);
+  crystal_free(&cr);
+
+  // do a load balanced sort in each partition
+
+  comm_free(lc);
+  comm_dup(lc, &tc);
+  comm_free(&tc);
+
+  GenmapFree(comp_ids);
+  GenmapFree(comp_count);
+}
+
 int genmap_rsb(genmap_handle h) {
   int verbose = h->options->debug_level > 1;
   int max_iter = 50;
@@ -118,27 +178,11 @@ int genmap_rsb(genmap_handle h) {
     metric_toc(lc, FIEDLERSORT);
 
     /* Bisect */
-    int bin = 1;
-    if (lc->id < (np + 1) / 2)
-      bin = 0;
-
-    struct comm tc;
-    genmap_comm_split(lc, bin, lc->id, &tc);
-    comm_free(lc);
-    comm_dup(lc, &tc);
-    comm_free(&tc);
+    split_and_repair_partitions(h, lc, level);
 
     genmap_comm_scan(h, lc);
     metric_push_level();
     level++;
-
-    /* Check for disconnected components */
-    GenmapInitLaplacianWeighted(h, lc);
-    e = genmap_get_elements(h);
-    sint components = get_components(NULL, e, lc, &h->buf, nelt, nv);
-    if (components > 1 && lc->id == 0)
-      printf("\tWarning: There are %d disconnected components in level = %d!\n",
-             components, level);
   }
 
 #if 0
