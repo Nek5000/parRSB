@@ -71,7 +71,7 @@ static void split_and_repair_partitions(genmap_handle h, struct comm *lc,
   sint ncomp_global = ncomp, buf;
   comm_allreduce(lc, gs_int, gs_max, &ncomp_global, 1, &buf);
 
-  //if (ncomp_global > 1 && lc->id == 0) {
+  // if (ncomp_global > 1 && lc->id == 0) {
   //  printf("\tWarning: There are %d disconnected components in level = %d!\n",
   //         ncomp, level);
   //  fflush(stdout);
@@ -83,7 +83,8 @@ static void split_and_repair_partitions(genmap_handle h, struct comm *lc,
     uint i;
     for (i = 0; i < nelt; i++)
       comp_count[comp_ids[i]]++;
-    comm_allreduce(&tc, gs_int, gs_add, comp_count, ncomp_global, &comp_count[ncomp_global]);
+    comm_allreduce(&tc, gs_int, gs_add, comp_count, ncomp_global,
+                   &comp_count[ncomp_global]);
 
     sint min_count = INT_MAX, min_id = -1;
     for (i = 0; i < ncomp; i++) {
@@ -106,13 +107,13 @@ static void split_and_repair_partitions(genmap_handle h, struct comm *lc,
 
     sint start = !bin * low_np;
     sint P = bin * low_np + !bin * high_np;
-    uint size = (min_count_global + P - 1)/P;
+    uint size = (min_count_global + P - 1) / P;
     sint current = 0;
 
     if (min_count_global == min_count) {
       for (i = 0; i < nelt; i++) {
         if (comp_ids[i] == min_id) {
-          e[i].proc = start + current/size;
+          e[i].proc = start + current / size;
           current++;
         }
       }
