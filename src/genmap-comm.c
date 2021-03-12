@@ -26,4 +26,3 @@ void genmap_comm_scan(genmap_handle h, struct comm *c) {
   genmap_set_local_start_index(h, out[0][0]);
   genmap_set_partition_nel(h, out[1][0]);
 }
-

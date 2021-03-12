@@ -48,7 +48,8 @@ static int dump_fiedler_if_discon(genmap_handle h, int level, int max_levels) {
   }
 }
 
-static void split_and_repair_partitions(genmap_handle h, struct comm *lc, int level) {
+static void split_and_repair_partitions(genmap_handle h, struct comm *lc,
+                                        int level) {
   /* Check for disconnected components */
   sint np = lc->np;
   int bin = 1;
@@ -78,7 +79,7 @@ static void split_and_repair_partitions(genmap_handle h, struct comm *lc, int le
   }
 
   sint *comp_count;
-  GenmapCalloc(2*ncomp, &comp_count);
+  GenmapCalloc(2 * ncomp, &comp_count);
   uint i;
   for (i = 0; i < nelt; i++)
     comp_count[comp_ids[i]]++;
@@ -91,8 +92,8 @@ static void split_and_repair_partitions(genmap_handle h, struct comm *lc, int le
   sint min_count_global = min_count;
   comm_allreduce(lc, gs_int, gs_min, &min_count_global, 1, buf);
 
-  sint low_np = (np + 1)/2;
-  sint high_np = np - (np + 1)/2;
+  sint low_np = (np + 1) / 2;
+  sint high_np = np - (np + 1) / 2;
 
   struct crystal cr;
   crystal_init(&cr, lc);
