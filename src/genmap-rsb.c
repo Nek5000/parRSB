@@ -67,46 +67,72 @@ static void split_and_repair_partitions(genmap_handle h, struct comm *lc,
 
   sint *comp_ids;
   GenmapMalloc(nelt, &comp_ids);
-
   sint ncomp = get_components(comp_ids, e, &tc, &h->buf, nelt, nv);
-
   sint ncomp_global = ncomp, buf;
   comm_allreduce(lc, gs_int, gs_max, &ncomp_global, 1, &buf);
-  if (ncomp_global > 1 && lc->id == 0) {
-    printf("\tWarning: There are %d disconnected components in level = %d!\n",
-           ncomp, level);
-    fflush(stdout);
+
+  //if (ncomp_global > 1 && lc->id == 0) {
+  //  printf("\tWarning: There are %d disconnected components in level = %d!\n",
+  //         ncomp, level);
+  //  fflush(stdout);
+  //}
+
+  if (ncomp_global > 1) {
+    sint *comp_count;
+    GenmapCalloc(2 * ncomp_global, &comp_count);
+    uint i;
+    for (i = 0; i < nelt; i++)
+      comp_count[comp_ids[i]]++;
+    comm_allreduce(&tc, gs_int, gs_add, comp_count, ncomp_global, &comp_count[ncomp_global]);
+
+    sint min_count = INT_MAX, min_id = -1;
+    for (i = 0; i < ncomp; i++) {
+      if (comp_count[i] < min_count) {
+        min_count = comp_count[i];
+        min_id = i;
+      }
+    }
+    sint min_count_global = min_count;
+    comm_allreduce(lc, gs_int, gs_min, &min_count_global, 1, buf);
+
+    struct crystal cr;
+    crystal_init(&cr, lc);
+
+    for (i = 0; i < nelt; i++)
+      e[i].proc = lc->id;
+
+    sint low_np = (np + 1) / 2;
+    sint high_np = np - (np + 1) / 2;
+
+    sint start = !bin * low_np;
+    sint P = bin * low_np + !bin * high_np;
+    uint size = (min_count_global + P - 1)/P;
+    sint current = 0;
+
+    if (min_count_global == min_count) {
+      for (i = 0; i < nelt; i++) {
+        if (comp_ids[i] == min_id) {
+          e[i].proc = start + current/size;
+          current++;
+        }
+      }
+    }
+
+    sarray_transfer(struct rsb_element, h->elements, proc, 1, &cr);
+    crystal_free(&cr);
+
+    // do a load balanced sort in each partition
+    parallel_sort(struct rsb_element, h->elements, fiedler, gs_double, 0, 1,
+                  &tc, &h->buf);
+
+    GenmapFree(comp_count);
   }
-
-  sint *comp_count;
-  GenmapCalloc(2 * ncomp, &comp_count);
-  uint i;
-  for (i = 0; i < nelt; i++)
-    comp_count[comp_ids[i]]++;
-  comm_allreduce(&tc, gs_int, gs_add, comp_count, ncomp, &comp_count[ncomp]);
-
-  sint min_count = INT_MAX, min_id = -1;
-  for (i = 0; i < ncomp; i++)
-    if (comp_count[i] < min_count)
-      min_count = comp_count[i], min_id = i;
-  sint min_count_global = min_count;
-  comm_allreduce(lc, gs_int, gs_min, &min_count_global, 1, buf);
-
-  sint low_np = (np + 1) / 2;
-  sint high_np = np - (np + 1) / 2;
-
-  struct crystal cr;
-  crystal_init(&cr, lc);
-  crystal_free(&cr);
-
-  // do a load balanced sort in each partition
 
   comm_free(lc);
   comm_dup(lc, &tc);
   comm_free(&tc);
 
   GenmapFree(comp_ids);
-  GenmapFree(comp_count);
 }
 
 int genmap_rsb(genmap_handle h) {
