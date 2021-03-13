@@ -71,11 +71,11 @@ static void split_and_repair_partitions(genmap_handle h, struct comm *lc,
   sint ncomp_global = ncomp, buf;
   comm_allreduce(lc, gs_int, gs_max, &ncomp_global, 1, &buf);
 
-  // if (ncomp_global > 1 && lc->id == 0) {
-  //  printf("\tWarning: There are %d disconnected components in level = %d!\n",
-  //         ncomp, level);
-  //  fflush(stdout);
-  //}
+  if (ncomp_global > 1 && lc->id == 0) {
+    printf("\tWarning: There are %d disconnected components in level = %d!\n",
+           ncomp_global, level);
+    fflush(stdout);
+  }
 
   if (ncomp_global > 1) {
     sint *comp_count;
@@ -94,7 +94,14 @@ static void split_and_repair_partitions(genmap_handle h, struct comm *lc,
       }
     }
     sint min_count_global = min_count;
-    comm_allreduce(lc, gs_int, gs_min, &min_count_global, 1, buf);
+    comm_allreduce(lc, gs_int, gs_min, &min_count_global, 1, &buf);
+    sint id_global = (min_count_global == min_count) * lc->id;
+    comm_allreduce(lc, gs_int, gs_min, &id_global, 1, &buf);
+
+    if (lc->id == 0) {
+      printf("min_count = %d, min_id = %d\n", min_count_global, id_global);
+      fflush(stdout);
+    }
 
     struct crystal cr;
     crystal_init(&cr, lc);
@@ -108,9 +115,9 @@ static void split_and_repair_partitions(genmap_handle h, struct comm *lc,
     sint start = !bin * low_np;
     sint P = bin * low_np + !bin * high_np;
     uint size = (min_count_global + P - 1) / P;
-    sint current = 0;
 
-    if (min_count_global == min_count) {
+    sint current = 0;
+    if (min_count_global == min_count && lc->id == id_global) {
       for (i = 0; i < nelt; i++) {
         if (comp_ids[i] == min_id) {
           e[i].proc = start + current / size;
