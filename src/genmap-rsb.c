@@ -62,7 +62,8 @@ static void split_and_repair_partitions(genmap_handle h, struct comm *lc,
   int nv = genmap_get_nvertices(h);
 
   /* Check for disconnected components */
-  sint *comp_ids = NULL; GenmapMalloc(nelt, &comp_ids);
+  sint *comp_ids = NULL;
+  GenmapMalloc(nelt, &comp_ids);
   GenmapInitLaplacianWeighted(h, &tc);
   sint ncomp_global, ncomp, buf;
   ncomp_global = ncomp = get_components(comp_ids, e, &tc, &h->buf, nelt, nv);
@@ -75,7 +76,8 @@ static void split_and_repair_partitions(genmap_handle h, struct comm *lc,
       fflush(stdout);
     }
 
-    sint *comp_count = NULL; GenmapCalloc(2 * ncomp_global, &comp_count);
+    sint *comp_count = NULL;
+    GenmapCalloc(2 * ncomp_global, &comp_count);
     uint i;
     for (i = 0; i < nelt; i++)
       comp_count[comp_ids[i]]++;
