@@ -96,11 +96,6 @@ static void split_and_repair_partitions(genmap_handle h, struct comm *lc,
     sint id_global = (min_count_global == min_count) ? lc->id : lc->np;
     comm_allreduce(lc, gs_int, gs_min, &id_global, 1, &buf);
 
-    if (lc->id == 0) {
-      printf("min_count = %d, min_id = %d\n", min_count_global, id_global);
-      fflush(stdout);
-    }
-
     struct crystal cr;
     crystal_init(&cr, lc);
 
@@ -112,12 +107,6 @@ static void split_and_repair_partitions(genmap_handle h, struct comm *lc,
     sint start = !bin * low_np;
     sint P = bin * low_np + !bin * high_np;
     sint size = (min_count_global + P - 1) / P;
-
-    if (lc->id == 0) {
-      printf("low_np = %d, high_np = %d\n", low_np, high_np);
-      printf("start = %d, P = %d size = %d\n", start, P, size);
-      fflush(stdout);
-    }
 
     sint current = 0;
     if (min_count_global == min_count && lc->id == id_global) {
