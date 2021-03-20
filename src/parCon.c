@@ -37,8 +37,8 @@ int parRSB_findConnectivity(long long *vertexid, double *coord, int nelt,
   uint rank = c.id;
   uint size = c.np;
 
-  if (rank == 0 && verbose > 0)
-    printf("Generating connectivity ...\n");
+  if (rank == 0)
+    printf("generating connectivity (tol=%g) ...", tol);
   fflush(stdout);
 
   double t_con = 0.0;
@@ -124,8 +124,8 @@ int parRSB_findConnectivity(long long *vertexid, double *coord, int nelt,
   comm_barrier(&c);
   t_con += comm_time();
 
-  if (rank == 0 && verbose > 0)
-    printf("\tfinished in %g s\n", t_con);
+  if (rank == 0)
+    printf("\n finished in %g s\n", t_con);
   fflush(stdout);
 
   buffer_free(&bfr);
