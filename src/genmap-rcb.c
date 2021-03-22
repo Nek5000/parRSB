@@ -2,8 +2,8 @@
 #include <genmap-impl.h>
 #include <sort.h>
 
-void get_rcb_axis_local(double *min, double *max, struct rcb_element *elems, uint nel,
-                        int ndim) {
+void get_rcb_axis_local(double *min, double *max, struct rcb_element *elems,
+                        uint nel, int ndim) {
   // TODO: Get rid of this
   size_t unit_size;
   if (elems->type == GENMAP_RCB_ELEMENT) {
@@ -59,7 +59,7 @@ void rcb_local(struct array *a, uint start, uint end, int ndim, buffer *buf) {
 
   double min[3], max[3];
   char *st = (char *)a->ptr + unit_size * start;
-  get_rcb_axis_local(min, max, st, size, ndim);
+  get_rcb_axis_local(min, max, (struct rcb_element *)st, size, ndim);
 
   double length[3];
   sint i;

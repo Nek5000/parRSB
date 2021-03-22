@@ -78,7 +78,8 @@ void genmap_restore_original(int *part, int *seq, struct crystal *cr,
   else
     unit_size = sizeof(struct rcb_element);
 
-  sarray_transfer_(eList, unit_size, offsetof(struct rcb_element, origin), 1, cr);
+  sarray_transfer_(eList, unit_size, offsetof(struct rcb_element, origin), 1,
+                   cr);
 
   uint nel = eList->n;
   if (element->type == GENMAP_RSB_ELEMENT) // RSB

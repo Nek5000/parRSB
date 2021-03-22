@@ -117,7 +117,10 @@ int genmap_rsb(genmap_handle h) {
     metric_toc(lc, FIEDLERSORT);
 
     /* Bisect */
+    double t = comm_time();
     split_and_repair_partitions(h, lc, level);
+    t = comm_time() - t;
+    metric_acc(BISECTANDREPAIR, t);
 
     genmap_comm_scan(h, lc);
     metric_push_level();
