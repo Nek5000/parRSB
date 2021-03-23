@@ -27,7 +27,7 @@
 
 /* rcb_element is used for rcb and rib */
 struct rcb_element {
-  unsigned char type;
+  int type;
   GenmapInt proc;
   GenmapInt origin;
   GenmapInt seq;
@@ -38,7 +38,7 @@ struct rcb_element {
 
 /* rsb_element should be a superset of rcb_element */
 struct rsb_element {
-  unsigned char type;
+  int type;
   GenmapInt proc;
   GenmapInt origin;
   GenmapInt seq;
@@ -99,12 +99,15 @@ typedef enum {
   FIEDLER,
   NFIEDLER,
   FIEDLERSORT,
-  BISECT,
+  BISECTANDREPAIR,
   LANCZOS,
   NLANCZOS,
   WEIGHTEDLAPLACIAN,
   TQLI,
   LAPLACIANSETUP,
+  FINDNBRS,
+  CSRMATSETUP,
+  CSRTOPSETUP,
   PRECONDSETUP,
   RQI,
   NRQI,
