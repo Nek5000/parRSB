@@ -6,6 +6,34 @@
 #include <genmap-impl.h>
 #include <sort.h>
 
+static int check_convergence(struct comm *gc, int max_pass, int max_iter) {
+  int max_levels = log2(gc->np);
+
+  int i;
+  for (i = 0; i < max_levels; i++) {
+    sint converged = 1;
+    int val = (int)metric_get_value(i, NFIEDLER);
+    if (val >= max_pass * max_iter) {
+      converged = 0;
+      break;
+    }
+
+    sint ibfr;
+    comm_allreduce(gc, gs_int, gs_min, &converged, 1, &ibfr);
+
+    double dbfr;
+    double final = (double)metric_get_value(i, LANCZOSTOLFINAL);
+    comm_allreduce(gc, gs_double, gs_min, &final, 1, &dbfr);
+
+    double target = (double)metric_get_value(i, LANCZOSTOLTARGET);
+
+    if (converged == 0 && gc->id == 0) {
+      printf("\tWarning: Partitioner only reached a tolerance of %lf given %lf after %d x %d iterations in Level=%d!\n", final, target, max_pass, max_iter, i);
+      fflush(stdout);
+    }
+  }
+}
+
 int genmap_rsb(genmap_handle h) {
   int verbose = h->options->debug_level > 1;
   int max_iter = 50;
@@ -86,20 +114,7 @@ int genmap_rsb(genmap_handle h) {
     level++;
   }
 
-  /* Check if Fidler converged */
-  sint converged = 1;
-  for (i = 0; i < metric_get_levels(); i++) {
-    int val = (int)metric_get_value(i, NFIEDLER);
-    if (val >= max_pass * max_iter) {
-      converged = 0;
-      level = i;
-      break;
-    }
-  }
-  comm_allreduce(gc, gs_int, gs_min, &converged, 1, bfr); // min
-  if (converged == 0 && gc->id == 0)
-    printf("\tWARNING: Failed to converge while partitioning, Level=%d!\n",
-           level);
+  check_convergence(gc, max_pass, max_iter);
 
   return 0;
 }

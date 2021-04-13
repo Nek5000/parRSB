@@ -259,13 +259,14 @@ void split_and_repair_partitions(genmap_handle h, struct comm *lc, int level) {
   ncomp_global = ncomp = get_components(comp_ids, e, &tc, &h->buf, nelt, nv);
   comm_allreduce(lc, gs_int, gs_max, &ncomp_global, 1, &buf);
 
-  while (ncomp_global > 1) {
-    if (lc->id == 0) {
-      printf("\tWarning: There are %d disconnected components in level = %d!\n",
-             ncomp_global, level);
-      fflush(stdout);
-    }
+  int is_disconnected = ncomp_global > 1;
+  if (lc->id == 0 && is_disconnected) {
+    printf("\tWarning: %d disconnected component(s) in Level = %d! Fixing ... ",
+           ncomp_global, level);
+    fflush(stdout);
+  }
 
+  while (ncomp_global > 1) {
     sint *comp_count = NULL;
     GenmapCalloc(2 * ncomp_global, &comp_count);
     uint i;
@@ -326,6 +327,11 @@ void split_and_repair_partitions(genmap_handle h, struct comm *lc, int level) {
     comm_allreduce(lc, gs_int, gs_max, &ncomp_global, 1, &buf);
 
     GenmapFree(comp_count);
+  }
+
+  if (lc->id == 0 && is_disconnected) {
+    printf("done.\n");
+    fflush(stdout);
   }
 
   balance_partitions(h, &tc, bin, lc);
