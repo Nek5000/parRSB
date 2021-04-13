@@ -28,7 +28,9 @@ static int check_convergence(struct comm *gc, int max_pass, int max_iter) {
     double target = (double)metric_get_value(i, LANCZOSTOLTARGET);
 
     if (converged == 0 && gc->id == 0) {
-      printf("\tWarning: Partitioner only reached a tolerance of %lf given %lf after %d x %d iterations in Level=%d!\n", final, target, max_pass, max_iter, i);
+      printf("\tWarning: Partitioner only reached a tolerance of %lf given %lf "
+             "after %d x %d iterations in Level=%d!\n",
+             final, target, max_pass, max_iter, i);
       fflush(stdout);
     }
   }
@@ -54,16 +56,10 @@ int genmap_rsb(genmap_handle h) {
   int ndim = (nv == 8) ? 3 : 2;
 
   int np = gc->np;
-  int level = 0, max_levels = log2(np);
-
-  sint bfr[2];
+  int level = 0;
 
   while ((np = lc->np) > 1) {
-    int global;
-    if (h->options->rsb_paul == 1)
-      global = 1;
-    else
-      global = (np == gc->np);
+    int global = 1;
 
     /* Run RCB, RIB pre-step or just sort by global id */
     if (h->options->rsb_prepartition == 1) { // RCB
