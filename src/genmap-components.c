@@ -240,40 +240,46 @@ void balance_partitions(genmap_handle h, struct comm *lc, int bin,
 
 void split_and_repair_partitions(genmap_handle h, struct comm *lc, int level) {
   sint np = lc->np;
+  sint id = lc->id;
   int bin = 1;
-  if (lc->id < (np + 1) / 2)
+  if (id < (np + 1) / 2)
     bin = 0;
+
   struct comm tc;
-  genmap_comm_split(lc, bin, lc->id, &tc);
+  genmap_comm_split(lc, bin, id, &tc);
+
+  /* Check for disconnected components */
+  GenmapInitLaplacianWeighted(h, &tc);
 
   struct rsb_element *e = genmap_get_elements(h);
   uint nelt = genmap_get_nel(h);
   int nv = genmap_get_nvertices(h);
 
-  /* Check for disconnected components */
-  GenmapInitLaplacianWeighted(h, &tc);
-
   sint *comp_ids = NULL;
   GenmapMalloc(nelt, &comp_ids);
-  sint ncomp_global, ncomp, buf;
-  ncomp_global = ncomp = get_components(comp_ids, e, &tc, &h->buf, nelt, nv);
-  comm_allreduce(lc, gs_int, gs_max, &ncomp_global, 1, &buf);
 
-  int is_disconnected = ncomp_global > 1;
-  if (lc->id == 0 && is_disconnected) {
-    printf("\tWarning: %d disconnected component(s) in Level = %d! Fixing ... ",
-           ncomp_global, level);
+  sint ncompg, ncomp, buf;
+  ncompg = ncomp = get_components(comp_ids, e, &tc, &h->buf, nelt, nv);
+  comm_allreduce(lc, gs_int, gs_max, &ncompg, 1, &buf);
+
+  int is_disconnected = ncompg > 1;
+  if (id == 0 && is_disconnected) {
+    printf("\tWarning: %d disconnected component(s) in Level = %d! Fixing...\n",
+           ncompg, level);
     fflush(stdout);
   }
 
-  while (ncomp_global > 1) {
+  int attempt = 0;
+
+  while (ncompg > 1) {
     sint *comp_count = NULL;
-    GenmapCalloc(2 * ncomp_global, &comp_count);
+    GenmapCalloc(2 * ncompg, &comp_count);
+
     uint i;
     for (i = 0; i < nelt; i++)
       comp_count[comp_ids[i]]++;
-    comm_allreduce(&tc, gs_int, gs_add, comp_count, ncomp_global,
-                   &comp_count[ncomp_global]);
+    comm_allreduce(&tc, gs_int, gs_add, comp_count, ncompg,
+                   &comp_count[ncompg]);
 
     sint min_count = INT_MAX, min_id = -1;
     for (i = 0; i < ncomp; i++) {
@@ -282,16 +288,18 @@ void split_and_repair_partitions(genmap_handle h, struct comm *lc, int level) {
         min_id = i;
       }
     }
+
     sint min_count_global = min_count;
     comm_allreduce(lc, gs_int, gs_min, &min_count_global, 1, &buf);
-    sint id_global = (min_count_global == min_count) ? lc->id : lc->np;
+
+    sint id_global = (min_count_global == min_count) ? id : np;
     comm_allreduce(lc, gs_int, gs_min, &id_global, 1, &buf);
 
     struct crystal cr;
     crystal_init(&cr, lc);
 
     for (i = 0; i < nelt; i++)
-      e[i].proc = lc->id;
+      e[i].proc = id;
 
     sint low_np = (np + 1) / 2;
     sint high_np = np - low_np;
@@ -300,7 +308,9 @@ void split_and_repair_partitions(genmap_handle h, struct comm *lc, int level) {
     sint size = (min_count_global + P - 1) / P;
 
     sint current = 0;
-    if (min_count_global == min_count && lc->id == id_global) {
+    if (min_count_global == min_count && id == id_global) {
+      printf("min_count_global = %d start = %d, P = %d, size = %d\n",
+             min_count_global, start, P, size);
       for (i = 0; i < nelt; i++) {
         if (comp_ids[i] == min_id) {
           e[i].proc = start + current / size;
@@ -319,17 +329,26 @@ void split_and_repair_partitions(genmap_handle h, struct comm *lc, int level) {
 
     genmap_comm_scan(h, &tc);
 
+    GenmapInitLaplacianWeighted(h, &tc);
+
     e = genmap_get_elements(h);
     nelt = genmap_get_nel(h);
     GenmapRealloc(nelt, &comp_ids);
-    GenmapInitLaplacianWeighted(h, &tc);
-    ncomp_global = ncomp = get_components(comp_ids, e, &tc, &h->buf, nelt, nv);
-    comm_allreduce(lc, gs_int, gs_max, &ncomp_global, 1, &buf);
+    ncompg = ncomp = get_components(comp_ids, e, &tc, &h->buf, nelt, nv);
+    comm_allreduce(lc, gs_int, gs_max, &ncompg, 1, &buf);
+
+    attempt++;
+
+    if (id == 0) {
+      printf("\t\t %d disconnected component(s) after %d attempt\n", ncompg,
+             attempt);
+      fflush(stdout);
+    }
 
     GenmapFree(comp_count);
   }
 
-  if (lc->id == 0 && is_disconnected) {
+  if (id == 0 && is_disconnected) {
     printf("done.\n");
     fflush(stdout);
   }
