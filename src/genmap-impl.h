@@ -144,7 +144,8 @@ typedef struct {
 sint get_components(sint *component, struct rsb_element *elements,
                     struct comm *c, buffer *buf, uint nelt, uint nv);
 
-void split_and_repair_partitions(genmap_handle h, struct comm *lc, int level);
+void split_and_repair_partitions(genmap_handle h, struct comm *lc, int level,
+                                 struct comm *gc);
 /* Matrix inverse */
 void matrix_inverse(int N, double *A);
 
