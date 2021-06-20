@@ -222,11 +222,13 @@ void balance_partitions(genmap_handle h, struct comm *lc, int bin,
     slong out[2][1], bfr[2][1];
     comm_scan(out, lc, gs_long, gs_add, &ielems_n, 1, bfr);
     slong start = out[0][0];
-    assert(out[1][0] >= send_cnt);
+    printf("start = %ld ielemsg = %d send_cnt = %u\n", start, out[1][0],
+           send_cnt);
 
     struct interface_element *ptr = ielems.ptr;
+    sint psize = (send_cnt + gc->np - lc->np - 1) / (gc->np - lc->np);
     for (e = 0; start + e < send_cnt && e < ielems.n; e++)
-      ptr[e].dest = start_id;
+      ptr[e].dest = start_id + (start + e) / psize;
 
     crystal_init(&cr, lc);
     sarray_transfer(struct interface_element, &ielems, orig, 0, &cr);
@@ -235,9 +237,7 @@ void balance_partitions(genmap_handle h, struct comm *lc, int bin,
     ptr = ielems.ptr;
     for (e = 0; e < ielems.n; e++)
       if (ptr[e].dest != -1)
-        elems[ptr[e].index].proc =
-            ptr[e]
-                .dest; // This is redundant and everything is equal to start_id
+        elems[ptr[e].index].proc = ptr[e].dest;
 
     array_free(&ielems);
   }
@@ -246,7 +246,7 @@ void balance_partitions(genmap_handle h, struct comm *lc, int bin,
   sarray_transfer(struct rsb_element, h->elements, proc, 1, &cr);
   crystal_free(&cr);
 
-  // do a load balanced sort in each partition
+  // Do a load balanced sort in each partition
   parallel_sort(struct rsb_element, h->elements, fiedler, gs_double, 0, 1, lc,
                 &h->buf);
 
@@ -432,6 +432,7 @@ void split_and_repair_partitions(genmap_handle h, struct comm *lc, int level,
   }
 
   GenmapFree(comp_ids);
+
   comm_free(lc);
   comm_dup(lc, &tc);
   comm_free(&tc);

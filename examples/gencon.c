@@ -25,7 +25,7 @@ int main(int argc, char *argv[]) {
   buffer bfr;
   buffer_init(&bfr, 1024);
 
-  findSegments(mesh, &comm, tol, 0, &bfr);
+  findUniqueVertices(mesh, &comm, tol, 0, &bfr);
   setGlobalID(mesh, &comm);
   sendBack(mesh, &comm, &bfr);
   matchPeriodicFaces(mesh, &comm, &bfr);
