@@ -138,8 +138,8 @@ sint get_components(sint *component, struct rsb_element *elements,
   return count;
 }
 
-void balance_partitions(genmap_handle h, struct comm *lc, int bin,
-                        struct comm *gc) {
+int balance_partitions(genmap_handle h, struct comm *lc, int bin,
+                       struct comm *gc) {
   assert(bin == 0 || bin == 1);
 
   uint nelt = genmap_get_nel(h);
@@ -193,10 +193,11 @@ void balance_partitions(genmap_handle h, struct comm *lc, int bin,
   comm_allreduce(gc, gs_long, gs_min, &start_id, 1, &buf);
 
   struct crystal cr;
+  sint balanced = 1;
 
   if (send_cnt > 0) {
     int mul = -1.0;
-    if (start_id == 0) // we are sending to lower fiedler values
+    if (start_id == 0) /* we are sending to lower fiedler values */
       mul = 1.0;
 
     struct array ielems;
@@ -222,35 +223,43 @@ void balance_partitions(genmap_handle h, struct comm *lc, int bin,
     slong out[2][1], bfr[2][1];
     comm_scan(out, lc, gs_long, gs_add, &ielems_n, 1, bfr);
     slong start = out[0][0];
-    assert(out[1][0] >= send_cnt);
 
-    struct interface_element *ptr = ielems.ptr;
-    for (e = 0; start + e < send_cnt && e < ielems.n; e++)
-      ptr[e].dest = start_id;
+    if (out[1][0] < send_cnt) balanced = 0;
+    else {
+      struct interface_element *ptr = ielems.ptr;
+      for (e = 0; start + e < send_cnt && e < ielems.n; e++)
+        ptr[e].dest = start_id;
 
-    crystal_init(&cr, lc);
-    sarray_transfer(struct interface_element, &ielems, orig, 0, &cr);
-    crystal_free(&cr);
+      crystal_init(&cr, lc);
+      sarray_transfer(struct interface_element, &ielems, orig, 0, &cr);
+      crystal_free(&cr);
 
-    ptr = ielems.ptr;
-    for (e = 0; e < ielems.n; e++)
-      if (ptr[e].dest != -1)
-        elems[ptr[e].index].proc =
-            ptr[e]
-                .dest; // This is redundant and everything is equal to start_id
+      ptr = ielems.ptr;
+      for (e = 0; e < ielems.n; e++)
+        if (ptr[e].dest != -1)
+          elems[ptr[e].index].proc = ptr[e].dest;
+    }
 
     array_free(&ielems);
   }
 
-  crystal_init(&cr, gc);
-  sarray_transfer(struct rsb_element, h->elements, proc, 1, &cr);
-  crystal_free(&cr);
+  comm_allreduce(gc, gs_int, gs_min, &balanced, 1, &buf);
 
-  // do a load balanced sort in each partition
-  parallel_sort(struct rsb_element, h->elements, fiedler, gs_double, 0, 1, lc,
-                &h->buf);
+  if (balanced == 1) {
+    crystal_init(&cr, gc);
+    sarray_transfer(struct rsb_element, h->elements, proc, 1, &cr);
+    crystal_free(&cr);
 
-  genmap_comm_scan(h, lc);
+    /* Do a load balanced sort in each partition */
+    parallel_sort(struct rsb_element, h->elements, fiedler, gs_double, 0, 1, lc,
+                  &h->buf);
+    genmap_comm_scan(h, lc);
+  } else {
+    /* Forget repair, just do a load balanced partition */
+    parallel_sort(struct rsb_element, h->elements, fiedler, gs_double, 0, 1, gc,
+                  &h->buf);
+    genmap_comm_scan(h, lc);
+  }
 
   GenmapFree(input);
 
@@ -362,7 +371,7 @@ void split_and_repair_partitions(genmap_handle h, struct comm *lc, int level,
     slong min_count_global = min_count;
     comm_allreduce(lc, gs_long, gs_min, &min_count_global, 1, &buf);
 
-    // bin is the tie breaker
+    /* bin is the tie breaker */
     sint min_bin = (min_count_global == min_count) ? bin : INT_MAX;
     comm_allreduce(lc, gs_int, gs_min, &min_bin, 1, &buf);
 
@@ -397,7 +406,7 @@ void split_and_repair_partitions(genmap_handle h, struct comm *lc, int level,
 
     attempt++;
 
-    // Do a load balanced sort in each partition
+    /* Do a load balanced sort in each partition */
     parallel_sort(struct rsb_element, h->elements, fiedler, gs_double, 0, 1,
                   &tc, &h->buf);
     genmap_comm_scan(h, &tc);
