@@ -224,7 +224,8 @@ int balance_partitions(genmap_handle h, struct comm *lc, int bin,
     comm_scan(out, lc, gs_long, gs_add, &ielems_n, 1, bfr);
     slong start = out[0][0];
 
-    if (out[1][0] < send_cnt) balanced = 0;
+    if (out[1][0] < send_cnt)
+      balanced = 0;
     else {
       struct interface_element *ptr = ielems.ptr;
       for (e = 0; start + e < send_cnt && e < ielems.n; e++)
