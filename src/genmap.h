@@ -1,11 +1,9 @@
 #ifndef _GENMAP_H_
 #define _GENMAP_H_
 
-#include "genmap-gslib.h"
-#include "genmap-types.h"
-#include <mpi.h>
-
 #include <parRSB.h>
+
+#include <genmap-types.h>
 
 typedef struct comm *genmap_comm;
 typedef struct genmap_handle_private *genmap_handle;

@@ -1,8 +1,7 @@
 #ifndef _GENMAP_GENCON_H_
 #define _GENMAP_GENCON_H_
 
-#include <genmap-gslib.h>
-#include <genmap-types.h>
+#include <genmap.h>
 
 /* Upper bound for number of dimensions */
 #define GC_MAX_DIM 3
