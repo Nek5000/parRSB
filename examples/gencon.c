@@ -1,6 +1,8 @@
+/*
+ * Generate connectivity (.co2) from geometry file (.re2).
+ */
 #include <mpi.h>
 #include <stdio.h>
-#include <stdlib.h>
 
 #include <parRSB.h>
 
@@ -10,7 +12,7 @@ int main(int argc, char *argv[]) {
   int id;
   MPI_Comm_rank(MPI_COMM_WORLD, &id);
 
-  if (argc < 2) {
+  if (argc < 2 || argc > 3) {
     if (id == 0)
       printf("Usage: ./%s <mesh file> [tol]\n", argv[0]);
     MPI_Finalize();
@@ -26,6 +28,7 @@ int main(int argc, char *argv[]) {
   double *coord = NULL;
   int err = parrsb_read_mesh(&nelt, &nv, NULL, &coord, mesh, MPI_COMM_WORLD, 1);
 
+  /* Find connectivity */
   long long *vl = NULL;
   if (err == 0) {
     vl = (long long *)calloc(nelt * nv, sizeof(long long));
@@ -34,7 +37,8 @@ int main(int argc, char *argv[]) {
                                    MPI_COMM_WORLD, 0);
   }
 
-  /* Write connectivity */
+  /* Write connectivity file */
+  err |= parrsb_dump_con(vl, nelt, nv, mesh, MPI_COMM_WORLD);
 
   if (vl != NULL)
     free(vl);
