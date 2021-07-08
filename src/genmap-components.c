@@ -140,7 +140,13 @@ sint get_components(sint *component, struct rsb_element *elements,
 
 int balance_partitions(genmap_handle h, struct comm *lc, int bin,
                        struct comm *gc) {
-  assert(bin == 0 || bin == 1);
+  if (bin < 0 || bin > 1) {
+    if (gc->id == 0) {
+      printf("%s:%d bin value out of range: %d\n", __FILE__, __LINE__, bin);
+      fflush(stdout);
+    }
+    return 1;
+  }
 
   uint nelt = genmap_get_nel(h);
   slong buf;
@@ -195,7 +201,6 @@ int balance_partitions(genmap_handle h, struct comm *lc, int bin,
   struct crystal cr;
   sint balanced = 0;
 
-#if 0
   if (send_cnt > 0) {
     int mul = -1;
     if (start_id == 0) /* we are sending to lower fiedler values */
@@ -228,19 +233,13 @@ int balance_partitions(genmap_handle h, struct comm *lc, int bin,
 
     sint P = gc->np - lc->np;
     slong part_size = (send_cnt + P - 1) / P;
-    if (lc->id == 0) {
-      printf("\t\t P = %d part_size = %lld\n", P, part_size);
-      fflush(stdout);
-    }
 
     if (out[1][0] < send_cnt)
       balanced = 0;
     else {
       struct interface_element *ptr = ielems.ptr;
-      for (e = 0; start + e < send_cnt && e < ielems.n; e++) {
-        ptr[e].dest = start_id + (start + e)/part_size;
-        assert(ptr[e].dest < P && "Wrong rank !");
-      }
+      for (e = 0; start + e < send_cnt && e < ielems.n; e++)
+        ptr[e].dest = start_id + (start + e) / part_size;
 
       crystal_init(&cr, lc);
       sarray_transfer(struct interface_element, &ielems, orig, 0, &cr);
@@ -254,9 +253,8 @@ int balance_partitions(genmap_handle h, struct comm *lc, int bin,
 
     array_free(&ielems);
   }
-#endif
-  comm_allreduce(gc, gs_int, gs_min, &balanced, 1, &buf);
 
+  comm_allreduce(gc, gs_int, gs_min, &balanced, 1, &buf);
   if (balanced == 1) {
     crystal_init(&cr, gc);
     sarray_transfer(struct rsb_element, h->elements, proc, 0, &cr);
@@ -266,11 +264,6 @@ int balance_partitions(genmap_handle h, struct comm *lc, int bin,
     parallel_sort(struct rsb_element, h->elements, fiedler, gs_double, 0, 1, lc,
                   &h->buf);
   } else {
-    if (gc->id == 0) {
-      printf("\t\t Warning: Not enough interface elements to balance "
-             "partitions !\n");
-      fflush(stdout);
-    }
     /* Forget repair, just do a load balanced partition */
     parallel_sort(struct rsb_element, h->elements, fiedler, gs_double, 0, 1, gc,
                   &h->buf);
@@ -279,8 +272,8 @@ int balance_partitions(genmap_handle h, struct comm *lc, int bin,
   genmap_comm_scan(h, lc);
 
   GenmapFree(input);
-  GenmapFree(ids);
   gs_free(gsh);
+  GenmapFree(ids);
 }
 
 sint count_comp_sizes(sint *comp_ids, slong *min_, slong *max_, struct comm *tc,
@@ -317,8 +310,8 @@ sint count_comp_sizes(sint *comp_ids, slong *min_, slong *max_, struct comm *tc,
   return ncomp;
 }
 
-void split_and_repair_partitions(genmap_handle h, struct comm *lc, int level,
-                                 struct comm *gc) {
+void repair_partitions(genmap_handle h, struct comm *lc, int level,
+                       struct comm *gc) {
   sint np = lc->np;
   sint id = lc->id;
   int bin = 1;
@@ -360,7 +353,7 @@ void split_and_repair_partitions(genmap_handle h, struct comm *lc, int level,
   }
 
   int attempt = 0;
-  int nattempts = 2 * ncompg;
+  int nattempts = ncompg < 10 ? ncompg : 10;
 
   while (ncompg > 1 && attempt < nattempts) {
     slong *comp_count = NULL;
@@ -378,11 +371,12 @@ void split_and_repair_partitions(genmap_handle h, struct comm *lc, int level,
 
     slong min_count = LONG_MAX;
     sint min_id = -1;
-    for (i = 0; i < ncomp; i++)
+    for (i = 0; i < ncomp; i++) {
       if (comp_count[ncomp + i] < min_count) {
         min_count = comp_count[ncomp + i];
         min_id = i;
       }
+    }
 
     slong min_count_global = min_count;
     comm_allreduce(lc, gs_long, gs_min, &min_count_global, 1, &buf);
@@ -391,6 +385,7 @@ void split_and_repair_partitions(genmap_handle h, struct comm *lc, int level,
     sint min_bin = (min_count_global == min_count) ? bin : INT_MAX;
     comm_allreduce(lc, gs_int, gs_min, &min_bin, 1, &buf);
 
+    e = genmap_get_elements(h);
     for (i = 0; i < nelt; i++)
       e[i].proc = id;
 
@@ -416,7 +411,7 @@ void split_and_repair_partitions(genmap_handle h, struct comm *lc, int level,
 
     struct crystal cr;
     crystal_init(&cr, lc);
-    sarray_transfer(struct rsb_element, h->elements, proc, 1, &cr);
+    sarray_transfer(struct rsb_element, h->elements, proc, 0, &cr);
     crystal_free(&cr);
 
     attempt++;

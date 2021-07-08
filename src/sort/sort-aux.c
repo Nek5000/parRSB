@@ -45,16 +45,17 @@ void get_extrema(void *extrema_, struct sort *data, uint field,
   extrema[0] *= -1;
 }
 
-int set_dest(uint *proc, uint np, ulong start, uint size, ulong nelem) {
-  uint psize = nelem / np, i;
-  if (psize == 0) {
+int set_dest(uint *proc, uint size, sint np, slong start, slong nelem) {
+  uint i;
+  if (nelem < np) {
     for (i = 0; i < size; i++)
       proc[i] = start + i;
     return 0;
   }
 
+  uint psize = nelem / np;
   uint nrem = nelem - np * psize;
-  uint lower = nrem * (psize + 1);
+  slong lower = nrem * (psize + 1);
 
   uint id1, id2;
   if (start < lower)
@@ -72,6 +73,8 @@ int set_dest(uint *proc, uint np, ulong start, uint size, ulong nelem) {
     ulong s = id1 * psize + min(id1, nrem);
     ulong e = (id1 + 1) * psize + min(id1 + 1, nrem);
     e = min(e, nelem);
+    assert(id1 < np && "Ooops ! id1 is larger than np");
+    assert(id1 >= 0 && "Ooops ! id1 is smaller than 0");
     while (s <= start + i && start + i < e && i < size)
       proc[i++] = id1;
     id1++;
@@ -82,15 +85,16 @@ int set_dest(uint *proc, uint np, ulong start, uint size, ulong nelem) {
 
 int load_balance(struct array *a, size_t size, struct comm *c,
                  struct crystal *cr) {
-  slong in = a->n, out[2][1], buf[2][1];
+  slong out[2][1], buf[2][1];
+  slong in = a->n;
   comm_scan(out, c, gs_long, gs_add, &in, 1, buf);
-  ulong start = out[0][0];
-  ulong nelem = out[1][0];
+  slong start = out[0][0];
+  slong nelem = out[1][0];
 
   uint *proc;
   GenmapCalloc(a->n, &proc);
+  set_dest(proc, a->n, c->np, start, nelem);
 
-  set_dest(proc, c->np, start, a->n, nelem);
   sarray_transfer_ext_(a, size, proc, sizeof(uint), cr);
 
   GenmapFree(proc);

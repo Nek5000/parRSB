@@ -99,7 +99,7 @@ int genmap_rsb(genmap_handle h) {
 
     /* Bisect */
     double t = comm_time();
-    split_and_repair_partitions(h, lc, level, gc);
+    repair_partitions(h, lc, level, gc);
     t = comm_time() - t;
     metric_acc(BISECTANDREPAIR, t);
 

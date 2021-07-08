@@ -1,5 +1,4 @@
 #include <float.h>
-#include <genmap-impl.h> //FIXME - include genmap-statistics
 #include <sort-impl.h>
 
 int parallel_sort_private(struct sort *data, struct comm *c) {
@@ -34,8 +33,8 @@ int parallel_sort_private(struct sort *data, struct comm *c) {
     struct crystal cr;
     crystal_init(&cr, c);
     load_balance(a, usize, c, &cr);
-    sort_local(data);
     crystal_free(&cr);
+    sort_local(data);
   }
 
   comm_free(&dup);

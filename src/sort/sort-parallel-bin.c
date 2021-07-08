@@ -1,4 +1,3 @@
-#include <genmap-impl.h> //FIXME - include genmap-statistics
 #include <sort-impl.h>
 
 /* assumes array is locally sorted */
@@ -37,14 +36,14 @@ int set_bin(uint **proc_, struct sort *s, uint field, struct comm *c) {
 }
 
 int parallel_bin_sort(struct sort *s, struct comm *c) {
-  // Local sort
+  /* Local sort */
   sort_local(s);
 
-  // Set destination bin
+  /* Set destination bin */
   uint *proc;
   set_bin(&proc, s, 0, c);
 
-  // Transfer to destination processor
+  /* Transfer to destination processor */
   struct crystal cr;
   crystal_init(&cr, c);
   sarray_transfer_ext_(s->a, s->unit_size, proc, sizeof(uint), &cr);
@@ -52,6 +51,8 @@ int parallel_bin_sort(struct sort *s, struct comm *c) {
 
   GenmapFree(proc);
 
-  // Locally sort again
+  /* Locally sort again */
   sort_local(s);
+
+  return 0;
 }
