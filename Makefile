@@ -29,10 +29,6 @@ GENCONDIR = $(SRCROOT)/src/gencon
 GENCONSRCS = $(wildcard $(GENCONDIR)/*.c)
 SRCOBJS += $(patsubst $(SRCROOT)/%.c,$(BUILDDIR)/%.o,$(GENCONSRCS))
 
-TESTDIR = $(SRCROOT)/tests
-TESTSRCS = $(wildcard $(TESTDIR)/*.c)
-TESTOBJS = $(patsubst $(SRCROOT)/%.c,$(BUILDDIR)/%,$(TESTSRCS))
-
 EXAMPLEDIR = $(SRCROOT)/examples
 EXAMPLESRCS = $(wildcard $(EXAMPLEDIR)/*.c)
 EXAMPLEOBJS = $(patsubst $(SRCROOT)/%.c,$(BUILDDIR)/%,$(EXAMPLESRCS))
@@ -76,11 +72,8 @@ ifneq (,$(strip $(DESTDIR)))
   INSTALLDIR = $(realpath $(DESTDIR))
 endif
 
-.PHONY: default
-default: check lib examples install
-
 .PHONY: all
-all: check lib tests examples install
+all: check lib examples install
 
 .PHONY: check
 check:
@@ -132,5 +125,4 @@ print-%:
 $(shell mkdir -p $(BUILDDIR)/src/sort)
 $(shell mkdir -p $(BUILDDIR)/src/precond)
 $(shell mkdir -p $(BUILDDIR)/src/gencon)
-$(shell mkdir -p $(BUILDDIR)/tests)
 $(shell mkdir -p $(BUILDDIR)/examples)
