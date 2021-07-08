@@ -3,6 +3,10 @@
 
 #include <gslib.h>
 
+/*
+ * Partitioning
+ */
+
 typedef struct {
   /* General options */
   int global_partitioner; // -1 - None, 0 - RSB, 1 - RCB, 2 - RIB (Default: 0)
@@ -25,6 +29,9 @@ void fparRSB_partMesh(int *part, int *seq, long long *vtx, double *coord,
 int parRSB_partMesh(int *part, int *seq, long long *vtx, double *coord, int nel,
                     int nv, parRSB_options *options, MPI_Comm comm);
 
+/*
+ * Connectivity
+ */
 #define fparRSB_findConnectivity                                               \
   FORTRAN_UNPREFIXED(fparrsb_findconnectivity, FPARRSB_FINDCONNECTIVITY)
 void fparRSB_findConnectivity(long long *vertexId, double *coord, int *nel,
@@ -36,5 +43,20 @@ int parRSB_findConnectivity(long long *vertexid, double *coord, int nel,
                             int nDim, long long *periodicInfo,
                             int nPeriodicFaces, double tol, MPI_Comm comm,
                             int verbose);
+
+/*
+ * Auxiliary functions
+ */
+int parrsb_read_mesh(unsigned int *nel, int *nv, long long **vl, double **coord,
+                     char *name, MPI_Comm comm, int read);
+
+int parrsb_dump_con(long long *vl, unsigned int nel, int nv, char *name,
+                    MPI_Comm comm);
+
+int parrsb_distribute_elements(unsigned int *nelt, long long **vl,
+                               double **coord, int *part, int nv,
+                               MPI_Comm comm);
+
+void parrsb_part_stat(long long *vtx, int nel, int nv, MPI_Comm comm);
 
 #endif

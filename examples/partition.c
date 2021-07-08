@@ -1,5 +1,5 @@
 /*
-Parition mesh using Nek5000's vertex connectivity (con) file.
+Parition mesh using Nek5000's vertex connectivity (.co2) file.
 */
 
 #include <mpi.h>

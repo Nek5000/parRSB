@@ -1,47 +1,46 @@
+#include <mpi.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <gencon-impl.h>
+#include <parRSB.h>
 
 int main(int argc, char *argv[]) {
   MPI_Init(&argc, &argv);
-  struct comm comm;
-  comm_init(&comm, MPI_COMM_WORLD);
+
+  int id;
+  MPI_Comm_rank(MPI_COMM_WORLD, &id);
 
   if (argc < 2) {
-    if (comm.id == 0)
-      printf("Usage: ./%s foo.re2 [tol]\n", argv[0]);
+    if (id == 0)
+      printf("Usage: ./%s <mesh file> [tol]\n", argv[0]);
     MPI_Finalize();
-    exit(1);
+    return 1;
   }
 
-  Mesh mesh;
-  read_geometry(&mesh, argv[1], &comm);
-
-  findMinNeighborDistance(mesh);
-
+  char *mesh = argv[1];
   double tol = (argc > 2) ? atof(argv[2]) : 0.2;
 
-  buffer bfr;
-  buffer_init(&bfr, 1024);
+  /* Read the geometry from the .re2 file */
+  unsigned int nelt;
+  int nv;
+  double *coord = NULL;
+  int err = parrsb_read_mesh(&nelt, &nv, NULL, &coord, mesh, MPI_COMM_WORLD, 1);
 
-  findSegments(mesh, &comm, tol, 0, &bfr);
-  setGlobalID(mesh, &comm);
-  sendBack(mesh, &comm, &bfr);
-  matchPeriodicFaces(mesh, &comm, &bfr);
+  long long *vl = NULL;
+  if (err == 0) {
+    vl = (long long *)calloc(nelt * nv, sizeof(long long));
+    int ndim = nv == 8 ? 3 : 2;
+    err |= parRSB_findConnectivity(vl, coord, nelt, ndim, NULL, 0, tol,
+                                   MPI_COMM_WORLD, 0);
+  }
 
-  buffer_free(&bfr);
+  /* Write connectivity */
 
-  char co2FileName[BUFSIZ];
-  strncpy(co2FileName, argv[1], BUFSIZ);
-  int len = strlen(co2FileName);
-  assert(len > 4 && len < BUFSIZ);
-  co2FileName[len - 2] = 'o', co2FileName[len - 3] = 'c';
+  if (vl != NULL)
+    free(vl);
+  if (coord != NULL)
+    free(coord);
 
-  write_connectivity(mesh, co2FileName, &comm);
-
-  mesh_free(mesh);
-  comm_free(&comm);
   MPI_Finalize();
 
   return 0;

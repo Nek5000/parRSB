@@ -43,8 +43,6 @@ int mesh_free(Mesh m);
 /* Read Nek5000 mesh files */
 int read_geometry(Mesh *mesh, char *fname, struct comm *c);
 int read_connectivity(Mesh mesh, char *fname, struct comm *c);
-int write_connectivity(Mesh mesh, char *fname, struct comm *c);
-int read_co2_mesh(Mesh *mesh, char *fname, struct comm *c);
 
 /* Connectivity */
 int findMinNeighborDistance(Mesh mesh);
