@@ -45,17 +45,6 @@ VToEMap *getVToEMap(Mesh m, struct comm *c, buffer *bfr) {
       sequenceId++;
     }
 
-#if 0
-    if (elemId == 647) {
-      for (j = 0; j < nv; j++) {
-        printf("elem = %ld x = %.10e, y = %.10e, z = %.10e, global-id = %ld\n",
-               elemId, ptr[i * nv + j].x[0], ptr[i * nv + j].x[1],
-               ptr[i * nv + j].x[2], ptr[i * nv + j].globalId + 1);
-        fflush(stdout);
-      }
-    }
-#endif
-
     elemId++;
   }
 
@@ -231,22 +220,11 @@ int faceCheck(Mesh mesh, struct comm *c, buffer *bfr) {
 
       for (k = 0; k < nfv; k++) {
         ulong globalId = ptr[i * nv + faces[j][k] - 1].globalId + 1;
-#if 0
-        double x = ptr[i * nv + faces[j][k] - 1].x[0];
-        double y = ptr[i * nv + faces[j][k] - 1].x[1];
-        double z = ptr[i * nv + faces[j][k] - 1].x[2];
-        if (c->id == 0 && i == 3 && j == 1)
-          printf("id = %d i = %d j = %d, k = %d global-id = %ld x = %.10e y = %.10e  z = %.10e\n", c->id, i, j, k, globalId, x, y, z);
-#endif
         int indx = getPosition(map, globalId);
         assert(indx >= 0);
         LongID elemId;
         for (l = map->offsets[indx]; l < map->offsets[indx + 1]; l++) {
           elemId.id = map->elements[l];
-#if 0
-          if (c->id == 0 && i == 3 && j == 1)
-            printf("elemId = %ld\n", elemId.id);
-#endif
           array_cat(LongID, &shared, &elemId, 1);
         }
       }
