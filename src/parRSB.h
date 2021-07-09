@@ -53,6 +53,9 @@ int parrsb_read_mesh(unsigned int *nel, int *nv, long long **vl, double **coord,
 int parrsb_dump_con(long long *vl, unsigned int nel, int nv, char *name,
                     MPI_Comm comm);
 
+int parrsb_dump_map(int nel, int nv, int *pmap, long long *vtx, char *name,
+                    MPI_Comm comm);
+
 int parrsb_distribute_elements(unsigned int *nelt, long long **vl,
                                double **coord, int *part, int nv,
                                MPI_Comm comm);

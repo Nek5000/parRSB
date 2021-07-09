@@ -94,9 +94,6 @@ int parrsb_dump_con(long long *vl, unsigned int nelt, int nv, char *name,
 
   if (id == 0) {
     sprintf(buf0, "%5s%12d%12d%12d", version, (int)nelgt, (int)nelgv, nv);
-#if 0
-    printf("%5s%12d%12d%12d\n", version, (int)nelgt, (int)nelgv, nv);
-#endif
     memset(buf0 + strlen(buf0), ' ', GC_CO2_HEADER_LEN - strlen(buf0));
     buf0[GC_CO2_HEADER_LEN] = '\0';
     buf0 += GC_CO2_HEADER_LEN;
@@ -104,13 +101,14 @@ int parrsb_dump_con(long long *vl, unsigned int nelt, int nv, char *name,
     buf0 += sizeof(float);
   }
 
-  int i, j, temp;
+  int i, j, k, temp;
   for (i = 0; i < nelt; i++) {
     temp = start + i + 1;
     WRITE_INT(buf0, temp);
     buf0 += sizeof(int);
     for (j = 0; j < nv; j++) {
-      temp = vl[i * nv + j];
+      k = PRE_TO_SYM_VERTEX[j];
+      temp = vl[i * nv + k];
       WRITE_INT(buf0, temp);
       buf0 += sizeof(int);
     }
@@ -132,7 +130,7 @@ int parrsb_dump_con(long long *vl, unsigned int nelt, int nv, char *name,
 
 #define HEADER_LEN 132
 
-int parrsb_dump_map(int nelt, int nv, int *pmap, int *vtx, char *fileName,
+int parrsb_dump_map(int nelt, int nv, int *pmap, long long *vtx, char *fileName,
                     MPI_Comm comm) {
   char *version = "#v001";
   float test = 6.54321;
@@ -182,10 +180,16 @@ int parrsb_dump_map(int nelt, int nv, int *pmap, int *vtx, char *fileName,
     memcpy(buf0, &test, sizeof(float)), buf0 += sizeof(float);
   }
 
-  int i;
+  int ivtx[8];
+  int i, j;
   for (i = 0; i < nelt; i++) {
-    memcpy(buf0, &pmap[i], sizeof(int)), buf0 += sizeof(int);
-    memcpy(buf0, &vtx[i * nv], sizeof(int) * nv), buf0 += nv * sizeof(int);
+    memcpy(buf0, &pmap[i], sizeof(int));
+    buf0 += sizeof(int);
+
+    for (j = 0; j < nv; j++)
+      ivtx[j] = vtx[i * nv + j];
+    memcpy(buf0, ivtx, sizeof(int) * nv);
+    buf0 += nv * sizeof(int);
   }
 
   MPI_Status status;

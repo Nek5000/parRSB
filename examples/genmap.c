@@ -1,10 +1,27 @@
 /*
- * Parition mesh using Nek5000's connectivity (.co2) and map (.ma2) file.
+ * Generate partitions (.ma2) from Nek5000's mesh (.re2) file.
  */
 #include <mpi.h>
 #include <stdio.h>
 
 #include <parRSB.h>
+
+void check_error_(int err, char *file, int line, MPI_Comm comm) {
+  int sum;
+  MPI_Allreduce(&err, &sum, 1, MPI_INT, MPI_SUM, comm);
+
+  if (sum != 0) {
+    int id;
+    MPI_Comm_rank(comm, &id);
+    if (id == 0)
+      printf("check_error failure in %s:%d\n", file, line);
+
+    MPI_Finalize();
+    exit(1);
+  }
+}
+
+#define check_error(err) check_error_(err, __FILE__, __LINE__, MPI_COMM_WORLD);
 
 int main(int argc, char *argv[]) {
   MPI_Init(&argc, &argv);
@@ -28,37 +45,49 @@ int main(int argc, char *argv[]) {
   if (id < ranks)
     color = 1;
   MPI_Comm comm;
-  MPI_Comm_split(MPI_COMM_WORLD, color, 0, &comm);
+  MPI_Comm_split(MPI_COMM_WORLD, color, id, &comm);
 
   /* Read the geometry from the .re2 file */
   unsigned int nelt;
   int nv;
   double *coord = NULL;
-  int err = parrsb_read_mesh(&nelt, &nv, NULL, &coord, mesh, comm, 1);
+  int err = 0;
+  if (color == 1)
+    err = parrsb_read_mesh(&nelt, &nv, NULL, &coord, mesh, comm, 1);
+  check_error(err);
 
   /* Find connectivity */
-  long long *vl = NULL;
-  if (err == 0) {
-    vl = (long long *)calloc(nelt * nv, sizeof(long long));
-    int ndim = nv == 8 ? 3 : 2;
+  long long *vl = (long long *)calloc(nelt * nv, sizeof(long long));
+  int ndim = nv == 8 ? 3 : 2;
+  if (color == 1)
     err |=
         parRSB_findConnectivity(vl, coord, nelt, ndim, NULL, 0, tol, comm, 0);
-  }
+  check_error(err);
 
-  parrsb_part_stat(vl, nelt, nv, comm);
+  if (color == 1)
+    parrsb_part_stat(vl, nelt, nv, comm);
 
   /* Partition the mesh */
   parRSB_options options = parrsb_default_options;
   int *part = (int *)calloc(nelt, sizeof(int));
-  err |= parRSB_partMesh(part, NULL, vl, coord, nelt, nv, &options, comm);
+  if (color == 1)
+    err |= parRSB_partMesh(part, NULL, vl, coord, nelt, nv, &options, comm);
+  check_error(err);
 
   /* Redistribute data */
-  err |= parrsb_distribute_elements(&nelt, &vl, &coord, part, nv, comm);
+  if (color == 1)
+    err |= parrsb_distribute_elements(&nelt, &vl, &coord, part, nv, comm);
+  check_error(err);
 
-  parrsb_part_stat(vl, nelt, nv, MPI_COMM_WORLD);
+  if (color == 1)
+    parrsb_part_stat(vl, nelt, nv, comm);
 
   /* Write map file */
+  if (color == 1)
+    err |= parrsb_dump_map(nelt, nv, part, vl, mesh, comm);
+  check_error(err);
 
+  /* Free resources */
   if (part != NULL)
     free(part);
   if (vl != NULL)
@@ -67,7 +96,6 @@ int main(int argc, char *argv[]) {
     free(coord);
 
   MPI_Comm_free(&comm);
-
   MPI_Finalize();
 
   return 0;
