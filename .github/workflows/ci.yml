@@ -1,0 +1,7 @@
+name: parRSB Tests
+on: [push]
+jobs:
+  wip-parrsb-tests
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Tests are WIP"
