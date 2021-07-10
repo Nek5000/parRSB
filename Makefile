@@ -3,8 +3,10 @@ DEBUG ?= 0
 MPI ?= 1
 CC ?= mpicc
 CFLAGS ?= -g -O0
-BLAS ?= 1
 UNDERSCORE ?= 1
+BLAS ?= 0
+BLASDIR ?=
+BLASFLAGS ?= -lblas -llapack
 
 ## Don't touch what follows ##
 MKFILEPATH = $(abspath $(lastword $(MAKEFILE_LIST)))
@@ -51,16 +53,10 @@ endif
 
 ifneq ($(BLAS),0)
   PP += -DGENMAP_BLAS
-  LDFLAGS += -L$(BLASLIBPATH) -lblasLapack -lgfortran
-endif
-
-ifneq ($(UNDERSCORE),0)
-  PP += -DGENMAP_UNDERSCORE
-endif
-
-ifneq ($(BLAS),0)
-  PP += -DGENMAP_BLAS
-  LDFLAGS += -L$(BLASLIBPATH) -lblasLapack
+  ifneq ($(BLASDIR),)
+    LDFLAGS+= -L$(BLASDIR)
+  endif
+  LDFLAGS += $(BLASFLAGS)
 endif
 
 ifneq ($(MPI),0)

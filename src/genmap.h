@@ -66,9 +66,6 @@ int GenmapTQLI(genmap_handle h, genmap_vector diag, genmap_vector upper,
 int genmap_inverse_power(double *y, int N, double *A, int verbose);
 int genmap_power(double *y, int N, double *A, int verbose);
 
-/* Matrix inverse */
-void matrix_inverse(int N, double *A);
-
 /* Lanczos */
 int GenmapLanczosLegendary(genmap_handle h, struct comm *c, genmap_vector f,
                            GenmapInt niter, genmap_vector **rr,

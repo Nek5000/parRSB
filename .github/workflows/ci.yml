@@ -1,7 +1,60 @@
-name: parRSB Tests
-on: [push]
+name: parRSB CI Tests
+on: [push, pull_request]
+env:
+  GITHUB.TOKEN: ${{ secrets.token }}
 jobs:
-  wip-parrsb-tests:
+  main:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        test: [pyramid, tgv, turbPipe]
+        np: [1, 2, 3, 4]
+      fail-fast: false
+    env:
+      GSVER: 1.0.7
+      CC: mpicc
     steps:
-      - run: echo "Tests are WIP"
+      - uses: actions/checkout@v2
+      - name: Install apt dependencies
+        shell: bash
+        run: |
+          sudo apt -y update
+          sudo apt install -y mpich libmpich-dev python3-pytest
+          sudo apt install -y libblas-dev liblapack-dev
+      - name: Build gslib
+        shell: bash
+        run: |
+          wget --no-check-certificate -O v$GSVER.tar.gz http://github.com/gslib/gslib/archive/v$GSVER.tar.gz
+          mkdir gslib
+          tar -zxvf v$GSVER.tar.gz -C ./gslib --strip-components=1
+          cd gslib
+          make -j4
+      - name: Build parRSB
+        shell: bash
+        run: |
+          export GSLIBPATH=`pwd`/gslib/build/
+          make -j1
+      - name: Clone tests
+        shell: bash
+        run: |
+          git clone https://github.com/thilinarmtb/parRSB-tests.git
+      - name: Test
+        shell: bash
+        run: |
+          export EXAMPLEDIR=`pwd`/build/examples
+
+          cd parRSB-tests/${{ matrix.test }}
+
+          tol=(`cat test.txt | grep tol`); tol=${tol[2]}
+          sha=(`cat test.txt | grep sha256sum`); sha=${sha[2]}
+
+          echo "localhost:4" > hostfile
+          mpirun -np ${{ matrix.np }} --hostfile hostfile ${EXAMPLEDIR}/gencon ${{ matrix.test }} ${tol}
+
+          sha_new=(`sha256sum ${{ matrix.test }}.co2`); sha_new=${sha_new[0]}
+          if [[ "${sha}" == "${sha_new}" ]]; then
+            echo 'ok'
+          else
+            echo "${sha}"
+            echo "${sha_new}"
+          fi
