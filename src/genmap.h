@@ -92,5 +92,6 @@ void genmap_restore_original(int *part, int *seq, struct crystal *cr,
 /* Misc */
 double GenmapGetMaxRss();
 void GenmapPrintStack();
+int log2ll(long long n);
 
 #endif

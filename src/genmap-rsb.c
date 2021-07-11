@@ -7,7 +7,7 @@
 #include <sort.h>
 
 static int check_convergence(struct comm *gc, int max_pass, int max_iter) {
-  int max_levels = log2(gc->np);
+  int max_levels = log2ll(gc->np);
 
   int i;
   for (i = 0; i < max_levels; i++) {
