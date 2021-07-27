@@ -16,12 +16,7 @@
     memcpy((coords), buf, sizeof(T) * nVertex);                                \
   } while (0)
 
-#define WRITE_INT(dest, val)                                                   \
-  do {                                                                         \
-    memcpy(dest, &(val), sizeof(int));                                         \
-  } while (0)
-
-// TODO: Use rsb_element here
+/* TODO: Use rsb_element here */
 struct Point_private {
   GenmapScalar dx;
   GenmapScalar x[GC_MAX_DIM];

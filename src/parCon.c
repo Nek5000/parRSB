@@ -18,30 +18,33 @@
     }                                                                          \
   } while (0)
 
-void fparRSB_findConnectivity(long long *vertexId, double *coord, int *nelt,
+void fparRSB_findConnectivity(long long *vtx, double *coord, int *nelt,
                               int *ndim, long long *periodicInfo,
                               int *nPeriodicFaces, double *tol, MPI_Fint *fcomm,
                               int *verbose, int *err) {
   *err = 1;
   MPI_Comm c = MPI_Comm_f2c(*fcomm);
-  *err = parRSB_findConnectivity(vertexId, coord, *nelt, *ndim, periodicInfo,
+  *err = parRSB_findConnectivity(vtx, coord, *nelt, *ndim, periodicInfo,
                                  *nPeriodicFaces, *tol, c, *verbose);
 }
 
-/* coord[nelt, nv, ndim] - in (vertices are orders in preprocessor ordering)
-   vertexid[nelt, nv] - out */
-int parRSB_findConnectivity(long long *vertexid, double *coord, int nelt,
-                            int ndim, long long *periodicInfo,
-                            int nPeriodicFaces, double tol, MPI_Comm comm,
-                            int verbose) {
+/*
+ * coord [nelt, nv, ndim] - in, vertices are in preprocessor ordering
+ * vtx[nelt, nv] - out
+ * nv = 8 if ndim == 3 or nv = 4 if ndim = 2
+ */
+int parRSB_findConnectivity(long long *vtx, double *coord, int nelt, int ndim,
+                            long long *periodicInfo, int nPeriodicFaces,
+                            double tol, MPI_Comm comm, int verbose) {
   struct comm c;
   comm_init(&c, comm);
   uint rank = c.id;
   uint size = c.np;
 
-  if (rank == 0)
+  if (rank == 0 && verbose > 0) {
     printf("generating connectivity (tol=%g) ...", tol);
-  fflush(stdout);
+    fflush(stdout);
+  }
 
   double t_con = 0.0;
   comm_barrier(&c);
@@ -121,14 +124,15 @@ int parRSB_findConnectivity(long long *vertexid, double *coord, int nelt,
   /* Copy output */
   Point ptr = mesh->elements.ptr;
   for (i = 0; i < nelt * nvertex; i++)
-    vertexid[i] = ptr[i].globalId + 1;
+    vtx[i] = ptr[i].globalId + 1;
 
   comm_barrier(&c);
   t_con += comm_time();
 
-  if (rank == 0)
+  if (rank == 0 && verbose > 0) {
     printf("\n finished in %g s\n", t_con);
-  fflush(stdout);
+    fflush(stdout);
+  }
 
   buffer_free(&bfr);
   mesh_free(mesh);

@@ -1,47 +1,67 @@
+/*
+ * Generate connectivity (.co2) from Nek5000 mesh file (.re2).
+ */
+#include <mpi.h>
 #include <stdio.h>
-#include <stdlib.h>
 
-#include <gencon-impl.h>
+#include <parRSB.h>
 
-int main(int argc, char *argv[]) {
-  MPI_Init(&argc, &argv);
-  struct comm comm;
-  comm_init(&comm, MPI_COMM_WORLD);
+void check_error_(int err, char *file, int line, MPI_Comm comm) {
+  int sum;
+  MPI_Allreduce(&err, &sum, 1, MPI_INT, MPI_SUM, comm);
 
-  if (argc < 2) {
-    if (comm.id == 0)
-      printf("Usage: ./%s foo.re2 [tol]\n", argv[0]);
+  if (sum != 0) {
+    int id;
+    MPI_Comm_rank(comm, &id);
+    if (id == 0)
+      printf("check_error failure in %s:%d\n", file, line);
+
     MPI_Finalize();
     exit(1);
   }
+}
 
-  Mesh mesh;
-  read_geometry(&mesh, argv[1], &comm);
+#define check_error(err) check_error_(err, __FILE__, __LINE__, MPI_COMM_WORLD);
 
-  findMinNeighborDistance(mesh);
+int main(int argc, char *argv[]) {
+  MPI_Init(&argc, &argv);
 
+  int id;
+  MPI_Comm_rank(MPI_COMM_WORLD, &id);
+
+  if (argc < 2 || argc > 3) {
+    if (id == 0)
+      printf("Usage: ./%s <mesh file> [tol]\n", argv[0]);
+    MPI_Finalize();
+    return 1;
+  }
+
+  char *mesh = argv[1];
   double tol = (argc > 2) ? atof(argv[2]) : 0.2;
 
-  buffer bfr;
-  buffer_init(&bfr, 1024);
+  /* Read the geometry from the .re2 file */
+  unsigned int nelt;
+  int nv;
+  double *coord = NULL;
+  int err = parrsb_read_mesh(&nelt, &nv, NULL, &coord, mesh, MPI_COMM_WORLD, 1);
+  check_error(err);
 
-  findUniqueVertices(mesh, &comm, tol, 0, &bfr);
-  setGlobalID(mesh, &comm);
-  sendBack(mesh, &comm, &bfr);
-  matchPeriodicFaces(mesh, &comm, &bfr);
+  /* Find connectivity */
+  long long *vl = (long long *)calloc(nelt * nv, sizeof(long long));
+  int ndim = nv == 8 ? 3 : 2;
+  err |= parRSB_findConnectivity(vl, coord, nelt, ndim, NULL, 0, tol,
+                                 MPI_COMM_WORLD, 0);
+  check_error(err);
 
-  buffer_free(&bfr);
+  /* Write connectivity file */
+  err |= parrsb_dump_con(vl, nelt, nv, mesh, MPI_COMM_WORLD);
+  check_error(err);
 
-  char co2FileName[BUFSIZ];
-  strncpy(co2FileName, argv[1], BUFSIZ);
-  int len = strlen(co2FileName);
-  assert(len > 4 && len < BUFSIZ);
-  co2FileName[len - 2] = 'o', co2FileName[len - 3] = 'c';
+  if (vl != NULL)
+    free(vl);
+  if (coord != NULL)
+    free(coord);
 
-  write_connectivity(mesh, co2FileName, &comm);
-
-  mesh_free(mesh);
-  comm_free(&comm);
   MPI_Finalize();
 
   return 0;
