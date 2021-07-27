@@ -1,5 +1,7 @@
-#include <mpi.h>
+#include <math.h>
 #include <stdio.h>
+
+#include <mpi.h>
 
 #include <gencon.h>
 #include <genmap.h>

@@ -328,8 +328,8 @@ void split_and_repair_partitions(genmap_handle h, struct comm *lc, int level,
 
   if (tc.id == 0 && ncomp > 1) {
     printf(
-        "\tWarning: %d disconnected components in Level = %d (%ld)! (min/max "
-        "size: %ld %ld) root = %d, np = %d\n",
+        "\tWarning: %d disconnected components in Level = %d (%lld)! (min/max "
+        "size: %lld %lld) root = %d, np = %d\n",
         ncomp, level, nelg, min, max, root, np);
     fflush(stdout);
   }
@@ -408,9 +408,9 @@ void split_and_repair_partitions(genmap_handle h, struct comm *lc, int level,
     ncompg = ncomp = count_comp_sizes(comp_ids, &min, &max, &tc, h);
     comm_allreduce(lc, gs_long, gs_max, &ncompg, 1, &buf);
     if (tc.id == 0 && ncomp > 1) {
-      printf("\t\t %ld disconnected components after attempt %d/%d, Level = %d "
-             "(%ld) "
-             "(min/max size: %ld %ld) root = %d np = %d\n",
+      printf("\t\t %d disconnected components after attempt %d/%d, Level = %d "
+             "(%lld) "
+             "(min/max size: %lld %lld) root = %d np = %d\n",
              ncomp, attempt, nattempts, level, nelg, min, max, root, np);
       fflush(stdout);
     }
@@ -425,8 +425,8 @@ void split_and_repair_partitions(genmap_handle h, struct comm *lc, int level,
   ncomp = count_comp_sizes(comp_ids, &min, &max, &tc, h);
   if (ncomp > 1 && tc.id == 0) {
     printf(
-        "%d disconnected components after balance, Level = %d (%ld) (min/max "
-        "size: %ld %ld) root = %d np =%d\n",
+        "%d disconnected components after balance, Level = %d (%lld) (min/max "
+        "size: %lld %lld) root = %d np =%d\n",
         ncomp, level, nelg, min, max, root, np);
     fflush(stdout);
   }
