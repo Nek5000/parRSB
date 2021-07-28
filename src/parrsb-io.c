@@ -56,7 +56,7 @@ int parrsb_read_mesh(unsigned int *nel, int *nv, long long **vl, double **coord,
 
 int parrsb_dump_con(long long *vl, unsigned int nelt, int nv, char *name,
                     MPI_Comm comm) {
-  const char version[5] = "#v001";
+  const char version[6] = "#v001";
   const float test = 6.54321;
 
   struct comm c;
@@ -134,7 +134,7 @@ int parrsb_dump_con(long long *vl, unsigned int nelt, int nv, char *name,
 
 int parrsb_dump_map(int nelt, int nv, int *pmap, long long *vtx, char *fileName,
                     MPI_Comm comm) {
-  char *version = "#v001";
+  char version[6] = "#v001";
   float test = 6.54321;
 
   int nelgt = nelt;
