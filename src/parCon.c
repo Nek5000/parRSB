@@ -6,6 +6,9 @@
 #include <gencon-impl.h>
 #include <parRSB.h>
 
+int PRE_TO_SYM_VERTEX[GC_MAX_VERTICES] = {0, 1, 3, 2, 4, 5, 7, 6};
+int PRE_TO_SYM_FACE[GC_MAX_FACES] = {2, 1, 3, 0, 4, 5};
+
 #define check_error(id, err, msg)                                              \
   do {                                                                         \
     if (err > 0) {                                                             \
@@ -18,14 +21,34 @@
     }                                                                          \
   } while (0)
 
-void fparRSB_findConnectivity(long long *vtx, double *coord, int *nelt,
-                              int *ndim, long long *periodicInfo,
-                              int *nPeriodicFaces, double *tol, MPI_Fint *fcomm,
-                              int *verbose, int *err) {
-  *err = 1;
-  MPI_Comm c = MPI_Comm_f2c(*fcomm);
-  *err = parRSB_findConnectivity(vtx, coord, *nelt, *ndim, periodicInfo,
-                                 *nPeriodicFaces, *tol, c, *verbose);
+static int transferBoundaryFaces(Mesh mesh, struct comm *c) {
+  uint size = c->np;
+
+  struct array *boundary = &mesh->boundary;
+  BoundaryFace ptr = boundary->ptr;
+  int nFaces = boundary->n;
+
+  slong nelgt = mesh->nelgt;
+  sint nelt = nelgt / size;
+  sint nrem = nelgt - nelt * size;
+  slong N = (size - nrem) * nelt;
+
+  sint i;
+  slong eid;
+  for (i = 0; i < nFaces; i++) {
+    eid = ptr[i].elementId;
+    if (eid < N)
+      ptr[i].proc = eid / nelt;
+    else
+      ptr[i].proc = (eid - N) / (nelt + 1) + size - nrem;
+  }
+
+  struct crystal cr;
+  crystal_init(&cr, c);
+  sarray_transfer(struct Boundary_private, boundary, proc, 1, &cr);
+  crystal_free(&cr);
+
+  return 0;
 }
 
 /*
@@ -123,8 +146,14 @@ int parRSB_findConnectivity(long long *vtx, double *coord, int nelt, int ndim,
 
   /* Copy output */
   Point ptr = mesh->elements.ptr;
-  for (i = 0; i < nelt * nvertex; i++)
-    vtx[i] = ptr[i].globalId + 1;
+  for (i = 0; i < nelt; i++) {
+    printf("e = %d, ", i);
+    for (j = 0; j < nvertex; j++) {
+      vtx[i * nvertex + j] = ptr[i * nvertex + j].globalId + 1;
+      printf("%lld ", vtx[i * nvertex + j]);
+    }
+    printf("\n");
+  }
 
   comm_barrier(&c);
   t_con += comm_time();
@@ -139,4 +168,14 @@ int parRSB_findConnectivity(long long *vtx, double *coord, int nelt, int ndim,
   comm_free(&c);
 
   return err;
+}
+
+void fparRSB_findConnectivity(long long *vtx, double *coord, int *nelt,
+                              int *ndim, long long *periodicInfo,
+                              int *nPeriodicFaces, double *tol, MPI_Fint *fcomm,
+                              int *verbose, int *err) {
+  *err = 1;
+  MPI_Comm c = MPI_Comm_f2c(*fcomm);
+  *err = parRSB_findConnectivity(vtx, coord, *nelt, *ndim, periodicInfo,
+                                 *nPeriodicFaces, *tol, c, *verbose);
 }

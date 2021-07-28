@@ -18,8 +18,6 @@ int mesh_init(Mesh *m_, int nel, int nDim) {
   return 0;
 }
 
-Element MeshGetElements(Mesh m) { return (Element)m->elements.ptr; }
-
 int mesh_free(Mesh m) {
   array_free(&m->elements);
   array_free(&m->boundary);
@@ -63,6 +61,22 @@ void get_vertex_coordinates(double **coords_, Mesh mesh) {
       }
     }
   }
+}
+
+int get_bcs(unsigned int *nbcs_, long long **bcs_, Mesh m) {
+  unsigned int nbcs = *nbcs_ = m->boundary.n;
+  long long *bcs = *bcs_ = tcalloc(long long, 4 * nbcs);
+
+  struct Boundary_private *ptr = m->boundary.ptr;
+  uint i;
+  for (i = 0; i < nbcs; i++) {
+    bcs[4 * i + 0] = ptr[i].elementId;
+    bcs[4 * i + 1] = ptr[i].faceId;
+    bcs[4 * i + 2] = ptr[i].bc[0];
+    bcs[4 * i + 3] = ptr[i].bc[1];
+  }
+
+  return 0;
 }
 
 int get_mesh_dim(Mesh mesh) { return mesh->nDim; }

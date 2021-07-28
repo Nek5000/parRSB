@@ -48,12 +48,14 @@ int main(int argc, char *argv[]) {
   MPI_Comm_split(MPI_COMM_WORLD, color, id, &comm);
 
   /* Read the geometry from the .re2 file */
-  unsigned int nelt;
-  int nv;
+  unsigned int nelt, nbcs;
   double *coord = NULL;
+  long long *bcs = NULL;
+  int nv;
   int err = 0;
   if (color == 1)
-    err = parrsb_read_mesh(&nelt, &nv, NULL, &coord, mesh, comm, 1);
+    err =
+        parrsb_read_mesh(&nelt, &nv, NULL, &coord, &nbcs, &bcs, mesh, comm, 1);
   check_error(err);
 
   /* Find connectivity */
@@ -61,7 +63,7 @@ int main(int argc, char *argv[]) {
   int ndim = nv == 8 ? 3 : 2;
   if (color == 1)
     err |=
-        parRSB_findConnectivity(vl, coord, nelt, ndim, NULL, 0, tol, comm, 0);
+        parRSB_findConnectivity(vl, coord, nelt, ndim, bcs, nbcs, tol, comm, 0);
   check_error(err);
 
   if (color == 1)
@@ -94,6 +96,8 @@ int main(int argc, char *argv[]) {
     free(vl);
   if (coord != NULL)
     free(coord);
+  if (bcs != NULL)
+    free(bcs);
 
   MPI_Comm_free(&comm);
   MPI_Finalize();

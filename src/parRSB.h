@@ -48,7 +48,8 @@ int parRSB_findConnectivity(long long *vertexid, double *coord, int nel,
  * Auxiliary functions
  */
 int parrsb_read_mesh(unsigned int *nel, int *nv, long long **vl, double **coord,
-                     char *name, MPI_Comm comm, int read);
+                     unsigned int *nbcs, long long **bcs, char *name,
+                     MPI_Comm comm, int read);
 
 int parrsb_dump_con(long long *vl, unsigned int nel, int nv, char *name,
                     MPI_Comm comm);

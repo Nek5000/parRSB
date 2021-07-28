@@ -58,8 +58,6 @@ struct Mesh_private {
   struct array boundary;
 };
 
-int transferBoundaryFaces(Mesh mesh, struct comm *c);
-
 /*
  Preprocessor Corner notation:      Symmetric Corner notation:
 

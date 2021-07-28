@@ -33,16 +33,12 @@ extern int PRE_TO_SYM_FACE[GC_MAX_FACES];
 
 /* Mesh */
 int mesh_init(Mesh *m, int nel, int nDim);
-Element MeshGetElements(Mesh m);
 void get_vertex_ids(long long **ids, Mesh m);
 void get_vertex_coordinates(double **coords, Mesh m);
+int get_bcs(unsigned int *nbcs, long long **bcs, Mesh m);
 int get_mesh_dim(Mesh m);
 int get_mesh_nel(Mesh m);
 int mesh_free(Mesh m);
-
-/* Read Nek5000 mesh files */
-int read_geometry(Mesh *mesh, char *fname, struct comm *c);
-int read_connectivity(Mesh mesh, char *fname, struct comm *c);
 
 /* Connectivity */
 int findMinNeighborDistance(Mesh mesh);

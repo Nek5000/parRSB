@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        test: [pyramid, tgv, turbPipe]
+        test: [box_2x2x2, pyramid, tgv, e3q, solid, ethier, vortex]
         np: [1, 2, 3, 4]
       fail-fast: false
     env:
@@ -55,6 +55,5 @@ jobs:
           if [[ "${sha}" == "${sha_new}" ]]; then
             echo 'ok'
           else
-            echo "${sha}"
-            echo "${sha_new}"
+            echo "not ok"
           fi
