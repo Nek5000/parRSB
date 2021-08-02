@@ -138,8 +138,8 @@ sint get_components(sint *component, struct rsb_element *elements,
   return count;
 }
 
-int balance_partitions(genmap_handle h, struct comm *lc, int bin,
-                       struct comm *gc) {
+static int balance_partitions(genmap_handle h, struct comm *lc, int bin,
+                              struct comm *gc) {
   if (bin < 0 || bin > 1) {
     if (gc->id == 0) {
       printf("%s:%d bin value out of range: %d\n", __FILE__, __LINE__, bin);
@@ -276,8 +276,8 @@ int balance_partitions(genmap_handle h, struct comm *lc, int bin,
   GenmapFree(ids);
 }
 
-sint count_comp_sizes(sint *comp_ids, slong *min_, slong *max_, struct comm *tc,
-                      genmap_handle h) {
+static sint count_comp_sizes(sint *comp_ids, slong *min_, slong *max_,
+                             struct comm *tc, genmap_handle h) {
   struct rsb_element *e = genmap_get_elements(h);
   uint nelt = genmap_get_nel(h);
   int nv = genmap_get_nvertices(h);
@@ -335,15 +335,15 @@ void repair_partitions(genmap_handle h, struct comm *lc, int level,
   sint *comp_ids = NULL;
   GenmapMalloc(nelt, &comp_ids);
 
-  sint ncomp;
   slong min, max;
-  ncomp = count_comp_sizes(comp_ids, &min, &max, &tc, h);
+  sint ncomp = count_comp_sizes(comp_ids, &min, &max, &tc, h);
   slong ncompg = ncomp;
   comm_allreduce(lc, gs_long, gs_max, &ncompg, 1, &buf);
 
   sint root = (lc->id == 0) * gc->id;
   comm_allreduce(lc, gs_int, gs_max, &root, 1, &buf);
 
+#if 0
   if (tc.id == 0 && ncomp > 1) {
     printf(
         "\tWarning: %d disconnected components in Level = %d (%lld)! (min/max "
@@ -351,6 +351,7 @@ void repair_partitions(genmap_handle h, struct comm *lc, int level,
         ncomp, level, nelg, min, max, root, np);
     fflush(stdout);
   }
+#endif
 
   int attempt = 0;
   int nattempts = 1;
@@ -424,16 +425,7 @@ void repair_partitions(genmap_handle h, struct comm *lc, int level,
     GenmapInitLaplacianWeighted(h, &tc);
 
     GenmapRealloc(nelt, &comp_ids);
-    ncomp = count_comp_sizes(comp_ids, &min, &max, &tc, h);
-    if (tc.id == 0 && ncomp > 1) {
-      printf("\t\t %d disconnected components after attempt %d/%d, Level = %d "
-             "(%lld) "
-             "(min/max size: %lld %lld) root = %d np = %d\n",
-             ncomp, attempt, nattempts, level, nelg, min, max, root, np);
-      fflush(stdout);
-    }
-
-    ncompg = ncomp;
+    ncompg = ncomp = count_comp_sizes(comp_ids, &min, &max, &tc, h);
     comm_allreduce(lc, gs_long, gs_max, &ncompg, 1, &buf);
 
     GenmapFree(comp_count);
@@ -444,6 +436,9 @@ void repair_partitions(genmap_handle h, struct comm *lc, int level,
   nelt = genmap_get_nel(h);
   GenmapRealloc(nelt, &comp_ids);
   ncomp = count_comp_sizes(comp_ids, &min, &max, &tc, h);
+  metric_acc(COMPONENTS, ncomp);
+
+#if 0
   if (ncomp > 1 && tc.id == 0) {
     printf(
         "%d disconnected components after balance, Level = %d (%lld) (min/max "
@@ -451,9 +446,9 @@ void repair_partitions(genmap_handle h, struct comm *lc, int level,
         ncomp, level, nelg, min, max, root, np);
     fflush(stdout);
   }
+#endif
 
   GenmapFree(comp_ids);
-
   comm_free(lc);
   comm_dup(lc, &tc);
   comm_free(&tc);

@@ -28,14 +28,12 @@ int GenmapFiedlerRQI(genmap_handle h, struct comm *gsc, int max_iter,
   normi = 1.0 / sqrt(norm);
   genmap_vector_scale(initVec, initVec, normi);
 
-  metric_tic(gsc, LAPLACIANSETUP);
+  metric_tic(gsc, LAPLACIAN_INIT);
   GenmapInitLaplacian(h, gsc);
-  metric_toc(gsc, LAPLACIANSETUP);
+  metric_toc(gsc, LAPLACIAN_INIT);
 
-  metric_tic(gsc, PRECONDSETUP);
   mgData d;
   mgSetup(h, gsc, h->M, &d);
-  metric_toc(gsc, PRECONDSETUP);
 
   genmap_vector y;
   genmap_vector_create_zeros(&y, lelt);
@@ -43,7 +41,7 @@ int GenmapFiedlerRQI(genmap_handle h, struct comm *gsc, int max_iter,
   metric_tic(gsc, RQI);
   int iter = rqi(h, gsc, d, initVec, max_iter, y);
   metric_toc(gsc, RQI);
-  metric_acc(NRQI, iter);
+  metric_acc(RQI_NITER, iter);
 
   mgFree(d);
 
@@ -94,16 +92,14 @@ int GenmapFiedlerLanczos(genmap_handle h, struct comm *gsc, int max_iter,
   iter =
       GenmapLanczosLegendary(h, gsc, initVec, max_iter, &q, alphaVec, betaVec);
   metric_toc(gsc, LANCZOS);
-  metric_acc(NLANCZOS, iter);
+  metric_acc(LANCZOS_NITER, iter);
 
   genmap_vector evLanczos, evTriDiag;
   genmap_vector_create(&evTriDiag, iter);
 
   /* Use TQLI and find the minimum eigenvalue and associated vector */
   genmap_vector *eVectors, eValues;
-  metric_tic(gsc, TQLI);
   GenmapTQLI(h, alphaVec, betaVec, &eVectors, &eValues);
-  metric_toc(gsc, TQLI);
 
   GenmapScalar eValMin = fabs(eValues->data[0]);
   GenmapInt eValMinI = 0;

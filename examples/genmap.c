@@ -70,10 +70,10 @@ int main(int argc, char *argv[]) {
     parrsb_part_stat(vl, nelt, nv, comm);
 
   /* Partition the mesh */
-  parRSB_options options = parrsb_default_options;
+  parrsb_options options = parrsb_default_options;
   int *part = (int *)calloc(nelt, sizeof(int));
   if (color == 1)
-    err |= parRSB_partMesh(part, NULL, vl, coord, nelt, nv, &options, comm);
+    err |= parRSB_partMesh(part, NULL, vl, coord, nelt, nv, options, comm);
   check_error(err);
 
   /* Redistribute data */

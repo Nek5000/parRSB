@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        test: [box_2x2x2, pyramid, tgv, e3q, solid, ethier, vortex]
+        test: [box_2x2x2, pyramid, tgv, e3q, solid, ethier, vortex, expansion]
         np: [1, 2, 3, 4]
       fail-fast: false
     env:
@@ -53,7 +53,7 @@ jobs:
 
           sha_new=(`sha256sum ${{ matrix.test }}.co2`); sha_new=${sha_new[0]}
           if [[ "${sha}" == "${sha_new}" ]]; then
-            echo 'ok'
+            exit 0
           else
-            echo "not ok"
+            exit 1
           fi

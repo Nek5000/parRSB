@@ -147,12 +147,12 @@ int parRSB_findConnectivity(long long *vtx, double *coord, int nelt, int ndim,
   /* Copy output */
   Point ptr = mesh->elements.ptr;
   for (i = 0; i < nelt; i++) {
-    printf("e = %d, ", i);
+    // printf("e = %d, ", i);
     for (j = 0; j < nvertex; j++) {
       vtx[i * nvertex + j] = ptr[i * nvertex + j].globalId + 1;
-      printf("%lld ", vtx[i * nvertex + j]);
+      // printf("%lld ", vtx[i * nvertex + j]);
     }
-    printf("\n");
+    // printf("\n");
   }
 
   comm_barrier(&c);

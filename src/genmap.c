@@ -3,7 +3,7 @@
 
 #include <genmap-impl.h>
 
-int genmap_init(genmap_handle *h_, comm_ext ce, parRSB_options *options) {
+int genmap_init(genmap_handle *h_, comm_ext ce, parrsb_options *options) {
   GenmapMalloc(1, h_);
   genmap_handle h = *h_;
 

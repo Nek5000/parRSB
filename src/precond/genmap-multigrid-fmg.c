@@ -22,7 +22,7 @@ int inverse(double *x, int level, int iter, genmap_handle h, genmap_comm c,
     metric_tic(&c->gsc, PROJECT);
     j = project_lvl(h, c, d, x, iter, level, y);
     metric_toc(&c->gsc, PROJECT);
-    metric_acc(NPROJECT, j);
+    metric_acc(PROJECT_NITER, j);
 
     // TODO: 1-orthogonalize
 

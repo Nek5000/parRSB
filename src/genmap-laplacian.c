@@ -103,33 +103,12 @@ static void genmap_find_neighbors(struct array *nbrs, genmap_handle h,
 int GenmapInitLaplacian(genmap_handle h, struct comm *c) {
   struct array entries;
 
-  metric_tic(c, FINDNBRS);
   genmap_find_neighbors(&entries, h, c);
-  metric_toc(c, FINDNBRS);
-
-  metric_tic(c, CSRMATSETUP);
   csr_mat_setup(&entries, c, &h->M);
-  metric_toc(c, CSRMATSETUP);
-
-  array_free(&entries);
-
-  metric_toc(c, CSRTOPSETUP);
   h->gsh = get_csr_top(h->M, c);
-  metric_toc(c, CSRTOPSETUP);
-
   GenmapRealloc(h->M->row_off[h->M->rn], &h->b);
 
-#if defined(GENMAP_DEBUG)
-  int nnz = h->M->row_off[h->M->rn];
-  double fro[2] = {0.0, 0.0}, buf[2];
-  for (int i = 0; i < nnz; i++) {
-    fro[0] += h->M->v[i];
-    fro[1] += h->M->v[i] * h->M->v[i];
-  }
-  comm_allreduce(c, gs_double, gs_add, &fro, 2, &buf);
-  if (c->gsc.id == 0)
-    printf("nrom(G,'1')=%g\nnorm(G,'fro')=%g\n", fro[0], fro[1]);
-#endif
+  array_free(&entries);
 
   return 0;
 }

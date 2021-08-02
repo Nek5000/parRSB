@@ -4,11 +4,8 @@
 #include <assert.h>
 #include <math.h>
 #include <stddef.h>
-#include <stdlib.h>
-
-#ifdef GENMAP_DEBUG
 #include <stdio.h>
-#endif
+#include <stdlib.h>
 
 #include <genmap-multigrid-precon.h>
 #include <genmap.h>
@@ -47,7 +44,6 @@ struct rsb_element {
   GenmapScalar fiedler;
   GenmapLong vertices[8];
   GenmapInt part;
-  GenmapULong globalId0;
 };
 
 int rcb(struct comm *ci, struct array *elements, int ndim, buffer *bfr);
@@ -75,7 +71,7 @@ struct genmap_handle_private {
   csr_mat M;
   GenmapScalar *b;
 
-  parRSB_options *options;
+  parrsb_options *options;
 };
 
 struct genmap_vector_private {
@@ -95,29 +91,19 @@ int GenmapFree(void *p);
 /* Genmap Metrics */
 typedef enum {
   RCB,
-  WEIGHTEDLAPLACIANSETUP,
   FIEDLER,
-  NFIEDLER,
-  FIEDLERSORT,
-  BISECTANDREPAIR,
+  FIEDLER_NITER,
   LANCZOS,
-  NLANCZOS,
-  LANCZOSTOLFINAL,
-  LANCZOSTOLTARGET,
-  WEIGHTEDLAPLACIAN,
-  TQLI,
-  LAPLACIANSETUP,
-  FINDNBRS,
-  CSRMATSETUP,
-  CSRTOPSETUP,
-  PRECONDSETUP,
-  RQI,
-  NRQI,
-  PROJECT,
-  NPROJECT,
-  GRAMMIAN,
+  LANCZOS_NITER,
+  LANCZOS_TOL_FINAL,
+  LANCZOS_TOL_TARGET,
   LAPLACIAN,
-  VCYCLE,
+  LAPLACIAN_INIT,
+  RQI,
+  RQI_NITER,
+  PROJECT,
+  PROJECT_NITER,
+  COMPONENTS,
   END
 } metric;
 
