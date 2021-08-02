@@ -1,7 +1,17 @@
 #ifndef _PARRSB_H_
 #define _PARRSB_H_
 
-#include <gslib.h>
+#include "gslib.h"
+
+#if !defined(MPI)
+#error "gslib needs to be compiled with MPI"
+#endif
+
+#if !defined(GLOBAL_LONG_LONG)
+#error "gslib needs to be compiled with GLOBAL_LONG_LONG"
+#endif
+
+#include <mpi.h>
 
 /*
  * Partitioning

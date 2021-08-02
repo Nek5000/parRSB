@@ -1,4 +1,3 @@
-#include <genmap-impl.h> //FIXME - include genmap-statistics
 #include <sort-impl.h>
 
 /* assumes array is locally sorted */
@@ -54,4 +53,6 @@ int parallel_bin_sort(struct sort *s, struct comm *c) {
 
   /* Locally sort again */
   sort_local(s);
+
+  return 0;
 }
