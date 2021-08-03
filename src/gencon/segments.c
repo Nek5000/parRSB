@@ -4,6 +4,89 @@
 #include <gencon-impl.h>
 #include <sort.h>
 
+/* Based on heapsort found in Numerical Receipes */
+static void tuple_sort_(void *ra, uint n, uint usize, uint offset) {
+  sint i, ir, j, l;
+  void *rra = calloc(1, usize);
+  assert(rra != NULL);
+
+#define cpy(rra_, i_, ra_, l_)                                                 \
+  do {                                                                         \
+    char *dst = (char *)rra_ + (i_ - 1) * usize;                               \
+    char *src = (char *)ra_ + (l_ - 1) * usize;                                \
+    memcpy(dst, src, usize);                                                   \
+  } while (0)
+
+#define get(ra_, l_) (*((double *)((char *)ra_ + (l_ - 1) * usize + offset)))
+
+  if (n < 2)
+    return;
+  l = n / 2 + 1;
+  ir = n;
+
+  for (;;) {
+    if (l > 1) {
+      --l;
+      assert(l >= 1 && l <= n && "l");
+      cpy(rra, 1, ra, l);
+    } else {
+      cpy(rra, 1, ra, ir);
+      cpy(ra, ir, ra, 1);
+      if (--ir == 1) {
+        cpy(ra, 1, rra, 1);
+        break;
+      }
+    }
+    i = l;
+    j = l + l;
+    while (j <= ir) {
+      if (j < ir && get(ra, j) < get(ra, j + 1))
+        j++;
+      assert(j >= 1 && j <= n && "j2");
+      assert(i >= 1 && i <= n && "i");
+      if (get(rra, 1) < get(ra, j)) {
+        cpy(ra, i, ra, j);
+        i = j;
+        j = 2 * j;
+      } else
+        break;
+    }
+    assert(i >= 1 && i <= n && "i2");
+    cpy(ra, i, rra, 1);
+  }
+
+#undef cpy
+#undef get
+
+  if (rra != NULL)
+    free(rra);
+}
+
+#define tuple_sort(T, arr, n, index)                                           \
+  do {                                                                         \
+    tuple_sort_((void *)arr, n, sizeof(T), offsetof(T, index));                \
+  } while (0)
+
+void test_tuple_sort() {
+  struct vals {
+    double x, y, z;
+  };
+
+  int SIZE = 10;
+  struct vals *arrays = tcalloc(struct vals, SIZE);
+
+  int i;
+  for (i = 0; i < SIZE; i++)
+    arrays[i].x = arrays[i].y = arrays[i].z = 1.0 + SIZE - i;
+
+  tuple_sort(struct vals, arrays, SIZE, x);
+
+  for (i = 0; i < SIZE; i++)
+    printf("i = %d lf = %lf\n", i, arrays[i].x);
+
+  free(arrays);
+}
+
 static void initSegment(Mesh mesh, struct comm *c) {
   uint nPoints = mesh->elements.n;
   Point points = mesh->elements.ptr;
@@ -39,13 +122,16 @@ static int sortSegmentsLocal(Mesh mesh, int dim, buffer *bfr) {
     /* sort start to end based on dim */
     switch (dim) {
     case 0:
-      sarray_sort(struct Point_private, &points[s], e - s, x[0], 3, bfr);
+      // sarray_sort(struct Point_private, &points[s], e - s, x[0], 3, bfr);
+      tuple_sort(struct Point_private, &points[s], e - s, x[0]);
       break;
     case 1:
-      sarray_sort(struct Point_private, &points[s], e - s, x[1], 3, bfr);
+      // sarray_sort(struct Point_private, &points[s], e - s, x[1], 3, bfr);
+      tuple_sort(struct Point_private, &points[s], e - s, x[1]);
       break;
     case 2:
-      sarray_sort(struct Point_private, &points[s], e - s, x[2], 3, bfr);
+      // sarray_sort(struct Point_private, &points[s], e - s, x[2], 3, bfr);
+      tuple_sort(struct Point_private, &points[s], e - s, x[2]);
       break;
     default:
       break;
@@ -121,8 +207,7 @@ static int findSegments(Mesh mesh, struct comm *c, int i,
 
   sint j;
   for (j = 1; j < npts; j++) {
-    GenmapScalar d = sqrDiff(pts[j].x[i], pts[j - 1].x[i]);
-
+    GenmapScalar d = diff_sqr(pts[j].x[i], pts[j - 1].x[i]);
     GenmapScalar dx = min(pts[j].dx, pts[j - 1].dx) * tolSquared;
 
     if (d > dx)
@@ -135,7 +220,7 @@ static int findSegments(Mesh mesh, struct comm *c, int i,
 
     if (c->id > 0) {
       struct Point_private *lastp = arr.ptr;
-      GenmapScalar d = sqrDiff(lastp->x[i], pts->x[i]);
+      GenmapScalar d = diff_sqr(lastp->x[i], pts->x[i]);
       GenmapScalar dx = min(lastp->dx, pts->dx) * tolSquared;
       if (d > dx)
         pts->ifSegment = 1;
@@ -147,18 +232,14 @@ static int findSegments(Mesh mesh, struct comm *c, int i,
   return 0;
 }
 
-slong countSegments(Mesh mesh, int verbose, struct comm *c) {
+slong countSegments(Mesh mesh, struct comm *c) {
   uint nPoints = mesh->elements.n;
   Point points = mesh->elements.ptr;
 
   sint count = 0, i;
-  for (i = 0; i < nPoints; i++) {
-    if (points[i].ifSegment > 0) {
+  for (i = 0; i < nPoints; i++)
+    if (points[i].ifSegment > 0)
       count++;
-      if (verbose > 0)
-        printf("ifseg: %d %d\n", c->id, i);
-    }
-  }
 
   slong buf[2][1];
   slong in = count;
@@ -185,12 +266,6 @@ static int setProc(Mesh mesh, sint rankg, uint index, int inc_proc,
   slong out[2][2], buf[2][2];
   comm_scan(out, c, gs_long, gs_add, size, 2, buf);
 
-#if 0
-  if (c->id == 0)
-    printf("size[0] = %lld, size[1] = %lld\n", out[1][0], out[1][1]);
-  fflush(stdout);
-#endif
-
   sint np[2] = {0};
   if (c->id < rankg)
     np[0] = 1;
@@ -202,12 +277,6 @@ static int setProc(Mesh mesh, sint rankg, uint index, int inc_proc,
     np[1] = 1;
 
   comm_allreduce(c, gs_int, gs_add, np, 2, buf);
-
-#if 0
-  if (c->id == 0)
-    printf("np[0] = %lld, np[1] = %lld\n", np[0], np[1]);
-  fflush(stdout);
-#endif
 
   sint low_size = (out[1][0] + np[0] - 1) / np[0];
   sint high_size = (out[1][1] + np[1] - 1) / np[1];
@@ -227,7 +296,7 @@ static int setProc(Mesh mesh, sint rankg, uint index, int inc_proc,
 }
 
 static int rearrangeSegments(Mesh mesh, struct comm *seg, buffer *bfr) {
-  while (seg->np > 1 && countSegments(mesh, 0, seg) > 1) {
+  while (seg->np > 1 && countSegments(mesh, seg) > 1) {
     uint nPoints = mesh->elements.n;
     Point points = mesh->elements.ptr;
 
@@ -276,13 +345,6 @@ static int rearrangeSegments(Mesh mesh, struct comm *seg, buffer *bfr) {
 
     setProc(mesh, rankg, index, inc_proc, seg);
 
-#if 0
-    if (seg->id == rankg)
-      printf("id: %d index: %u gid: %lld\n", rankg, index,
-             points[index].globalId);
-    fflush(stdout);
-#endif
-
     int bin = 1;
     if (seg->id < rankg)
       bin = 0;
@@ -302,16 +364,6 @@ static int rearrangeSegments(Mesh mesh, struct comm *seg, buffer *bfr) {
 
     parallel_sort(struct Point_private, &mesh->elements, globalId, gs_long,
                   bin_sort, 1, seg, bfr);
-
-#if 0
-    Point pnt = mesh->elements.ptr;
-    printf("id: %d n: %u\n", c.id, mesh->elements.n);
-    fflush(stdout);
-    if (seg->id == 0)
-      printf("id: %d ifseg: %d gid: %lld\n", c.id, pnt[0].ifSegment,
-             pnt[0].globalId);
-    fflush(stdout);
-#endif
   }
 
   return 0;
@@ -337,7 +389,7 @@ int findUniqueVertices(Mesh mesh, struct comm *c, GenmapScalar tol, int verbose,
       slong buf[2];
       comm_allreduce(c, gs_long, gs_add, &n_pts, 1, buf);
 
-      slong n_seg = countSegments(mesh, 0, c);
+      slong n_seg = countSegments(mesh, c);
       if (c->id == 0)
         printf("locglob: %d %d %lld %u\n", t + 1, d + 1, n_seg, n_pts);
 
@@ -350,3 +402,5 @@ int findUniqueVertices(Mesh mesh, struct comm *c, GenmapScalar tol, int verbose,
 
   return 0;
 }
+
+#undef tuple_sort

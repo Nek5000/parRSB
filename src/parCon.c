@@ -61,17 +61,16 @@ int parRSB_findConnectivity(long long *vtx, double *coord, int nelt, int ndim,
                             double tol, MPI_Comm comm, int verbose) {
   struct comm c;
   comm_init(&c, comm);
-  uint rank = c.id;
-  uint size = c.np;
+  int rank = c.id;
+  int size = c.np;
 
-  if (rank == 0 && verbose > 0) {
-    printf("generating connectivity (tol=%g) ...", tol);
+  if (rank == 0) {
+    printf("Running parCon ... (tol=%g)\n", tol);
     fflush(stdout);
   }
 
-  double t_con = 0.0;
   comm_barrier(&c);
-  t_con -= comm_time();
+  double tcon = comm_time();
 
   Mesh mesh;
   mesh_init(&mesh, nelt, ndim);
@@ -80,7 +79,8 @@ int parRSB_findConnectivity(long long *vtx, double *coord, int nelt, int ndim,
   slong in = nelt;
   comm_scan(out, &c, gs_long, gs_add, &in, 1, buff);
   ulong start = out[0][0];
-  ulong nelgt = mesh->nelgt = mesh->nelgv = out[1][0];
+  ulong nelgt = out[1][0];
+  mesh->nelgt = mesh->nelgv = nelgt;
 
   int nelt_ = nelgt / size;
   int nrem = nelgt - nelt_ * size;
@@ -117,15 +117,19 @@ int parRSB_findConnectivity(long long *vtx, double *coord, int nelt, int ndim,
   }
   assert(mesh->boundary.n == nPeriodicFaces);
 
-  transferBoundaryFaces(mesh, &c);
-
-  findMinNeighborDistance(mesh);
-
   buffer bfr;
   buffer_init(&bfr, 1024);
 
-  sint buf;
-  sint err = findUniqueVertices(mesh, &c, tol, verbose, &bfr);
+  sint err, buf;
+  err = transferBoundaryFaces(mesh, &c);
+  comm_allreduce(&c, gs_int, gs_max, &err, 1, &buf);
+  check_error(rank, err, "transferBoundaryFaces");
+
+  err = findMinNeighborDistance(mesh);
+  comm_allreduce(&c, gs_int, gs_max, &err, 1, &buf);
+  check_error(rank, err, "findMinNeighborDistance");
+
+  err = findUniqueVertices(mesh, &c, tol, verbose, &bfr);
   comm_allreduce(&c, gs_int, gs_max, &err, 1, &buf);
   check_error(rank, err, "findSegments");
 
@@ -155,11 +159,11 @@ int parRSB_findConnectivity(long long *vtx, double *coord, int nelt, int ndim,
     // printf("\n");
   }
 
+  /* Report time and finish */
   comm_barrier(&c);
-  t_con += comm_time();
-
+  tcon = comm_time() - tcon;
   if (rank == 0 && verbose > 0) {
-    printf("\n finished in %g s\n", t_con);
+    printf("parCon finished in %g s\n", tcon);
     fflush(stdout);
   }
 

@@ -3,10 +3,12 @@
 
 #include <gencon.h>
 
-#define sqrDiff(x, y) (((x) - (y)) * ((x) - (y)))
-#define distance2D(a, b)                                                       \
-  (sqrDiff((a).x[0], (b).x[0]) + sqrDiff((a).x[1], (b).x[1]))
-#define distance3D(a, b) (distance2D(a, b) + sqrDiff((a).x[2], (b).x[2]))
+double diff_sqr(double x, double y);
+double distance_2d(struct Point_private *a, struct Point_private *b);
+double distance_3d(struct Point_private *a, struct Point_private *b);
+
+#define distance2D(a, b) (diff_sqr(a.x[0], b.x[0]) + diff_sqr(a.x[1], b.x[1]))
+#define distance3D(a, b) (distance2D(a, b) + diff_sqr(a.x[2], b.x[2]))
 
 #define min(a, b) ((a) < (b) ? (a) : (b))
 #define max(a, b) ((a) > (b) ? (a) : (b))

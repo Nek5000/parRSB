@@ -150,8 +150,8 @@ sint get_components(sint *component, struct rsb_element *elements,
   return count;
 }
 
-int balance_partitions(genmap_handle h, struct comm *tc, struct comm *lc,
-                       int bin, struct comm *gc) {
+int balance_partitions(genmap_handle h, struct comm *lc, int bin,
+                       struct comm *gc) {
   assert(check_bin_val(bin, gc) == 0);
 
   uint nelt = genmap_get_nel(h);
@@ -279,47 +279,13 @@ int balance_partitions(genmap_handle h, struct comm *tc, struct comm *lc,
   genmap_comm_scan(h, lc);
 
   nelt = genmap_get_nel(h);
-  sint ncomp = get_components(NULL, genmap_get_elements(h), tc, &h->buf, nelt,
-                              nv);
+  sint ncomp =
+      get_components(NULL, genmap_get_elements(h), lc, &h->buf, nelt, nv);
   metric_acc(COMPONENTS, ncomp);
 
   GenmapFree(input);
   gs_free(gsh);
   GenmapFree(ids);
-}
-
-static sint count_comp_sizes(sint *comp_ids, slong *min_, slong *max_,
-                             struct comm *tc, genmap_handle h) {
-  struct rsb_element *e = genmap_get_elements(h);
-  uint nelt = genmap_get_nel(h);
-  int nv = genmap_get_nvertices(h);
-
-  sint ncomp = get_components(comp_ids, e, tc, &h->buf, nelt, nv);
-
-  slong *size;
-  GenmapCalloc(2 * ncomp, &size);
-
-  uint i;
-  for (i = 0; i < nelt; i++)
-    size[comp_ids[i]]++;
-
-  comm_allreduce(tc, gs_long, gs_add, size, ncomp, &size[ncomp]);
-
-  slong min = LONG_MAX;
-  slong max = 0;
-  for (i = 0; i < ncomp; i++) {
-    if (size[i] < min)
-      min = size[i];
-    if (size[i] > max)
-      max = size[i];
-  }
-
-  *min_ = min;
-  *max_ = max;
-
-  GenmapFree(size);
-
-  return ncomp;
 }
 
 int repair_partitions(genmap_handle h, struct comm *tc, struct comm *lc,
@@ -337,13 +303,13 @@ int repair_partitions(genmap_handle h, struct comm *tc, struct comm *lc,
   sint id = lc->id;
 
   struct rsb_element *e = genmap_get_elements(h);
-  int nv = genmap_get_nvertices(h);
+  uint nv = genmap_get_nvertices(h);
 
   sint *comp_ids = NULL;
   GenmapMalloc(nelt, &comp_ids);
 
   slong min, max;
-  sint ncomp = count_comp_sizes(comp_ids, &min, &max, tc, h);
+  sint ncomp = get_components(comp_ids, e, tc, &h->buf, nelt, nv);
   slong ncompg = ncomp;
   comm_allreduce(lc, gs_long, gs_max, &ncompg, 1, &buf);
 
@@ -415,14 +381,15 @@ int repair_partitions(genmap_handle h, struct comm *tc, struct comm *lc,
     attempt++;
 
     /* Do a load balanced sort in each partition */
-    parallel_sort(struct rsb_element, h->elements, fiedler, gs_double, 0, 1,
-                  tc, &h->buf);
+    parallel_sort(struct rsb_element, h->elements, fiedler, gs_double, 0, 1, tc,
+                  &h->buf);
     genmap_comm_scan(h, tc);
     nelt = genmap_get_nel(h);
     GenmapInitLaplacianWeighted(h, tc);
 
     GenmapRealloc(nelt, &comp_ids);
-    ncompg = ncomp = count_comp_sizes(comp_ids, &min, &max, tc, h);
+    ncompg = ncomp =
+        get_components(comp_ids, genmap_get_elements(h), tc, &h->buf, nelt, nv);
     comm_allreduce(lc, gs_long, gs_max, &ncompg, 1, &buf);
 
     GenmapFree(comp_count);

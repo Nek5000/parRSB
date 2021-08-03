@@ -212,36 +212,6 @@ static int readRe2Boundaries(Mesh mesh, MPI_File file, struct comm *c) {
   free(buf);
 }
 
-static int transferBoundaryFaces(Mesh mesh, struct comm *c) {
-  uint size = c->np;
-
-  struct array *boundary = &mesh->boundary;
-  BoundaryFace ptr = boundary->ptr;
-  int nFaces = boundary->n;
-
-  slong nelgt = mesh->nelgt;
-  sint nelt = nelgt / size;
-  sint nrem = nelgt - nelt * size;
-  slong N = (size - nrem) * nelt;
-
-  sint i;
-  slong eid;
-  for (i = 0; i < nFaces; i++) {
-    eid = ptr[i].elementId;
-    if (eid < N)
-      ptr[i].proc = eid / nelt;
-    else
-      ptr[i].proc = (eid - N) / (nelt + 1) + size - nrem;
-  }
-
-  struct crystal cr;
-  crystal_init(&cr, c);
-  sarray_transfer(struct Boundary_private, boundary, proc, 1, &cr);
-  crystal_free(&cr);
-
-  return 0;
-}
-
 static int read_geometry(Mesh *mesh_, char *fname, struct comm *c) {
   int nelt, nDim, nVertex;
   int errs = 0;

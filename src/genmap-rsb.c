@@ -105,8 +105,9 @@ int genmap_rsb(genmap_handle h) {
 
     struct comm tc;
     genmap_comm_split(lc, bin, lc->id, &tc);
-    repair_partitions(h, &tc, lc, bin, gc);
-    balance_partitions(h, &tc, lc, bin, gc);
+    if (h->options->repair == 1)
+      repair_partitions(h, &tc, lc, bin, gc);
+    balance_partitions(h, &tc, bin, lc);
     comm_free(lc);
     comm_dup(lc, &tc);
     comm_free(&tc);

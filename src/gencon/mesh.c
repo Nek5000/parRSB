@@ -49,18 +49,20 @@ void get_vertex_coordinates(double **coords_, Mesh mesh) {
   int ndim = mesh->nDim;
   int nv = (ndim == 3) ? 8 : 4;
 
-  GenmapMalloc(nelt * nv * ndim, coords_);
-  double *coords = *coords_;
+  size_t size = nelt;
+  size = size * nv * ndim;
+
+  double *coords = *coords_ = tcalloc(double, size);
 
   Point ptr = mesh->elements.ptr;
-  int e, v, d, count = 0;
-  for (e = 0; e < nelt; e++) {
-    for (v = 0; v < nv; v++) {
+  int e, v, d;
+  int count = 0;
+  for (e = 0; e < nelt; e++)
+    for (v = 0; v < nv; v++)
       for (d = 0; d < ndim; d++) {
-        coords[count++] = ptr[e * nv + v].x[d];
+        coords[count] = ptr[e * nv + v].x[d];
+        count++;
       }
-    }
-  }
 }
 
 int get_bcs(unsigned int *nbcs_, long long **bcs_, Mesh m) {

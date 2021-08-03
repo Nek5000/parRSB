@@ -62,7 +62,6 @@ int parRSB_partMesh(int *part, int *seq, long long *vtx, double *coord, int nel,
                     int nv, parrsb_options options, MPI_Comm comm) {
   struct comm c;
   comm_init(&c, comm);
-
   int rank = c.id;
   int size = c.np;
 
@@ -147,8 +146,8 @@ int parRSB_partMesh(int *part, int *seq, long long *vtx, double *coord, int nel,
   genmap_restore_original(part, seq, &cr, &elist, &bfr);
 
   /* Report time and finish */
-  t = comm_time() - t;
   comm_barrier(&c);
+  t = comm_time() - t;
   if (rank == 0) {
     printf("parRSB finished in %g s\n", t);
     fflush(stdout);
