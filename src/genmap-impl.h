@@ -126,12 +126,15 @@ typedef struct {
   uint workProc;
 } vertex;
 
-/* Components */
+/* Repair and balance */
 sint get_components(sint *component, struct rsb_element *elements,
                     struct comm *c, buffer *buf, uint nelt, uint nv);
 
-void repair_partitions(genmap_handle h, struct comm *lc, int level,
-                       struct comm *gc);
+int repair_partitions(genmap_handle h, struct comm *tc, struct comm *lc,
+                      int bin, struct comm *gc);
+int balance_partitions(genmap_handle h, struct comm *tc, struct comm *lc,
+                       int bin, struct comm *gc);
+
 /* Matrix inverse */
 void matrix_inverse(int N, double *A);
 

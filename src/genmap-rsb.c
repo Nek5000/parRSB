@@ -99,7 +99,17 @@ int genmap_rsb(genmap_handle h) {
                   &h->buf);
 
     /* Bisect, repair and balance */
-    repair_partitions(h, lc, level, gc);
+    int bin = 1;
+    if (lc->id < (lc->np + 1) / 2)
+      bin = 0;
+
+    struct comm tc;
+    genmap_comm_split(lc, bin, lc->id, &tc);
+    repair_partitions(h, &tc, lc, bin, gc);
+    balance_partitions(h, &tc, lc, bin, gc);
+    comm_free(lc);
+    comm_dup(lc, &tc);
+    comm_free(&tc);
 
     genmap_comm_scan(h, lc);
     metric_push_level();

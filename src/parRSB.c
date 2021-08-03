@@ -17,7 +17,7 @@ static int if_number(const char *c) {
   return 1;
 }
 
-#define init_option(opt, str)                                                   \
+#define init_option(opt, str)                                                  \
   do {                                                                         \
     const char *val = getenv(str);                                             \
     if (val != NULL && if_number(val))                                         \

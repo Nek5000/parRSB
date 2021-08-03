@@ -107,6 +107,7 @@ int rqi(genmap_handle h, struct comm *gsc, mgData d, genmap_vector z,
           Z[i * lelt + l] = z->data[l];
       }
     }
+
     metric_tic(gsc, PROJECT);
     ppfi = project(h, gsc, d, z, 100, y);
     metric_toc(gsc, PROJECT);
