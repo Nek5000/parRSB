@@ -17,10 +17,6 @@
 /* Upper bounds for faces */
 #define GC_MAX_FACE_VERTICES 4
 
-/* Header lengths */
-#define GC_RE2_HEADER_LEN 80
-#define GC_CO2_HEADER_LEN 132
-
 typedef struct Point_private *Point;
 typedef struct Element_private *Element;
 typedef struct Boundary_private *BoundaryFace;

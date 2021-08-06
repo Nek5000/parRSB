@@ -1,12 +1,68 @@
 /*
  * Generate partitions (.ma2) from Nek5000's mesh (.re2) file.
  */
+#include <getopt.h>
 #include <mpi.h>
 #include <stdio.h>
 
 #include <parRSB.h>
 
-void check_error_(int err, char *file, int line, MPI_Comm comm) {
+struct input {
+  char *mesh;
+  double tol;
+  int test;
+  int dump;
+  int nactive;
+};
+
+static int parse_input(struct input *in, int argc, char *argv[]) {
+  in->mesh = NULL;
+  in->tol = 0.2;
+  in->test = 0;
+  in->dump = 1;
+  MPI_Comm_size(MPI_COMM_WORLD, &in->nactive);
+
+  int c;
+  for (;;) {
+    static struct option long_options[] = {
+        {"mesh", required_argument, 0, 'm'},
+        {"tol", optional_argument, 0, 't'},
+        {"test", no_argument, 0, 'c'},
+        {"no-dump", no_argument, 0, 'd'},
+        {"nactive", optional_argument, 0, 'n'},
+        {0, 0, 0, 0}};
+
+    int option_index = 0;
+    c = getopt_long(argc, argv, "", long_options, &option_index);
+
+    if (c == -1)
+      break;
+
+    switch (c) {
+    case 'm':
+      in->mesh = optarg;
+      break;
+    case 't':
+      in->tol = atof(optarg);
+      break;
+    case 'c':
+      in->test = 1;
+      break;
+    case 'd':
+      in->dump = 0;
+      break;
+    case 'n':
+      in->nactive = atoi(optarg);
+      break;
+    case '?':
+      break;
+    default:
+      abort();
+    }
+  }
+}
+
+static void check_error_(int err, char *file, int line, MPI_Comm comm) {
   int sum;
   MPI_Allreduce(&err, &sum, 1, MPI_INT, MPI_SUM, comm);
 
@@ -26,23 +82,14 @@ void check_error_(int err, char *file, int line, MPI_Comm comm) {
 int main(int argc, char *argv[]) {
   MPI_Init(&argc, &argv);
 
-  int id, np;
+  struct input in;
+  parse_input(&in, argc, argv);
+
+  int id;
   MPI_Comm_rank(MPI_COMM_WORLD, &id);
-  MPI_Comm_size(MPI_COMM_WORLD, &np);
-
-  if (argc < 2 || argc > 4) {
-    if (id == 0)
-      printf("Usage: %s <mesh file> [ranks] [tol]\n", argv[0]);
-    MPI_Finalize();
-    return 1;
-  }
-
-  char *mesh = argv[1];
-  double tol = (argc > 2) ? atof(argv[2]) : 0.2;
-  int ranks = (argc > 3) ? atoi(argv[3]) : np;
 
   int color = 0;
-  if (id < ranks)
+  if (id < in.nactive)
     color = 1;
   MPI_Comm comm;
   MPI_Comm_split(MPI_COMM_WORLD, color, id, &comm);
@@ -54,16 +101,16 @@ int main(int argc, char *argv[]) {
   int nv;
   int err = 0;
   if (color == 1)
-    err =
-        parrsb_read_mesh(&nelt, &nv, NULL, &coord, &nbcs, &bcs, mesh, comm, 1);
+    err = parrsb_read_mesh(&nelt, &nv, NULL, &coord, &nbcs, &bcs, in.mesh, comm,
+                           1);
   check_error(err);
 
   /* Find connectivity */
   long long *vl = (long long *)calloc(nelt * nv, sizeof(long long));
   int ndim = nv == 8 ? 3 : 2;
   if (color == 1)
-    err |=
-        parRSB_findConnectivity(vl, coord, nelt, ndim, bcs, nbcs, tol, comm, 0);
+    err |= parRSB_findConnectivity(vl, coord, nelt, ndim, bcs, nbcs, in.tol,
+                                   comm, 0);
   check_error(err);
 
   if (color == 1)
@@ -85,8 +132,8 @@ int main(int argc, char *argv[]) {
     parrsb_part_stat(vl, nelt, nv, comm);
 
   /* Write map file */
-  if (color == 1)
-    err |= parrsb_dump_map(nelt, nv, part, vl, mesh, comm);
+  if (color == 1 && in.dump == 1)
+    err |= parrsb_dump_map(nelt, nv, part, vl, in.mesh, comm);
   check_error(err);
 
   /* Free resources */
@@ -104,3 +151,5 @@ int main(int argc, char *argv[]) {
 
   return 0;
 }
+
+#undef check_error

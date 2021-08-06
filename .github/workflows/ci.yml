@@ -44,16 +44,7 @@ jobs:
           export EXAMPLEDIR=`pwd`/build/examples
 
           cd parRSB-tests/${{ matrix.test }}
-
           tol=(`cat test.txt | grep tol`); tol=${tol[2]}
-          sha=(`cat test.txt | grep sha256sum`); sha=${sha[2]}
 
           echo "localhost:4" > hostfile
-          mpirun -np ${{ matrix.np }} --hostfile hostfile ${EXAMPLEDIR}/gencon ${{ matrix.test }} ${tol}
-
-          sha_new=(`sha256sum ${{ matrix.test }}.co2`); sha_new=${sha_new[0]}
-          if [[ "${sha}" == "${sha_new}" ]]; then
-            exit 0
-          else
-            exit 1
-          fi
+          mpirun -np ${{ matrix.np }} --hostfile hostfile ${EXAMPLEDIR}/gencon --mesh ${{ matrix.test }} --tol=${tol} --no-dump --test
