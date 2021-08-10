@@ -29,7 +29,7 @@ int parRSB_partMesh(int *part, int *seq, long long *vtx, double *coord, int nel,
                     int nv, parrsb_options options, MPI_Comm comm);
 ```
 
-See `example/partition.c` for an example.
+See `example/genmap.c` for an example.
 
 #### Parameters
 
@@ -48,19 +48,33 @@ comm    (in)    ... MPI Communicator (size determines number of partitions).
 ```C
 typedef struct {
   /* General options */
-  int partitioner; // -1 - None, 0 - RSB, 1 - RCB, 2 - RIB (Default: 0)
-  int local_partitioner;  // -1 - None, 0 - RSB, 1 - RCB, 2 - RIB (Default: -1)
-  int debug_level;        // 0, 1, 2, .. etc (Default: 0)
-  int profile_level;  // 0 or 1 (Default: 0)
+  int partitioner;   // 0 - RSB, 1 - RCB, 2 - RIB (Default: 0)
+  int debug_level;   // 0, 1, 2, .. etc (Default: 0)
+  int profile_level; // 0, 1, 2, .. etc (Default: 0)
 
   /* RSB specific */
-  int rsb_algo;         // 0 - Lanczos, 1 - MG (Default: 0)
-  int rsb_pre; // 0 - None, 1 - RCB , 2 - RIB (Default: 1)
-  int rsb_grammian;     // 0 or 1 (Default: 1)
+  int rsb_algo;     // 0 - Lanczos, 1 - RQI (Default: 0)
+  int rsb_pre;      // 0 - None, 1 - RCB , 2 - RIB (Default: 1)
+  int rsb_grammian; // 0 or 1 (Default: 1)
+
+  /* Other */
+  int repair; // 0 - No, 1 - Yes (Default: 1)
 } parrsb_options;
 ```
 
 You can use `parrsb_default_options` struct instance to pass default options
-to `parRSB_partMesh` routine.
+to `parRSB_partMesh` routine. All of these options can be controlled at runtime
+setting up the relevant env. variable to the corresponding value as well. Below
+is the list of env. variables:
+
+```
+PARRSB_PARTITIONER
+PARRSB_DEBUG_LEVEL
+PARRSB_PROFILE_LEVEL
+PARRSB_RSB_ALGO
+PARRSB_RSB_PRE
+PARRSB_RSB_GRAMMIAN
+PARRSB_REPAIR
+```
 
 Note, any initial distribution of mesh elements is valid.
