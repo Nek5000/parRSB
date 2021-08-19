@@ -308,7 +308,7 @@ static int read_connectivity(unsigned int *nelt_, int *nv_, long long **vl_,
   if (rank == 0)
     buf0 += header_size;
 
-  long long *vl = *vl_ = tcalloc(long long, nv * nelt);
+  long long *vl = *vl_ = tcalloc(long long, nv *nelt);
   int i, j, tmp1, tmp2;
   for (i = 0; i < nelt; i++) {
     READ_T(&tmp1, buf0, int, 1);

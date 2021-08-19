@@ -11,7 +11,9 @@
 #error "gslib needs to be compiled with GLOBAL_LONG_LONG"
 #endif
 
-#include <mpi.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*
  * Partitioning
@@ -43,14 +45,13 @@ void fparRSB_partMesh(int *part, int *seq, long long *vtx, double *coord,
 /*
  * Connectivity
  */
-int parRSB_findConnectivity(long long *vertexid, double *coord, int nel,
-                            int nDim, long long *periodicInfo,
-                            int nPeriodicFaces, double tol, MPI_Comm comm,
-                            int verbose);
+int parRSB_findConnectivity(long long *vtx, double *coord, int nel, int nDim,
+                            long long *periodicInfo, int nPeriodicFaces,
+                            double tol, MPI_Comm comm, int verbose);
 
 #define fparRSB_findConnectivity                                               \
   FORTRAN_UNPREFIXED(fparrsb_findconnectivity, FPARRSB_FINDCONNECTIVITY)
-void fparRSB_findConnectivity(long long *vertexId, double *coord, int *nel,
+void fparRSB_findConnectivity(long long *vtx, double *coord, int *nel,
                               int *nDim, long long *periodicInfo,
                               int *nPeriodicFaces, double *tol, MPI_Fint *fcomm,
                               int *verbose, int *err);
@@ -73,5 +74,9 @@ int parrsb_distribute_elements(unsigned int *nelt, long long **vl,
                                MPI_Comm comm);
 
 void parrsb_part_stat(long long *vtx, int nel, int nv, MPI_Comm comm);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

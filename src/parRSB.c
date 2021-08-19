@@ -36,7 +36,7 @@ static void init_options(parrsb_options *options) {
 
 #undef init_option
 
-#define print_option(opt, str) printf("%s = %d\n", str, options->opt);
+#define print_option(opt, str) printf("%s = %d\n", str, options->opt)
 
 static void print_options(parrsb_options *options) {
   print_option(partitioner, "PARRSB_PARTITIONER");

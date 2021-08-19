@@ -1,8 +1,5 @@
 #include "genmap-impl.h"
 
-#include <math.h>
-#include <stdio.h>
-
 int GenmapLanczosLegendary(genmap_handle h, struct comm *gsc, genmap_vector f,
                            GenmapInt niter, genmap_vector **rr,
                            genmap_vector diag, genmap_vector upper) {

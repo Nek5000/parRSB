@@ -1,8 +1,4 @@
-#include <math.h>
-#include <stdio.h>
-
 #include <genmap-impl.h>
-#include <genmap-multigrid-precon.h>
 
 #define MM 505
 

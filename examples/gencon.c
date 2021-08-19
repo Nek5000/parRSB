@@ -51,6 +51,9 @@ static int parse_input(struct input *in, int argc, char *argv[]) {
     case 'd':
       in->dump = 0;
       break;
+    case 'n':
+      in->nactive = atoi(optarg);
+      break;
     case '?':
       break;
     default:
@@ -58,6 +61,23 @@ static int parse_input(struct input *in, int argc, char *argv[]) {
     }
   }
 }
+
+static void check_error_(int err, char *file, int line, MPI_Comm comm) {
+  int sum;
+  MPI_Allreduce(&err, &sum, 1, MPI_INT, MPI_SUM, comm);
+
+  if (sum != 0) {
+    int id;
+    MPI_Comm_rank(comm, &id);
+    if (id == 0)
+      printf("check_error failure in %s:%d\n", file, line);
+
+    MPI_Finalize();
+    exit(1);
+  }
+}
+
+#define check_error(err) check_error_(err, __FILE__, __LINE__, MPI_COMM_WORLD);
 
 struct pair {
   ulong gid;
@@ -99,12 +119,17 @@ static int test_parcon(unsigned int neltp, long long *vlp, char *name,
 
   int np;
   MPI_Comm_size(MPI_COMM_WORLD, &np);
-  if (np == 1)
+  if (np == 1) {
     for (i = 0; i < size; i++)
       if (vls[i] != vlp[i]) {
         err = 1;
         break;
       }
+  }
+
+  /* TODO: Add a check for number of distinct global ids serial vs parallel and
+   * that should be enough to make sure serial vs parallel mapping the same upto
+   * a permutation. Or set the gs using vlp and check min/max of vls */
 
   gs_free(gsh);
   comm_free(&c);
@@ -119,23 +144,6 @@ static int test_parcon(unsigned int neltp, long long *vlp, char *name,
 
   return err;
 }
-
-static void check_error_(int err, char *file, int line, MPI_Comm comm) {
-  int sum;
-  MPI_Allreduce(&err, &sum, 1, MPI_INT, MPI_SUM, comm);
-
-  if (sum != 0) {
-    int id;
-    MPI_Comm_rank(comm, &id);
-    if (id == 0)
-      printf("check_error failure in %s:%d\n", file, line);
-
-    MPI_Finalize();
-    exit(1);
-  }
-}
-
-#define check_error(err) check_error_(err, __FILE__, __LINE__, MPI_COMM_WORLD);
 
 int main(int argc, char *argv[]) {
   MPI_Init(&argc, &argv);

@@ -1,8 +1,4 @@
-#include <math.h>
-#include <stdio.h>
-
 #include <genmap-impl.h>
-#include <genmap-multigrid-precon.h>
 
 // Input z should be orthogonal to 1-vector, have unit norm.
 // RQI should not change z.
