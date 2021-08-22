@@ -17,7 +17,7 @@ static int if_number(const char *c) {
   return 1;
 }
 
-#define init_option(opt, str)                                                  \
+#define INIT_OPTION(opt, str)                                                  \
   do {                                                                         \
     const char *val = getenv(str);                                             \
     if (val != NULL && if_number(val))                                         \
@@ -25,30 +25,30 @@ static int if_number(const char *c) {
   } while (0)
 
 static void init_options(parrsb_options *options) {
-  init_option(partitioner, "PARRSB_PARTITIONER");
-  init_option(debug_level, "PARRSB_DEBUG_LEVEL");
-  init_option(profile_level, "PARRSB_PROFILE_LEVEL");
-  init_option(rsb_algo, "PARRSB_RSB_ALGO");
-  init_option(rsb_pre, "PARRSB_RSB_PRE");
-  init_option(rsb_grammian, "PARRSB_RSB_GRAMMIAN");
-  init_option(repair, "PARRSB_REPAIR");
+  INIT_OPTION(partitioner, "PARRSB_PARTITIONER");
+  INIT_OPTION(debug_level, "PARRSB_DEBUG_LEVEL");
+  INIT_OPTION(profile_level, "PARRSB_PROFILE_LEVEL");
+  INIT_OPTION(rsb_algo, "PARRSB_RSB_ALGO");
+  INIT_OPTION(rsb_pre, "PARRSB_RSB_PRE");
+  INIT_OPTION(rsb_grammian, "PARRSB_RSB_GRAMMIAN");
+  INIT_OPTION(repair, "PARRSB_REPAIR");
 }
 
-#undef init_option
+#undef INIT_OPTION
 
-#define print_option(opt, str) printf("%s = %d\n", str, options->opt)
+#define PRINT_OPTION(opt, str) printf("%s = %d\n", str, options->opt)
 
 static void print_options(parrsb_options *options) {
-  print_option(partitioner, "PARRSB_PARTITIONER");
-  print_option(debug_level, "PARRSB_DEBUG_LEVEL");
-  print_option(profile_level, "PARRSB_PROFILE_LEVEL");
-  print_option(rsb_algo, "PARRSB_RSB_ALGO");
-  print_option(rsb_pre, "PARRSB_RSB_PRE");
-  print_option(rsb_grammian, "PARRSB_RSB_GRAMMIAN");
-  print_option(repair, "PARRSB_REPAIR");
+  PRINT_OPTION(partitioner, "PARRSB_PARTITIONER");
+  PRINT_OPTION(debug_level, "PARRSB_DEBUG_LEVEL");
+  PRINT_OPTION(profile_level, "PARRSB_PROFILE_LEVEL");
+  PRINT_OPTION(rsb_algo, "PARRSB_RSB_ALGO");
+  PRINT_OPTION(rsb_pre, "PARRSB_RSB_PRE");
+  PRINT_OPTION(rsb_grammian, "PARRSB_RSB_GRAMMIAN");
+  PRINT_OPTION(repair, "PARRSB_REPAIR");
 }
 
-#undef print_option
+#undef PRINT_OPTION
 
 /*
  * part = [nel], out,

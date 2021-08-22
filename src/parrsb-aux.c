@@ -89,7 +89,8 @@ int parrsb_distribute_elements(unsigned int *nelt_, long long **vl_,
   return 0;
 }
 
-void parrsb_part_stat(long long *vtx, int nel, int nv, MPI_Comm ce) {
+void parrsb_get_part_stat(int *nc, int *ns, int *nss, int *nel, long long *vtx,
+                          int nelt, int nv, MPI_Comm ce) {
   int i, j;
 
   struct comm comm;
@@ -98,7 +99,7 @@ void parrsb_part_stat(long long *vtx, int nel, int nv, MPI_Comm ce) {
   int Nmsg;
   int *Ncomm;
 
-  int nelMin, nelMax;
+  int nelMin, nelMax, nelSum;
   int ncMin, ncMax, ncSum;
   int nsMin, nsMax, nsSum;
   int nssMin, nssMax, nssSum;
@@ -116,7 +117,7 @@ void parrsb_part_stat(long long *vtx, int nel, int nv, MPI_Comm ce) {
   if (np == 1)
     return;
 
-  numPoints = nel * nv;
+  numPoints = nelt * nv;
   data = (long long *)malloc((numPoints + 1) * sizeof(long long));
   for (i = 0; i < numPoints; i++)
     data[i] = vtx[i];
@@ -161,24 +162,59 @@ void parrsb_part_stat(long long *vtx, int nel, int nv, MPI_Comm ce) {
     nsSum = 0;
   comm_allreduce(&comm, gs_int, gs_add, &nsSum, 1, &b);
 
-  nelMax = nel;
-  nelMin = nel;
+  nelMax = nelt;
+  nelMin = nelt;
+  nelSum = nelt;
   comm_allreduce(&comm, gs_int, gs_max, &nelMax, 1, &b);
   comm_allreduce(&comm, gs_int, gs_min, &nelMin, 1, &b);
-
-  if (id == 0) {
-    printf(" Max neighbors: %d | Min neighbors: %d | Avg neighbors: %lf\n",
-           ncMax, ncMin, (double)ncSum / np);
-    printf(" Max nvolume: %d | Min nvolume: %d | Avg nvolume: %lf\n", nsMax,
-           nsMin, (double)nsSum / np);
-    printf(" Max volume: %d | Min volume: %d | Avg volume: %lf\n", nssMax,
-           nssMin, (double)nssSum / np);
-    printf(" Max elements: %d | Min elements: %d\n", nelMax, nelMin);
-    fflush(stdout);
-  }
+  comm_allreduce(&comm, gs_int, gs_add, &nelSum, 1, &b);
 
   free(Ncomm);
   comm_free(&comm);
+
+  if (nc != NULL) {
+    nc[0] = ncMin;
+    nc[1] = ncMax;
+    nc[2] = ncSum;
+  }
+
+  if (ns != NULL) {
+    ns[0] = nsMin;
+    ns[1] = nsMax;
+    ns[2] = nsSum;
+  }
+
+  if (nss != NULL) {
+    nss[0] = nssMin;
+    nss[1] = nssMax;
+    nss[2] = nssSum;
+  }
+
+  if (nel != NULL) {
+    nel[0] = nelMin;
+    nel[1] = nelMax;
+    nel[2] = nelSum;
+  }
+}
+
+void parrsb_print_part_stat(long long *vtx, int nelt, int nv, MPI_Comm ce) {
+  int id, np;
+  MPI_Comm_rank(ce, &id);
+  MPI_Comm_rank(ce, &np);
+
+  int nc[3], ns[3], nss[3], nel[3];
+  parrsb_get_part_stat(nc, ns, nss, nel, vtx, nelt, nv, ce);
+
+  if (id == 0) {
+    printf("Min neighbors: %d | Max neighbors: %d | Avg neighbors: %lf\n",
+           nc[0], nc[1], (double)nc[2] / np);
+    printf("Min nvolume: %d | Max nvolume: %d | Avg nvolume: %lf\n", ns[0],
+           ns[1], (double)ns[2] / np);
+    printf("Min volume: %d | Max volume: %d | Avg volume: %lf\n", nss[0],
+           nss[1], (double)nss[2] / np);
+    printf("Min elements: %d | Max elements: %d\n", nel[0], nel[1]);
+    fflush(stdout);
+  }
 }
 
 #undef MAXNV

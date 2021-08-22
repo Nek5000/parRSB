@@ -63,18 +63,20 @@ int parrsb_read_mesh(unsigned int *nel, int *nv, long long **vl, double **coord,
                      unsigned int *nbcs, long long **bcs, char *name,
                      MPI_Comm comm, int read);
 
-int parrsb_dump_con(long long *vl, unsigned int nel, int nv, char *name,
+int parrsb_dump_con(long long *vl, unsigned int nelt, int nv, char *name,
                     MPI_Comm comm);
 
-int parrsb_dump_map(int nel, int nv, int *pmap, long long *vtx, char *name,
+int parrsb_dump_map(int nelt, int nv, int *pmap, long long *vtx, char *name,
                     MPI_Comm comm);
 
 int parrsb_distribute_elements(unsigned int *nelt, long long **vl,
                                double **coord, int *part, int nv,
                                MPI_Comm comm);
 
-void parrsb_part_stat(long long *vtx, int nel, int nv, MPI_Comm comm);
+void parrsb_print_part_stat(long long *vtx, int nelt, int nv, MPI_Comm comm);
 
+void parrsb_get_part_stat(int *nc, int *ns, int *nss, int *nel, long long *vtx,
+                          int nelt, int nv, MPI_Comm comm);
 #ifdef __cplusplus
 }
 #endif

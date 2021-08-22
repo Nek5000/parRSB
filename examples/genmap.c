@@ -114,7 +114,7 @@ int main(int argc, char *argv[]) {
   check_error(err);
 
   if (color == 1)
-    parrsb_part_stat(vl, nelt, nv, comm);
+    parrsb_print_part_stat(vl, nelt, nv, comm);
 
   /* Partition the mesh */
   parrsb_options options = parrsb_default_options;
@@ -129,7 +129,7 @@ int main(int argc, char *argv[]) {
   check_error(err);
 
   if (color == 1)
-    parrsb_part_stat(vl, nelt, nv, comm);
+    parrsb_print_part_stat(vl, nelt, nv, comm);
 
   /* Write map file */
   if (color == 1 && in.dump == 1)
