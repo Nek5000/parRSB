@@ -97,10 +97,6 @@ static int test_parcon(unsigned int neltp, long long *vlp, char *name,
   slong *minp = tcalloc(slong, size);
   slong *maxp = tcalloc(slong, size);
 
-  uint i;
-  for (i = 0; i < size; i++)
-    minp[i] = maxp[i] = vlp[i];
-
   buffer buf;
   buffer_init(&buf, 1024);
 
@@ -108,6 +104,26 @@ static int test_parcon(unsigned int neltp, long long *vlp, char *name,
   comm_init(&c, comm);
 
   struct gs_data *gsh = gs_setup(vls, size, &c, 0, gs_pairwise, 0);
+
+  uint i;
+  for (i = 0; i < size; i++)
+    minp[i] = maxp[i] = vlp[i];
+
+  gs(minp, gs_long, gs_min, 0, gsh, &buf);
+  gs(maxp, gs_long, gs_max, 0, gsh, &buf);
+
+  for (i = 0; i < size; i++)
+    if (minp[i] != maxp[i]) {
+      err = 1;
+      break;
+    }
+
+  gs_free(gsh);
+  gsh = gs_setup(vlp, size, &c, 0, gs_pairwise, 0);
+
+  for (i = 0; i < size; i++)
+    minp[i] = maxp[i] = vls[i];
+
   gs(minp, gs_long, gs_min, 0, gsh, &buf);
   gs(maxp, gs_long, gs_max, 0, gsh, &buf);
 
@@ -126,10 +142,6 @@ static int test_parcon(unsigned int neltp, long long *vlp, char *name,
         break;
       }
   }
-
-  /* TODO: Add a check for number of distinct global ids serial vs parallel and
-   * that should be enough to make sure serial vs parallel mapping the same upto
-   * a permutation. Or set the gs using vlp and check min/max of vls */
 
   gs_free(gsh);
   comm_free(&c);
