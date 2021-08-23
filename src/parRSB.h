@@ -59,6 +59,14 @@ void fparRSB_findConnectivity(long long *vtx, double *coord, int *nel,
 /*
  * Auxiliary functions
  */
+typedef struct {
+  char *mesh; // Mesh name, required.
+  double tol; // gencon tolerance, default: 0.2
+  int test; // run tests, default: 0
+  int dump; // dump the connectivity or map file, default: 1
+  int nactive; // # of active MPI ranks, default: MPI_Comm_size
+} parrsb_input;
+
 int parrsb_read_mesh(unsigned int *nel, int *nv, long long **vl, double **coord,
                      unsigned int *nbcs, long long **bcs, char *name,
                      MPI_Comm comm, int read);
@@ -77,6 +85,12 @@ void parrsb_print_part_stat(long long *vtx, int nelt, int nv, MPI_Comm comm);
 
 void parrsb_get_part_stat(int *nc, int *ns, int *nss, int *nel, long long *vtx,
                           int nelt, int nv, MPI_Comm comm);
+
+parrsb_input *parrsb_parse_input(int argc, char *argv[]);
+
+void parrsb_check_error_(int err, char *file, int line, MPI_Comm comm);
+#define parrsb_check_error(err, comm) parrsb_check_error_(err, __FILE__, __LINE__, comm)
+
 #ifdef __cplusplus
 }
 #endif

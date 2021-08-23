@@ -1,5 +1,5 @@
-#include <mpi.h>
 #include <stdio.h>
+#include <getopt.h>
 
 #include <gencon.h>
 #include <genmap.h>
@@ -214,6 +214,71 @@ void parrsb_print_part_stat(long long *vtx, int nelt, int nv, MPI_Comm ce) {
            nss[1], (double)nss[2] / np);
     printf("Min elements: %d | Max elements: %d\n", nel[0], nel[1]);
     fflush(stdout);
+  }
+}
+
+parrsb_input *parrsb_parse_input(int argc, char *argv[]) {
+  parrsb_input *in = tcalloc(parrsb_input, 1);
+  in->mesh = NULL;
+  in->tol = 0.2;
+  in->test = 0;
+  in->dump = 1;
+  MPI_Comm_size(MPI_COMM_WORLD, &in->nactive);
+
+  int c;
+  for (;;) {
+    static struct option long_options[] = {
+        {"mesh", required_argument, 0, 'm'},
+        {"tol", optional_argument, 0, 't'},
+        {"test", no_argument, 0, 'c'},
+        {"no-dump", no_argument, 0, 'd'},
+        {"nactive", optional_argument, 0, 'n'},
+        {0, 0, 0, 0}};
+
+    int option_index = 0;
+    c = getopt_long(argc, argv, "", long_options, &option_index);
+
+    if (c == -1)
+      break;
+
+    switch (c) {
+    case 'm':
+      in->mesh = optarg;
+      break;
+    case 't':
+      in->tol = atof(optarg);
+      break;
+    case 'c':
+      in->test = 1;
+      break;
+    case 'd':
+      in->dump = 0;
+      break;
+    case 'n':
+      in->nactive = atoi(optarg);
+      break;
+    case '?':
+      break;
+    default:
+      exit(1);
+    }
+  }
+
+  return in;
+}
+
+void parrsb_check_error_(int err, char *file, int line, MPI_Comm comm) {
+  int sum;
+  MPI_Allreduce(&err, &sum, 1, MPI_INT, MPI_SUM, comm);
+
+  if (sum != 0) {
+    int id;
+    MPI_Comm_rank(comm, &id);
+    if (id == 0)
+      printf("check_error failure in %s:%d\n", file, line);
+
+    MPI_Finalize();
+    exit(1);
   }
 }
 
