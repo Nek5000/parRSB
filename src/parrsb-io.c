@@ -1,8 +1,6 @@
 #include <math.h>
 #include <stdio.h>
 
-#include <mpi.h>
-
 #include <gencon-impl.h>
 #include <genmap.h>
 #include <parRSB.h>
@@ -483,7 +481,7 @@ int parrsb_dump_map(int nelt, int nv, int *pmap, long long *vtx, char *fileName,
   char *buf = (char *)malloc(writeSize), *buf0 = buf;
 
   if (rank == 0) {
-    memcpy(buf0, header, HEADER_LEN * sizeof(char)), buf0 += HEADER_LEN;
+    memcpy(buf0, header, HEADER_LEN * sizeof(char)), buf0 += HEADER_LEN * sizeof(char);
     memcpy(buf0, &test, sizeof(float)), buf0 += sizeof(float);
   }
 
@@ -517,3 +515,58 @@ int parrsb_dump_map(int nelt, int nv, int *pmap, long long *vtx, char *fileName,
 #undef HEADER_LEN
 #undef GC_RE2_HEADER_LEN
 #undef GC_CO2_HEADER_LEN
+
+#define WRITE_T(dest, val, T, nunits)                                          \
+  do {                                                                         \
+    memcpy(dest, val, sizeof(T) * nunits);                                     \
+    dest += sizeof(T) * nunits;                                                \
+  } while (0)
+
+int parrsb_dump_part(const char *fname, int nel, int ndim, double *coord,
+                     int gid, MPI_Comm comm) {
+  struct comm c;
+  comm_init(&c, comm);
+
+  int rank = c.id, size = c.np;
+
+  MPI_File file;
+  int err = MPI_File_open(comm, fname, MPI_MODE_CREATE | MPI_MODE_WRONLY,
+                          MPI_INFO_NULL, &file);
+  parrsb_check_error(err, comm);
+
+  slong nelt = nel;
+  slong out[2][1], buf[2][1];
+  comm_scan(out, &c, gs_long, gs_add, &nelt, 1, buf);
+  slong start = out[0][0];
+  slong nelgt = out[1][0];
+
+  uint write_size = (ndim * sizeof(double) + sizeof(int)) * nelt;
+  if (rank == 0)
+    write_size += sizeof(slong) + sizeof(int); // for nelgt and ndim
+
+  char *pbuf, *pbuf0;
+  pbuf = pbuf0 = (char *)tcalloc(char, write_size);
+  if (rank == 0) {
+    WRITE_T(pbuf0, &nelgt, slong, 1);
+    WRITE_T(pbuf0, &ndim, int, 1);
+  }
+
+  uint i;
+  for (i = 0; i < nelt; i++) {
+    WRITE_T(pbuf0, &coord[i * ndim], double, ndim);
+    WRITE_T(pbuf0, &gid, int, 1);
+  }
+
+  MPI_Status st;
+  err = MPI_File_write_ordered(file, pbuf, write_size, MPI_BYTE, &st);
+  parrsb_check_error(err, comm);
+
+  err += MPI_File_close(&file);
+  parrsb_check_error(err, comm);
+
+  free(pbuf);
+
+  return err;
+}
+
+#undef WRITE_T

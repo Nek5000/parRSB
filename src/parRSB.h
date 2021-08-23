@@ -54,6 +54,21 @@ void fparrsb_find_conn(long long *vtx, double *coord, int *nel,
                               int *nDim, long long *periodicInfo,
                               int *nPeriodicFaces, double *tol, MPI_Fint *fcomm,
                               int *verbose, int *err);
+/*
+ * I/O routines
+ */
+int parrsb_read_mesh(unsigned int *nel, int *nv, long long **vl, double **coord,
+                     unsigned int *nbcs, long long **bcs, char *name,
+                     MPI_Comm comm, int read);
+
+int parrsb_dump_con(long long *vl, unsigned int nelt, int nv, char *name,
+                    MPI_Comm comm);
+
+int parrsb_dump_map(int nelt, int nv, int *pmap, long long *vtx, char *name,
+                    MPI_Comm comm);
+
+int parrsb_dump_part(const char *fname, int nel, int ndim, double *coord,
+                     int gid, MPI_Comm comm);
 
 /*
  * Auxiliary functions
@@ -66,16 +81,6 @@ typedef struct {
   int nactive; // # of active MPI ranks, default: MPI_Comm_size
 } parrsb_input;
 
-int parrsb_read_mesh(unsigned int *nel, int *nv, long long **vl, double **coord,
-                     unsigned int *nbcs, long long **bcs, char *name,
-                     MPI_Comm comm, int read);
-
-int parrsb_dump_con(long long *vl, unsigned int nelt, int nv, char *name,
-                    MPI_Comm comm);
-
-int parrsb_dump_map(int nelt, int nv, int *pmap, long long *vtx, char *name,
-                    MPI_Comm comm);
-
 int parrsb_distribute_elements(unsigned int *nelt, long long **vl,
                                double **coord, int *part, int nv,
                                MPI_Comm comm);
@@ -84,6 +89,7 @@ void parrsb_print_part_stat(long long *vtx, int nelt, int nv, MPI_Comm comm);
 
 void parrsb_get_part_stat(int *nc, int *ns, int *nss, int *nel, long long *vtx,
                           int nelt, int nv, MPI_Comm comm);
+
 
 parrsb_input *parrsb_parse_input(int argc, char *argv[]);
 
