@@ -1,5 +1,5 @@
 /*
- * Generate connectivity (.co2) from Nek5000 mesh file (.re2).
+ * Generate connectivity (.co2) from Nek5000 mesh (.re2) file.
  */
 #include <parRSB.h>
 
@@ -102,7 +102,7 @@ int main(int argc, char *argv[]) {
     err |= test_parcon(nelt, vl, in->mesh, MPI_COMM_WORLD);
   parrsb_check_error(err, MPI_COMM_WORLD);
 
-  /* Write connectivity file */
+  /* Write connectivity to .co2 file */
   if (in->dump == 1)
     err |= parrsb_dump_con(vl, nelt, nv, in->mesh, MPI_COMM_WORLD);
   parrsb_check_error(err, MPI_COMM_WORLD);

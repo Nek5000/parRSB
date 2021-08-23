@@ -1,5 +1,5 @@
-#include <stdio.h>
 #include <getopt.h>
+#include <stdio.h>
 
 #include <gencon.h>
 #include <genmap.h>
