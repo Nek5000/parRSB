@@ -10,6 +10,7 @@ jobs:
         test: [box_2x2x2, pyramid, tgv, e3q, solid, ethier, vortex, expansion]
         np: [1, 2, 3, 4]
       fail-fast: false
+    name: "${{ matrix.test }}"
     env:
       GSVER: 1.0.7
       CC: mpicc
@@ -38,7 +39,7 @@ jobs:
         shell: bash
         run: |
           git clone https://github.com/thilinarmtb/parRSB-tests.git
-      - name: Test
+      - name: gencon
         shell: bash
         run: |
           export EXAMPLEDIR=`pwd`/build/examples
@@ -48,3 +49,13 @@ jobs:
 
           echo "localhost:4" > hostfile
           mpirun -np ${{ matrix.np }} --hostfile hostfile ${EXAMPLEDIR}/gencon --mesh ${{ matrix.test }} --tol=${tol} --no-dump --test
+      - name: genmap
+        shell: bash
+        run: |
+          export EXAMPLEDIR=`pwd`/build/examples
+
+          cd parRSB-tests/${{ matrix.test }}
+          tol=(`cat test.txt | grep tol`); tol=${tol[2]}
+
+          echo "localhost:4" > hostfile
+          mpirun -np ${{ matrix.np }} --hostfile hostfile ${EXAMPLEDIR}/genmap --mesh ${{ matrix.test }} --tol=${tol} --no-dump --test

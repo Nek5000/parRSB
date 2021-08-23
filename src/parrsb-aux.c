@@ -200,10 +200,10 @@ void parrsb_get_part_stat(int *nc, int *ns, int *nss, int *nel, long long *vtx,
 void parrsb_print_part_stat(long long *vtx, int nelt, int nv, MPI_Comm ce) {
   int id, np;
   MPI_Comm_rank(ce, &id);
-  MPI_Comm_rank(ce, &np);
+  MPI_Comm_size(ce, &np);
 
   int nc[3], ns[3], nss[3], nel[3];
-  parrsb_get_part_stat(nc, ns, nss, nel, vtx, nelt, nv, ce);
+  parrsb_get_part_stat(&nc[0], &ns[0], &nss[0], &nel[0], vtx, nelt, nv, ce);
 
   if (id == 0) {
     printf("Min neighbors: %d | Max neighbors: %d | Avg neighbors: %lf\n",

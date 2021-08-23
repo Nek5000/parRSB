@@ -41,11 +41,11 @@ int main(int argc, char *argv[]) {
   parrsb_check_error(err, comm);
 
   int nss[6];
-  if (active == 1) {
+  if (active == 1 && in->nactive > 1) {
     if (id == 0)
       printf("Partition statistics before RSB:\n");
     parrsb_print_part_stat(vl, nelt, nv, comm);
-    parrsb_get_part_stat(NULL, NULL, nss, NULL, vl, nelt, nv, comm);
+    parrsb_get_part_stat(NULL, NULL, &nss[0], NULL, vl, nelt, nv, comm);
   }
 
   /* Partition the mesh */
@@ -60,14 +60,14 @@ int main(int argc, char *argv[]) {
     err |= parrsb_distribute_elements(&nelt, &vl, &coord, part, nv, comm);
   parrsb_check_error(err, comm);
 
-  if (active == 1) {
+  if (active == 1 && in->nactive > 1) {
     if (id == 0)
       printf("Partition statistics after RSB:\n");
     parrsb_print_part_stat(vl, nelt, nv, comm);
     parrsb_get_part_stat(NULL, NULL, &nss[3], NULL, vl, nelt, nv, comm);
   }
 
-  if (active == 1 && in->test)
+  if (active == 1 && in->test && in->nactive > 1)
     err |= nss[2] < nss[5];
   parrsb_check_error(err, comm);
 
