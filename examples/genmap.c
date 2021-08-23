@@ -36,7 +36,7 @@ int main(int argc, char *argv[]) {
   long long *vl = (long long *)calloc(nelt * nv, sizeof(long long));
   int ndim = nv == 8 ? 3 : 2;
   if (active == 1)
-    err |= parRSB_findConnectivity(vl, coord, nelt, ndim, bcs, nbcs, in->tol,
+    err |= parrsb_find_conn(vl, coord, nelt, ndim, bcs, nbcs, in->tol,
                                    comm, 0);
   parrsb_check_error(err, comm);
 
@@ -52,7 +52,7 @@ int main(int argc, char *argv[]) {
   parrsb_options options = parrsb_default_options;
   int *part = (int *)calloc(nelt, sizeof(int));
   if (active == 1)
-    err |= parRSB_partMesh(part, NULL, vl, coord, nelt, nv, options, comm);
+    err |= parrsb_part_mesh(part, NULL, vl, coord, nelt, nv, options, comm);
   parrsb_check_error(err, comm);
 
   /* Redistribute data */

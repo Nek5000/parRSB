@@ -58,7 +58,7 @@ static void print_options(parrsb_options *options) {
  * nel = in,
  * nv = in,
  * options = in */
-int parRSB_partMesh(int *part, int *seq, long long *vtx, double *coord, int nel,
+int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord, int nel,
                     int nv, parrsb_options options, MPI_Comm comm) {
   struct comm c;
   comm_init(&c, comm);
@@ -161,11 +161,11 @@ int parRSB_partMesh(int *part, int *seq, long long *vtx, double *coord, int nel,
   return 0;
 }
 
-void fparRSB_partMesh(int *part, int *seq, long long *vtx, double *coord,
+void fparrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
                       int *nel, int *nv, int *options, int *comm, int *err) {
   *err = 1;
   comm_ext c = MPI_Comm_f2c(*comm);
   /* TODO: Convert int options to parrsb_options instead of default options */
   parrsb_options opt = parrsb_default_options;
-  *err = parRSB_partMesh(part, seq, vtx, coord, *nel, *nv, opt, c);
+  *err = parrsb_part_mesh(part, seq, vtx, coord, *nel, *nv, opt, c);
 }

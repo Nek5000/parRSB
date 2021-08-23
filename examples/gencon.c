@@ -93,7 +93,7 @@ int main(int argc, char *argv[]) {
   /* Find connectivity */
   long long *vl = (long long *)calloc(nelt * nv, sizeof(long long));
   int ndim = nv == 8 ? 3 : 2;
-  err |= parRSB_findConnectivity(vl, coord, nelt, ndim, bcs, nbcs, in->tol,
+  err |= parrsb_find_conn(vl, coord, nelt, ndim, bcs, nbcs, in->tol,
                                  MPI_COMM_WORLD, 0);
   parrsb_check_error(err, MPI_COMM_WORLD);
 

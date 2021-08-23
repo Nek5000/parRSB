@@ -25,7 +25,7 @@ mpirun -np 4 ./partition 2 case01.co2
 ### C Interface
 
 ```C
-int parRSB_partMesh(int *part, int *seq, long long *vtx, double *coord, int nel,
+int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord, int nel,
                     int nv, parrsb_options options, MPI_Comm comm);
 ```
 
@@ -63,7 +63,7 @@ typedef struct {
 ```
 
 You can use `parrsb_default_options` struct instance to pass default options
-to `parRSB_partMesh` routine. All of these options can be controlled at runtime
+to `parrsb_part_mesh` routine. All of these options can be controlled at runtime
 setting up the relevant env. variable to the corresponding value as well. Below
 is the list of env. variables:
 
