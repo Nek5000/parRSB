@@ -25,17 +25,11 @@ int parrsb_distribute_elements(unsigned int *nelt_, long long **vl_,
                                MPI_Comm comm) {
   int ndim = (nv == 8) ? 3 : 2;
   long long *vl = *vl_;
-  double *coord = *coord_;
-
-  size_t unit_size = 0;
-  if (coord != NULL)
-    unit_size = sizeof(elem_data);
-  else
-    unit_size = sizeof(vtx_data);
+  double *coord = coord_ == NULL ? NULL : *coord_;
 
   uint nelt = *nelt_;
   struct array elements;
-  array_init_(&elements, nelt, unit_size, __FILE__, __LINE__);
+  array_init(elem_data, &elements, nelt);
 
   elem_data data;
   int e, n;
@@ -43,12 +37,12 @@ int parrsb_distribute_elements(unsigned int *nelt_, long long **vl_,
     data.proc = part[e];
     for (n = 0; n < nv; ++n)
       data.vtx[n] = vl[e * nv + n];
-    array_cat_(unit_size, &elements, &data, 1, __FILE__, __LINE__);
+    array_cat(elem_data, &elements, &data, 1);
   }
   assert(elements.n == nelt);
 
+  elem_data *ed = elements.ptr;
   if (coord != NULL) {
-    elem_data *ed = elements.ptr;
     for (e = 0; e < nelt; e++)
       for (n = 0; n < ndim * nv; n++)
         ed[e].coord[n] = coord[e * ndim * nv + n];
@@ -60,22 +54,18 @@ int parrsb_distribute_elements(unsigned int *nelt_, long long **vl_,
   struct crystal cr;
   crystal_init(&cr, &c);
 
-  sarray_transfer_(&elements, unit_size, offsetof(vtx_data, proc), 0, &cr);
-
-  nelt = elements.n;
-  *nelt_ = nelt;
+  sarray_transfer(elem_data, &elements, proc, 0, &cr);
+  *nelt_ = nelt = elements.n;
+  ed = elements.ptr;
 
   vl = *vl_ = (long long *)realloc(*vl_, nv * nelt * sizeof(long long));
-  for (e = 0; e < nelt; ++e) {
-    vtx_data *vd = (vtx_data *)(elements.ptr + unit_size * e);
+  for (e = 0; e < nelt; ++e)
     for (n = 0; n < nv; ++n)
-      vl[e * nv + n] = vd->vtx[n];
-  }
+      vl[e * nv + n] = ed[e].vtx[n];
 
   if (coord != NULL) {
     coord = *coord_ =
         (double *)realloc(*coord_, ndim * nv * nelt * sizeof(double));
-    elem_data *ed = elements.ptr;
     for (e = 0; e < nelt; ++e) {
       for (n = 0; n < ndim * nv; ++n)
         coord[e * ndim * nv + n] = ed[e].coord[n];

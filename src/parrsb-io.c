@@ -358,7 +358,7 @@ int parrsb_read_mesh(unsigned int *nel, int *nv, long long **vl, double **coord,
     memcpy(dest, &(val), sizeof(int));                                         \
   } while (0)
 
-int parrsb_dump_con(long long *vl, unsigned int nelt, int nv, char *name,
+int parrsb_dump_con(char *name, unsigned int nelt, int nv, long long *vl,
                     MPI_Comm comm) {
   const char version[6] = "#v001";
   const float test = 6.54321;
@@ -435,8 +435,8 @@ int parrsb_dump_con(long long *vl, unsigned int nelt, int nv, char *name,
 
 #define HEADER_LEN 132
 
-int parrsb_dump_map(int nelt, int nv, int *pmap, long long *vtx, char *fileName,
-                    MPI_Comm comm) {
+int parrsb_dump_map(char *name, unsigned int nelt, int nv, long long *vtx,
+                    int *pmap, MPI_Comm comm) {
   char version[6] = "#v001";
   float test = 6.54321;
 
@@ -463,8 +463,8 @@ int parrsb_dump_map(int nelt, int nv, int *pmap, long long *vtx, char *fileName,
 
   int errs = 0;
   MPI_File file;
-  int err = MPI_File_open(comm, fileName, MPI_MODE_WRONLY | MPI_MODE_CREATE,
-                          infoIn, &file);
+  int err = MPI_File_open(comm, name, MPI_MODE_WRONLY | MPI_MODE_CREATE, infoIn,
+                          &file);
   if (err) {
     errs++;
     MPI_Abort(comm, 911);
@@ -481,7 +481,8 @@ int parrsb_dump_map(int nelt, int nv, int *pmap, long long *vtx, char *fileName,
   char *buf = (char *)malloc(writeSize), *buf0 = buf;
 
   if (rank == 0) {
-    memcpy(buf0, header, HEADER_LEN * sizeof(char)), buf0 += HEADER_LEN * sizeof(char);
+    memcpy(buf0, header, HEADER_LEN * sizeof(char)),
+        buf0 += HEADER_LEN * sizeof(char);
     memcpy(buf0, &test, sizeof(float)), buf0 += sizeof(float);
   }
 
@@ -522,7 +523,7 @@ int parrsb_dump_map(int nelt, int nv, int *pmap, long long *vtx, char *fileName,
     dest += sizeof(T) * nunits;                                                \
   } while (0)
 
-int parrsb_dump_part(const char *fname, int nel, int ndim, double *coord,
+int parrsb_dump_part(char *name, unsigned int nel, int nv, double *coord,
                      int gid, MPI_Comm comm) {
   struct comm c;
   comm_init(&c, comm);
@@ -530,7 +531,7 @@ int parrsb_dump_part(const char *fname, int nel, int ndim, double *coord,
   int rank = c.id, size = c.np;
 
   MPI_File file;
-  int err = MPI_File_open(comm, fname, MPI_MODE_CREATE | MPI_MODE_WRONLY,
+  int err = MPI_File_open(comm, name, MPI_MODE_CREATE | MPI_MODE_WRONLY,
                           MPI_INFO_NULL, &file);
   parrsb_check_error(err, comm);
 
@@ -540,6 +541,7 @@ int parrsb_dump_part(const char *fname, int nel, int ndim, double *coord,
   slong start = out[0][0];
   slong nelgt = out[1][0];
 
+  int ndim = nv == 8 ? 3 : 2;
   uint write_size = (ndim * sizeof(double) + sizeof(int)) * nelt;
   if (rank == 0)
     write_size += sizeof(slong) + sizeof(int); // for nelgt and ndim
@@ -551,9 +553,17 @@ int parrsb_dump_part(const char *fname, int nel, int ndim, double *coord,
     WRITE_T(pbuf0, &ndim, int, 1);
   }
 
-  uint i;
+  uint i, j, k;
+  double tcoord[3];
   for (i = 0; i < nelt; i++) {
-    WRITE_T(pbuf0, &coord[i * ndim], double, ndim);
+    tcoord[0] = tcoord[1] = tcoord[2] = 0.0;
+    for (j = 0; j < nv; j++)
+      for (k = 0; k < ndim; k++)
+        tcoord[k] += coord[i * nv * ndim + j * ndim + k];
+    tcoord[0] /= nv;
+    tcoord[1] /= nv;
+    tcoord[2] /= nv;
+    WRITE_T(pbuf0, tcoord, double, ndim);
     WRITE_T(pbuf0, &gid, int, 1);
   }
 

@@ -35,25 +35,25 @@ typedef struct {
 
 extern parrsb_options parrsb_default_options;
 
-int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord, int nel,
-                    int nv, parrsb_options options, MPI_Comm comm);
+int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
+                     int nel, int nv, parrsb_options options, MPI_Comm comm);
 
 #define fparrsb_part_mesh FORTRAN_UNPREFIXED(fparrsb_partmesh, FPARRSB_PARTMESH)
 void fparrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
-                      int *nel, int *nve, int *options, int *comm, int *err);
+                       int *nel, int *nve, int *options, int *comm, int *err);
 
 /*
  * Connectivity
  */
 int parrsb_find_conn(long long *vtx, double *coord, int nel, int nDim,
-                            long long *periodicInfo, int nPeriodicFaces,
-                            double tol, MPI_Comm comm, int verbose);
+                     long long *periodicInfo, int nPeriodicFaces, double tol,
+                     MPI_Comm comm, int verbose);
 
-#define fparrsb_find_conn FORTRAN_UNPREFIXED(fparrsb_find_conn, FPARRSB_FIND_CONN)
-void fparrsb_find_conn(long long *vtx, double *coord, int *nel,
-                              int *nDim, long long *periodicInfo,
-                              int *nPeriodicFaces, double *tol, MPI_Fint *fcomm,
-                              int *verbose, int *err);
+#define fparrsb_find_conn                                                      \
+  FORTRAN_UNPREFIXED(fparrsb_find_conn, FPARRSB_FIND_CONN)
+void fparrsb_find_conn(long long *vtx, double *coord, int *nel, int *nDim,
+                       long long *periodicInfo, int *nPeriodicFaces,
+                       double *tol, MPI_Fint *fcomm, int *verbose, int *err);
 /*
  * I/O routines
  */
@@ -61,13 +61,13 @@ int parrsb_read_mesh(unsigned int *nel, int *nv, long long **vl, double **coord,
                      unsigned int *nbcs, long long **bcs, char *name,
                      MPI_Comm comm, int read);
 
-int parrsb_dump_con(long long *vl, unsigned int nelt, int nv, char *name,
+int parrsb_dump_con(char *name, unsigned int nelt, int nv, long long *vl,
                     MPI_Comm comm);
 
-int parrsb_dump_map(int nelt, int nv, int *pmap, long long *vtx, char *name,
-                    MPI_Comm comm);
+int parrsb_dump_map(char *name, unsigned int nelt, int nv, long long *vtx,
+                    int *pmap, MPI_Comm comm);
 
-int parrsb_dump_part(const char *fname, int nel, int ndim, double *coord,
+int parrsb_dump_part(char *name, unsigned int nelt, int nv, double *coord,
                      int gid, MPI_Comm comm);
 
 /*
@@ -89,7 +89,6 @@ void parrsb_print_part_stat(long long *vtx, int nelt, int nv, MPI_Comm comm);
 
 void parrsb_get_part_stat(int *nc, int *ns, int *nss, int *nel, long long *vtx,
                           int nelt, int nv, MPI_Comm comm);
-
 
 parrsb_input *parrsb_parse_input(int argc, char *argv[]);
 

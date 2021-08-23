@@ -58,8 +58,8 @@ static void print_options(parrsb_options *options) {
  * nel = in,
  * nv = in,
  * options = in */
-int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord, int nel,
-                    int nv, parrsb_options options, MPI_Comm comm) {
+int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
+                     int nel, int nv, parrsb_options options, MPI_Comm comm) {
   struct comm c;
   comm_init(&c, comm);
   int rank = c.id;
@@ -162,7 +162,7 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord, int nel
 }
 
 void fparrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
-                      int *nel, int *nv, int *options, int *comm, int *err) {
+                       int *nel, int *nv, int *options, int *comm, int *err) {
   *err = 1;
   comm_ext c = MPI_Comm_f2c(*comm);
   /* TODO: Convert int options to parrsb_options instead of default options */

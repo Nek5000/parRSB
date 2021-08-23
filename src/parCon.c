@@ -57,8 +57,8 @@ static int transferBoundaryFaces(Mesh mesh, struct comm *c) {
  * nv = 8 if ndim == 3 or nv = 4 if ndim = 2
  */
 int parrsb_find_conn(long long *vtx, double *coord, int nelt, int ndim,
-                            long long *periodicInfo, int nPeriodicFaces,
-                            double tol, MPI_Comm comm, int verbose) {
+                     long long *periodicInfo, int nPeriodicFaces, double tol,
+                     MPI_Comm comm, int verbose) {
   struct comm c;
   comm_init(&c, comm);
   int rank = c.id;
@@ -174,12 +174,11 @@ int parrsb_find_conn(long long *vtx, double *coord, int nelt, int ndim,
   return err;
 }
 
-void fparrsb_find_conn(long long *vtx, double *coord, int *nelt,
-                              int *ndim, long long *periodicInfo,
-                              int *nPeriodicFaces, double *tol, MPI_Fint *fcomm,
-                              int *verbose, int *err) {
+void fparrsb_find_conn(long long *vtx, double *coord, int *nelt, int *ndim,
+                       long long *periodicInfo, int *nPeriodicFaces,
+                       double *tol, MPI_Fint *fcomm, int *verbose, int *err) {
   *err = 1;
   MPI_Comm c = MPI_Comm_f2c(*fcomm);
   *err = parrsb_find_conn(vtx, coord, *nelt, *ndim, periodicInfo,
-                                 *nPeriodicFaces, *tol, c, *verbose);
+                          *nPeriodicFaces, *tol, c, *verbose);
 }

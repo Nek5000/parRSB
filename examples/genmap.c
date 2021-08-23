@@ -3,8 +3,7 @@
  */
 #include <parRSB.h>
 
-static int test_parrsb() {
-}
+static int test_parrsb() {}
 
 int main(int argc, char *argv[]) {
   MPI_Init(&argc, &argv);
@@ -32,12 +31,14 @@ int main(int argc, char *argv[]) {
                            comm, 1);
   parrsb_check_error(err, comm);
 
+  if (active == 1)
+    parrsb_dump_part("part.pre", nelt, nv, coord, id, comm);
+
   /* Find connectivity */
   long long *vl = (long long *)calloc(nelt * nv, sizeof(long long));
   int ndim = nv == 8 ? 3 : 2;
   if (active == 1)
-    err |= parrsb_find_conn(vl, coord, nelt, ndim, bcs, nbcs, in->tol,
-                                   comm, 0);
+    err |= parrsb_find_conn(vl, coord, nelt, ndim, bcs, nbcs, in->tol, comm, 0);
   parrsb_check_error(err, comm);
 
   int nss[6];
@@ -67,13 +68,16 @@ int main(int argc, char *argv[]) {
     parrsb_get_part_stat(NULL, NULL, &nss[3], NULL, vl, nelt, nv, comm);
   }
 
+  if (active == 1)
+    parrsb_dump_part("part.post", nelt, nv, coord, id, comm);
+
   if (active == 1 && in->test && in->nactive > 1)
     err |= nss[2] < nss[5];
   parrsb_check_error(err, comm);
 
   /* Write partition to .ma2 file */
   if (active == 1 && in->dump == 1)
-    err |= parrsb_dump_map(nelt, nv, part, vl, in->mesh, comm);
+    err |= parrsb_dump_map(in->mesh, nelt, nv, vl, part, comm);
   parrsb_check_error(err, comm);
 
   /* Free resources */
