@@ -1,8 +1,8 @@
 #include <genmap-impl.h>
 
 /* Load balance input data */
-void genmap_load_balance(struct array *eList, uint nel, int nv, double *coord,
-                         long long *vtx, struct crystal *cr, buffer *bfr) {
+size_t genmap_load_balance(struct array *eList, uint nel, int nv, double *coord,
+                           long long *vtx, struct crystal *cr, buffer *bfr) {
   slong in = nel;
   slong out[2][1], buf[2][1];
   comm_scan(out, &cr->comm, gs_long, gs_add, &in, 1, buf);
@@ -40,10 +40,9 @@ void genmap_load_balance(struct array *eList, uint nel, int nv, double *coord,
       element->proc = (eg % size) - 1;
 
     element->coord[0] = element->coord[1] = element->coord[2] = 0.0;
-    for (v = 0; v < nv; v++) {
+    for (v = 0; v < nv; v++)
       for (n = 0; n < ndim; n++)
         element->coord[n] += coord[e * ndim * nv + v * ndim + n];
-    }
     for (n = 0; n < ndim; n++)
       element->coord[n] /= nv;
 
@@ -67,6 +66,7 @@ void genmap_load_balance(struct array *eList, uint nel, int nv, double *coord,
     sarray_sort(struct rcb_element, eList->ptr, nel, globalId, 1, bfr);
 
   free(element);
+  return unit_size;
 }
 
 void genmap_restore_original(int *part, int *seq, struct crystal *cr,

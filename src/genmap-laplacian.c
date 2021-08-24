@@ -167,9 +167,6 @@ int GenmapInitLaplacianWeighted(genmap_handle h, struct comm *c) {
       h->weights[i] += u[nv * i + j];
   }
 
-  for (i = 0; i < lelt; i++)
-    h->weights[i] *= -1;
-
   GenmapFree(u);
   GenmapFree(vertices);
 
@@ -193,7 +190,7 @@ int GenmapLaplacianWeighted(genmap_handle h, GenmapScalar *u, GenmapScalar *v) {
   for (i = 0; i < lelt; i++) {
     v[i] = h->weights[i] * u[i];
     for (j = 0; j < nv; j++)
-      v[i] += ucv[nv * i + j];
+      v[i] -= ucv[nv * i + j];
   }
 
   GenmapFree(ucv);

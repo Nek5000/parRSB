@@ -72,6 +72,7 @@ struct genmap_handle_private {
   GenmapScalar *b;
 
   parrsb_options *options;
+  size_t elem_size;
 };
 
 struct genmap_vector_private {
@@ -139,8 +140,7 @@ int balance_partitions(genmap_handle h, struct comm *lc, int bin,
 void matrix_inverse(int N, double *A);
 
 /* Dump data */
-int GenmapFiedlerDump(const char *fname, genmap_handle h, slong start,
-                      struct comm *c);
+int GenmapFiedlerDump(const char *fname, genmap_handle h, struct comm *c);
 int GenmapVectorDump(const char *fname, GenmapScalar *y, uint size,
                      struct comm *c);
 int GenmapCentroidDump(const char *fname, genmap_handle h, sint g_id,

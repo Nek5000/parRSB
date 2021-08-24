@@ -4,13 +4,11 @@
 
 #define write_T(dest, val, T, nunits)                                          \
   do {                                                                         \
-    T v = val;                                                                 \
-    memcpy(dest, &(val), sizeof(T) * nunits);                                  \
+    memcpy(dest, (val), sizeof(T) * nunits);                                   \
     dest += sizeof(T) * nunits;                                                \
   } while (0)
 
-int GenmapFiedlerDump(const char *fname, genmap_handle h, slong g_start,
-                      struct comm *c) {
+int GenmapFiedlerDump(const char *fname, genmap_handle h, struct comm *c) {
   uint rank = c->id;
 
   MPI_File file;
@@ -36,17 +34,16 @@ int GenmapFiedlerDump(const char *fname, genmap_handle h, slong g_start,
   char *pbuf, *pbuf0;
   pbuf = pbuf0 = (char *)calloc(write_size, sizeof(char));
   if (rank == 0) {
-    write_T(pbuf0, nelgt, long, 1);
-    write_T(pbuf0, ndim, int, 1);
+    write_T(pbuf0, &nelgt, slong, 1);
+    write_T(pbuf0, &ndim, int, 1);
   }
 
   struct rsb_element *elm = genmap_get_elements(h);
   uint i;
   for (i = 0; i < nelt; i++) {
-    slong id = g_start + i;
-    write_T(pbuf0, id, long, 1);
-    write_T(pbuf0, elm[i].coord[0], double, ndim);
-    write_T(pbuf0, elm[i].fiedler, double, 1);
+    write_T(pbuf0, &elm[i].globalId, GenmapLong, 1);
+    write_T(pbuf0, &elm[i].coord[0], double, ndim);
+    write_T(pbuf0, &elm[i].fiedler, double, 1);
   }
 
   MPI_Status st;
@@ -89,11 +86,11 @@ int GenmapVectorDump(const char *fname, GenmapScalar *y, uint size,
   pbuf = pbuf0 = (char *)calloc(write_size, sizeof(char));
 
   if (rank == 0)
-    write_T(pbuf0, nelgt, long, 1);
+    write_T(pbuf0, &nelgt, long, 1);
 
   uint i;
   for (i = 0; i < nelt; i++)
-    write_T(pbuf0, y[i], double, 1);
+    write_T(pbuf0, &y[i], double, 1);
 
   MPI_Status st;
   err = MPI_File_write_ordered(file, pbuf, write_size, MPI_BYTE, &st);
@@ -137,15 +134,15 @@ int GenmapCentroidDump(const char *fname, genmap_handle h, sint g_id,
   char *pbuf, *pbuf0;
   pbuf = pbuf0 = (char *)calloc(write_size, sizeof(char));
   if (rank == 0) {
-    write_T(pbuf0, nelgt, slong, 1);
-    write_T(pbuf0, ndim, int, 1);
+    write_T(pbuf0, &nelgt, slong, 1);
+    write_T(pbuf0, &ndim, int, 1);
   }
 
   struct rsb_element *elm = genmap_get_elements(h);
   uint i;
   for (i = 0; i < nelt; i++) {
-    write_T(pbuf0, elm[i].coord[0], double, ndim);
-    write_T(pbuf0, g_id, int, 1);
+    write_T(pbuf0, &elm[i].coord[0], double, ndim);
+    write_T(pbuf0, &g_id, int, 1);
   }
 
   MPI_Status st;
@@ -189,14 +186,14 @@ int GenmapElementIdDump(const char *fname, genmap_handle h, struct comm *c) {
   char *pbuf, *pbuf0;
   pbuf = pbuf0 = (char *)calloc(write_size, sizeof(char));
   if (rank == 0) {
-    write_T(pbuf0, nelgt, slong, 1);
-    write_T(pbuf0, ndim, int, 1);
+    write_T(pbuf0, &nelgt, slong, 1);
+    write_T(pbuf0, &ndim, int, 1);
   }
 
   struct rsb_element *elm = genmap_get_elements(h);
   uint i;
   for (i = 0; i < nelt; i++)
-    write_T(pbuf0, elm[i].globalId, GenmapLong, 1);
+    write_T(pbuf0, &elm[i].globalId, GenmapLong, 1);
 
   MPI_Status st;
   err = MPI_File_write_ordered(file, pbuf, write_size, MPI_BYTE, &st);
@@ -247,7 +244,7 @@ int dump_fiedler_if_discon(genmap_handle h, int level, int max_levels) {
         // Dump the current partition
         char fname[BUFSIZ];
         sprintf(fname, "fiedler_%02d.dump", level);
-        GenmapFiedlerDump(fname, h, start, lc);
+        GenmapFiedlerDump(fname, h, lc);
       }
     }
   }

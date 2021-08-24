@@ -87,7 +87,8 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
 
   /* Load balance input data */
   struct array elist;
-  genmap_load_balance(&elist, nel, nv, coord, vtx, &cr, &bfr);
+  size_t elem_size = genmap_load_balance(&elist, nel, nv, coord, vtx, &cr,
+                                         &bfr);
 
   /* Run RSB now */
   comm_ext comm_rsb;
@@ -105,6 +106,7 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
     genmap_set_elements(h, &elist);
     genmap_comm_scan(h, genmap_global_comm(h));
     genmap_set_nvertices(h, nv);
+    h->elem_size = elem_size;
 
     GenmapLong nelg = genmap_get_partition_nel(h);
     GenmapInt id = genmap_comm_rank(genmap_global_comm(h));
