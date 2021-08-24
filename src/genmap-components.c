@@ -62,11 +62,12 @@ sint get_components(sint *component, struct rsb_element *elements,
 
   struct unmarked u;
   uint d;
-  slong nnz1, nnzg, nnzg0, nnzb, nmarked = 0;
+  slong nnz1, nnzg, nnzg0, nnzb;
+  slong nmarked = 0;
   sint count = 0;
 
   do {
-    // Count unmarked elements
+    /* Count unmarked elements */
     arr.n = 0;
     for (e = 0; e < nelt; e++) {
       if (component[e] == -1) {
@@ -78,18 +79,16 @@ sint get_components(sint *component, struct rsb_element *elements,
     int bin = 0;
     if (arr.n > 0)
       bin = 1;
-
     genmap_comm_split(c, bin, c->id, &cc);
 
     nnz1 = nnzg = nnzg0 = 0;
-
     if (bin == 1) {
-      // Initialize p
+      /* Initialize p */
       for (e = 0; e < arr.n; e++)
         for (d = 0; d < nv; d++)
           p[e * nv + d] = 0;
 
-      // Mark the first non-marked element as seed
+      /* Mark the first non-marked element as seed */
       struct unmarked *ptr = (struct unmarked *)arr.ptr;
       slong first = start + ptr[0].index;
       slong first_ = first;
@@ -100,7 +99,7 @@ sint get_components(sint *component, struct rsb_element *elements,
           p[0 * nv + d] = 1;
       }
 
-      // Setup gs
+      /* Setup gs */
       for (e = 0; e < arr.n; e++)
         for (d = 0; d < nv; d++)
           ids[e * nv + d] = elements[ptr[e].index].vertices[d];
@@ -141,11 +140,10 @@ sint get_components(sint *component, struct rsb_element *elements,
     count++;
   } while (nmarked < nelg);
 
-  if (null_input == 1)
-    GenmapFree(component);
-
   GenmapFree(p);
   GenmapFree(ids);
+  if (null_input == 1)
+    GenmapFree(component);
 
   return count;
 }
@@ -292,8 +290,8 @@ int repair_partitions(genmap_handle h, struct comm *tc, struct comm *lc,
                       int bin, struct comm *gc) {
   assert(check_bin_val(bin, gc) == 0);
 
-  uint nelt = genmap_get_nel(h);
   slong buf;
+  uint nelt = genmap_get_nel(h);
   slong nelg = nelt;
   comm_allreduce(lc, gs_long, gs_add, &nelg, 1, &buf);
 

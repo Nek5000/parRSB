@@ -157,7 +157,7 @@ int GenmapInitLaplacianWeighted(genmap_handle h, struct comm *c) {
 
   for (i = 0; i < lelt; i++)
     for (j = 0; j < nv; j++)
-      u[nv * i + j] = 1.;
+      u[nv * i + j] = 1.0;
 
   gs(u, gs_double, gs_add, 0, h->gsw, &h->buf);
 

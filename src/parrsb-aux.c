@@ -273,3 +273,4 @@ void parrsb_check_error_(int err, char *file, int line, MPI_Comm comm) {
 }
 
 #undef MAXNV
+#undef MAXDIM
