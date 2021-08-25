@@ -64,9 +64,8 @@ int genmap_inverse_power(double *y, int N, double *A, int verbose);
 int genmap_power(double *y, int N, double *A, int verbose);
 
 /* Lanczos */
-int GenmapLanczos(genmap_handle h, struct comm *c, genmap_vector f,
-                  int niter, genmap_vector **rr, genmap_vector diag,
-                  genmap_vector upper);
+int GenmapLanczos(genmap_handle h, struct comm *c, genmap_vector f, int niter,
+                  genmap_vector **rr, genmap_vector diag, genmap_vector upper);
 
 /* Fiedler */
 int GenmapFiedlerLanczos(genmap_handle h, struct comm *c, int maxIter,

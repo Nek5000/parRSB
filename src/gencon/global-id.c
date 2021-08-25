@@ -34,7 +34,6 @@ int setGlobalID(Mesh mesh, struct comm *c) {
     comm_scan(out, &nonZeroRanks, gs_long, gs_add, &in, 1, buf);
     slong start = out[0][0];
 
-    assert(points[0].ifSegment == 1);
     count = -1;
     for (i = 0; i < nPoints; i++) {
       if (points[i].ifSegment)

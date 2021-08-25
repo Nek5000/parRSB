@@ -27,7 +27,8 @@ int GenmapFiedlerDump(const char *fname, genmap_handle h, struct comm *c) {
   slong nelgt = out[1][0];
 
   int ndim = (h->nv == 8) ? 3 : 2;
-  uint write_size = ((ndim + 1) * sizeof(double) + sizeof(GenmapLong) + sizeof(uint)) * nelt;
+  uint write_size =
+      ((ndim + 1) * sizeof(double) + sizeof(GenmapLong) + sizeof(uint)) * nelt;
   if (rank == 0)
     write_size += sizeof(long) + sizeof(int); // for nelgt and ndim
 

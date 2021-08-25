@@ -1,7 +1,7 @@
 #include "genmap-impl.h"
 
-int GenmapLanczos(genmap_handle h, struct comm *gsc, genmap_vector f,
-                  int niter, genmap_vector **rr_, genmap_vector diag,
+int GenmapLanczos(genmap_handle h, struct comm *gsc, genmap_vector f, int niter,
+                  genmap_vector **rr_, genmap_vector diag,
                   genmap_vector upper) {
   assert(diag->size == niter);
   assert(diag->size == upper->size + 1);
@@ -24,7 +24,7 @@ int GenmapLanczos(genmap_handle h, struct comm *gsc, genmap_vector f,
   genmap_vector *rr = *rr_;
   GenmapInt i;
   for (i = 0; i < niter + 1; ++i)
-      rr[i] = NULL;
+    rr[i] = NULL;
 
   genmap_vector r, p, w;
   genmap_vector_create_zeros(&p, lelt);
@@ -77,8 +77,8 @@ int GenmapLanczos(genmap_handle h, struct comm *gsc, genmap_vector f,
     pap = genmap_vector_dot(w, p);
     comm_allreduce(gsc, gs_double, gs_add, &pap, 1, &rni);
     if (gsc->id == 0)
-      printf("iter = %d beta = %lf pp = %lf pap = %lf ww = %lf\n",
-             iter, beta, pp, pap, ww);
+      printf("iter = %d beta = %lf pp = %lf pap = %lf ww = %lf\n", iter, beta,
+             pp, pap, ww);
 
     alpha = rtz1 / pap;
     genmap_vector_axpby(r, r, 1.0, w, -1.0 * alpha);
