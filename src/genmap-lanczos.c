@@ -32,9 +32,6 @@ int GenmapLanczos(genmap_handle h, struct comm *gsc, genmap_vector f,
   genmap_vector_create(&r, lelt);
 
   genmap_vector_copy(r, f);
-  if (gsc->np == NPO) {
-    GenmapVectorDump("lanczos.f", f->data, h, gsc);
-  }
 
   genmap_vector_ortho_one(gsc, r, nelg);
   GenmapScalar rtr = genmap_vector_dot(r, r);
@@ -47,8 +44,6 @@ int GenmapLanczos(genmap_handle h, struct comm *gsc, genmap_vector f,
 
   GenmapScalar eps = 1.e-5;
   GenmapScalar rtol = rnorm * eps;
-  if (gsc->id == 0)
-    printf("rtol = %lf\n", rtol);
 
   GenmapScalar rtz1 = 1.0;
   GenmapScalar pap = 0.0;

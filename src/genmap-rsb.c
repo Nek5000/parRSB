@@ -47,6 +47,52 @@ static void check_partitions(struct comm *gc, int max_pass, int max_iter) {
   }
 }
 
+struct fiedler {
+  double fiedler;
+  uint proc;
+};
+
+static void smooth_fiedler(genmap_handle h, struct comm *c) {
+  struct array arr;
+  array_init(struct fiedler, &arr, 1);
+
+  struct crystal cr;
+  crystal_init(&cr, c);
+
+  struct fiedler f;
+  sint nel = genmap_get_nel(h);
+  struct rsb_element *elem = genmap_get_elements(h);
+
+  double prev;
+  uint nsmooth = 50;
+  uint i;
+  for (i = 0; i < nsmooth; i++) {
+    arr.n = 0;
+
+    if (c->id < c->np - 1 && nel > 0) {
+      f.fiedler = elem[nel - 1].fiedler;
+      f.proc = c->id + 1;
+      array_cat(struct fiedler, &arr, &f, 1);
+    }
+    sarray_transfer(struct fiedler, &arr, proc, 0, &cr);
+
+    if (c->id > 0 && arr.n > 0) {
+      struct fiedler *f = arr.ptr;
+      prev = f->fiedler;
+    } else if (nel > 0)
+      prev = elem[0].fiedler;
+
+    uint j;
+    for (j = 0; j < nel; j++) {
+      elem[j].fiedler = (elem[j].fiedler + prev) / 2.0;
+      prev = elem[j].fiedler;
+    }
+  }
+
+  crystal_free(&cr);
+  array_free(&arr);
+}
+
 int genmap_rsb(genmap_handle h) {
   int verbose = h->options->debug_level > 1;
   int max_iter = 50;
@@ -58,8 +104,6 @@ int genmap_rsb(genmap_handle h) {
   genmap_comm_scan(h, lc);
 
   uint nelt = genmap_get_nel(h);
-  struct rsb_element *e = genmap_get_elements(h);
-
   int nv = h->nv;
   int ndim = (nv == 8) ? 3 : 2;
 
@@ -71,8 +115,8 @@ int genmap_rsb(genmap_handle h) {
 
     /* Run RCB, RIB pre-step or just sort by global id */
     if (h->options->rsb_pre == 0) // Sort by global id
-      parallel_sort(struct rsb_element, h->elements, fiedler, gs_long, 0, 1, lc,
-                  &h->buf);
+      parallel_sort(struct rsb_element, h->elements, globalId, gs_long, 0, 1,
+                    lc, &h->buf);
     else if (h->options->rsb_pre == 1) // RCB
       rcb(lc, h->elements, ndim, &h->buf);
     else if (h->options->rsb_pre == 2) // RIB
@@ -97,8 +141,9 @@ int genmap_rsb(genmap_handle h) {
     metric_toc(lc, FIEDLER);
 
     /* Sort by Fiedler vector */
-    parallel_sort(struct rsb_element, h->elements, fiedler, gs_double, 0, 1, lc,
-                  &h->buf);
+    // smooth_fiedler(h, lc);
+    parallel_sort_2(struct rsb_element, h->elements, fiedler, gs_double,
+                    globalId, gs_long, 0, 1, lc, &h->buf);
 
     /* Bisect, repair and balance */
     int bin = 1;
@@ -110,6 +155,7 @@ int genmap_rsb(genmap_handle h) {
     if (h->options->repair == 1)
       repair_partitions(h, &tc, lc, bin, gc);
     balance_partitions(h, &tc, bin, lc);
+
     comm_free(lc);
     comm_dup(lc, &tc);
     comm_free(&tc);
