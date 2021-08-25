@@ -105,8 +105,7 @@ int GenmapFiedlerLanczos(genmap_handle h, struct comm *gsc, int max_iter,
 
   int iter;
   metric_tic(gsc, LANCZOS);
-  iter =
-      GenmapLanczosLegendary(h, gsc, initVec, max_iter, &q, alphaVec, betaVec);
+  iter = GenmapLanczos(h, gsc, initVec, max_iter, &q, alphaVec, betaVec);
   metric_toc(gsc, LANCZOS);
   metric_acc(LANCZOS_NITER, iter);
 

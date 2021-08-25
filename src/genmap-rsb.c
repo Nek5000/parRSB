@@ -70,7 +70,10 @@ int genmap_rsb(genmap_handle h) {
     int global = 1;
 
     /* Run RCB, RIB pre-step or just sort by global id */
-    if (h->options->rsb_pre == 1) // RCB
+    if (h->options->rsb_pre == 0) // Sort by global id
+      parallel_sort(struct rsb_element, h->elements, fiedler, gs_long, 0, 1, lc,
+                  &h->buf);
+    else if (h->options->rsb_pre == 1) // RCB
       rcb(lc, h->elements, ndim, &h->buf);
     else if (h->options->rsb_pre == 2) // RIB
       rib(lc, h->elements, ndim, &h->buf);

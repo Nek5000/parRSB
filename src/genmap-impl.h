@@ -28,7 +28,7 @@ struct rcb_element {
   GenmapInt proc;
   GenmapInt origin;
   GenmapInt seq;
-  GenmapLong globalId;
+  GenmapULong globalId;
   GenmapScalar coord[MAXDIM];
   GenmapScalar fiedler;
 };
@@ -39,7 +39,7 @@ struct rsb_element {
   GenmapInt proc;
   GenmapInt origin;
   GenmapInt seq;
-  GenmapLong globalId;
+  GenmapULong globalId;
   GenmapScalar coord[MAXDIM];
   GenmapScalar fiedler;
   GenmapLong vertices[8];
@@ -141,7 +141,7 @@ void matrix_inverse(int N, double *A);
 
 /* Dump data */
 int GenmapFiedlerDump(const char *fname, genmap_handle h, struct comm *c);
-int GenmapVectorDump(const char *fname, GenmapScalar *y, uint size,
+int GenmapVectorDump(const char *fname, GenmapScalar *y, genmap_handle h,
                      struct comm *c);
 int GenmapCentroidDump(const char *fname, genmap_handle h, sint g_id,
                        struct comm *c);

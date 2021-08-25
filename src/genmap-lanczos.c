@@ -1,8 +1,8 @@
 #include "genmap-impl.h"
 
-int GenmapLanczosLegendary(genmap_handle h, struct comm *gsc, genmap_vector f,
-                           GenmapInt niter, genmap_vector **rr_,
-                           genmap_vector diag, genmap_vector upper) {
+int GenmapLanczos(genmap_handle h, struct comm *gsc, genmap_vector f,
+                  int niter, genmap_vector **rr_, genmap_vector diag,
+                  genmap_vector upper) {
   assert(diag->size == niter);
   assert(diag->size == upper->size + 1);
   assert(f->size == genmap_get_nel(h));
@@ -32,6 +32,9 @@ int GenmapLanczosLegendary(genmap_handle h, struct comm *gsc, genmap_vector f,
   genmap_vector_create(&r, lelt);
 
   genmap_vector_copy(r, f);
+  if (gsc->np == NPO) {
+    GenmapVectorDump("lanczos.f", f->data, h, gsc);
+  }
 
   genmap_vector_ortho_one(gsc, r, nelg);
   GenmapScalar rtr = genmap_vector_dot(r, r);
@@ -79,8 +82,8 @@ int GenmapLanczosLegendary(genmap_handle h, struct comm *gsc, genmap_vector f,
     pap = genmap_vector_dot(w, p);
     comm_allreduce(gsc, gs_double, gs_add, &pap, 1, &rni);
     if (gsc->id == 0)
-      printf("iter = %d beta = %lf pp = %lf pap = %lf ww = %lf\n", iter, beta,
-             pp, pap, ww);
+      printf("iter = %d beta = %lf pp = %lf pap = %lf ww = %lf\n",
+             iter, beta, pp, pap, ww);
 
     alpha = rtz1 / pap;
     genmap_vector_axpby(r, r, 1.0, w, -1.0 * alpha);
@@ -116,86 +119,4 @@ int GenmapLanczosLegendary(genmap_handle h, struct comm *gsc, genmap_vector f,
   GenmapDestroyVector(r);
 
   return iter;
-}
-
-int GenmapLanczos(genmap_handle h, struct comm *gsc, genmap_vector init,
-                  GenmapInt iter, genmap_vector **q, genmap_vector alpha,
-                  genmap_vector beta) {
-  assert(alpha->size == iter);
-  assert(alpha->size == beta->size + 1);
-  assert(init->size == genmap_get_nel(h));
-
-  if (genmap_get_partition_nel(h) < iter) {
-    iter = genmap_get_partition_nel(h);
-    alpha->size = iter;
-    beta->size = iter - 1;
-  }
-
-  GenmapInt lelt = genmap_get_nel(h);
-
-  genmap_vector q1;
-  genmap_vector_create(&q1, lelt);
-  genmap_vector_copy(q1, init);
-
-  genmap_vector_ortho_one(gsc, q1, genmap_get_partition_nel(h));
-  GenmapScalar normq1 = genmap_vector_dot(q1, q1), buf;
-  comm_allreduce(gsc, gs_double, gs_add, &normq1, 1, &buf);
-  normq1 = sqrt(normq1);
-  genmap_vector_scale(q1, q1, 1. / normq1);
-
-  /* Set q_0 and beta_0 to zero (both uses 0-indexing) */
-  genmap_vector q0;
-  genmap_vector_create_zeros(&q0, lelt);
-  beta->data[0] = 0.;
-
-  genmap_vector u;
-  genmap_vector_create(&u, lelt);
-
-  if (*q == NULL) {
-    GenmapMalloc((size_t)iter, q);
-    GenmapInt i;
-    for (i = 0; i < iter; ++i)
-      (*q)[i] = NULL;
-  }
-
-  GenmapScalar b = 0.0;
-
-  int k;
-  for (k = 0; k < iter; k++) {
-    genmap_vector_create(&(*q)[k], lelt);
-    genmap_vector_copy((*q)[k], q1);
-
-    metric_tic(gsc, LAPLACIAN);
-    GenmapLaplacianWeighted(h, q1->data, u->data);
-    metric_toc(gsc, LAPLACIAN);
-
-    alpha->data[k] = genmap_vector_dot(q1, u);
-    comm_allreduce(gsc, gs_double, gs_add, &alpha->data[k], 1, &buf);
-
-    genmap_vector_axpby(u, u, 1., q0, -b);
-    genmap_vector_axpby(u, u, 1., q1, -alpha->data[k]);
-
-    b = genmap_vector_dot(u, u);
-    comm_allreduce(gsc, gs_double, gs_add, &b, 1, &buf);
-    b = sqrt(b);
-
-    if (k < iter - 1) {
-      beta->data[k] = b;
-      if (fabs(b) < normq1 * GENMAP_TOL) {
-        beta->size = k;
-        alpha->size = k + 1;
-        k = k + 1;
-        break;
-      }
-
-      genmap_vector_copy(q0, q1);
-      genmap_vector_scale(q1, u, 1. / beta->data[k]);
-    }
-  }
-
-  GenmapDestroyVector(q0);
-  GenmapDestroyVector(q1);
-  GenmapDestroyVector(u);
-
-  return k;
 }
