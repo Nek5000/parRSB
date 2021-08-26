@@ -241,8 +241,6 @@ static int read_geometry(unsigned int *nelt, int *nv, double **coord,
   if (err)
     errs++;
 
-  MPI_Barrier(comm);
-
   return errs;
 }
 
@@ -423,7 +421,7 @@ int parrsb_dump_con(char *name, unsigned int nelt, int nv, long long *vl,
   err |= MPI_File_write_ordered(file, buf, write_size, MPI_BYTE, &st);
   err |= MPI_File_close(&file);
 
-  comm_barrier(&c);
+  genmap_barrier(&c);
   comm_free(&c);
 
   free(buf);
@@ -507,7 +505,6 @@ int parrsb_dump_map(char *name, unsigned int nelt, int nv, long long *vtx,
   if (err)
     errs++;
 
-  MPI_Barrier(comm);
   free(buf);
 
   return errs;

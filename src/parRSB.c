@@ -70,7 +70,7 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
     fflush(stdout);
   }
 
-  comm_barrier(&c);
+  genmap_barrier(&c);
   double t = comm_time();
 
   init_options(&options);
@@ -148,7 +148,7 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
   genmap_restore_original(part, seq, &cr, &elist, &bfr);
 
   /* Report time and finish */
-  comm_barrier(&c);
+  genmap_barrier(&c);
   t = comm_time() - t;
   if (rank == 0) {
     printf("parRSB finished in %g s\n", t);

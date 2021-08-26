@@ -55,7 +55,7 @@ int GenmapFiedlerDump(const char *fname, genmap_handle h, struct comm *c) {
             __LINE__, fname);
 
   err += MPI_File_close(&file);
-  MPI_Barrier(c->c);
+  genmap_barrier(c);
 
   free(pbuf);
 
@@ -108,7 +108,7 @@ int GenmapVectorDump(const char *fname, GenmapScalar *y, genmap_handle h,
             __LINE__, fname);
 
   err += MPI_File_close(&file);
-  MPI_Barrier(c->c);
+  genmap_barrier(c);
 
   free(pbuf);
 
@@ -161,7 +161,7 @@ int GenmapCentroidDump(const char *fname, genmap_handle h, sint g_id,
             __LINE__, fname);
 
   err += MPI_File_close(&file);
-  MPI_Barrier(c->c);
+  genmap_barrier(c);
 
   free(pbuf);
 
@@ -211,7 +211,7 @@ int GenmapElementIdDump(const char *fname, genmap_handle h, struct comm *c) {
             __LINE__, fname);
 
   err += MPI_File_close(&file);
-  MPI_Barrier(c->c);
+  genmap_barrier(c);
 
   free(pbuf);
 

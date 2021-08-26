@@ -4,6 +4,7 @@ MPI ?= 1
 CC ?= mpicc
 CFLAGS ?= -g -O0
 UNDERSCORE ?= 1
+SYNC_BY_REDUCTION ?= 1
 BLAS ?= 0
 BLASDIR ?=
 BLASFLAGS ?= -lblas -llapack
@@ -61,6 +62,10 @@ endif
 
 ifneq ($(MPI),0)
   PP += -DMPI
+endif
+
+ifneq ($(SYNC_BY_REDUCTION),0)
+  PP += -DGENMAP_SYNC_BY_REDUCTION
 endif
 
 INSTALLDIR=

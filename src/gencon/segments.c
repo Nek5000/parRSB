@@ -394,7 +394,7 @@ int findUniqueVertices(Mesh mesh, struct comm *c, GenmapScalar tol, int verbose,
         printf("locglob: %d %d %lld %lld\n", t + 1, d + 1, n_seg, n_pts);
 
       rearrangeSegments(mesh, &seg, bfr);
-      comm_barrier(c);
+      genmap_barrier(c);
     }
   }
 

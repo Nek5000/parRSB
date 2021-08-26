@@ -59,6 +59,16 @@ int genmap_finalize(genmap_handle h) {
   return 0;
 }
 
+void genmap_barrier(struct comm *c) {
+#if defined(GENMAP_SYNC_BY_REDUCTION)
+  sint dummy = c->id;
+  sint buf;
+  comm_allreduce(c, gs_int, gs_max, &dummy, 1, &buf);
+#else
+  comm_barrier(c);
+#endif
+}
+
 void *genmap_get_elements(genmap_handle h) {
   return (struct rsb_element *)h->elements->ptr;
 }

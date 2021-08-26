@@ -27,13 +27,13 @@ void metric_finalize() {
 void metric_acc(metric m, double count) { metrics[m] += count; }
 
 void metric_tic(struct comm *c, metric m) {
-  comm_barrier(c);
+  genmap_barrier(c);
   metrics[m] -= comm_time();
 }
 
 void metric_toc(struct comm *c, metric m) {
   metrics[m] += comm_time();
-  comm_barrier(c);
+  genmap_barrier(c);
 }
 
 double metric_get_value(int level, metric m) {

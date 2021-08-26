@@ -69,7 +69,7 @@ int parrsb_find_conn(long long *vtx, double *coord, int nelt, int ndim,
     fflush(stdout);
   }
 
-  comm_barrier(&c);
+  genmap_barrier(&c);
   double tcon = comm_time();
 
   Mesh mesh;
@@ -160,7 +160,7 @@ int parrsb_find_conn(long long *vtx, double *coord, int nelt, int ndim,
   }
 
   /* Report time and finish */
-  comm_barrier(&c);
+  genmap_barrier(&c);
   tcon = comm_time() - tcon;
   if (rank == 0 && verbose > 0) {
     printf("parCon finished in %g s\n", tcon);
