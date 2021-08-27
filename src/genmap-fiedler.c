@@ -94,8 +94,6 @@ int GenmapFiedlerLanczos(genmap_handle h, struct comm *gsc, int max_iter,
   GenmapScalar rnorm;
   comm_allreduce(gsc, gs_double, gs_add, &rtr, 1, &rnorm);
   rnorm = sqrt(rtr);
-  if (gsc->id == 0)
-    printf("rnorm = %lf n = %lld\n", rnorm, nelg);
 
   genmap_vector_ortho_one(gsc, initVec, nelg);
   rtr = genmap_vector_dot(initVec, initVec);
@@ -139,8 +137,6 @@ int GenmapFiedlerLanczos(genmap_handle h, struct comm *gsc, int max_iter,
 
   comm_allreduce(gsc, gs_double, gs_add, &norm, 1, &normi);
   norm = sqrt(norm);
-  if (gsc->id == 0)
-    printf("enorm = %lf\n", norm);
 
   genmap_vector_scale(evLanczos, evLanczos, 1.0 / norm);
   for (i = 0; i < lelt; i++)

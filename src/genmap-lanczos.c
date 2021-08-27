@@ -76,9 +76,9 @@ int GenmapLanczos(genmap_handle h, struct comm *gsc, genmap_vector f, int niter,
     pap_old = pap;
     pap = genmap_vector_dot(w, p);
     comm_allreduce(gsc, gs_double, gs_add, &pap, 1, &rni);
-    if (gsc->id == 0)
-      printf("iter = %d beta = %lf pp = %lf pap = %lf ww = %lf\n", iter, beta,
-             pp, pap, ww);
+//    if (gsc->id == 0)
+//      printf("iter = %d beta = %lf pp = %lf pap = %lf ww = %lf\n", iter, beta,
+//             pp, pap, ww);
 
     alpha = rtz1 / pap;
     genmap_vector_axpby(r, r, 1.0, w, -1.0 * alpha);
