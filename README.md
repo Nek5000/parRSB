@@ -27,8 +27,8 @@ mpirun -np 4 ./gencon --mesh ethier --tol=0.2 --test --no-dump
 `--mesh` is the name of the input mesh (.re2 file) and is required. `--tol` is the
 tolerance used for finding connectivity. `--test` will run a check to see if `genmap`
 or `gencon` examples passed the builtin tests. If `--no-dump` is not specified, the
-examples will write a .re2` or a `.ma2` file by default. `--nactive` parameter specify
-how many MPI ranks are active in the examples. Please not that `--tol` and `--nactive`
+examples will write a `.re2` or a `.ma2` file by default. `--nactive` parameter specify
+how many MPI ranks are active in the examples. Please note that `--tol` and `--nactive`
 requires a `=` sign (since they are optional) while `--mesh` does not need one.
 
 ### C Interface
