@@ -1,7 +1,7 @@
 #include <sort-impl.h>
 
-int sort_field(struct array *arr, size_t usize, gs_dom t, uint off, buffer *buf,
-               int keep) {
+static int sort_field(struct array *arr, size_t usize, gs_dom t, uint off,
+                      buffer *buf, int keep) {
   uint nunits = arr->n;
   void *ptr = arr->ptr;
   switch (t) {

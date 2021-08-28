@@ -1,8 +1,4 @@
-#include <math.h>
-#include <stdio.h>
-
 #include <genmap-impl.h>
-#include <genmap-multigrid-precon.h>
 
 // Input z should be orthogonal to 1-vector, have unit norm.
 // RQI should not change z.
@@ -29,7 +25,7 @@ int rqi(genmap_handle h, struct comm *gsc, mgData d, genmap_vector z,
   metric_tic(gsc, PROJECT);
   int ppfi = project(h, gsc, d, z, 100, y);
   metric_toc(gsc, PROJECT);
-  metric_acc(NPROJECT, ppfi);
+  metric_acc(PROJECT_NITER, ppfi);
 
   uint i, j, k, l;
   for (i = 0; i < max_iter; i++) {
@@ -43,7 +39,6 @@ int rqi(genmap_handle h, struct comm *gsc, mgData d, genmap_vector z,
     int N = i + 1;
 
     if (h->options->rsb_grammian == 1) {
-      metric_tic(gsc, GRAMMIAN);
       // if k>1;
       //  Z(:,k)=z-Z(:,1:k-1)*(Z(:,1:k-1)'*z);
       //  Z(:,k)=Z(:,k)/norm(Z(:,k));
@@ -107,13 +102,12 @@ int rqi(genmap_handle h, struct comm *gsc, mgData d, genmap_vector z,
         for (l = 0; l < lelt; l++)
           Z[i * lelt + l] = z->data[l];
       }
-      metric_toc(gsc, GRAMMIAN);
     }
 
     metric_tic(gsc, PROJECT);
     ppfi = project(h, gsc, d, z, 100, y);
     metric_toc(gsc, PROJECT);
-    metric_acc(NPROJECT, ppfi);
+    metric_acc(PROJECT_NITER, ppfi);
 
     genmap_vector_ortho_one(gsc, y, nelg);
 
@@ -124,8 +118,6 @@ int rqi(genmap_handle h, struct comm *gsc, mgData d, genmap_vector z,
     GenmapScalar norme = genmap_vector_dot(err, err);
     comm_allreduce(gsc, gs_double, gs_add, &norme, 1, buf);
     norme = sqrt(norme);
-
-    metric_acc(END + i, norme);
 
     if (ppfi == 1)
       break;

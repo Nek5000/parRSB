@@ -1,8 +1,4 @@
-#include <math.h>
-#include <stdio.h>
-
 #include <genmap-impl.h>
-#include <genmap-multigrid-precon.h>
 
 int flex_cg(genmap_handle h, struct comm *gsc, mgData d, genmap_vector ri,
             int maxIter, genmap_vector x) {
