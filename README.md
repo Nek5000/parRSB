@@ -1,5 +1,3 @@
-[![CI](https://github.com/Nek5000/parRSB/workflows/ci/badge.svg)](https://github.com/Nek5000/parRSB/actions)
-
 # parRSB
 
 * Computes high quality partitionings using recursive spectral bisection (RSB)
@@ -16,11 +14,22 @@ instructions there to build it.
 
 ### Run Example
 
+You can run both `genmap` and `gencon` examples in `build/examples` directory after
+building parRSB. Examples invoked with all available options are shown below.
+
 ```sh
 
-cd example
-mpirun -np 4 ./partition 2 case01.co2
+cd build/examples
+mpirun -np 4 ./genmap --mesh ethier --nactive=2 --tol=0.2 --test --no-dump
+mpirun -np 4 ./gencon --mesh ethier --tol=0.2 --test --no-dump
 ```
+
+`--mesh` is the name of the input mesh (.re2 file) and is required. `--tol` is the
+tolerance used for finding connectivity. `--test` will run a check to see if `genmap`
+or `gencon` examples passed the builtin tests. If `--no-dump` is not specified, the
+examples will write a .re2` or a `.ma2` file by default. `--nactive` parameter specify
+how many MPI ranks are active in the examples. Please not that `--tol` and `--nactive`
+requires a `=` sign (since they are optional) while `--mesh` does not need one.
 
 ### C Interface
 
@@ -55,7 +64,7 @@ typedef struct {
   /* RSB specific */
   int rsb_algo;     // 0 - Lanczos, 1 - RQI (Default: 0)
   int rsb_pre;      // 0 - None, 1 - RCB , 2 - RIB (Default: 1)
-  int rsb_grammian; // 0 or 1 (Default: 1)
+  int rsb_grammian; // 0 or 1 (Default: 0)
 
   /* Other */
   int repair; // 0 - No, 1 - Yes (Default: 1)

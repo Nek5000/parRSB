@@ -31,9 +31,6 @@ int main(int argc, char *argv[]) {
                            comm, 1);
   parrsb_check_error(err, comm);
 
-  if (active == 1)
-    parrsb_dump_part("part.pre", nelt, nv, coord, id, comm);
-
   /* Find connectivity */
   long long *vl = (long long *)calloc(nelt * nv, sizeof(long long));
   int ndim = nv == 8 ? 3 : 2;
@@ -67,9 +64,6 @@ int main(int argc, char *argv[]) {
     parrsb_print_part_stat(vl, nelt, nv, comm);
     parrsb_get_part_stat(NULL, NULL, &nss[3], NULL, vl, nelt, nv, comm);
   }
-
-  if (active == 1)
-    parrsb_dump_part("part.post", nelt, nv, coord, id, comm);
 
   if (active == 1 && in->test && in->nactive > 1)
     err |= nss[2] < nss[5];
