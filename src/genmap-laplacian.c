@@ -138,19 +138,7 @@ int GenmapInitLaplacianWeighted(genmap_handle h, struct comm *c) {
   if (h->gsw != NULL)
     gs_free(h->gsw);
 
-#if defined(GENMAP_DEBUG)
-  double t1 = GenmapGetMaxRss();
-  if (c->id == 0)
-    printf("RSS before gs_setup: %lf\n", t1);
-#endif
-
   h->gsw = gs_setup(vertices, numPoints, c, 0, gs_crystal_router, 0);
-
-#if defined(GENMAP_DEBUG)
-  t1 = GenmapGetMaxRss();
-  if (c->id == 0)
-    printf("RSS after gs_setup: %lf\n", t1);
-#endif
 
   GenmapScalar *u;
   GenmapMalloc(numPoints, &u);

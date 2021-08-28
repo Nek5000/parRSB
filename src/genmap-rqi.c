@@ -119,8 +119,6 @@ int rqi(genmap_handle h, struct comm *gsc, mgData d, genmap_vector z,
     comm_allreduce(gsc, gs_double, gs_add, &norme, 1, buf);
     norme = sqrt(norme);
 
-    metric_acc(END + i, norme);
-
     if (ppfi == 1)
       break;
   }
