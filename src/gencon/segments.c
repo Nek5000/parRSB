@@ -390,7 +390,7 @@ int findUniqueVertices(Mesh mesh, struct comm *c, GenmapScalar tol, int verbose,
       comm_allreduce(c, gs_long, gs_add, &n_pts, 1, buf);
 
       slong n_seg = countSegments(mesh, c);
-      if (c->id == 0)
+      if (c->id == 0 && verbose)
         printf("locglob: %d %d %lld %lld\n", t + 1, d + 1, n_seg, n_pts);
 
       rearrangeSegments(mesh, &seg, bfr);

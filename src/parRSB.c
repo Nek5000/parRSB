@@ -74,10 +74,6 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
   double t = comm_time();
 
   init_options(&options);
-  if (rank == 0) {
-    print_options(&options);
-    fflush(stdout);
-  }
 
   struct crystal cr;
   crystal_init(&cr, &c);
