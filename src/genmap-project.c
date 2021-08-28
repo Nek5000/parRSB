@@ -40,7 +40,7 @@ int project(genmap_handle h, struct comm *gsc, mgData d, genmap_vector ri,
 
   GenmapScalar alpha, beta, rz0, rz2, scale;
 
-  double tol = 1e-3;
+  double tol = 1e-5;
   double res_tol = rr * tol;
 
   uint j, k;

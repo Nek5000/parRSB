@@ -7,7 +7,7 @@
 #include <genmap-impl.h>
 #include <parRSB.h>
 
-parrsb_options parrsb_default_options = {0, 0, 0, 0, 1, 1, 1};
+parrsb_options parrsb_default_options = {0, 0, 0, 0, 1, 0, 1};
 
 static int if_number(const char *c) {
   int i;
