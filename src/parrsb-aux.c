@@ -81,45 +81,36 @@ int parrsb_distribute_elements(unsigned int *nelt_, long long **vl_,
 
 void parrsb_get_part_stat(int *nc, int *ns, int *nss, int *nel, long long *vtx,
                           int nelt, int nv, MPI_Comm ce) {
-  int i, j;
-
   struct comm comm;
-  int np, id;
+  comm_init(&comm, ce);
+
+  int np = comm.np;
+  int id = comm.id;
+
+  if (np == 1)
+    return;
+
+  int Npts = nelt * nv;
+  int i;
+  slong *data = (slong *)malloc((Npts + 1) * sizeof(slong));
+  for (i = 0; i < Npts; i++)
+    data[i] = vtx[i];
+  struct gs_data *gsh = gs_setup(data, Npts, &comm, 0, gs_pairwise, 0);
 
   int Nmsg;
-  int *Ncomm;
+  pw_data_nmsg(gsh, &Nmsg);
+
+  int *Ncomm = (int *)malloc((Nmsg + 1) * sizeof(int));
+  pw_data_size(gsh, Ncomm);
+
+  gs_free(gsh);
+  free(data);
 
   int nelMin, nelMax, nelSum;
   int ncMin, ncMax, ncSum;
   int nsMin, nsMax, nsSum;
   int nssMin, nssMax, nssSum;
-
-  struct gs_data *gsh;
   int b;
-
-  int numPoints;
-  long long *data;
-
-  comm_init(&comm, ce);
-  np = comm.np;
-  id = comm.id;
-
-  if (np == 1)
-    return;
-
-  numPoints = nelt * nv;
-  data = (long long *)malloc((numPoints + 1) * sizeof(long long));
-  for (i = 0; i < numPoints; i++)
-    data[i] = vtx[i];
-
-  gsh = gs_setup(data, numPoints, &comm, 0, gs_pairwise, 0);
-
-  pw_data_nmsg(gsh, &Nmsg);
-  Ncomm = (int *)malloc((Nmsg + 1) * sizeof(int));
-  pw_data_size(gsh, Ncomm);
-
-  gs_free(gsh);
-  free(data);
 
   ncMax = Nmsg;
   ncMin = Nmsg;
