@@ -115,7 +115,7 @@ void metric_toc(struct comm *c, metric m);
 double metric_get_value(int level, metric m);
 void metric_push_level();
 uint metric_get_levels();
-void metric_print(struct comm *c);
+void metric_print(struct comm *c, int profile_level);
 void metric_finalize();
 
 /* genCon */

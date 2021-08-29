@@ -177,18 +177,10 @@ int rib(struct comm *ci, struct array *elements, int ndim, buffer *bfr) {
     int bin = (rank >= p);
 
     comm_ext comm_rib;
-#ifdef MPI
     MPI_Comm_split(c.c, bin, rank, &comm_rib);
-#else
-    comm_rib = 1;
-#endif
-
     comm_free(&c);
     comm_init(&c, comm_rib);
-
-#ifdef MPI
     MPI_Comm_free(&comm_rib);
-#endif
 
     size = c.np;
     rank = c.id;

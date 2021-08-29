@@ -2,7 +2,7 @@
 DEBUG ?= 0
 MPI ?= 1
 CC ?= mpicc
-CFLAGS ?= -g -O0
+CFLAGS ?= -g -O2
 UNDERSCORE ?= 1
 SYNC_BY_REDUCTION ?= 1
 BLAS ?= 0

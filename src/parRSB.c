@@ -7,7 +7,7 @@
 #include <genmap-impl.h>
 #include <parRSB.h>
 
-parrsb_options parrsb_default_options = {0, 0, 0, 0, 1, 0, 1};
+parrsb_options parrsb_default_options = {0, 1, 0, 0, 1, 0, 1};
 
 static int if_number(const char *c) {
   int i;
@@ -26,7 +26,7 @@ static int if_number(const char *c) {
 
 static void init_options(parrsb_options *options) {
   INIT_OPTION(partitioner, "PARRSB_PARTITIONER");
-  INIT_OPTION(debug_level, "PARRSB_DEBUG_LEVEL");
+  INIT_OPTION(verbose_level, "PARRSB_VERBOSE_LEVEL");
   INIT_OPTION(profile_level, "PARRSB_PROFILE_LEVEL");
   INIT_OPTION(rsb_algo, "PARRSB_RSB_ALGO");
   INIT_OPTION(rsb_pre, "PARRSB_RSB_PRE");
@@ -40,7 +40,7 @@ static void init_options(parrsb_options *options) {
 
 static void print_options(parrsb_options *options) {
   PRINT_OPTION(partitioner, "PARRSB_PARTITIONER");
-  PRINT_OPTION(debug_level, "PARRSB_DEBUG_LEVEL");
+  PRINT_OPTION(verbose_level, "PARRSB_VERBOSE_LEVEL");
   PRINT_OPTION(profile_level, "PARRSB_PROFILE_LEVEL");
   PRINT_OPTION(rsb_algo, "PARRSB_RSB_ALGO");
   PRINT_OPTION(rsb_pre, "PARRSB_RSB_PRE");
@@ -65,7 +65,7 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
   int rank = c.id;
   int size = c.np;
 
-  if (rank == 0) {
+  if (rank == 0 && options.verbose_level > 0) {
     printf("Running parRSB ...\n");
     fflush(stdout);
   }
@@ -74,6 +74,10 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
   double t = comm_time();
 
   init_options(&options);
+  if (rank == 0 && options.verbose_level > 1) {
+    print_options(&options);
+    fflush(stdout);
+  }
 
   struct crystal cr;
   crystal_init(&cr, &c);
@@ -88,9 +92,7 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
 
   /* Run RSB now */
   comm_ext comm_rsb;
-#ifdef MPI
   MPI_Comm_split(c.c, nel > 0, rank, &comm_rsb);
-#endif
 
   // TODO: Move this into another file
   if (nel > 0) {
@@ -132,21 +134,18 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
 
     genmap_finalize(h);
 
-    if (options.debug_level > 0)
-      metric_print(&c);
+    metric_print(&c, options.profile_level);
     metric_finalize();
   }
 
-#ifdef MPI
   MPI_Comm_free(&comm_rsb);
-#endif
 
   genmap_restore_original(part, seq, &cr, &elist, &bfr);
 
   /* Report time and finish */
   genmap_barrier(&c);
   t = comm_time() - t;
-  if (rank == 0) {
+  if (rank == 0 && options.verbose_level > 0) {
     printf("parRSB finished in %g s\n", t);
     fflush(stdout);
   }

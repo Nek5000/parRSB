@@ -57,7 +57,7 @@ void metric_push_level() {
 
 uint metric_get_levels() { return stack_size; }
 
-void metric_print(struct comm *c) {
+void metric_print(struct comm *c, int profile_level) {
   double *min, *max, *sum, *buf;
   GenmapCalloc(MAXSIZE, &min);
   GenmapCalloc(MAXSIZE, &max);
@@ -82,7 +82,7 @@ void metric_print(struct comm *c) {
 
   int j;
   for (i = 0; i < stack_size; i++) {
-    if (c->id == 0) {
+    if (c->id == 0 && profile_level > 0) {
       printf("level=%02d\n", i);
       printf("  RCB                    : %g/%g/%g\n", SUMMARY(i, RCB));
       printf("  FIEDLER                : %g/%g/%g\n", SUMMARY(i, FIEDLER));

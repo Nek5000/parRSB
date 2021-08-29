@@ -1,6 +1,6 @@
 #include <genmap-impl.h>
 
-#define MM 505
+#define MM 500
 
 int project(genmap_handle h, struct comm *gsc, mgData d, genmap_vector ri,
             int max_iter, genmap_vector x) {

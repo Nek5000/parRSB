@@ -76,7 +76,6 @@ static double get_avg_nbrs(genmap_handle h, struct comm *c) {
 }
 
 int genmap_rsb(genmap_handle h) {
-  int verbose = h->options->debug_level > 1;
   int max_iter = 50;
   int max_pass = 50;
 
@@ -139,6 +138,7 @@ int genmap_rsb(genmap_handle h) {
       repair_partitions(h, &tc, lc, bin, gc);
     balance_partitions(h, &tc, bin, lc);
 
+#if 0
     if (get_avg_nbrs(h, lc) > nbrs) {
       /* Run RCB, RIB pre-step or just sort by global id */
       if (h->options->rsb_pre == 0) // Sort by global id
@@ -149,6 +149,7 @@ int genmap_rsb(genmap_handle h) {
       else if (h->options->rsb_pre == 2) // RIB
         rib(lc, h->elements, ndim, &h->buf);
     }
+#endif
 
     comm_free(lc);
     comm_dup(lc, &tc);

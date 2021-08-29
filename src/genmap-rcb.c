@@ -183,18 +183,10 @@ int rcb(struct comm *ci, struct array *elements, int ndim, buffer *bfr) {
       bin = 0;
 
     comm_ext comm_rcb;
-#ifdef MPI
     MPI_Comm_split(c.c, bin, rank, &comm_rcb);
-#else
-    comm_rcb = 1;
-#endif
-
     comm_free(&c);
     comm_init(&c, comm_rcb);
-
-#ifdef MPI
     MPI_Comm_free(&comm_rcb);
-#endif
 
     size = c.np;
     rank = c.id;

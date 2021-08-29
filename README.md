@@ -58,7 +58,7 @@ comm    (in)    ... MPI Communicator (size determines number of partitions).
 typedef struct {
   /* General options */
   int partitioner;   // 0 - RSB, 1 - RCB, 2 - RIB (Default: 0)
-  int debug_level;   // 0, 1, 2, .. etc (Default: 0)
+  int verbose_level;   // 0, 1, 2, .. etc (Default: 0)
   int profile_level; // 0, 1, 2, .. etc (Default: 0)
 
   /* RSB specific */
@@ -78,7 +78,7 @@ is the list of env. variables:
 
 ```
 PARRSB_PARTITIONER
-PARRSB_DEBUG_LEVEL
+PARRSB_VERBOSE_LEVEL
 PARRSB_PROFILE_LEVEL
 PARRSB_RSB_ALGO
 PARRSB_RSB_PRE
