@@ -2,13 +2,10 @@
 
 #define MM 500
 
-int project(genmap_handle h, struct comm *gsc, mgData d, genmap_vector ri,
-            int max_iter, genmap_vector x) {
+int project(genmap_vector x, struct gs_laplacian *gl, mgData d,
+            genmap_vector ri, int max_iter, struct comm *gsc, buffer *buf) {
   assert(x->size == ri->size);
-  assert(x->size == genmap_get_nel(h));
-
   uint lelt = x->size;
-  GenmapLong nelg = genmap_get_partition_nel(h);
 
   genmap_vector z0, z, dz, w, p, r;
   genmap_vector_create(&z, lelt);
@@ -19,9 +16,8 @@ int project(genmap_handle h, struct comm *gsc, mgData d, genmap_vector ri,
   genmap_vector_create(&dz, lelt);
 
   assert(max_iter < MM);
-  double *P, *W;
-  GenmapCalloc(lelt * MM, &P);
-  GenmapCalloc(lelt * MM, &W);
+  double *P = tcalloc(double, lelt * MM);
+  double *W = tcalloc(double, lelt * MM);
 
   uint i;
   for (i = 0; i < lelt; i++) {
@@ -29,14 +25,19 @@ int project(genmap_handle h, struct comm *gsc, mgData d, genmap_vector ri,
     r->data[i] = ri->data[i];
   }
 
+  slong out[2][1], bfr[2][1];
+  slong in = lelt;
+  comm_scan(out, gsc, gs_long, gs_add, &in, 1, bfr);
+  slong nelg = out[1][0];
+
   genmap_vector_copy(z, r);
   genmap_vector_copy(p, z);
 
-  GenmapScalar rz1 = genmap_vector_dot(r, z), buf;
-  comm_allreduce(gsc, gs_double, gs_add, &rz1, 1, &buf);
+  GenmapScalar rz1 = genmap_vector_dot(r, z);
+  comm_allreduce(gsc, gs_double, gs_add, &rz1, 1, bfr);
 
   GenmapScalar rr = genmap_vector_dot(r, r);
-  comm_allreduce(gsc, gs_double, gs_add, &rr, 1, &buf);
+  comm_allreduce(gsc, gs_double, gs_add, &rr, 1, bfr);
 
   GenmapScalar alpha, beta, rz0, rz2, scale;
 
@@ -47,15 +48,11 @@ int project(genmap_handle h, struct comm *gsc, mgData d, genmap_vector ri,
   i = 0;
   while (i < max_iter) {
     metric_tic(gsc, LAPLACIAN);
-#if 1
-    GenmapLaplacianWeighted(h, p->data, w->data);
-#else
-    GenmapLaplacian(h, p->data, w->data);
-#endif
+    GenmapLaplacianWeighted(w->data, gl, p->data, buf);
     metric_toc(gsc, LAPLACIAN);
 
     GenmapScalar den = genmap_vector_dot(p, w);
-    comm_allreduce(gsc, gs_double, gs_add, &den, 1, &buf);
+    comm_allreduce(gsc, gs_double, gs_add, &den, 1, bfr);
     alpha = rz1 / den;
 
     scale = 1.0 / sqrt(den);
@@ -68,28 +65,28 @@ int project(genmap_handle h, struct comm *gsc, mgData d, genmap_vector ri,
     genmap_vector_axpby(r, r, 1.0, w, -alpha);
 
     rr = genmap_vector_dot(r, r);
-    comm_allreduce(gsc, gs_double, gs_add, &rr, 1, &buf);
+    comm_allreduce(gsc, gs_double, gs_add, &rr, 1, bfr);
 
     if (rr < res_tol || sqrt(rr) < tol)
       break;
 
     GenmapScalar norm0 = genmap_vector_dot(z, z);
-    comm_allreduce(gsc, gs_double, gs_add, &norm0, 1, &buf);
+    comm_allreduce(gsc, gs_double, gs_add, &norm0, 1, bfr);
 
     genmap_vector_copy(z0, z);
     mg_vcycle(z->data, r->data, d);
 
     GenmapScalar norm1 = genmap_vector_dot(z, z);
-    comm_allreduce(gsc, gs_double, gs_add, &norm1, 1, &buf);
+    comm_allreduce(gsc, gs_double, gs_add, &norm1, 1, bfr);
 
     rz0 = rz1;
     genmap_vector_ortho_one(gsc, z, nelg);
     rz1 = genmap_vector_dot(r, z);
-    comm_allreduce(gsc, gs_double, gs_add, &rz1, 1, &buf);
+    comm_allreduce(gsc, gs_double, gs_add, &rz1, 1, bfr);
 
     genmap_vector_axpby(dz, z, 1.0, z0, -1.0);
     rz2 = genmap_vector_dot(r, dz);
-    comm_allreduce(gsc, gs_double, gs_add, &rz2, 1, &buf);
+    comm_allreduce(gsc, gs_double, gs_add, &rz2, 1, bfr);
 
     beta = rz2 / rz0;
     genmap_vector_axpby(p, z, 1.0, p, beta);
@@ -104,7 +101,7 @@ int project(genmap_handle h, struct comm *gsc, mgData d, genmap_vector ri,
       double a = 0.0;
       for (k = 0; k < lelt; k++)
         a += W[j * lelt + k] * p->data[k];
-      comm_allreduce(gsc, gs_double, gs_add, &a, 1, &buf);
+      comm_allreduce(gsc, gs_double, gs_add, &a, 1, bfr);
       for (k = 0; k < lelt; k++)
         P[(MM - 1) * lelt + k] += a * P[j * lelt + k];
     }

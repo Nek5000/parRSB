@@ -1,35 +1,33 @@
 #include <genmap-impl.h>
 
-#define min(a, b) ((b) < (a) ? (b) : (a))
+#define MIN(a, b) ((b) < (a) ? (b) : (a))
 
-static void genmap_find_neighbors(struct array *nbrs, genmap_handle h,
-                                  struct comm *cc) {
-  sint lelt = genmap_get_nel(h);
-  sint nv = genmap_get_nvertices(h);
+static void genmap_find_neighbors(struct array *nbrs, struct rsb_element *elems,
+                                  sint nelt, int nv, struct comm *cc,
+                                  buffer *buf) {
+  slong out[2][1], bfr[2][1];
+  slong lelt = nelt;
+  comm_scan(out, cc, gs_long, gs_add, &lelt, 1, bfr);
+  ulong elem_id = out[0][0] + 1;
+  ulong sequence_id = elem_id * nv;
 
-  genmap_comm_scan(h, cc);
-  ulong elem_id = genmap_get_local_start_index(h) + 1;
-  ulong sequenceId = elem_id * nv;
-
-  size_t size = lelt * nv;
   struct array vertices;
+  size_t size = nelt * nv;
   array_init(vertex, &vertices, size);
 
-  struct rsb_element *elems = genmap_get_elements(h);
   sint i, j;
   for (i = 0; i < lelt; i++) {
     for (j = 0; j < nv; j++) {
-      vertex vrt = {.sequenceId = sequenceId,
+      vertex vrt = {.sequenceId = sequence_id,
                     .nNeighbors = 0,
                     .elementId = elem_id,
                     .vertexId = elems[i].vertices[j],
                     .workProc = elems[i].vertices[j] % cc->np};
       array_cat(vertex, &vertices, &vrt, 1);
-      sequenceId++;
+      sequence_id++;
     }
     elem_id++;
   }
-  assert(vertices.n == lelt * nv);
 
   struct crystal cr;
   crystal_init(&cr, cc);
@@ -38,7 +36,7 @@ static void genmap_find_neighbors(struct array *nbrs, genmap_handle h,
   size = vertices.n;
   vertex *vPtr = vertices.ptr;
 
-  sarray_sort(vertex, vPtr, size, vertexId, 1, &h->buf);
+  sarray_sort(vertex, vPtr, size, vertexId, 1, buf);
 
   struct array a;
   array_init(csr_entry, &a, 10);
@@ -50,12 +48,12 @@ static void genmap_find_neighbors(struct array *nbrs, genmap_handle h,
     e = s + 1;
     while (e < size && vPtr[s].vertexId == vPtr[e].vertexId)
       e++;
-    int n_neighbors = min(e, size) - s;
+    int nnbrs = MIN(e, size) - s;
 
-    for (i = s; i < min(e, size); i++) {
+    for (i = s; i < MIN(e, size); i++) {
       t.r = vPtr[i].elementId;
       t.proc = vPtr[i].workProc;
-      for (j = 0; j < n_neighbors; j++) {
+      for (j = 0; j < nnbrs; j++) {
         t.c = vPtr[s + j].elementId;
         array_cat(csr_entry, &a, &t, 1);
       }
@@ -64,16 +62,14 @@ static void genmap_find_neighbors(struct array *nbrs, genmap_handle h,
   }
 
   sarray_transfer(csr_entry, &a, proc, 1, &cr);
-  sarray_sort_2(csr_entry, a.ptr, a.n, r, 1, c, 1, &h->buf);
-
   array_init(entry, nbrs, lelt);
-
   if (a.n == 0) {
     crystal_free(&cr);
     array_free(&vertices);
     array_free(&a);
   }
 
+  sarray_sort_2(csr_entry, a.ptr, a.n, r, 1, c, 1, buf);
   csr_entry *aptr = a.ptr;
   entry *nptr = nbrs->ptr;
 
@@ -91,99 +87,83 @@ static void genmap_find_neighbors(struct array *nbrs, genmap_handle h,
     }
   }
 
-  sarray_sort_2(entry, nbrs->ptr, nbrs->n, r, 1, c, 1, &h->buf);
+  sarray_sort_2(entry, nbrs->ptr, nbrs->n, r, 1, c, 1, buf);
 
   crystal_free(&cr);
   array_free(&vertices);
   array_free(&a);
 }
 
-int GenmapInitLaplacian(genmap_handle h, struct comm *c) {
+int GenmapInitLaplacian(struct csr_mat *M, struct rsb_element *elems, uint lelt,
+                        int nv, struct comm *c, buffer *buf) {
   struct array entries;
-
-  genmap_find_neighbors(&entries, h, c);
-  csr_mat_setup(&entries, c, &h->M);
-  h->gsh = get_csr_top(h->M, c);
-  GenmapRealloc(h->M->row_off[h->M->rn], &h->b);
-
+  genmap_find_neighbors(&entries, elems, lelt, nv, c, buf);
+  csr_mat_setup(M, &entries, c, buf);
   array_free(&entries);
 
   return 0;
 }
 
-int GenmapLaplacian(genmap_handle h, GenmapScalar *u, GenmapScalar *v) {
-  csr_mat_gather(h->M, h->gsh, u, h->b, &h->buf);
-  csr_mat_apply(v, h->M, h->b);
-
+int GenmapLaplacian(GenmapScalar *v, struct csr_mat *M, GenmapScalar *u,
+                    buffer *buf) {
+  csr_mat_apply(v, M, u, buf);
   return 0;
 }
 
-int GenmapInitLaplacianWeighted(genmap_handle h, struct comm *c) {
-  GenmapInt lelt = genmap_get_nel(h);
-  GenmapInt nv = genmap_get_nvertices(h);
+int GenmapInitLaplacianWeighted(struct gs_laplacian *gl,
+                                struct rsb_element *elems, uint lelt, int nv,
+                                struct comm *c, buffer *buf) {
+  uint npts = nv * lelt;
 
-  GenmapRealloc(lelt, &h->weights);
-  GenmapUInt numPoints = (GenmapUInt)nv * lelt;
-
-  GenmapLong *vertices;
-  GenmapMalloc(numPoints, &vertices);
-
-  struct rsb_element *elements = genmap_get_elements(h);
+  slong *vertices = tcalloc(slong, npts);
   GenmapInt i, j;
-  for (i = 0; i < lelt; i++) {
-    for (j = 0; j < nv; j++)
-      vertices[i * nv + j] = elements[i].vertices[j];
-  }
-
-  if (h->gsw != NULL)
-    gs_free(h->gsw);
-
-  h->gsw = gs_setup(vertices, numPoints, c, 0, gs_crystal_router, 0);
-
-  GenmapScalar *u;
-  GenmapMalloc(numPoints, &u);
-
   for (i = 0; i < lelt; i++)
     for (j = 0; j < nv; j++)
-      u[nv * i + j] = 1.0;
+      vertices[i * nv + j] = elems[i].vertices[j];
 
-  gs(u, gs_double, gs_add, 0, h->gsw, &h->buf);
-
-  for (i = 0; i < lelt; i++) {
-    h->weights[i] = 0.0;
+  gl->u = tcalloc(GenmapScalar, npts);
+  for (i = 0; i < lelt; i++)
     for (j = 0; j < nv; j++)
-      h->weights[i] += u[nv * i + j];
+      gl->u[nv * i + j] = 1.0;
+
+  gl->gsh = gs_setup(vertices, npts, c, 0, gs_crystal_router, 0);
+  gs(gl->u, gs_double, gs_add, 0, gl->gsh, buf);
+
+  gl->weights = tcalloc(GenmapScalar, lelt);
+  for (i = 0; i < lelt; i++) {
+    gl->weights[i] = 0.0;
+    for (j = 0; j < nv; j++)
+      gl->weights[i] += gl->u[nv * i + j];
   }
 
-  GenmapFree(u);
-  GenmapFree(vertices);
+  gl->lelt = lelt;
+  gl->nv = nv;
+
+  if (vertices != NULL)
+    free(vertices);
 
   return 0;
 }
 
-int GenmapLaplacianWeighted(genmap_handle h, GenmapScalar *u, GenmapScalar *v) {
-  GenmapInt lelt = genmap_get_nel(h);
-  GenmapInt nv = genmap_get_nvertices(h);
-
-  GenmapScalar *ucv;
-  GenmapMalloc((size_t)(nv * lelt), &ucv);
+int GenmapLaplacianWeighted(GenmapScalar *v, struct gs_laplacian *gl,
+                            GenmapScalar *u, buffer *buf) {
+  uint lelt = gl->lelt;
+  int nv = gl->nv;
 
   GenmapInt i, j;
   for (i = 0; i < lelt; i++)
     for (j = 0; j < nv; j++)
-      ucv[nv * i + j] = u[i];
+      gl->u[nv * i + j] = u[i];
 
-  gs(ucv, gs_double, gs_add, 0, h->gsw, &h->buf);
+  gs(gl->u, gs_double, gs_add, 0, gl->gsh, buf);
 
   for (i = 0; i < lelt; i++) {
-    v[i] = h->weights[i] * u[i];
+    v[i] = gl->weights[i] * u[i];
     for (j = 0; j < nv; j++)
-      v[i] -= ucv[nv * i + j];
+      v[i] -= gl->u[nv * i + j];
   }
-
-  GenmapFree(ucv);
 
   return 0;
 }
 
-#undef min
+#undef MIN

@@ -1,12 +1,9 @@
 #include <genmap-impl.h>
 
-int flex_cg(genmap_handle h, struct comm *gsc, mgData d, genmap_vector ri,
-            int maxIter, genmap_vector x) {
+int flex_cg(genmap_vector x, struct gs_laplacian *gl, mgData d,
+            genmap_vector ri, int maxIter, struct comm *gsc, buffer *buf) {
   assert(x->size == ri->size);
-  assert(x->size == genmap_get_nel(h));
-
   uint lelt = x->size;
-  GenmapLong nelg = genmap_get_partition_nel(h);
 
   genmap_vector z0, z, dz, w, p, r;
   genmap_vector_create(&z, lelt);
@@ -19,30 +16,37 @@ int flex_cg(genmap_handle h, struct comm *gsc, mgData d, genmap_vector ri,
 #define PREC 1
 #define ORTH 1
 
-  int rank = gsc->id;
-
   uint i;
-  for (i = 0; i < lelt; i++)
-    x->data[i] = 0.0, r->data[i] = ri->data[i];
+  for (i = 0; i < lelt; i++) {
+    x->data[i] = 0.0;
+    r->data[i] = ri->data[i];
+  }
+
+  slong out[2][1], bfr[2][1];
+  slong in = lelt;
+  comm_scan(out, gsc, gs_long, gs_add, &in, 1, bfr);
+  slong nelg = out[1][0];
 
   genmap_vector_copy(z, r);
 #if ORTH
   genmap_vector_ortho_one(gsc, z, nelg);
 #endif
 
-  GenmapScalar den, alpha, beta, rz0, rz1, rz2, rr, buf;
+  GenmapScalar den, alpha, beta, rz0, rz1, rz2, rr;
 
   rz1 = genmap_vector_dot(r, z);
-  comm_allreduce(gsc, gs_double, gs_add, &rz1, 1, &buf);
+  comm_allreduce(gsc, gs_double, gs_add, &rz1, 1, bfr);
 
   genmap_vector_copy(p, z);
 
   i = 0;
   while (i < maxIter && sqrt(rz1) > GENMAP_TOL) {
-    GenmapLaplacian(h, p->data, w->data);
+    metric_tic(gsc, LAPLACIAN);
+    GenmapLaplacianWeighted(w->data, gl, p->data, buf);
+    metric_toc(gsc, LAPLACIAN);
 
     den = genmap_vector_dot(p, w);
-    comm_allreduce(gsc, gs_double, gs_add, &den, 1, &buf);
+    comm_allreduce(gsc, gs_double, gs_add, &den, 1, bfr);
 
     alpha = rz1 / den;
 
@@ -62,18 +66,18 @@ int flex_cg(genmap_handle h, struct comm *gsc, mgData d, genmap_vector ri,
     rz0 = rz1;
 
     rz1 = genmap_vector_dot(r, z);
-    comm_allreduce(gsc, gs_double, gs_add, &rz1, 1, &buf);
+    comm_allreduce(gsc, gs_double, gs_add, &rz1, 1, bfr);
 
     genmap_vector_axpby(dz, z, 1.0, z0, -1.0);
     rz2 = genmap_vector_dot(r, dz);
-    comm_allreduce(gsc, gs_double, gs_add, &rz2, 1, &buf);
+    comm_allreduce(gsc, gs_double, gs_add, &rz2, 1, bfr);
     beta = rz2 / rz0;
 
     genmap_vector_axpby(p, z, 1.0, p, beta);
     i++;
 
     rr = genmap_vector_dot(r, r);
-    comm_allreduce(gsc, gs_double, gs_add, &rr, 1, &buf);
+    comm_allreduce(gsc, gs_double, gs_add, &rr, 1, bfr);
   }
 
   genmap_destroy_vector(z);

@@ -1,13 +1,6 @@
 #include <genmap-impl.h>
 #include <genmap-multigrid-precon.h>
 
-int log2i(sint i) {
-  sint k = 1, l = 0;
-  while (k <= i)
-    k *= 2, l++;
-  return l - 1;
-}
-
 void setOwner(char *ptr, sint n, size_t inOffset, size_t outOffset, slong lelg,
               sint np) {
   sint lelt = lelg / np;
@@ -54,8 +47,8 @@ void compress_col(struct array *entries) {
 
 void mgLevelSetup(mgData d, uint lvl) {
   assert(lvl > 0);
-  csr_mat M0 = d->levels[lvl - 1]->M;
-  uint rn0 = M0->rn, nnz0 = M0->row_off[rn0];
+  struct csr_mat *M0 = d->levels[lvl - 1]->M;
+  uint rn0 = M0->rn, nnz0 = M0->roff[rn0];
 
   struct array entries = null_array;
   array_init(entry, &entries, nnz0);
@@ -64,7 +57,7 @@ void mgLevelSetup(mgData d, uint lvl) {
   uint i, j, nn = 0;
   entry *ptr = entries.ptr;
   for (i = 0; i < rn0; i++)
-    for (j = M0->row_off[i]; j < M0->row_off[i + 1]; j++) {
+    for (j = M0->roff[i]; j < M0->roff[i + 1]; j++) {
       ptr[nn].r = M0->row_start + i;
       ptr[nn].c = M0->col[j];
       ptr[nn].rn = (ptr[nn].r + 1) / 2;
@@ -83,7 +76,7 @@ void mgLevelSetup(mgData d, uint lvl) {
     return;
 
   if (ng > 1 && ng % 2 == 1)
-    for (j = 0; j < M0->row_off[rn0]; j++) {
+    for (j = 0; j < M0->roff[rn0]; j++) {
       if (ptr[j].c == ng)
         ptr[j].cn -= 1;
       if (ptr[j].r == ng)
@@ -135,9 +128,9 @@ void mgLevelSetup(mgData d, uint lvl) {
   l->data = d;
 
   GenmapMalloc(1, &l->M);
-  csr_mat M1 = l->M;
+  struct csr_mat *M1 = l->M;
   M1->rn = nn;
-  GenmapMalloc(M1->rn + 1, &M1->row_off);
+  GenmapMalloc(M1->rn + 1, &M1->roff);
 
   slong cn = nn;
   comm_scan(out, &d->c, gs_long, gs_add, &cn, 1, bf);
@@ -161,7 +154,7 @@ void mgLevelSetup(mgData d, uint lvl) {
 
   uint rn1;
   GenmapScalar v;
-  M1->row_off[0] = i = j = nn = rn1 = 0;
+  M1->roff[0] = i = j = nn = rn1 = 0;
   ptr = entries.ptr;
   while (i < entries.n) {
     v = 0.0;
@@ -173,7 +166,7 @@ void mgLevelSetup(mgData d, uint lvl) {
     M1->col[nn] = ptr[i].cn, M1->v[nn] = v, nn++;
 
     if ((j < entries.n && ptr[j].rn != ptr[i].rn) || j >= entries.n)
-      M1->row_off[++rn1] = nn;
+      M1->roff[++rn1] = nn;
     i = j;
   }
   assert(nn == nnz1);    // sanity check
@@ -182,7 +175,7 @@ void mgLevelSetup(mgData d, uint lvl) {
   /* setup gs ids for coarse level (rhs interpolation ) */
   GenmapRealloc(rn0 + rn1, &ids);
   for (i = nn = 0; i < rn1; i++)
-    for (j = M1->row_off[i]; j < M1->row_off[i + 1]; j++)
+    for (j = M1->roff[i]; j < M1->roff[i + 1]; j++)
       if (M1->row_start + i == M1->col[j]) {
         ids[rn0 + nn] = M1->col[j];
         M1->diag[i] = M1->v[j];
@@ -196,7 +189,7 @@ void mgLevelSetup(mgData d, uint lvl) {
   /* setup gs handle for the mat-vec */
   GenmapRealloc(nnz1, &ids);
   for (i = 0; i < M1->rn; i++)
-    for (j = M1->row_off[i]; j < M1->row_off[i + 1]; j++)
+    for (j = M1->roff[i]; j < M1->roff[i + 1]; j++)
       if (M1->row_start + i == M1->col[j])
         ids[j] = M1->col[j];
       else
@@ -210,11 +203,9 @@ void mgLevelSetup(mgData d, uint lvl) {
   array_free(&entries);
 }
 
-void mgSetup(genmap_handle h, struct comm *gsc, csr_mat M, mgData *d_) {
+void mgSetup(struct comm *gsc, struct csr_mat *M, mgData *d_) {
   GenmapMalloc(1, d_);
   mgData d = *d_;
-  d->h = h;
-
   comm_dup(&d->c, gsc);
 
   uint np = gsc->np;
@@ -224,7 +215,7 @@ void mgSetup(genmap_handle h, struct comm *gsc, csr_mat M, mgData *d_) {
   comm_scan(out, &d->c, gs_long, gs_add, &in, 1, bf);
   slong rg = out[1][0];
 
-  d->nlevels = log2i(rg) + 1;
+  d->nlevels = log2ll(rg) + 1;
   GenmapMalloc(d->nlevels, &d->levels);
   GenmapMalloc(d->nlevels + 1, &d->level_off);
 
@@ -235,12 +226,12 @@ void mgSetup(genmap_handle h, struct comm *gsc, csr_mat M, mgData *d_) {
   d->levels[0]->nsmooth = 2, d->levels[0]->sigma = 0.6;
 
   uint i;
-  uint nnz = M->row_off[M->rn];
+  uint nnz = M->roff[M->rn];
   for (i = 1; i < d->nlevels; i++) {
     mgLevelSetup(d, i);
-    csr_mat Mi = d->levels[i]->M;
-    if (Mi->row_off[Mi->rn] > nnz)
-      nnz = Mi->row_off[Mi->rn];
+    struct csr_mat *Mi = d->levels[i]->M;
+    if (Mi->roff[Mi->rn] > nnz)
+      nnz = Mi->roff[Mi->rn];
     d->level_off[i + 1] = d->level_off[i] + Mi->rn;
     d->levels[i]->nsmooth = 2;
     d->levels[i]->sigma = 0.6;

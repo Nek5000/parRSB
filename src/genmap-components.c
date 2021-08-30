@@ -32,10 +32,10 @@ int check_bin_val(int bin, struct comm *gc) {
 /* Find the number of disconnected components */
 sint get_components(sint *component, struct rsb_element *elements,
                     struct comm *c, buffer *buf, uint nelt, uint nv) {
-  slong nelt_ = nelt;
   slong out[2][1], buff[2][1];
-  comm_scan(out, c, gs_long, gs_add, &nelt_, 1, buff);
-  slong nelg = out[1][0];
+  slong nelg = nelt;
+  comm_scan(out, c, gs_long, gs_add, &nelg, 1, buff);
+  nelg = out[1][0];
   ulong start = out[0][0];
 
   if (nelg == 0)
@@ -152,7 +152,8 @@ int balance_partitions(genmap_handle h, struct comm *lc, int bin,
                        struct comm *gc) {
   assert(check_bin_val(bin, gc) == 0);
 
-  uint nelt = genmap_get_nel(h);
+  uint nelt = h->elements->n;
+
   slong buf;
   slong nelgt = nelt;
   comm_allreduce(lc, gs_long, gs_add, &nelgt, 1, &buf);
@@ -171,13 +172,10 @@ int balance_partitions(genmap_handle h, struct comm *lc, int bin,
     send_cnt = nelgt - nelgt_exp;
 
   /* Setup gather-scatter */
-  int nv = genmap_get_nvertices(h);
+  int nv = h->nv;
   uint size = nelt * nv;
-
-  slong *ids = NULL;
-  GenmapMalloc(size, &ids);
-
-  struct rsb_element *elems = genmap_get_elements(h);
+  slong *ids = tcalloc(slong, size);
+  struct rsb_element *elems = h->elements->ptr;
   uint e, v;
   for (e = 0; e < nelt; e++)
     for (v = 0; v < nv; v++)
@@ -185,8 +183,7 @@ int balance_partitions(genmap_handle h, struct comm *lc, int bin,
 
   struct gs_data *gsh = gs_setup(ids, size, gc, 0, gs_pairwise, 0);
 
-  sint *input = NULL;
-  GenmapMalloc(size, &input);
+  sint *input = tcalloc(sint, size);
 
   if (send_cnt > 0)
     for (e = 0; e < size; e++)
@@ -277,77 +274,69 @@ int balance_partitions(genmap_handle h, struct comm *lc, int bin,
   genmap_comm_scan(h, lc);
 
   nelt = genmap_get_nel(h);
-  sint ncomp =
-      get_components(NULL, genmap_get_elements(h), lc, &h->buf, nelt, nv);
+  sint ncomp = get_components(NULL, h->elements->ptr, lc, &h->buf, nelt, nv);
   metric_acc(COMPONENTS, ncomp);
 
-  GenmapFree(input);
+  free(input);
   gs_free(gsh);
-  GenmapFree(ids);
+  free(ids);
 }
 
 int repair_partitions(genmap_handle h, struct comm *tc, struct comm *lc,
                       int bin, struct comm *gc) {
   assert(check_bin_val(bin, gc) == 0);
 
+  uint nelt = h->elements->n;
+
   slong buf;
-  uint nelt = genmap_get_nel(h);
   slong nelg = nelt;
   comm_allreduce(lc, gs_long, gs_add, &nelg, 1, &buf);
 
-  /* Check for disconnected components */
-  GenmapInitLaplacianWeighted(h, tc);
   sint np = lc->np;
   sint id = lc->id;
 
-  struct rsb_element *e = genmap_get_elements(h);
-  uint nv = genmap_get_nvertices(h);
-
-  sint *comp_ids = NULL;
-  GenmapMalloc(nelt, &comp_ids);
-
-  slong min, max;
-  sint ncomp = get_components(comp_ids, e, tc, &h->buf, nelt, nv);
+  struct rsb_element *e = h->elements->ptr;
+  sint *cmpids = tcalloc(sint, nelt);
+  sint ncomp = get_components(cmpids, e, tc, &h->buf, nelt, h->nv);
   slong ncompg = ncomp;
   comm_allreduce(lc, gs_long, gs_max, &ncompg, 1, &buf);
 
-  sint root = (lc->id == 0) * gc->id;
+  sint root = (id == 0) * gc->id;
   comm_allreduce(lc, gs_int, gs_max, &root, 1, &buf);
 
   int attempt = 0;
   int nattempts = 1;
 
   while (ncompg > 1 && attempt < nattempts) {
-    slong *comp_count = NULL;
-    GenmapCalloc(3 * ncomp, &comp_count);
+    slong *cmpcnt = tcalloc(slong, 3 * ncomp);
 
     uint i;
     for (i = 0; i < nelt; i++)
-      comp_count[comp_ids[i]]++;
+      cmpcnt[cmpids[i]]++;
 
     for (i = 0; i < ncomp; i++)
-      comp_count[ncomp + i] = comp_count[i];
+      cmpcnt[ncomp + i] = cmpcnt[i];
 
-    comm_allreduce(tc, gs_long, gs_add, &comp_count[ncomp], ncomp,
-                   &comp_count[2 * ncomp]);
+    comm_allreduce(tc, gs_long, gs_add, &cmpcnt[ncomp], ncomp,
+                   &cmpcnt[2 * ncomp]);
 
-    slong min_count = LONG_MAX;
-    sint min_id = -1;
+    slong mincnt = LONG_MAX;
+    sint minid = -1;
     for (i = 0; i < ncomp; i++) {
-      if (comp_count[ncomp + i] < min_count) {
-        min_count = comp_count[ncomp + i];
-        min_id = i;
+      if (cmpcnt[ncomp + i] < mincnt) {
+        mincnt = cmpcnt[ncomp + i];
+        minid = i;
       }
     }
 
-    slong min_count_global = min_count;
-    comm_allreduce(lc, gs_long, gs_min, &min_count_global, 1, &buf);
+    slong mincntg = mincnt;
+    comm_allreduce(lc, gs_long, gs_min, &mincntg, 1, &buf);
 
     /* bin is the tie breaker */
-    sint min_bin = (min_count_global == min_count) ? bin : INT_MAX;
+    sint min_bin = (mincntg == mincnt) ? bin : INT_MAX;
     comm_allreduce(lc, gs_int, gs_min, &min_bin, 1, &buf);
 
-    e = genmap_get_elements(h);
+    e = h->elements->ptr;
     for (i = 0; i < nelt; i++)
       e[i].proc = id;
 
@@ -355,16 +344,16 @@ int repair_partitions(genmap_handle h, struct comm *tc, struct comm *lc,
     sint high_np = np - low_np;
     sint start = (1 - bin) * low_np;
     sint P = bin * low_np + (1 - bin) * high_np;
-    slong size = (min_count_global + P - 1) / P;
+    slong size = (mincntg + P - 1) / P;
 
-    if (min_count_global == min_count && min_bin == bin) {
-      slong in = comp_count[min_id];
+    if (mincntg == mincnt && min_bin == bin) {
+      slong in = cmpcnt[minid];
       slong out[2][1], buff[2][1];
       comm_scan(out, tc, gs_long, gs_add, &in, 1, buff);
       slong off = out[0][0];
 
       for (i = 0; i < nelt; i++) {
-        if (comp_ids[i] == min_id) {
+        if (cmpids[i] == minid) {
           e[i].proc = start + off / size;
           off++;
         }
@@ -381,19 +370,17 @@ int repair_partitions(genmap_handle h, struct comm *tc, struct comm *lc,
     /* Do a load balanced sort in each partition */
     parallel_sort(struct rsb_element, h->elements, fiedler, gs_double, 0, 1, tc,
                   &h->buf);
-    genmap_comm_scan(h, tc);
-    nelt = genmap_get_nel(h);
-    GenmapInitLaplacianWeighted(h, tc);
 
-    GenmapRealloc(nelt, &comp_ids);
-    ncompg = ncomp =
-        get_components(comp_ids, genmap_get_elements(h), tc, &h->buf, nelt, nv);
+    nelt = h->elements->n;
+    cmpids = trealloc(sint, cmpids, nelt);
+    ncomp = get_components(cmpids, h->elements->ptr, tc, &h->buf, nelt, h->nv);
+    ncompg = ncomp;
     comm_allreduce(lc, gs_long, gs_max, &ncompg, 1, &buf);
 
-    GenmapFree(comp_count);
+    free(cmpcnt);
   }
 
-  GenmapFree(comp_ids);
+  free(cmpids);
 
   return 0;
 }

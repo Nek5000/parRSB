@@ -19,7 +19,8 @@
 #define MAXDIM 3 /* Maximum dimension of the mesh */
 #define MAXNV 8  /* Maximum number of vertices per element */
 
-/* rcb_element is used for rcb and rib */
+/* `struct rcb_element` is used for RCB and RIB partitioning.
+   `struct rsb_element` should be a superset of `struct rcb_element` */
 struct rcb_element {
   GenmapInt proc;
   GenmapInt origin;
@@ -29,7 +30,6 @@ struct rcb_element {
   GenmapScalar fiedler;
 };
 
-/* rsb_element should be a superset of rcb_element */
 struct rsb_element {
   GenmapInt proc;
   GenmapInt origin;
@@ -46,6 +46,44 @@ int rcb(struct array *elements, size_t unit_size, int ndim, struct comm *c,
 int rib(struct array *elements, size_t unit_size, int ndim, struct comm *c,
         buffer *bfr);
 
+/* Laplacian */
+struct gs_laplacian {
+  struct gs_data *gsh;
+  GenmapScalar *weights;
+  GenmapScalar *u;
+  uint lelt;
+  int nv;
+};
+
+int GenmapInitLaplacian(struct csr_mat *M, struct rsb_element *elems, uint n,
+                        int nv, struct comm *c, buffer *buf);
+int GenmapLaplacian(GenmapScalar *v, struct csr_mat *M, GenmapScalar *u,
+                    buffer *buf);
+
+int GenmapInitLaplacianWeighted(struct gs_laplacian *gl,
+                                struct rsb_element *elems, uint lelt, int nv,
+                                struct comm *c, buffer *buf);
+int GenmapLaplacianWeighted(GenmapScalar *v, struct gs_laplacian *gl,
+                            GenmapScalar *u, buffer *buf);
+
+/* Fiedler */
+int GenmapFiedlerLanczos(struct rsb_element *elements, uint lelt, int nv,
+                         int max_iter, int global, struct comm *gsc,
+                         buffer *buf);
+
+int GenmapFiedlerRQI(struct rsb_element *elements, uint lelt, int nv,
+                     int max_iter, int global, struct comm *gsc, buffer *buf);
+
+/* RSB */
+int genmap_rsb(genmap_handle h);
+
+/* Iterative methods */
+int flex_cg(genmap_vector x, struct gs_laplacian *gl, mgData d,
+            genmap_vector ri, int maxIter, struct comm *gsc, buffer *buf);
+
+int project(genmap_vector x, struct gs_laplacian *gl, mgData d,
+            genmap_vector ri, int max_iter, struct comm *gsc, buffer *buf);
+
 struct genmap_handle_private {
   struct comm *global;
 
@@ -61,11 +99,6 @@ struct genmap_handle_private {
   struct gs_data *gsw;
   GenmapScalar *weights;
   buffer buf;
-
-  /* Un-weighted Laplacian */
-  struct gs_data *gsh;
-  csr_mat M;
-  GenmapScalar *b;
 
   parrsb_options *options;
   size_t unit_size;
@@ -114,7 +147,7 @@ uint metric_get_levels();
 void metric_print(struct comm *c, int profile_level);
 void metric_finalize();
 
-/* genCon */
+/* Gencon */
 typedef struct {
   GenmapULong sequenceId;
   int nNeighbors;

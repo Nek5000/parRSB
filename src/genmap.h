@@ -13,7 +13,6 @@ void *genmap_get_elements(genmap_handle h);
 int genmap_get_nvertices(genmap_handle h);
 GenmapULong genmap_get_partition_nel(genmap_handle h);
 GenmapInt genmap_get_nel(genmap_handle h);
-GenmapLong genmap_get_local_start_index(genmap_handle h);
 int genmap_finalize(genmap_handle h);
 
 void genmap_comm_scan(genmap_handle h, struct comm *c);
@@ -35,30 +34,9 @@ int genmap_vector_ortho_one(struct comm *c, genmap_vector q1, GenmapULong n);
 
 int genmap_destroy_vector(genmap_vector x);
 
-/* Laplacian */
-int GenmapInitLaplacian(genmap_handle h, struct comm *c);
-int GenmapLaplacian(genmap_handle h, GenmapScalar *u, GenmapScalar *v);
-
-int GenmapInitLaplacianWeighted(genmap_handle h, struct comm *c);
-int GenmapLaplacianWeighted(genmap_handle h, GenmapScalar *u, GenmapScalar *v);
-
 /* Eigen */
-int GenmapTQLI(genmap_handle h, genmap_vector diag, genmap_vector upper,
-               genmap_vector **eVec, genmap_vector *eVal);
 int genmap_inverse_power(double *y, int N, double *A, int verbose);
 int genmap_power(double *y, int N, double *A, int verbose);
-
-/* Lanczos */
-int GenmapLanczos(genmap_handle h, struct comm *c, genmap_vector f, int niter,
-                  genmap_vector **rr, genmap_vector diag, genmap_vector upper);
-
-/* Fiedler */
-int GenmapFiedlerLanczos(genmap_handle h, struct comm *c, int maxIter,
-                         int global);
-int GenmapFiedlerRQI(genmap_handle h, struct comm *c, int maxIter, int global);
-
-/* RSB/RCB */
-int genmap_rsb(genmap_handle h);
 
 /* Misc */
 double GenmapGetMaxRss();

@@ -75,6 +75,28 @@ static double get_avg_nbrs(genmap_handle h, struct comm *c) {
   return (nmsg + 1e-6) / c->np;
 }
 
+static void rsb_local(struct rsb_element *elems, uint n, int nv, buffer *buf) {
+  uint s = 0, e = n;
+  uint size = e - s;
+
+  slong *ids = tcalloc(slong, size);
+  uint i, j, cnt;
+  while (size > 1) {
+    cnt = 0;
+    for (i = s; i < e; i++) {
+      for (j = 0; j < nv; j++)
+        ids[cnt++] = elems[i].vertices[j];
+    }
+    // GenmapInitLaplacianWeighted()
+    // GenmapFiedlerLanczos()
+    // mid = (s + e) / 2
+    // rsb_local(s, mid)
+    // rsb_local(mid, e)
+  }
+
+  free(ids);
+}
+
 int genmap_rsb(genmap_handle h) {
   int max_iter = 50;
   int max_pass = 50;
@@ -106,19 +128,16 @@ int genmap_rsb(genmap_handle h) {
 
     double nbrs = get_avg_nbrs(h, &lc);
 
-    /* Initialize the laplacian */
-    metric_tic(&lc, LAPLACIAN_INIT);
-    GenmapInitLaplacianWeighted(h, &lc);
-    metric_toc(&lc, LAPLACIAN_INIT);
-
     /* Run fiedler */
     metric_tic(&lc, FIEDLER);
     int ipass = 0, iter;
     do {
       if (h->options->rsb_algo == 0)
-        iter = GenmapFiedlerLanczos(h, &lc, max_iter, global);
+        iter = GenmapFiedlerLanczos(h->elements->ptr, h->elements->n, h->nv,
+                                    max_iter, global, &lc, &h->buf);
       else if (h->options->rsb_algo == 1)
-        iter = GenmapFiedlerRQI(h, &lc, max_iter, global);
+        iter = GenmapFiedlerRQI(h->elements->ptr, h->elements->n, h->nv,
+                                max_iter, global, &lc, &h->buf);
       metric_acc(FIEDLER_NITER, iter);
       global = 0;
     } while (++ipass < max_pass && iter == max_iter);
@@ -158,6 +177,7 @@ int genmap_rsb(genmap_handle h) {
     metric_push_level();
     level++;
   }
+  // rsb_local
   comm_free(&lc);
 
   check_rsb_partition(gc, max_pass, max_iter);

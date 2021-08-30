@@ -15,11 +15,6 @@ int genmap_init(genmap_handle *h_, comm_ext ce, parrsb_options *options) {
   h->gsw = NULL;
   buffer_init(&h->buf, 1024);
 
-  /* Un-weighted Laplacian */
-  h->gsh = NULL;
-  h->M = NULL;
-  h->b = NULL;
-
   h->options = options;
 
   return 0;
@@ -32,14 +27,6 @@ int genmap_finalize(genmap_handle h) {
   if (h->gsw != NULL)
     gs_free(h->gsw);
   buffer_free(&h->buf);
-
-  /* Un-weighted Laplacian */
-  if (h->gsh)
-    gs_free(h->gsh);
-  if (h->M)
-    csr_mat_free(h->M);
-  if (h->b != NULL)
-    GenmapFree(h->b);
 
   if (h->global != NULL) {
     comm_free(h->global);
@@ -57,7 +44,6 @@ void *genmap_get_elements(genmap_handle h) {
 int genmap_get_nvertices(genmap_handle h) { return h->nv; }
 GenmapInt genmap_get_nel(genmap_handle h) { return h->elements->n; }
 GenmapULong genmap_get_partition_nel(genmap_handle h) { return h->nel; }
-GenmapLong genmap_get_local_start_index(genmap_handle h) { return h->start; }
 
 void genmap_barrier(struct comm *c) {
 #if defined(GENMAP_SYNC_BY_REDUCTION)
