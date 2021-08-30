@@ -2,7 +2,8 @@
 #include <genmap-impl.h>
 #include <sort.h>
 
-static void get_rib_axis(char *elems, uint nel, size_t unit_size, int ndim, struct comm *c) {
+static void get_rib_axis(char *elems, uint nel, size_t unit_size, int ndim,
+                         struct comm *c) {
   double avg[3];
   avg[0] = avg[1] = avg[2] = 0.0;
   struct rcb_element *elem;
@@ -89,7 +90,8 @@ static int rib_level(struct array *a, size_t unit_size, int ndim,
   return 0;
 }
 
-int rib(struct array *elements, size_t unit_size, int ndim, struct comm *ci, buffer *bfr) {
+int rib(struct array *elements, size_t unit_size, int ndim, struct comm *ci,
+        buffer *bfr) {
   struct comm c;
   comm_dup(&c, ci);
 

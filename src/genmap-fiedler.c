@@ -54,8 +54,8 @@ int GenmapFiedlerRQI(genmap_handle h, struct comm *gsc, int max_iter,
   for (i = 0; i < lelt; i++)
     elements[i].fiedler = y->data[i];
 
-  GenmapDestroyVector(y);
-  GenmapDestroyVector(initVec);
+  genmap_destroy_vector(y);
+  genmap_destroy_vector(initVec);
 
   return iter;
 }
@@ -142,19 +142,19 @@ int GenmapFiedlerLanczos(genmap_handle h, struct comm *gsc, int max_iter,
   for (i = 0; i < lelt; i++)
     elements[i].fiedler = evLanczos->data[i];
 
-  GenmapDestroyVector(initVec);
-  GenmapDestroyVector(alphaVec);
-  GenmapDestroyVector(betaVec);
-  GenmapDestroyVector(evLanczos);
-  GenmapDestroyVector(evTriDiag);
+  genmap_destroy_vector(initVec);
+  genmap_destroy_vector(alphaVec);
+  genmap_destroy_vector(betaVec);
+  genmap_destroy_vector(evLanczos);
+  genmap_destroy_vector(evTriDiag);
 
-  GenmapDestroyVector(eValues);
+  genmap_destroy_vector(eValues);
   for (i = 0; i < iter; i++)
-    GenmapDestroyVector(eVectors[i]);
+    genmap_destroy_vector(eVectors[i]);
   GenmapFree(eVectors);
 
   for (i = 0; i < iter + 1; i++)
-    GenmapDestroyVector(q[i]);
+    genmap_destroy_vector(q[i]);
   GenmapFree(q);
 
   return iter;

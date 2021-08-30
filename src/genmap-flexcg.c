@@ -76,12 +76,12 @@ int flex_cg(genmap_handle h, struct comm *gsc, mgData d, genmap_vector ri,
     comm_allreduce(gsc, gs_double, gs_add, &rr, 1, &buf);
   }
 
-  GenmapDestroyVector(z);
-  GenmapDestroyVector(w);
-  GenmapDestroyVector(p);
-  GenmapDestroyVector(r);
-  GenmapDestroyVector(z0);
-  GenmapDestroyVector(dz);
+  genmap_destroy_vector(z);
+  genmap_destroy_vector(w);
+  genmap_destroy_vector(p);
+  genmap_destroy_vector(r);
+  genmap_destroy_vector(z0);
+  genmap_destroy_vector(dz);
 
   return i;
 }

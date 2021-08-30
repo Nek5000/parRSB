@@ -114,12 +114,12 @@ int project(genmap_handle h, struct comm *gsc, mgData d, genmap_vector ri,
     metric_toc(gsc, PROJECT);
   }
 
-  GenmapDestroyVector(z);
-  GenmapDestroyVector(w);
-  GenmapDestroyVector(p);
-  GenmapDestroyVector(r);
-  GenmapDestroyVector(z0);
-  GenmapDestroyVector(dz);
+  genmap_destroy_vector(z);
+  genmap_destroy_vector(w);
+  genmap_destroy_vector(p);
+  genmap_destroy_vector(r);
+  genmap_destroy_vector(z0);
+  genmap_destroy_vector(dz);
 
   GenmapFree(P);
   GenmapFree(W);

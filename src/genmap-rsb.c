@@ -79,10 +79,11 @@ int genmap_rsb(genmap_handle h) {
   int max_iter = 50;
   int max_pass = 50;
 
-  struct comm *lc = h->local;
   struct comm *gc = h->global;
+  struct comm lc;
+  comm_dup(&lc, gc);
 
-  genmap_comm_scan(h, lc);
+  genmap_comm_scan(h, &lc);
 
   uint nelt = genmap_get_nel(h);
   int nv = h->nv;
@@ -91,72 +92,73 @@ int genmap_rsb(genmap_handle h) {
   int np = gc->np;
   int level = 0;
 
-  while ((np = lc->np) > 1) {
+  while ((np = lc.np) > 1) {
     int global = 1;
 
     /* Run RCB, RIB pre-step or just sort by global id */
     if (h->options->rsb_pre == 0) // Sort by global id
       parallel_sort(struct rsb_element, h->elements, globalId, gs_long, 0, 1,
-                    lc, &h->buf);
+                    &lc, &h->buf);
     else if (h->options->rsb_pre == 1) // RCB
-      rcb(h->elements, h->unit_size, ndim, lc, &h->buf);
+      rcb(h->elements, h->unit_size, ndim, &lc, &h->buf);
     else if (h->options->rsb_pre == 2) // RIB
-      rib(h->elements, h->unit_size, ndim, lc, &h->buf);
+      rib(h->elements, h->unit_size, ndim, &lc, &h->buf);
 
-    double nbrs = get_avg_nbrs(h, lc);
+    double nbrs = get_avg_nbrs(h, &lc);
 
     /* Initialize the laplacian */
-    metric_tic(lc, LAPLACIAN_INIT);
-    GenmapInitLaplacianWeighted(h, lc);
-    metric_toc(lc, LAPLACIAN_INIT);
+    metric_tic(&lc, LAPLACIAN_INIT);
+    GenmapInitLaplacianWeighted(h, &lc);
+    metric_toc(&lc, LAPLACIAN_INIT);
 
     /* Run fiedler */
-    metric_tic(lc, FIEDLER);
+    metric_tic(&lc, FIEDLER);
     int ipass = 0, iter;
     do {
       if (h->options->rsb_algo == 0)
-        iter = GenmapFiedlerLanczos(h, lc, max_iter, global);
+        iter = GenmapFiedlerLanczos(h, &lc, max_iter, global);
       else if (h->options->rsb_algo == 1)
-        iter = GenmapFiedlerRQI(h, lc, max_iter, global);
+        iter = GenmapFiedlerRQI(h, &lc, max_iter, global);
       metric_acc(FIEDLER_NITER, iter);
       global = 0;
     } while (++ipass < max_pass && iter == max_iter);
-    metric_toc(lc, FIEDLER);
+    metric_toc(&lc, FIEDLER);
 
     /* Sort by Fiedler vector */
     parallel_sort_2(struct rsb_element, h->elements, fiedler, gs_double,
-                    globalId, gs_long, 0, 1, lc, &h->buf);
+                    globalId, gs_long, 0, 1, &lc, &h->buf);
 
     /* Bisect, repair and balance */
     int bin = 1;
-    if (lc->id < (lc->np + 1) / 2)
+    if (lc.id < (lc.np + 1) / 2)
       bin = 0;
 
     struct comm tc;
-    genmap_comm_split(lc, bin, lc->id, &tc);
+    genmap_comm_split(&lc, bin, lc.id, &tc);
     if (h->options->repair == 1)
-      repair_partitions(h, &tc, lc, bin, gc);
-    balance_partitions(h, &tc, bin, lc);
+      repair_partitions(h, &tc, &lc, bin, gc);
+    balance_partitions(h, &tc, bin, &lc);
 
-    if (get_avg_nbrs(h, lc) > nbrs) {
+    if (get_avg_nbrs(h, &lc) > nbrs) {
       /* Run RCB, RIB pre-step or just sort by global id */
       if (h->options->rsb_pre == 0) // Sort by global id
         parallel_sort(struct rsb_element, h->elements, globalId, gs_long, 0, 1,
-                      lc, &h->buf);
+                      &lc, &h->buf);
       else if (h->options->rsb_pre == 1) // RCB
-        rcb(h->elements, h->unit_size, ndim, lc, &h->buf);
+        rcb(h->elements, h->unit_size, ndim, &lc, &h->buf);
       else if (h->options->rsb_pre == 2) // RIB
-        rib(h->elements, h->unit_size, ndim, lc, &h->buf);
+        rib(h->elements, h->unit_size, ndim, &lc, &h->buf);
     }
 
-    comm_free(lc);
-    comm_dup(lc, &tc);
+    comm_free(&lc);
+    comm_dup(&lc, &tc);
     comm_free(&tc);
 
-    genmap_comm_scan(h, lc);
+    genmap_comm_scan(h, &lc);
     metric_push_level();
     level++;
   }
+  comm_free(&lc);
 
   check_rsb_partition(gc, max_pass, max_iter);
 

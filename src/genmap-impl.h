@@ -47,8 +47,7 @@ int rib(struct array *elements, size_t unit_size, int ndim, struct comm *c,
         buffer *bfr);
 
 struct genmap_handle_private {
-  genmap_comm global;
-  genmap_comm local;
+  struct comm *global;
 
   GenmapLong nel;
   GenmapLong Nnodes;

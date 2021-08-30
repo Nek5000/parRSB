@@ -4,38 +4,20 @@
 #include <genmap-types.h>
 #include <parRSB.h>
 
-typedef struct comm *genmap_comm;
 typedef struct genmap_handle_private *genmap_handle;
 typedef struct genmap_vector_private *genmap_vector;
 
 /* genmap_handle */
 int genmap_init(genmap_handle *h, comm_ext ce, parrsb_options *options);
-
 void *genmap_get_elements(genmap_handle h);
-void genmap_set_elements(genmap_handle h, struct array *elements);
-
-genmap_comm genmap_local_comm(genmap_handle h);
-genmap_comm genmap_global_comm(genmap_handle h);
-
-void genmap_set_nvertices(genmap_handle h, int nv);
 int genmap_get_nvertices(genmap_handle h);
-
 GenmapULong genmap_get_partition_nel(genmap_handle h);
-void genmap_set_partition_nel(genmap_handle h, GenmapULong globalElements);
-
 GenmapInt genmap_get_nel(genmap_handle h);
-
 GenmapLong genmap_get_local_start_index(genmap_handle h);
-void genmap_set_local_start_index(genmap_handle h, GenmapLong localStart);
-
-void genmap_barrier(struct comm *c);
-
 int genmap_finalize(genmap_handle h);
 
-/* genmap_comm */
-void genmap_comm_scan(genmap_handle h, genmap_comm c);
-int genmap_comm_size(genmap_comm c);
-int genmap_comm_rank(genmap_comm c);
+void genmap_comm_scan(genmap_handle h, struct comm *c);
+void genmap_barrier(struct comm *c);
 void genmap_comm_split(struct comm *old, int bin, int key, struct comm *new_);
 
 /* genmap_vector */
@@ -51,7 +33,7 @@ GenmapScalar genmap_vector_dot(genmap_vector x, genmap_vector y);
 
 int genmap_vector_ortho_one(struct comm *c, genmap_vector q1, GenmapULong n);
 
-int GenmapDestroyVector(genmap_vector x);
+int genmap_destroy_vector(genmap_vector x);
 
 /* Laplacian */
 int GenmapInitLaplacian(genmap_handle h, struct comm *c);

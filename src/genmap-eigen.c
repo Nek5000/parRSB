@@ -32,7 +32,7 @@ int GenmapSymTriDiagSolve(genmap_vector x, genmap_vector b, genmap_vector alpha,
     x->data[i] = (x->data[i] - beta->data[i] * x->data[i + 1]) / diag->data[i];
   }
 
-  GenmapDestroyVector(diag);
+  genmap_destroy_vector(diag);
   return 0;
 }
 
@@ -78,7 +78,7 @@ int GenmapTQLI(genmap_handle h, genmap_vector diagonal, genmap_vector upper,
 
       if (m != l) {
         if (iter++ == 30) {
-          if (genmap_comm_rank(genmap_global_comm(h)) == 0)
+          if (h->global->id == 0)
             printf("Too many iterations.\n");
           genmap_vector_copy(*eValues, d);
           return 1;
@@ -151,8 +151,8 @@ int GenmapTQLI(genmap_handle h, genmap_vector diagonal, genmap_vector upper,
 
   genmap_vector_copy(*eValues, d);
 
-  GenmapDestroyVector(d);
-  GenmapDestroyVector(e);
+  genmap_destroy_vector(d);
+  genmap_destroy_vector(e);
 
   return 0;
 }

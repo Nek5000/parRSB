@@ -21,7 +21,7 @@ extern "C" {
 typedef struct {
   /* General options */
   int partitioner;   // 0 - RSB, 1 - RCB, 2 - RIB (Default: 0)
-  int verbose_level;   // 0, 1, 2, .. etc (Default: 1)
+  int verbose_level; // 0, 1, 2, .. etc (Default: 1)
   int profile_level; // 0, 1, 2, .. etc (Default: 0)
 
   /* RSB specific */

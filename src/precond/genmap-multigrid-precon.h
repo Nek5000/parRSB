@@ -82,12 +82,4 @@ int project(genmap_handle h, struct comm *c, mgData d, genmap_vector r,
 int rqi(genmap_handle h, struct comm *gsc, mgData d, genmap_vector z,
         int maxIter, genmap_vector fiedler);
 
-#if 0
-void mg_vcycle_lvl(GenmapScalar *u1, GenmapScalar *rhs, mgData d,
-                   int lvl_start);
-int project_lvl(genmap_handle h, genmap_comm c, mgData d, GenmapScalar *ri,
-                int maxIter, int lvl_start, GenmapScalar *xo);
-int fmg(genmap_handle h, genmap_comm c, mgData d, GenmapScalar *z, int maxIter, GenmapScalar *fiedler);
-#endif
-
 #endif

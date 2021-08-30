@@ -110,9 +110,9 @@ int GenmapLanczos(genmap_handle h, struct comm *gsc, genmap_vector f, int niter,
   metric_acc(LANCZOS_TOL_FINAL, rnorm);
   metric_acc(LANCZOS_TOL_TARGET, rtol);
 
-  GenmapDestroyVector(p);
-  GenmapDestroyVector(w);
-  GenmapDestroyVector(r);
+  genmap_destroy_vector(p);
+  genmap_destroy_vector(w);
+  genmap_destroy_vector(r);
 
   return iter;
 }

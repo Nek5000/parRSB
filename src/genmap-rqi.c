@@ -10,7 +10,7 @@ int rqi(genmap_handle h, struct comm *gsc, mgData d, genmap_vector z,
   genmap_vector err;
   genmap_vector_create(&err, lelt);
 
-  int rank = genmap_comm_rank(genmap_global_comm(h));
+  int rank = h->global->id;
   GenmapLong nelg = genmap_get_partition_nel(h);
 
   // Grammian
@@ -130,7 +130,7 @@ int rqi(genmap_handle h, struct comm *gsc, mgData d, genmap_vector z,
   GenmapFree(v);
   GenmapFree(buf);
 
-  GenmapDestroyVector(err);
+  genmap_destroy_vector(err);
 
   return i + 1;
 }

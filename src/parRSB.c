@@ -192,14 +192,14 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
     genmap_handle h;
     genmap_init(&h, comm_rsb, &options);
 
-    genmap_set_elements(h, &elist);
-    genmap_comm_scan(h, genmap_global_comm(h));
-    genmap_set_nvertices(h, nv);
+    h->elements = &elist;
+    genmap_comm_scan(h, h->global);
+    h->nv = nv;
     h->unit_size = elem_size;
 
     GenmapLong nelg = genmap_get_partition_nel(h);
-    GenmapInt id = genmap_comm_rank(genmap_global_comm(h));
-    GenmapInt size_ = genmap_comm_size(genmap_global_comm(h));
+    GenmapInt id = h->global->id;
+    GenmapInt size_ = h->global->np;
 
     if (size_ > nelg) {
       if (id == 0)

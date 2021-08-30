@@ -27,7 +27,7 @@ int genmap_vector_create(genmap_vector *x, GenmapInt size) {
   return 0;
 }
 
-int GenmapDestroyVector(genmap_vector x) {
+int genmap_destroy_vector(genmap_vector x) {
   if (x->data) {
     GenmapFree(x->data);
   }
