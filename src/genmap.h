@@ -76,14 +76,7 @@ int GenmapFiedlerLanczos(genmap_handle h, struct comm *c, int maxIter,
 int GenmapFiedlerRQI(genmap_handle h, struct comm *c, int maxIter, int global);
 
 /* RSB/RCB */
-size_t genmap_load_balance(struct array *eList, uint nel, int nv, double *coord,
-                           long long *vtx, struct crystal *cr, buffer *bfr);
 int genmap_rsb(genmap_handle h);
-int genmap_rcb(genmap_handle h);
-int genmap_rib(genmap_handle h);
-
-void genmap_restore_original(int *part, int *seq, struct crystal *cr,
-                             struct array *eList, buffer *bfr);
 
 /* Misc */
 double GenmapGetMaxRss();

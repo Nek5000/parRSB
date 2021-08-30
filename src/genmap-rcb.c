@@ -2,15 +2,9 @@
 #include <genmap-impl.h>
 #include <sort.h>
 
-void get_rcb_axis_local(double *min, double *max, struct rcb_element *elems,
-                        uint nel, int ndim) {
-  // TODO: Get rid of this
-  size_t unit_size;
-  if (elems->type == GENMAP_RCB_ELEMENT) {
-    unit_size = sizeof(struct rcb_element);
-  } else if (elems->type == GENMAP_RSB_ELEMENT) {
-    unit_size = sizeof(struct rsb_element);
-  }
+static void get_axis_len(double *length, size_t unit_size, char *elems,
+                         uint nel, int ndim, struct comm *c) {
+  double min[3], max[3], buf[3];
 
   sint i;
   for (i = 0; i < ndim; i++) {
@@ -20,7 +14,7 @@ void get_rcb_axis_local(double *min, double *max, struct rcb_element *elems,
 
   struct rcb_element *ei;
   for (i = 0; i < nel; i++) {
-    ei = (struct rcb_element *)((char *)elems + i * unit_size);
+    ei = (struct rcb_element *)(elems + i * unit_size);
     if (ei->coord[0] < min[0])
       min[0] = ei->coord[0];
     if (ei->coord[0] > max[0])
@@ -34,46 +28,41 @@ void get_rcb_axis_local(double *min, double *max, struct rcb_element *elems,
 
   if (ndim == 3) {
     for (i = 0; i < nel; i++) {
-      ei = (struct rcb_element *)((char *)elems + i * unit_size);
+      ei = (struct rcb_element *)(elems + i * unit_size);
       if (ei->coord[2] < min[2])
         min[2] = ei->coord[2];
       if (ei->coord[2] > max[2])
         max[2] = ei->coord[2];
     }
   }
-}
 
-void rcb_local(struct array *a, uint start, uint end, int ndim, buffer *buf) {
-  sint size = end - start;
-  assert(size >= 0);
+  if (c != NULL) {
+    comm_allreduce(c, gs_double, gs_min, min, 3, buf);
+    comm_allreduce(c, gs_double, gs_max, max, 3, buf);
+  }
 
-  if (size <= 2)
-    return;
-
-  size_t unit_size;
-  struct rsb_element *elem = a->ptr;
-  if (elem->type == GENMAP_RCB_ELEMENT)
-    unit_size = sizeof(struct rcb_element);
-  else if (elem->type == GENMAP_RSB_ELEMENT)
-    unit_size = sizeof(struct rsb_element);
-
-  double min[3], max[3];
-  char *st = (char *)a->ptr + unit_size * start;
-  get_rcb_axis_local(min, max, (struct rcb_element *)st, size, ndim);
-
-  double length[3];
-  sint i;
   for (i = 0; i < ndim; i++)
     length[i] = max[i] - min[i];
+}
+
+static void rcb_local(struct array *a, size_t unit_size, uint start, uint end,
+                      int ndim, buffer *buf) {
+  sint size = end - start;
+  if (size <= 1)
+    return;
+
+  double length[3];
+  char *st = (char *)a->ptr + unit_size * start;
+  get_axis_len(length, unit_size, st, size, ndim, NULL);
 
   int axis = 0;
-  if (fabs(length[axis]) < fabs(length[1]))
+  if (length[1] > length[0])
     axis = 1;
   if (ndim == 3)
-    if (fabs(length[axis]) < fabs(length[2]))
+    if (length[2] > length[axis])
       axis = 2;
 
-  if (elem->type == GENMAP_RCB_ELEMENT) {
+  if (unit_size == sizeof(struct rcb_element)) {
     switch (axis) {
     case 0:
       sarray_sort(struct rcb_element, st, size, coord[0], 3, buf);
@@ -87,7 +76,7 @@ void rcb_local(struct array *a, uint start, uint end, int ndim, buffer *buf) {
     default:
       break;
     }
-  } else if (elem->type == GENMAP_RSB_ELEMENT) {
+  } else if (unit_size == sizeof(struct rsb_element)) {
     switch (axis) {
     case 0:
       sarray_sort(struct rsb_element, st, size, coord[0], 3, buf);
@@ -104,39 +93,25 @@ void rcb_local(struct array *a, uint start, uint end, int ndim, buffer *buf) {
   }
 
   uint mid = (start + end) / 2;
-  rcb_local(a, start, mid, ndim, buf);
-  rcb_local(a, mid, end, ndim, buf);
+  rcb_local(a, unit_size, start, mid, ndim, buf);
+  rcb_local(a, unit_size, mid, end, ndim, buf);
 }
 
-// TODO: Get rid of this
-void get_rcb_axis(double *length, struct array *a, struct comm *c, int ndim) {
-  double min[MAXDIM], max[MAXDIM], buf[MAXDIM];
-
-  get_rcb_axis_local(min, max, a->ptr, a->n, ndim);
-  comm_allreduce(c, gs_double, gs_min, min, MAXDIM, buf);
-  comm_allreduce(c, gs_double, gs_max, max, MAXDIM, buf);
-
-  sint i;
-  for (i = 0; i < ndim; i++)
-    length[i] = max[i] - min[i];
-}
-
-int rcb_level(struct comm *c, struct array *a, int ndim, buffer *bfr) {
+static int rcb_level(struct array *a, size_t unit_size, int ndim,
+                     struct comm *c, buffer *bfr) {
   if (c->np == 1)
     return 0;
 
-  double length[MAXDIM];
+  double length[3];
+  get_axis_len(length, unit_size, (char *)a->ptr, a->n, ndim, c);
 
-  get_rcb_axis(length, a, c, ndim);
-
-  int axis1 = 0, d;
+  int axis = 0, d;
   for (d = 1; d < ndim; d++)
-    if (length[d] > length[axis1])
-      axis1 = d;
+    if (length[d] > length[axis])
+      axis = d;
 
-  struct rsb_element *elem = a->ptr;
-  if (elem->type == GENMAP_RCB_ELEMENT) {
-    switch (axis1) {
+  if (unit_size == sizeof(struct rcb_element)) {
+    switch (axis) {
     case 0:
       parallel_sort(struct rcb_element, a, coord[0], gs_double, 0, 1, c, bfr);
       break;
@@ -149,8 +124,8 @@ int rcb_level(struct comm *c, struct array *a, int ndim, buffer *bfr) {
     default:
       break;
     }
-  } else if (elem->type == GENMAP_RSB_ELEMENT) {
-    switch (axis1) {
+  } else if (unit_size == sizeof(struct rsb_element)) {
+    switch (axis) {
     case 0:
       parallel_sort(struct rsb_element, a, coord[0], gs_double, 0, 1, c, bfr);
       break;
@@ -168,7 +143,8 @@ int rcb_level(struct comm *c, struct array *a, int ndim, buffer *bfr) {
   return 0;
 }
 
-int rcb(struct comm *ci, struct array *elements, int ndim, buffer *bfr) {
+int rcb(struct array *elements, size_t unit_size, int ndim, struct comm *ci,
+        buffer *bfr) {
   struct comm c;
   comm_dup(&c, ci);
 
@@ -176,13 +152,13 @@ int rcb(struct comm *ci, struct array *elements, int ndim, buffer *bfr) {
   int rank = c.id;
 
   while (size > 1) {
-    rcb_level(&c, elements, ndim, bfr);
+    rcb_level(elements, unit_size, ndim, &c, bfr);
 
     int bin = 1;
     if (rank < (size + 1) / 2)
       bin = 0;
 
-    comm_ext comm_rcb;
+    MPI_Comm comm_rcb;
     MPI_Comm_split(c.c, bin, rank, &comm_rcb);
     comm_free(&c);
     comm_init(&c, comm_rcb);
@@ -191,27 +167,9 @@ int rcb(struct comm *ci, struct array *elements, int ndim, buffer *bfr) {
     size = c.np;
     rank = c.id;
   }
-
-  rcb_local(elements, 0, elements->n, ndim, bfr);
-
   comm_free(&c);
 
-  return 0;
-}
-
-int genmap_rcb(genmap_handle h) {
-  struct comm *lc = h->local;
-
-  int ndim = (h->nv == 8) ? 3 : 2;
-
-  rcb(lc, h->elements, ndim, &h->buf);
-
-#if 0
-  struct rcb_element *eptr = h->elements->ptr;
-  int e;
-  for (e = 0; e < h->elements->n; e++)
-    eptr[e].seq = e;
-#endif
+  rcb_local(elements, unit_size, 0, elements->n, ndim, bfr);
 
   return 0;
 }

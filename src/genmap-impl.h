@@ -10,9 +10,6 @@
 #include <genmap-multigrid-precon.h>
 #include <genmap.h>
 
-#define GENMAP_RCB_ELEMENT 0
-#define GENMAP_RSB_ELEMENT 1
-
 #define GENMAP_ALIGN 32
 
 #define GENMAP_SP_TOL 1e-05
@@ -24,7 +21,6 @@
 
 /* rcb_element is used for rcb and rib */
 struct rcb_element {
-  int type;
   GenmapInt proc;
   GenmapInt origin;
   GenmapInt seq;
@@ -35,7 +31,6 @@ struct rcb_element {
 
 /* rsb_element should be a superset of rcb_element */
 struct rsb_element {
-  int type;
   GenmapInt proc;
   GenmapInt origin;
   GenmapInt seq;
@@ -46,8 +41,10 @@ struct rsb_element {
   GenmapInt part;
 };
 
-int rcb(struct comm *ci, struct array *elements, int ndim, buffer *bfr);
-int rib(struct comm *ci, struct array *elements, int ndim, buffer *bfr);
+int rcb(struct array *elements, size_t unit_size, int ndim, struct comm *c,
+        buffer *bfr);
+int rib(struct array *elements, size_t unit_size, int ndim, struct comm *c,
+        buffer *bfr);
 
 struct genmap_handle_private {
   genmap_comm global;
@@ -72,7 +69,7 @@ struct genmap_handle_private {
   GenmapScalar *b;
 
   parrsb_options *options;
-  size_t elem_size;
+  size_t unit_size;
 };
 
 struct genmap_vector_private {

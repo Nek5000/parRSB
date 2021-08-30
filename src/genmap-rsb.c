@@ -99,9 +99,9 @@ int genmap_rsb(genmap_handle h) {
       parallel_sort(struct rsb_element, h->elements, globalId, gs_long, 0, 1,
                     lc, &h->buf);
     else if (h->options->rsb_pre == 1) // RCB
-      rcb(lc, h->elements, ndim, &h->buf);
+      rcb(h->elements, h->unit_size, ndim, lc, &h->buf);
     else if (h->options->rsb_pre == 2) // RIB
-      rib(lc, h->elements, ndim, &h->buf);
+      rib(h->elements, h->unit_size, ndim, lc, &h->buf);
 
     double nbrs = get_avg_nbrs(h, lc);
 
@@ -138,18 +138,16 @@ int genmap_rsb(genmap_handle h) {
       repair_partitions(h, &tc, lc, bin, gc);
     balance_partitions(h, &tc, bin, lc);
 
-#if 0
     if (get_avg_nbrs(h, lc) > nbrs) {
       /* Run RCB, RIB pre-step or just sort by global id */
       if (h->options->rsb_pre == 0) // Sort by global id
         parallel_sort(struct rsb_element, h->elements, globalId, gs_long, 0, 1,
                       lc, &h->buf);
       else if (h->options->rsb_pre == 1) // RCB
-        rcb(lc, h->elements, ndim, &h->buf);
+        rcb(h->elements, h->unit_size, ndim, lc, &h->buf);
       else if (h->options->rsb_pre == 2) // RIB
-        rib(lc, h->elements, ndim, &h->buf);
+        rib(h->elements, h->unit_size, ndim, lc, &h->buf);
     }
-#endif
 
     comm_free(lc);
     comm_dup(lc, &tc);

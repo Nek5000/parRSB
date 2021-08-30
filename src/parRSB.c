@@ -50,6 +50,99 @@ static void print_options(parrsb_options *options) {
 
 #undef PRINT_OPTION
 
+/* Load balance input data */
+static size_t load_balance(struct array *eList, uint nel, int nv, double *coord,
+                           long long *vtx, struct crystal *cr, buffer *bfr) {
+  slong in = nel;
+  slong out[2][1], buf[2][1];
+  comm_scan(out, &cr->comm, gs_long, gs_add, &in, 1, buf);
+  slong start = out[0][0];
+  slong nelg = out[1][0];
+
+  int size = cr->comm.np;
+  uint nstar = nelg / size;
+  uint nrem = nelg - nstar * size;
+  slong lower = (nstar + 1) * nrem;
+
+  size_t unit_size;
+  struct rcb_element *element = NULL;
+
+  if (vtx == NULL) { // RCB
+    unit_size = sizeof(struct rcb_element);
+    element = calloc(1, sizeof(struct rcb_element));
+  } else {
+    unit_size = sizeof(struct rsb_element);
+    element = calloc(1, sizeof(struct rsb_element));
+  }
+
+  element->origin = cr->comm.id;
+
+  array_init_(eList, nel, unit_size, __FILE__, __LINE__);
+
+  int ndim = (nv == 8) ? 3 : 2;
+  int e, n, v;
+  for (e = 0; e < nel; ++e) {
+    slong eg = element->globalId = start + e + 1;
+    if (eg <= lower)
+      element->proc = (eg - 1) / (nstar + 1);
+    else if (nstar != 0)
+      element->proc = (eg - 1 - lower) / nstar + nrem;
+
+    element->coord[0] = element->coord[1] = element->coord[2] = 0.0;
+    for (v = 0; v < nv; v++)
+      for (n = 0; n < ndim; n++)
+        element->coord[n] += coord[e * ndim * nv + v * ndim + n];
+    for (n = 0; n < ndim; n++)
+      element->coord[n] /= nv;
+
+    array_cat_(unit_size, eList, element, 1, __FILE__, __LINE__);
+  }
+  assert(eList->n == nel);
+
+  if (vtx != NULL) { // RSB
+    struct rsb_element *elements = eList->ptr;
+    for (e = 0; e < nel; e++) {
+      for (v = 0; v < nv; v++)
+        elements[e].vertices[v] = vtx[e * nv + v];
+    }
+  }
+
+  sarray_transfer_(eList, unit_size, offsetof(struct rcb_element, proc), 1, cr);
+  nel = eList->n;
+  if (vtx != NULL) // RSB
+    sarray_sort(struct rsb_element, eList->ptr, nel, globalId, 1, bfr);
+  else
+    sarray_sort(struct rcb_element, eList->ptr, nel, globalId, 1, bfr);
+
+  free(element);
+  return unit_size;
+}
+
+static void restore_original(int *part, int *seq, struct crystal *cr,
+                             struct array *elist, size_t unit_size,
+                             buffer *bfr) {
+  sarray_transfer_(elist, unit_size, offsetof(struct rcb_element, origin), 1,
+                   cr);
+  uint nel = elist->n;
+
+  if (unit_size == sizeof(struct rsb_element)) // RSB
+    sarray_sort(struct rsb_element, elist->ptr, nel, globalId, 1, bfr);
+  else if (unit_size == sizeof(struct rcb_element)) // RCB
+    sarray_sort(struct rcb_element, elist->ptr, nel, globalId, 1, bfr);
+
+  struct rcb_element *element;
+  uint e;
+  for (e = 0; e < nel; e++) {
+    element = (struct rcb_element *)((char *)elist->ptr + e * unit_size);
+    part[e] = element->origin; // element[e].origin;
+  }
+
+  if (seq != NULL)
+    for (e = 0; e < nel; e++) {
+      element = (struct rcb_element *)((char *)elist->ptr + e * unit_size);
+      seq[e] = element->seq; // element[e].seq;
+    }
+}
 /*
  * part = [nel], out,
  * seq = [nel], out,
@@ -87,14 +180,12 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
 
   /* Load balance input data */
   struct array elist;
-  size_t elem_size =
-      genmap_load_balance(&elist, nel, nv, coord, vtx, &cr, &bfr);
+  size_t elem_size = load_balance(&elist, nel, nv, coord, vtx, &cr, &bfr);
 
   /* Run RSB now */
-  comm_ext comm_rsb;
+  MPI_Comm comm_rsb;
   MPI_Comm_split(c.c, nel > 0, rank, &comm_rsb);
 
-  // TODO: Move this into another file
   if (nel > 0) {
     metric_init();
 
@@ -104,7 +195,7 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
     genmap_set_elements(h, &elist);
     genmap_comm_scan(h, genmap_global_comm(h));
     genmap_set_nvertices(h, nv);
-    h->elem_size = elem_size;
+    h->unit_size = elem_size;
 
     GenmapLong nelg = genmap_get_partition_nel(h);
     GenmapInt id = genmap_comm_rank(genmap_global_comm(h));
@@ -118,15 +209,16 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
       return 1;
     }
 
+    int ndim = (nv == 8) ? 3 : 2;
     switch (options.partitioner) {
     case 0:
       genmap_rsb(h);
       break;
     case 1:
-      genmap_rcb(h);
+      rcb(&elist, elem_size, ndim, h->global, &bfr);
       break;
     case 2:
-      genmap_rib(h);
+      rib(&elist, elem_size, ndim, h->global, &bfr);
       break;
     default:
       break;
@@ -140,7 +232,7 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
 
   MPI_Comm_free(&comm_rsb);
 
-  genmap_restore_original(part, seq, &cr, &elist, &bfr);
+  restore_original(part, seq, &cr, &elist, elem_size, &bfr);
 
   /* Report time and finish */
   genmap_barrier(&c);
