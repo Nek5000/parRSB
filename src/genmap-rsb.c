@@ -75,22 +75,13 @@ static void rsb_local(struct rsb_element *elems, uint n, int nv, buffer *buf) {
   uint s = 0, e = n;
   uint size = e - s;
 
-  slong *ids = tcalloc(slong, size);
   uint i, j, cnt;
   while (size > 1) {
-    cnt = 0;
-    for (i = s; i < e; i++) {
-      for (j = 0; j < nv; j++)
-        ids[cnt++] = elems[i].vertices[j];
-    }
-    // GenmapInitLaplacianWeighted()
-    // GenmapFiedlerLanczos()
+    // fiedlerLanczos()
     // mid = (s + e) / 2
     // rsb_local(s, mid)
     // rsb_local(mid, e)
   }
-
-  free(ids);
 }
 
 int rsb(struct array *elements, parrsb_options *options, int nv,
@@ -104,8 +95,6 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
   int ndim = (nv == 8) ? 3 : 2;
 
   while (lc.np > 1) {
-    int global = 1;
-
     /* Run RCB, RIB pre-step or just sort by global id */
     if (options->rsb_pre == 0) // Sort by global id
       parallel_sort(struct rsb_element, elements, globalId, gs_long, 0, 1, &lc,
@@ -119,17 +108,8 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
 
     /* Run fiedler */
     metric_tic(&lc, FIEDLER);
-    int ipass = 0, iter = 0;
-    do {
-      if (options->rsb_algo == 0)
-        iter = GenmapFiedlerLanczos(elements->ptr, elements->n, nv, max_iter,
-                                    global, &lc, bfr);
-      else if (options->rsb_algo == 1)
-        iter = GenmapFiedlerRQI(elements->ptr, elements->n, nv, max_iter,
-                                global, &lc, bfr);
-      metric_acc(FIEDLER_NITER, iter);
-      global = 0;
-    } while (++ipass < max_pass && iter == max_iter);
+    fiedler(elements->ptr, elements->n, nv, max_iter, max_pass,
+            options->rsb_algo, &lc, bfr);
     metric_toc(&lc, FIEDLER);
 
     /* Sort by Fiedler vector */
@@ -145,7 +125,7 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
     genmap_comm_split(&lc, bin, lc.id, &tc);
 
     if (options->repair == 1) {
-      repair_partitions (elements, nv, &tc, &lc, bin, gc, bfr);
+      repair_partitions(elements, nv, &tc, &lc, bin, gc, bfr);
       balance_partitions(elements, nv, &tc, &lc, bin, bfr);
     }
 

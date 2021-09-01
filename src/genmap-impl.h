@@ -11,10 +11,7 @@
 #include <parRSB.h>
 
 #define GENMAP_ALIGN 32
-
-#define GENMAP_SP_TOL 1e-05
-#define GENMAP_DP_TOL 1e-12
-#define GENMAP_TOL GENMAP_DP_TOL
+#define GENMAP_TOL 1e-12
 
 #define MAXDIM 3 /* Maximum dimension of the mesh */
 #define MAXNV 8  /* Maximum number of vertices per element */
@@ -24,7 +21,6 @@ struct genmap_vector_private {
   GenmapInt size;
   GenmapScalar *data;
 };
-
 typedef struct genmap_vector_private *genmap_vector;
 
 int genmap_vector_create(genmap_vector *x, GenmapInt size);
@@ -55,6 +51,7 @@ int rcb(struct array *elements, size_t unit_size, int ndim, struct comm *c,
 int rib(struct array *elements, size_t unit_size, int ndim, struct comm *c,
         buffer *bfr);
 
+/* RSB */
 struct rsb_element {
   GenmapInt proc;
   GenmapInt origin;
@@ -62,12 +59,11 @@ struct rsb_element {
   GenmapULong globalId;
   GenmapScalar coord[MAXDIM];
   GenmapScalar fiedler;
-  GenmapLong vertices[8];
+  GenmapLong vertices[MAXNV];
   GenmapInt part;
 };
 
-/* Laplacian */
-struct gs_laplacian {
+struct laplacian {
   struct gs_data *gsh;
   GenmapScalar *weights;
   GenmapScalar *u;
@@ -97,36 +93,37 @@ struct csr_mat {
   struct gs_data *gsh;
 };
 
+typedef struct {
+  GenmapULong sequenceId;
+  int nNeighbors;
+  GenmapULong elementId;
+  GenmapULong vertexId;
+  uint workProc;
+} vertex;
+
 int GenmapInitLaplacian(struct csr_mat *M, struct rsb_element *elems, uint n,
                         int nv, struct comm *c, buffer *buf);
 int GenmapLaplacian(GenmapScalar *v, struct csr_mat *M, GenmapScalar *u,
                     buffer *buf);
 
-int GenmapInitLaplacianWeighted(struct gs_laplacian *gl,
+int GenmapInitLaplacianWeighted(struct laplacian *gl,
                                 struct rsb_element *elems, uint lelt, int nv,
                                 struct comm *c, buffer *buf);
-int GenmapLaplacianWeighted(GenmapScalar *v, struct gs_laplacian *gl,
+int GenmapLaplacianWeighted(GenmapScalar *v, struct laplacian *gl,
                             GenmapScalar *u, buffer *buf);
+void laplacian_free(struct laplacian *l);
 
-/* Eigen */
 int genmap_inverse_power(double *y, int N, double *A, int verbose);
 int genmap_power(double *y, int N, double *A, int verbose);
 
-/* Fiedler */
-int GenmapFiedlerLanczos(struct rsb_element *elements, uint lelt, int nv,
-                         int max_iter, int global, struct comm *gsc,
-                         buffer *buf);
+int fiedler(struct rsb_element *elements, uint lelt, int nv, int max_iter,
+                  int max_pass, int global, struct comm *gsc, buffer *buf);
 
-int GenmapFiedlerRQI(struct rsb_element *elements, uint lelt, int nv,
-                     int max_iter, int global, struct comm *gsc, buffer *buf);
-
-/* Repair and balance */
 int repair_partitions(struct array *elements, int nv, struct comm *tc,
                       struct comm *lc, int bin, struct comm *gc, buffer *bfr);
 int balance_partitions(struct array *elements, int nv, struct comm *lc,
                        struct comm *gc, int bin, buffer *bfr);
 
-/* RSB */
 int rsb(struct array *elements, parrsb_options *options, int nv,
         struct comm *gc, buffer *bfr);
 
@@ -169,18 +166,6 @@ uint metric_get_levels();
 void metric_print(struct comm *c, int profile_level);
 void metric_finalize();
 
-/* Gencon */
-typedef struct {
-  GenmapULong sequenceId;
-  int nNeighbors;
-  GenmapULong elementId;
-  GenmapULong vertexId;
-  uint workProc;
-} vertex;
-
-/* Matrix inverse */
-void matrix_inverse(int N, double *A);
-
 /* Dump data */
 int GenmapFiedlerDump(const char *fname, struct rsb_element *elm, uint nelt,
                       int nv, struct comm *c);
@@ -188,10 +173,12 @@ int GenmapVectorDump(const char *fname, GenmapScalar *y,
                      struct rsb_element *elm, uint nelt, int nv,
                      struct comm *c);
 /* Misc */
+int log2ll(long long n);
+
 void genmap_barrier(struct comm *c);
 void genmap_comm_split(struct comm *old, int bin, int key, struct comm *new_);
+
 double GenmapGetMaxRss();
 void GenmapPrintStack();
-int log2ll(long long n);
 
 #endif

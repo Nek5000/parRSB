@@ -145,10 +145,15 @@ void mgLevelSetup(mgData d, uint lvl) {
     i = j, nnz1++;
   }
 
-  if (nnz1 == 0)
-    M1->col = NULL, M1->v = NULL, M1->diag = NULL;
-  else {
-    GenmapMalloc(nnz1, &M1->col), GenmapMalloc(nnz1, &M1->v);
+  if (nnz1 == 0) {
+    M1->col = NULL;
+    M1->v = NULL;
+    M1->diag = NULL;
+    M1->buf = NULL;
+  } else {
+    GenmapMalloc(nnz1, &M1->col);
+    GenmapMalloc(nnz1, &M1->v);
+    GenmapMalloc(nnz1, &M1->buf);
     GenmapMalloc(M1->rn, &M1->diag);
   }
 

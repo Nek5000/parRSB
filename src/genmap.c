@@ -52,3 +52,11 @@ int GenmapFree(void *p) {
   p = NULL;
   return 0;
 }
+
+int log2ll(long long n) {
+  int k = 0;
+  while (n > 1)
+    n /= 2, k++;
+
+  return k;
+}

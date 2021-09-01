@@ -5,9 +5,6 @@
 #include <genmap-impl.h>
 #include <parRSB.h>
 
-#define MAXNV 8  /* maximum number of vertices per element */
-#define MAXDIM 3 /* maximum number of vertices per element */
-
 /* elem_data must always start with vtx_data */
 typedef struct {
   int proc;
@@ -262,6 +259,3 @@ void parrsb_check_error_(int err, char *file, int line, MPI_Comm comm) {
     exit(1);
   }
 }
-
-#undef MAXNV
-#undef MAXDIM

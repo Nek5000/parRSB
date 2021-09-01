@@ -53,8 +53,8 @@ jobs:
         shell: bash
         run: |
           export EXAMPLEDIR=`pwd`/build/examples
-          export PARRSB_RSB_PRE=1
-          export PARRSB_RSB_ALGO=0
+          export PARRSB_RSB_PRE=0
+          export PARRSB_RSB_ALGO=1
 
           cd parRSB-tests/${{ matrix.test }}
           tol=(`cat test.txt | grep tol`); tol=${tol[2]}

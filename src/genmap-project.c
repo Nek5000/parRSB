@@ -2,7 +2,7 @@
 
 #define MM 500
 
-int project(genmap_vector x, struct gs_laplacian *gl, mgData d,
+int project(genmap_vector x, struct laplacian *gl, mgData d,
             genmap_vector ri, int max_iter, struct comm *gsc, buffer *buf) {
   assert(x->size == ri->size);
   uint lelt = x->size;
