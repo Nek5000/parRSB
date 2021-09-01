@@ -7,8 +7,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <genmap-multigrid-precon.h>
-#include <genmap.h>
+#include <genmap-types.h>
+#include <parRSB.h>
 
 #define GENMAP_ALIGN 32
 
@@ -18,6 +18,26 @@
 
 #define MAXDIM 3 /* Maximum dimension of the mesh */
 #define MAXNV 8  /* Maximum number of vertices per element */
+
+/* genmap_vector */
+struct genmap_vector_private {
+  GenmapInt size;
+  GenmapScalar *data;
+};
+
+typedef struct genmap_vector_private *genmap_vector;
+
+int genmap_vector_create(genmap_vector *x, GenmapInt size);
+int genmap_vector_create_zeros(genmap_vector *x, GenmapInt size);
+int genmap_vector_copy(genmap_vector x, genmap_vector y);
+
+int genmap_vector_scale(genmap_vector y, genmap_vector x, GenmapScalar alpha);
+int genmap_vector_axpby(genmap_vector z, genmap_vector x, GenmapScalar alpha,
+                        genmap_vector y, GenmapScalar beta);
+
+GenmapScalar genmap_vector_dot(genmap_vector x, genmap_vector y);
+int genmap_vector_ortho_one(struct comm *c, genmap_vector q1, GenmapULong n);
+int genmap_destroy_vector(genmap_vector x);
 
 /* `struct rcb_element` is used for RCB and RIB partitioning.
    `struct rsb_element` should be a superset of `struct rcb_element` */
@@ -30,6 +50,11 @@ struct rcb_element {
   GenmapScalar fiedler;
 };
 
+int rcb(struct array *elements, size_t unit_size, int ndim, struct comm *c,
+        buffer *bfr);
+int rib(struct array *elements, size_t unit_size, int ndim, struct comm *c,
+        buffer *bfr);
+
 struct rsb_element {
   GenmapInt proc;
   GenmapInt origin;
@@ -41,11 +66,6 @@ struct rsb_element {
   GenmapInt part;
 };
 
-int rcb(struct array *elements, size_t unit_size, int ndim, struct comm *c,
-        buffer *bfr);
-int rib(struct array *elements, size_t unit_size, int ndim, struct comm *c,
-        buffer *bfr);
-
 /* Laplacian */
 struct gs_laplacian {
   struct gs_data *gsh;
@@ -53,6 +73,28 @@ struct gs_laplacian {
   GenmapScalar *u;
   uint lelt;
   int nv;
+};
+
+typedef struct {
+  ulong r, c;
+  uint proc;
+} csr_entry;
+
+typedef struct {
+  ulong r, c, rn, cn;
+  uint p;
+  GenmapScalar v;
+} entry;
+
+struct csr_mat {
+  uint rn;
+  ulong row_start;
+
+  uint *roff;
+  ulong *col;
+  GenmapScalar *v, *diag, *buf;
+
+  struct gs_data *gsh;
 };
 
 int GenmapInitLaplacian(struct csr_mat *M, struct rsb_element *elems, uint n,
@@ -66,6 +108,10 @@ int GenmapInitLaplacianWeighted(struct gs_laplacian *gl,
 int GenmapLaplacianWeighted(GenmapScalar *v, struct gs_laplacian *gl,
                             GenmapScalar *u, buffer *buf);
 
+/* Eigen */
+int genmap_inverse_power(double *y, int N, double *A, int verbose);
+int genmap_power(double *y, int N, double *A, int verbose);
+
 /* Fiedler */
 int GenmapFiedlerLanczos(struct rsb_element *elements, uint lelt, int nv,
                          int max_iter, int global, struct comm *gsc,
@@ -74,41 +120,17 @@ int GenmapFiedlerLanczos(struct rsb_element *elements, uint lelt, int nv,
 int GenmapFiedlerRQI(struct rsb_element *elements, uint lelt, int nv,
                      int max_iter, int global, struct comm *gsc, buffer *buf);
 
+/* Repair and balance */
+int repair_partitions(struct array *elements, int nv, struct comm *tc,
+                      struct comm *lc, int bin, struct comm *gc, buffer *bfr);
+int balance_partitions(struct array *elements, int nv, struct comm *lc,
+                       struct comm *gc, int bin, buffer *bfr);
+
 /* RSB */
-int genmap_rsb(genmap_handle h);
+int rsb(struct array *elements, parrsb_options *options, int nv,
+        struct comm *gc, buffer *bfr);
 
-/* Iterative methods */
-int flex_cg(genmap_vector x, struct gs_laplacian *gl, mgData d,
-            genmap_vector ri, int maxIter, struct comm *gsc, buffer *buf);
-
-int project(genmap_vector x, struct gs_laplacian *gl, mgData d,
-            genmap_vector ri, int max_iter, struct comm *gsc, buffer *buf);
-
-struct genmap_handle_private {
-  struct comm *global;
-
-  GenmapLong nel;
-  GenmapLong Nnodes;
-  GenmapLong start;
-  int nv;
-
-  struct array *elements;
-  struct crystal cr;
-
-  /* Weighted Laplacian */
-  struct gs_data *gsw;
-  GenmapScalar *weights;
-  buffer buf;
-
-  parrsb_options *options;
-  size_t unit_size;
-};
-
-struct genmap_vector_private {
-  GenmapInt size;
-  GenmapScalar *data;
-};
-
+/* Memory */
 int GenmapMallocArray(size_t n, size_t unit, void *p);
 int GenmapCallocArray(size_t n, size_t unit, void *p);
 int GenmapReallocArray(size_t n, size_t unit, void *p);
@@ -156,24 +178,20 @@ typedef struct {
   uint workProc;
 } vertex;
 
-/* Repair and balance */
-sint get_components(sint *component, struct rsb_element *elements,
-                    struct comm *c, buffer *buf, uint nelt, uint nv);
-
-int repair_partitions(genmap_handle h, struct comm *tc, struct comm *lc,
-                      int bin, struct comm *gc);
-int balance_partitions(genmap_handle h, struct comm *lc, int bin,
-                       struct comm *gc);
-
 /* Matrix inverse */
 void matrix_inverse(int N, double *A);
 
 /* Dump data */
-int GenmapFiedlerDump(const char *fname, genmap_handle h, struct comm *c);
-int GenmapVectorDump(const char *fname, GenmapScalar *y, genmap_handle h,
+int GenmapFiedlerDump(const char *fname, struct rsb_element *elm, uint nelt,
+                      int nv, struct comm *c);
+int GenmapVectorDump(const char *fname, GenmapScalar *y,
+                     struct rsb_element *elm, uint nelt, int nv,
                      struct comm *c);
-int GenmapCentroidDump(const char *fname, genmap_handle h, sint g_id,
-                       struct comm *c);
-int GenmapElementIdDump(const char *fname, genmap_handle h, struct comm *c);
+/* Misc */
+void genmap_barrier(struct comm *c);
+void genmap_comm_split(struct comm *old, int bin, int key, struct comm *new_);
+double GenmapGetMaxRss();
+void GenmapPrintStack();
+int log2ll(long long n);
 
 #endif

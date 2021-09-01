@@ -1,8 +1,8 @@
 #include <getopt.h>
 #include <stdio.h>
 
-#include <gencon.h>
-#include <genmap.h>
+#include <gencon-impl.h>
+#include <genmap-impl.h>
 #include <parRSB.h>
 
 #define MAXNV 8  /* maximum number of vertices per element */

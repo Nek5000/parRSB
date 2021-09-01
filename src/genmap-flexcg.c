@@ -1,4 +1,4 @@
-#include <genmap-impl.h>
+#include <genmap-multigrid-precon.h>
 
 int flex_cg(genmap_vector x, struct gs_laplacian *gl, mgData d,
             genmap_vector ri, int maxIter, struct comm *gsc, buffer *buf) {

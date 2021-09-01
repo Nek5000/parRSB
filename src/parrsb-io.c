@@ -2,7 +2,7 @@
 #include <stdio.h>
 
 #include <gencon-impl.h>
-#include <genmap.h>
+#include <genmap-impl.h>
 #include <parRSB.h>
 
 #define GC_RE2_HEADER_LEN 80

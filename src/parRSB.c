@@ -155,10 +155,8 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
                      int nel, int nv, parrsb_options options, MPI_Comm comm) {
   struct comm c;
   comm_init(&c, comm);
-  int rank = c.id;
-  int size = c.np;
 
-  if (rank == 0 && options.verbose_level > 0) {
+  if (c.id == 0 && options.verbose_level > 0) {
     printf("Running parRSB ...\n");
     fflush(stdout);
   }
@@ -167,7 +165,7 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
   double t = comm_time();
 
   init_options(&options);
-  if (rank == 0 && options.verbose_level > 1) {
+  if (c.id == 0 && options.verbose_level > 1) {
     print_options(&options);
     fflush(stdout);
   }
@@ -183,61 +181,57 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
   size_t elem_size = load_balance(&elist, nel, nv, coord, vtx, &cr, &bfr);
 
   /* Run RSB now */
-  MPI_Comm comm_rsb;
-  MPI_Comm_split(c.c, nel > 0, rank, &comm_rsb);
+  MPI_Comm comma;
+  MPI_Comm_split(c.c, nel > 0, c.id, &comma);
 
+  int ndim = (nv == 8) ? 3 : 2;
   if (nel > 0) {
     metric_init();
 
-    genmap_handle h;
-    genmap_init(&h, comm_rsb, &options);
+    struct comm ca;
+    comm_init(&ca, comma);
 
-    h->elements = &elist;
-    genmap_comm_scan(h, h->global);
-    h->nv = nv;
-    h->unit_size = elem_size;
+    slong out[2][1], buf[2][1];
+    slong in = nel;
+    comm_scan(out, &ca, gs_long, gs_add, &in, 1, buf);
+    slong nelg = out[1][0];
 
-    GenmapLong nelg = genmap_get_partition_nel(h);
-    GenmapInt id = h->global->id;
-    GenmapInt size_ = h->global->np;
-
-    if (size_ > nelg) {
-      if (id == 0)
+    if (ca.np > nelg) {
+      if (ca.id == 0)
         printf("Total number of elements is smaller than the "
                "number of processors.\n"
                "Run with smaller number of processors.\n");
       return 1;
     }
 
-    int ndim = (nv == 8) ? 3 : 2;
     switch (options.partitioner) {
     case 0:
-      genmap_rsb(h);
+      rsb(&elist, &options, nv, &ca, &bfr);
       break;
     case 1:
-      rcb(&elist, elem_size, ndim, h->global, &bfr);
+      rcb(&elist, elem_size, ndim, &ca, &bfr);
       break;
     case 2:
-      rib(&elist, elem_size, ndim, h->global, &bfr);
+      rib(&elist, elem_size, ndim, &ca, &bfr);
       break;
     default:
       break;
     }
 
-    genmap_finalize(h);
+    metric_print(&ca, options.profile_level);
 
-    metric_print(&c, options.profile_level);
+    comm_free(&ca);
     metric_finalize();
   }
 
-  MPI_Comm_free(&comm_rsb);
+  MPI_Comm_free(&comma);
 
   restore_original(part, seq, &cr, &elist, elem_size, &bfr);
 
   /* Report time and finish */
   genmap_barrier(&c);
   t = comm_time() - t;
-  if (rank == 0 && options.verbose_level > 0) {
+  if (c.id == 0 && options.verbose_level > 0) {
     printf("parRSB finished in %g s\n", t);
     fflush(stdout);
   }

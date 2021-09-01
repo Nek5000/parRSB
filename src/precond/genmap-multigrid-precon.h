@@ -1,21 +1,10 @@
 #ifndef _GENMAP_PRECON_H_
 #define _GENMAP_PRECON_H_
 
-#include <genmap.h>
+#include <genmap-impl.h>
 
 typedef struct mgData_ *mgData;
 typedef struct mgLevel_ *mgLevel;
-
-struct csr_mat {
-  uint rn;
-  ulong row_start;
-
-  uint *roff;
-  ulong *col;
-  GenmapScalar *v, *diag, *buf;
-
-  struct gs_data *gsh;
-};
 
 // for the coarse level
 void csr_mat_setup(struct csr_mat *M, struct array *entries, struct comm *c,
@@ -48,17 +37,6 @@ void mgSetup(struct comm *c, struct csr_mat *M, mgData *d);
 void mgLevelSetup(mgData data, uint level);
 void mgFree(mgData d);
 
-typedef struct {
-  ulong r, c;
-  uint proc;
-} csr_entry;
-
-typedef struct {
-  ulong r, c, rn, cn;
-  uint p;
-  GenmapScalar v;
-} entry;
-
 #define GETLNG(p, i, off)                                                      \
   (*((ulong *)((char *)(p) + (off) + (i) * sizeof(entry))))
 #define GETPTR(p, i, off) ((char *)(p) + (off) + (i) * sizeof(entry))
@@ -67,5 +45,12 @@ void setOwner(char *ptr, sint n, size_t inOffset, size_t outOffset, slong lelg,
               sint np);
 
 void mg_vcycle(GenmapScalar *u, GenmapScalar *rhs, mgData d);
+
+/* Iterative methods */
+int flex_cg(genmap_vector x, struct gs_laplacian *gl, mgData d,
+            genmap_vector ri, int maxIter, struct comm *gsc, buffer *buf);
+
+int project(genmap_vector x, struct gs_laplacian *gl, mgData d,
+            genmap_vector ri, int max_iter, struct comm *gsc, buffer *buf);
 
 #endif
