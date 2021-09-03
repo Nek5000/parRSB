@@ -1,5 +1,5 @@
-#include <genmap-multigrid-precon.h>
 #include <genmap-impl.h>
+#include <genmap-multigrid-precon.h>
 
 #define MIN(a, b) ((b) < (a) ? (b) : (a))
 
@@ -112,7 +112,8 @@ int GenmapLaplacian(GenmapScalar *v, struct csr_mat *M, GenmapScalar *u,
 }
 
 int GenmapInitLaplacianWeighted(struct laplacian *gl, struct rsb_element *elems,
-                                uint lelt, int nv, struct comm *c, buffer *buf) {
+                                uint lelt, int nv, struct comm *c,
+                                buffer *buf) {
   uint npts = nv * lelt;
 
   slong *vertices = tcalloc(slong, npts);

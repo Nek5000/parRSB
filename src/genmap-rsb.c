@@ -71,16 +71,18 @@ static double get_avg_nbrs(struct rsb_element *elems, uint nel, int nv,
   return (nmsg + 1e-6) / c->np;
 }
 
-static void rsb_local(struct rsb_element *elems, uint n, int nv, buffer *buf) {
-  uint s = 0, e = n;
+static void rsb_local(struct rsb_element *elems, uint s, uint e, int nv,
+                      int max_iter, int max_pass, struct comm *lc,
+                      buffer *buf) {
+  /* lc should contain only a single rank */
+  uint mid;
   uint size = e - s;
-
-  uint i, j, cnt;
-  while (size > 1) {
-    // fiedlerLanczos()
-    // mid = (s + e) / 2
-    // rsb_local(s, mid)
-    // rsb_local(mid, e)
+  if (size > 1) {
+    fiedler(elems + s, size, nv, max_iter, max_pass, 0, lc, buf);
+    sarray_sort(struct rsb_element, elems + s, size, fiedler, 3, buf);
+    mid = (s + e) / 2;
+    rsb_local(elems, s, mid, nv, max_iter, max_pass, lc, buf);
+    rsb_local(elems, mid, e, nv, max_iter, max_pass, lc, buf);
   }
 }
 
@@ -146,7 +148,7 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
 
     metric_push_level();
   }
-  // rsb_local
+  rsb_local(elements->ptr, 0, elements->n, nv, max_iter, max_pass, &lc, bfr);
   comm_free(&lc);
 
   check_rsb_partition(gc, max_pass, max_iter);

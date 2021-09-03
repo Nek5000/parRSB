@@ -2,8 +2,8 @@
 
 #define MM 500
 
-int project(genmap_vector x, struct laplacian *gl, mgData d,
-            genmap_vector ri, int max_iter, struct comm *gsc, buffer *buf) {
+int project(genmap_vector x, struct laplacian *gl, mgData d, genmap_vector ri,
+            int max_iter, struct comm *gsc, buffer *buf) {
   assert(x->size == ri->size);
   uint lelt = x->size;
 
@@ -16,8 +16,8 @@ int project(genmap_vector x, struct laplacian *gl, mgData d,
   genmap_vector_create(&dz, lelt);
 
   assert(max_iter < MM);
-  double *P = tcalloc(double, lelt * MM);
-  double *W = tcalloc(double, lelt * MM);
+  double *P = tcalloc(double, lelt *MM);
+  double *W = tcalloc(double, lelt *MM);
 
   uint i;
   for (i = 0; i < lelt; i++) {

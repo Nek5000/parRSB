@@ -1,5 +1,5 @@
 ## General build parameters ##
-DEBUG ?= 0
+DEBUG ?= 1
 MPI ?= 1
 CC ?= mpicc
 CFLAGS ?= -g -O2

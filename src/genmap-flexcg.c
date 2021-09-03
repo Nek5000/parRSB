@@ -1,7 +1,7 @@
 #include <genmap-multigrid-precon.h>
 
-int flex_cg(genmap_vector x, struct laplacian *gl, mgData d,
-            genmap_vector ri, int maxIter, struct comm *gsc, buffer *buf) {
+int flex_cg(genmap_vector x, struct laplacian *gl, mgData d, genmap_vector ri,
+            int maxIter, struct comm *gsc, buffer *buf) {
   assert(x->size == ri->size);
   uint lelt = x->size;
 

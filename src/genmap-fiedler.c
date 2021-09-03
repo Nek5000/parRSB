@@ -6,9 +6,8 @@
 
 // Input z should be orthogonal to 1-vector, have unit norm.
 // RQI should not change z.
-static int rqi(genmap_vector y, struct laplacian *gl, mgData d,
-               genmap_vector z, struct comm *gsc, int max_iter, int grammian,
-               buffer *bff) {
+static int rqi(genmap_vector y, struct laplacian *gl, mgData d, genmap_vector z,
+               struct comm *gsc, int max_iter, int grammian, buffer *bff) {
   assert(z->size == y->size);
   assert(z->size == gl->lelt);
 
@@ -266,8 +265,9 @@ static int tqli(genmap_vector **eVectors, genmap_vector *eValues,
 }
 
 static int lanczos_aux(genmap_vector diag, genmap_vector upper,
-                       genmap_vector **ri, uint lelt, int niter, genmap_vector f,
-                       struct laplacian *gl, struct comm *gsc, buffer *bfr) {
+                       genmap_vector **ri, uint lelt, int niter,
+                       genmap_vector f, struct laplacian *gl, struct comm *gsc,
+                       buffer *bfr) {
   assert(diag->size == niter);
   assert(diag->size == upper->size + 1);
   assert(f->size == lelt);
@@ -390,8 +390,8 @@ static int lanczos(genmap_vector fiedler, uint lelt, int max_iter,
   genmap_vector *q = NULL;
 
   metric_tic(gsc, LANCZOS);
-  int iter = lanczos_aux(alphaVec, betaVec, &q, lelt, max_iter, initv, gl, gsc,
-                         buf);
+  int iter =
+      lanczos_aux(alphaVec, betaVec, &q, lelt, max_iter, initv, gl, gsc, buf);
   metric_toc(gsc, LANCZOS);
   metric_acc(LANCZOS_NITER, iter);
 
@@ -436,7 +436,7 @@ static int lanczos(genmap_vector fiedler, uint lelt, int max_iter,
 }
 
 int fiedler(struct rsb_element *elems, uint lelt, int nv, int max_iter,
-                  int max_pass, int algo, struct comm *gsc, buffer *buf) {
+            int max_pass, int algo, struct comm *gsc, buffer *buf) {
   slong out[2][1], bfr[2][1];
   slong in = lelt;
   comm_scan(out, gsc, gs_long, gs_add, &in, 1, bfr);

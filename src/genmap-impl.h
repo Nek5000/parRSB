@@ -106,9 +106,8 @@ int GenmapInitLaplacian(struct csr_mat *M, struct rsb_element *elems, uint n,
 int GenmapLaplacian(GenmapScalar *v, struct csr_mat *M, GenmapScalar *u,
                     buffer *buf);
 
-int GenmapInitLaplacianWeighted(struct laplacian *gl,
-                                struct rsb_element *elems, uint lelt, int nv,
-                                struct comm *c, buffer *buf);
+int GenmapInitLaplacianWeighted(struct laplacian *gl, struct rsb_element *elems,
+                                uint lelt, int nv, struct comm *c, buffer *buf);
 int GenmapLaplacianWeighted(GenmapScalar *v, struct laplacian *gl,
                             GenmapScalar *u, buffer *buf);
 void laplacian_free(struct laplacian *l);
@@ -117,7 +116,7 @@ int genmap_inverse_power(double *y, int N, double *A, int verbose);
 int genmap_power(double *y, int N, double *A, int verbose);
 
 int fiedler(struct rsb_element *elements, uint lelt, int nv, int max_iter,
-                  int max_pass, int global, struct comm *gsc, buffer *buf);
+            int max_pass, int global, struct comm *gsc, buffer *buf);
 
 int repair_partitions(struct array *elements, int nv, struct comm *tc,
                       struct comm *lc, int bin, struct comm *gc, buffer *bfr);
