@@ -40,8 +40,8 @@ static void check_partitions(struct comm *gc, int max_pass, int max_iter) {
 
     if (maxc > 1 && gc->id == 0) {
       printf("Warning: Partition created %d/%d (min/max) disconnected "
-             "components.\n",
-             minc, maxc);
+             "components in Level=%d.\n",
+             i, minc, maxc);
       fflush(stdout);
     }
   }
