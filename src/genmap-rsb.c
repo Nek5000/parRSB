@@ -48,7 +48,7 @@ static void check_rsb_partition(struct comm *gc, int max_pass, int max_iter) {
 }
 
 static double get_avg_nbrs(struct rsb_element *elems, uint nel, int nv,
-                           struct comm *c) {
+                           struct comm *c, int verbose) {
   uint npts = nel * nv;
   slong *ids = tcalloc(slong, npts);
 
@@ -62,13 +62,70 @@ static double get_avg_nbrs(struct rsb_element *elems, uint nel, int nv,
   int nmsg;
   pw_data_nmsg(gsh, &nmsg);
 
-  int b;
-  comm_allreduce(c, gs_int, gs_add, &nmsg, 1, &b);
+  int nsum, nmin, nmax, b;
+  nsum = nmin = nmax = nmsg;
+  comm_allreduce(c, gs_int, gs_add, &nsum, 1, &b);
+  comm_allreduce(c, gs_int, gs_min, &nmin, 1, &b);
+  comm_allreduce(c, gs_int, gs_max, &nmax, 1, &b);
+
+  nsum = (nsum + 1e-6) / c->np;
+
+  if (verbose > 0 && c->id == 0)
+    printf("neighbors (avg, min, max): %d %d %d\n", nsum, nmin, nmax);
 
   gs_free(gsh);
   free(ids);
 
-  return (nmsg + 1e-6) / c->np;
+  return nsum;
+}
+
+static slong get_sep_size(struct rsb_element *elems, uint nel, int nv,
+                          struct comm *c, int bin, int verbose, buffer *bfr) {
+  uint npts = nel * nv;
+  slong *ids = tcalloc(slong, npts);
+  sint *dof = tcalloc(sint, npts);
+
+  int e, n;
+  for (e = 0; e < nel; e++)
+    for (n = 0; n < nv; n++)
+      ids[e * nv + n] = elems[e].vertices[n];
+
+  struct gs_data *gsh = gs_setup(ids, npts, c, 0, gs_pairwise, 0);
+
+  for (n = 0; n < npts; n++)
+    dof[n] = bin;
+
+  gs(dof, gs_int, gs_add, 0, gsh, bfr);
+
+  if (bin == 1)
+    for (n = 0; n < npts; n++)
+      dof[n] = 0;
+
+  gs(dof, gs_int, gs_add, 0, gsh, bfr);
+
+  for (n = 0; n < npts; n++)
+    if (dof[n] > 0)
+      dof[n] = 1;
+
+  gs(dof, gs_int, gs_add, 0, gsh, bfr);
+
+  double sum = 0.0;
+  for (n = 0; n < npts; n++)
+    if (dof[n] > 0)
+      sum += 1.0 / dof[n];
+
+  double b;
+  comm_allreduce(c, gs_long, gs_add, &sum, 1, &b);
+  slong count = sum + 0.1;
+
+  if (verbose > 0 && c->id == 0)
+    printf("# dof in sep = %lld\n", count);
+
+  gs_free(gsh);
+  free(ids);
+  free(dof);
+
+  return count;
 }
 
 static void rsb_local(struct rsb_element *elems, uint s, uint e, int nv,
@@ -106,7 +163,8 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
     else if (options->rsb_pre == 2) // RIB
       rib(elements, sizeof(struct rsb_element), ndim, &lc, bfr);
 
-    double nbrs = get_avg_nbrs(elements->ptr, elements->n, nv, &lc);
+    double nbrs =
+        get_avg_nbrs(elements->ptr, elements->n, nv, &lc, lc.np == gc->np);
 
     /* Run fiedler */
     metric_tic(&lc, FIEDLER);
@@ -123,6 +181,9 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
     if (lc.id < (lc.np + 1) / 2)
       bin = 0;
 
+    get_sep_size(elements->ptr, elements->n, nv, &lc, bin, lc.np == gc->np,
+                 bfr);
+
     struct comm tc;
     comm_split(&lc, bin, lc.id, &tc);
 
@@ -131,7 +192,7 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
       balance_partitions(elements, nv, &tc, &lc, bin, bfr);
     }
 
-    if (get_avg_nbrs(elements->ptr, elements->n, nv, &lc) > nbrs) {
+    if (get_avg_nbrs(elements->ptr, elements->n, nv, &lc, 0) > nbrs) {
       /* Run RCB, RIB pre-step or just sort by global id */
       if (options->rsb_pre == 0) // Sort by global id
         parallel_sort(struct rsb_element, elements, globalId, gs_long, 0, 1,
