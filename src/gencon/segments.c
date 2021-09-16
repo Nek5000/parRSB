@@ -357,7 +357,7 @@ static int rearrangeSegments(Mesh mesh, struct comm *seg, buffer *bfr) {
     crystal_free(&cr);
 
     struct comm new;
-    genmap_comm_split(seg, bin, seg->id, &new);
+    comm_split(seg, bin, seg->id, &new);
     comm_free(seg);
     comm_dup(seg, &new);
     comm_free(&new);

@@ -175,7 +175,7 @@ int GenmapVectorDump(const char *fname, GenmapScalar *y,
 int log2ll(long long n);
 
 void genmap_barrier(struct comm *c);
-void genmap_comm_split(struct comm *old, int bin, int key, struct comm *new_);
+void comm_split(struct comm *old, int bin, int key, struct comm *new_);
 
 double GenmapGetMaxRss();
 void GenmapPrintStack();

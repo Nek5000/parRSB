@@ -124,7 +124,7 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
       bin = 0;
 
     struct comm tc;
-    genmap_comm_split(&lc, bin, lc.id, &tc);
+    comm_split(&lc, bin, lc.id, &tc);
 
     if (options->repair == 1) {
       repair_partitions(elements, nv, &tc, &lc, bin, gc, bfr);

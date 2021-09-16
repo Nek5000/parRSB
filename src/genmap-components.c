@@ -79,7 +79,7 @@ static sint get_components(sint *component, struct rsb_element *elements,
     int bin = 0;
     if (arr.n > 0)
       bin = 1;
-    genmap_comm_split(c, bin, c->id, &cc);
+    comm_split(c, bin, c->id, &cc);
 
     nnz1 = nnzg = nnzg0 = 0;
     if (bin == 1) {
