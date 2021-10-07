@@ -84,22 +84,14 @@ void metric_print(struct comm *c, int profile_level) {
   for (i = 0; i < stack_size; i++) {
     if (c->id == 0 && profile_level > 0) {
       printf("level=%02d\n", i);
-      printf("  RCB                    : %g/%g/%g\n", SUMMARY(i, RCB));
+      printf("  PRE                    : %g/%g/%g\n", SUMMARY(i, PRE));
       printf("  FIEDLER                : %g/%g/%g\n", SUMMARY(i, FIEDLER));
       printf("  FIEDLER_NITER          : %g/%g/%g\n",
              SUMMARY(i, FIEDLER_NITER));
       printf("    LAPLACIAN_INIT       : %g/%g/%g\n",
              SUMMARY(i, LAPLACIAN_INIT));
-      printf("    RQI                  : %g/%g/%g\n", SUMMARY(i, RQI));
-      printf("    RQI_NITER            : %g/%g/%g\n", SUMMARY(i, RQI_NITER));
-      for (j = 0; j < min[i * MAXMETS + RQI_NITER]; j++)
-        printf("      rqi=%02d             : %g/%g/%g\n", j,
-               SUMMARY(i, END + j));
-      printf("      PROJECT            : %g/%g/%g\n", SUMMARY(i, PROJECT));
-      printf("      PROJECT_NITER      : %g/%g/%g\n",
-             SUMMARY(i, PROJECT_NITER));
-      printf("        LAPLACIAN        : %g/%g/%g\n", SUMMARY(i, LAPLACIAN));
-      printf("        PROJECT          : %g/%g/%g\n", SUMMARY(i, PROJECT));
+      printf("  FIEDLER_SORT           : %g/%g/%g\n", SUMMARY(i, FIEDLER_SORT));
+      printf("  REPAIR_BALANCE         : %g/%g/%g\n", SUMMARY(i, REPAIR_BALANCE));
     }
   }
 

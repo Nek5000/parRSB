@@ -19,10 +19,10 @@ static void check_rsb_partition(struct comm *gc, int max_pass, int max_iter) {
 
     if (converged == 0) {
       double dbfr;
-      double final = (double)metric_get_value(i, LANCZOS_TOL_FINAL);
+      double final = (double)metric_get_value(i, TOL_FINAL);
       comm_allreduce(gc, gs_double, gs_min, &final, 1, &dbfr);
 
-      double target = (double)metric_get_value(i, LANCZOS_TOL_TARGET);
+      double target = (double)metric_get_value(i, TOL_TARGET);
       comm_allreduce(gc, gs_double, gs_min, &target, 1, &dbfr);
 
       if (gc->id == 0) {
@@ -40,8 +40,8 @@ static void check_rsb_partition(struct comm *gc, int max_pass, int max_iter) {
 
     if (maxc > 1 && gc->id == 0) {
       printf("Warning: Partition created %d/%d (min/max) disconnected "
-             "components.\n",
-             minc, maxc);
+             "components in Level=%d!\n",
+             minc, maxc, i);
       fflush(stdout);
     }
   }
@@ -115,7 +115,7 @@ static slong get_sep_size(struct rsb_element *elems, uint nel, int nv,
       sum += 1.0 / dof[n];
 
   double b;
-  comm_allreduce(c, gs_long, gs_add, &sum, 1, &b);
+  comm_allreduce(c, gs_double, gs_add, &sum, 1, &b);
   slong count = sum + 0.1;
 
   if (verbose > 0 && c->id == 0)
@@ -155,6 +155,7 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
 
   while (lc.np > 1) {
     /* Run RCB, RIB pre-step or just sort by global id */
+    metric_tic(&lc, PRE);
     if (options->rsb_pre == 0) // Sort by global id
       parallel_sort(struct rsb_element, elements, globalId, gs_long, 0, 1, &lc,
                     bfr);
@@ -162,9 +163,12 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
       rcb(elements, sizeof(struct rsb_element), ndim, &lc, bfr);
     else if (options->rsb_pre == 2) // RIB
       rib(elements, sizeof(struct rsb_element), ndim, &lc, bfr);
+    metric_toc(&lc, PRE);
 
+#if 0
     double nbrs =
         get_avg_nbrs(elements->ptr, elements->n, nv, &lc, lc.np == gc->np);
+#endif
 
     /* Run fiedler */
     metric_tic(&lc, FIEDLER);
@@ -173,25 +177,32 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
     metric_toc(&lc, FIEDLER);
 
     /* Sort by Fiedler vector */
+    metric_tic(&lc, FIEDLER_SORT);
     parallel_sort_2(struct rsb_element, elements, fiedler, gs_double, globalId,
                     gs_long, 0, 1, &lc, bfr);
+    metric_tic(&lc, FIEDLER_SORT);
 
     /* Bisect, repair and balance */
     int bin = 1;
     if (lc.id < (lc.np + 1) / 2)
       bin = 0;
 
-    get_sep_size(elements->ptr, elements->n, nv, &lc, bin, lc.np == gc->np,
-                 bfr);
+#if 0
+     get_sep_size(elements->ptr, elements->n, nv, &lc, bin, lc.np == gc->np,
+                  bfr);
+#endif
 
     struct comm tc;
     comm_split(&lc, bin, lc.id, &tc);
 
+    metric_tic(&lc, REPAIR_BALANCE);
     if (options->repair == 1) {
       repair_partitions(elements, nv, &tc, &lc, bin, gc, bfr);
       balance_partitions(elements, nv, &tc, &lc, bin, bfr);
     }
+    metric_toc(&lc, REPAIR_BALANCE);
 
+#if 0
     if (get_avg_nbrs(elements->ptr, elements->n, nv, &lc, 0) > nbrs) {
       /* Run RCB, RIB pre-step or just sort by global id */
       if (options->rsb_pre == 0) // Sort by global id
@@ -202,6 +213,7 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
       else if (options->rsb_pre == 2) // RIB
         rib(elements, sizeof(struct rsb_element), ndim, &lc, bfr);
     }
+#endif
 
     comm_free(&lc);
     comm_dup(&lc, &tc);

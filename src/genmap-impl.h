@@ -138,19 +138,18 @@ int GenmapFree(void *p);
 
 /* Genmap Metrics */
 typedef enum {
-  RCB,
+  PRE,
   FIEDLER,
   FIEDLER_NITER,
+  FIEDLER_SORT,
+  REPAIR_BALANCE,
   LANCZOS,
-  LANCZOS_NITER,
-  LANCZOS_TOL_FINAL,
-  LANCZOS_TOL_TARGET,
+  TOL_FINAL,
+  TOL_TARGET,
   LAPLACIAN,
   LAPLACIAN_INIT,
   RQI,
-  RQI_NITER,
   PROJECT,
-  PROJECT_NITER,
   COMPONENTS,
   END
 } metric;
