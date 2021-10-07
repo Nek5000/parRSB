@@ -112,8 +112,7 @@ int GenmapLaplacianWeighted(GenmapScalar *v, struct laplacian *gl,
                             GenmapScalar *u, buffer *buf);
 void laplacian_free(struct laplacian *l);
 
-int genmap_inverse_power(double *y, int N, double *A, int verbose);
-int genmap_power(double *y, int N, double *A, int verbose);
+int power_serial(double *y, int N, double *A, int verbose);
 
 int fiedler(struct rsb_element *elements, uint lelt, int nv, int max_iter,
             int max_pass, int global, struct comm *gsc, buffer *buf);
@@ -150,6 +149,7 @@ typedef enum {
   LAPLACIAN_INIT,
   RQI,
   PROJECT,
+  PROJECT_NITER,
   COMPONENTS,
   END
 } metric;

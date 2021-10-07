@@ -45,7 +45,7 @@ static void get_rib_axis(char *elems, uint nel, size_t unit_size, int ndim,
     comm_allreduce(c, gs_double, gs_add, I, 9, buf);
 
   double ev[3];                           // ev[2] = 0 if 2D
-  genmap_power(ev, ndim, (double *)I, 0); // FIXME: 2D does not work
+  power_serial(ev, ndim, (double *)I, 0); // FIXME: 2D does not work
 
   for (i = 0; i < nel; i++) {
     elem = (struct rcb_element *)(elems + i * unit_size);

@@ -123,10 +123,11 @@ int genmap_vector_axpby(genmap_vector z, genmap_vector x, GenmapScalar alpha,
 /* Orthogonalize by 1-vector (vector of all 1's) */
 int genmap_vector_ortho_one(struct comm *c, genmap_vector q1, GenmapULong n) {
   GenmapInt i;
-  GenmapScalar sum = 0.0, buf;
+  GenmapScalar sum = 0.0;
   for (i = 0; i < q1->size; i++)
     sum += q1->data[i];
 
+  GenmapScalar buf;
   comm_allreduce(c, gs_double, gs_add, &sum, 1, &buf);
   sum /= n;
 

@@ -46,11 +46,4 @@ void setOwner(char *ptr, sint n, size_t inOffset, size_t outOffset, slong lelg,
 
 void mg_vcycle(GenmapScalar *u, GenmapScalar *rhs, mgData d);
 
-/* Iterative methods */
-int flex_cg(genmap_vector x, struct laplacian *gl, mgData d, genmap_vector ri,
-            int maxIter, struct comm *gsc, buffer *buf);
-
-int project(genmap_vector x, struct laplacian *gl, mgData d, genmap_vector ri,
-            int max_iter, struct comm *gsc, buffer *buf);
-
 #endif

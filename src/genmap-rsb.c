@@ -180,7 +180,7 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
     metric_tic(&lc, FIEDLER_SORT);
     parallel_sort_2(struct rsb_element, elements, fiedler, gs_double, globalId,
                     gs_long, 0, 1, &lc, bfr);
-    metric_tic(&lc, FIEDLER_SORT);
+    metric_toc(&lc, FIEDLER_SORT);
 
     /* Bisect, repair and balance */
     int bin = 1;
