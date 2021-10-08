@@ -44,4 +44,3 @@ void matrix_inverse(int N, double *A) {}
 #undef FDGETRF
 #undef FDGETRI
 #undef FNAME
-

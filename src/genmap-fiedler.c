@@ -1,10 +1,25 @@
-#include <limits.h>
+#include <time.h>
 #include <math.h>
 
 #include <genmap-impl.h>
 #include <genmap-multigrid-precon.h>
 
 #define MM 500
+
+int vec_copy(genmap_vector y, genmap_vector x) {
+  /* Asserts:
+       - size y = size x
+  */
+  assert(y->size >= x->size);
+
+  GenmapInt n = x->size;
+  GenmapInt i;
+  for (i = 0; i < n; i++) {
+    y->data[i] = x->data[i];
+  }
+
+  return 0;
+}
 
 static int vec_scale(genmap_vector y, genmap_vector x, GenmapScalar alpha) {
   /* asserts:
@@ -37,7 +52,7 @@ static GenmapScalar vec_dot(genmap_vector y, genmap_vector x) {
 }
 
 static int vec_axpby(genmap_vector z, genmap_vector x, GenmapScalar alpha,
-                        genmap_vector y, GenmapScalar beta) {
+                     genmap_vector y, GenmapScalar beta) {
   assert(z->size == x->size);
   assert(z->size == y->size);
 
@@ -66,98 +81,6 @@ static int vec_ortho(struct comm *c, genmap_vector q1, GenmapULong n) {
 
   return 0;
 }
-
-#if 0
-int flex_cg(genmap_vector x, struct laplacian *gl, mgData d, genmap_vector ri,
-            int maxIter, struct comm *gsc, buffer *buf) {
-  assert(x->size == ri->size);
-  uint lelt = x->size;
-
-  genmap_vector z0, z, dz, w, p, r;
-  genmap_vector_create(&z, lelt);
-  genmap_vector_create(&w, lelt);
-  genmap_vector_create(&r, lelt);
-  genmap_vector_create(&p, lelt);
-  genmap_vector_create(&z0, lelt);
-  genmap_vector_create(&dz, lelt);
-
-#define PREC 1
-#define ORTH 1
-
-  uint i;
-  for (i = 0; i < lelt; i++) {
-    x->data[i] = 0.0;
-    r->data[i] = ri->data[i];
-  }
-
-  slong out[2][1], bfr[2][1];
-  slong in = lelt;
-  comm_scan(out, gsc, gs_long, gs_add, &in, 1, bfr);
-  slong nelg = out[1][0];
-
-  genmap_vector_copy(z, r);
-#if ORTH
-  vec_ortho(gsc, z, nelg);
-#endif
-
-  GenmapScalar den, alpha, beta, rz0, rz1, rz2, rr;
-
-  rz1 = vec_dot(r, z);
-  comm_allreduce(gsc, gs_double, gs_add, &rz1, 1, bfr);
-
-  genmap_vector_copy(p, z);
-
-  i = 0;
-  while (i < maxIter && sqrt(rz1) > GENMAP_TOL) {
-    metric_tic(gsc, LAPLACIAN);
-    GenmapLaplacianWeighted(w->data, gl, p->data, buf);
-    metric_toc(gsc, LAPLACIAN);
-
-    den = vec_dot(p, w);
-    comm_allreduce(gsc, gs_double, gs_add, &den, 1, bfr);
-
-    alpha = rz1 / den;
-
-    vec_axpby(x, x, 1.0, p, alpha);
-    vec_axpby(r, r, 1.0, w, -alpha);
-
-    genmap_vector_copy(z0, z);
-#if PREC
-    mg_vcycle(z->data, r->data, d);
-#else
-    genmap_vector_copy(z, r);
-#endif
-#if ORTH
-    vec_ortho(gsc, z, nelg);
-#endif
-
-    rz0 = rz1;
-
-    rz1 = vec_dot(r, z);
-    comm_allreduce(gsc, gs_double, gs_add, &rz1, 1, bfr);
-
-    vec_axpby(dz, z, 1.0, z0, -1.0);
-    rz2 = vec_dot(r, dz);
-    comm_allreduce(gsc, gs_double, gs_add, &rz2, 1, bfr);
-    beta = rz2 / rz0;
-
-    vec_axpby(p, z, 1.0, p, beta);
-    i++;
-
-    rr = vec_dot(r, r);
-    comm_allreduce(gsc, gs_double, gs_add, &rr, 1, bfr);
-  }
-
-  genmap_destroy_vector(z);
-  genmap_destroy_vector(w);
-  genmap_destroy_vector(p);
-  genmap_destroy_vector(r);
-  genmap_destroy_vector(z0);
-  genmap_destroy_vector(dz);
-
-  return i;
-}
-#endif
 
 int power_serial(double *y, int N, double *A, int verbose) {
   time_t t;
@@ -258,19 +181,20 @@ int project(genmap_vector x, struct laplacian *gl, mgData d, genmap_vector ri,
   comm_scan(out, gsc, gs_long, gs_add, &in, 1, bfr);
   slong nelg = out[1][0];
 
-  genmap_vector_copy(z, r);
-  genmap_vector_copy(p, z);
+  GenmapScalar rr = vec_dot(r, r);
+  comm_allreduce(gsc, gs_double, gs_add, &rr, 1, bfr);
+  double tol = 1e-5;
+  double res_tol = rr * tol;
+
+  vec_copy(z, r);
+  vec_ortho(gsc, z, nelg);
 
   GenmapScalar rz1 = vec_dot(r, z);
   comm_allreduce(gsc, gs_double, gs_add, &rz1, 1, bfr);
 
-  GenmapScalar rr = vec_dot(r, r);
-  comm_allreduce(gsc, gs_double, gs_add, &rr, 1, bfr);
+  vec_copy(p, z);
 
   GenmapScalar alpha, beta, rz0, rz2, scale;
-
-  double tol = 1e-5;
-  double res_tol = rr * tol;
 
   uint j, k;
   i = 0;
@@ -301,7 +225,7 @@ int project(genmap_vector x, struct laplacian *gl, mgData d, genmap_vector ri,
     GenmapScalar norm0 = vec_dot(z, z);
     comm_allreduce(gsc, gs_double, gs_add, &norm0, 1, bfr);
 
-    genmap_vector_copy(z0, z);
+    vec_copy(z0, z);
     mg_vcycle(z->data, r->data, d);
 
     GenmapScalar norm1 = vec_dot(z, z);
@@ -475,10 +399,10 @@ static int inverse(genmap_vector y, struct laplacian *gl, mgData d,
     comm_allreduce(gsc, gs_double, gs_add, &norme, 1, bfr);
     norme = sqrt(norme);
 
-    if (ppfi == 1)
+    if (norme < 1e-5)
       break;
   }
-  metric_acc(PROJECT_NITER, ppfi);
+  metric_set(PROJECT_NITER, ppfi);
 
   GenmapFree(Z);
   GenmapFree(GZ);
@@ -489,7 +413,7 @@ static int inverse(genmap_vector y, struct laplacian *gl, mgData d,
 
   genmap_destroy_vector(err);
 
-  return i + 1;
+  return i;
 }
 
 static double sign(GenmapScalar a, GenmapScalar b) {
@@ -507,8 +431,8 @@ static int tqli(genmap_vector **eVectors, genmap_vector *eValues,
   genmap_vector_create(&d, n);
   genmap_vector_create(&e, n);
 
-  genmap_vector_copy(d, diagonal);
-  genmap_vector_copy(e, upper);
+  vec_copy(d, diagonal);
+  vec_copy(e, upper);
   e->data[n - 1] = 0.0;
 
   /* Create the vector to store eigenvalues */
@@ -536,7 +460,7 @@ static int tqli(genmap_vector **eVectors, genmap_vector *eValues,
         if (iter++ == 30) {
           if (id == 0)
             printf("Too many iterations.\n");
-          genmap_vector_copy(*eValues, d);
+          vec_copy(*eValues, d);
           return 1;
         }
 
@@ -605,7 +529,7 @@ static int tqli(genmap_vector **eVectors, genmap_vector *eValues,
     vec_scale((*eVectors)[k], (*eVectors)[k], scale);
   }
 
-  genmap_vector_copy(*eValues, d);
+  vec_copy(*eValues, d);
 
   genmap_destroy_vector(d);
   genmap_destroy_vector(e);
@@ -644,7 +568,7 @@ static int lanczos_aux(genmap_vector diag, genmap_vector upper,
   genmap_vector_create(&w, lelt);
   genmap_vector_create(&r, lelt);
 
-  genmap_vector_copy(r, f);
+  vec_copy(r, f);
 
   vec_ortho(gsc, r, nelg);
   GenmapScalar rtr = vec_dot(r, r);
@@ -759,7 +683,7 @@ static int lanczos(genmap_vector fiedler, uint lelt, int max_iter,
       eValMinI = i;
     }
   }
-  genmap_vector_copy(evTriDiag, eVectors[eValMinI]);
+  vec_copy(evTriDiag, eVectors[eValMinI]);
 
   GenmapInt j;
   for (i = 0; i < lelt; i++) {
@@ -825,8 +749,8 @@ int fiedler(struct rsb_element *elems, uint lelt, int nv, int max_iter,
     if (algo == 0)
       iter = lanczos(fiedler, lelt, max_iter, initv, &gl, gsc, buf);
     else if (algo == 1)
-      iter = inverse(fiedler, &gl, d, initv, gsc, max_iter, 0 /* grammian */,
-                     buf);
+      iter =
+          inverse(fiedler, &gl, d, initv, gsc, max_iter, 0 /* grammian */, buf);
     metric_acc(FIEDLER_NITER, iter);
 
     GenmapScalar norm = 0;

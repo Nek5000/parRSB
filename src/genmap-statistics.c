@@ -3,8 +3,8 @@
 
 #include <genmap-impl.h>
 
-#define MAXMETS 100
-#define MAXLVLS 30
+#define MAXMETS 5100
+#define MAXLVLS 20
 #define MAXSIZE (MAXMETS * MAXLVLS)
 
 static double metrics[MAXMETS];
@@ -24,7 +24,9 @@ void metric_finalize() {
     GenmapFree(stack);
 }
 
-void metric_acc(metric m, double count) { metrics[m] += count; }
+void metric_acc(metric m, double val) { metrics[m] += val; }
+
+void metric_set(metric m, double val) { metrics[m] = val; }
 
 void metric_tic(struct comm *c, metric m) {
   genmap_barrier(c);

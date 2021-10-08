@@ -25,7 +25,6 @@ typedef struct genmap_vector_private *genmap_vector;
 
 int genmap_vector_create(genmap_vector *x, GenmapInt size);
 int genmap_vector_create_zeros(genmap_vector *x, GenmapInt size);
-int genmap_vector_copy(genmap_vector x, genmap_vector y);
 int genmap_destroy_vector(genmap_vector x);
 
 /* `struct rcb_element` is used for RCB and RIB partitioning.
@@ -105,6 +104,8 @@ int GenmapLaplacianWeighted(GenmapScalar *v, struct laplacian *gl,
                             GenmapScalar *u, buffer *buf);
 void laplacian_free(struct laplacian *l);
 
+void matrix_inverse(int N, double *A);
+
 int power_serial(double *y, int N, double *A, int verbose);
 
 int fiedler(struct rsb_element *elements, uint lelt, int nv, int max_iter,
@@ -148,7 +149,8 @@ typedef enum {
 } metric;
 
 void metric_init();
-void metric_acc(metric m, double count);
+void metric_acc(metric m, double val);
+void metric_set(metric m, double val);
 void metric_tic(struct comm *c, metric m);
 void metric_toc(struct comm *c, metric m);
 double metric_get_value(int level, metric m);

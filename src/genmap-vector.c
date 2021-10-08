@@ -39,21 +39,6 @@ int genmap_destroy_vector(genmap_vector x) {
   return 0;
 }
 
-int genmap_vector_copy(genmap_vector y, genmap_vector x) {
-  /* Asserts:
-       - size y = size x
-  */
-  assert(y->size >= x->size);
-
-  GenmapInt n = x->size;
-  GenmapInt i;
-  for (i = 0; i < n; i++) {
-    y->data[i] = x->data[i];
-  }
-
-  return 0;
-}
-
 int GenmapCreateOnesVector(genmap_vector *x, GenmapInt size) {
   genmap_vector_create(x, size);
 
