@@ -26,13 +26,6 @@ typedef struct genmap_vector_private *genmap_vector;
 int genmap_vector_create(genmap_vector *x, GenmapInt size);
 int genmap_vector_create_zeros(genmap_vector *x, GenmapInt size);
 int genmap_vector_copy(genmap_vector x, genmap_vector y);
-
-int genmap_vector_scale(genmap_vector y, genmap_vector x, GenmapScalar alpha);
-int genmap_vector_axpby(genmap_vector z, genmap_vector x, GenmapScalar alpha,
-                        genmap_vector y, GenmapScalar beta);
-
-GenmapScalar genmap_vector_dot(genmap_vector x, genmap_vector y);
-int genmap_vector_ortho_one(struct comm *c, genmap_vector q1, GenmapULong n);
 int genmap_destroy_vector(genmap_vector x);
 
 /* `struct rcb_element` is used for RCB and RIB partitioning.

@@ -6,6 +6,67 @@
 
 #define MM 500
 
+static int vec_scale(genmap_vector y, genmap_vector x, GenmapScalar alpha) {
+  /* asserts:
+       - size x = size y
+  */
+  assert(x->size == y->size);
+
+  GenmapInt n = x->size;
+  GenmapInt i;
+  for (i = 0; i < n; i++) {
+    y->data[i] = alpha * x->data[i];
+  }
+
+  return 0;
+}
+
+static GenmapScalar vec_dot(genmap_vector y, genmap_vector x) {
+  /* asserts:
+       - size x = size y
+  */
+  assert(x->size == y->size);
+
+  GenmapScalar result = 0.0;
+  GenmapInt i;
+  for (i = 0; i < x->size; i++) {
+    result += x->data[i] * y->data[i];
+  }
+
+  return result;
+}
+
+static int vec_axpby(genmap_vector z, genmap_vector x, GenmapScalar alpha,
+                        genmap_vector y, GenmapScalar beta) {
+  assert(z->size == x->size);
+  assert(z->size == y->size);
+
+  GenmapInt n = z->size;
+  GenmapInt i;
+  for (i = 0; i < n; i++) {
+    z->data[i] = alpha * x->data[i] + beta * y->data[i];
+  }
+
+  return 0;
+}
+
+/* Orthogonalize by 1-vector (vector of all 1's) */
+static int vec_ortho(struct comm *c, genmap_vector q1, GenmapULong n) {
+  GenmapInt i;
+  GenmapScalar sum = 0.0;
+  for (i = 0; i < q1->size; i++)
+    sum += q1->data[i];
+
+  GenmapScalar buf;
+  comm_allreduce(c, gs_double, gs_add, &sum, 1, &buf);
+  sum /= n;
+
+  for (i = 0; i < q1->size; i++)
+    q1->data[i] -= sum;
+
+  return 0;
+}
+
 #if 0
 int flex_cg(genmap_vector x, struct laplacian *gl, mgData d, genmap_vector ri,
             int maxIter, struct comm *gsc, buffer *buf) {
@@ -36,12 +97,12 @@ int flex_cg(genmap_vector x, struct laplacian *gl, mgData d, genmap_vector ri,
 
   genmap_vector_copy(z, r);
 #if ORTH
-  genmap_vector_ortho_one(gsc, z, nelg);
+  vec_ortho(gsc, z, nelg);
 #endif
 
   GenmapScalar den, alpha, beta, rz0, rz1, rz2, rr;
 
-  rz1 = genmap_vector_dot(r, z);
+  rz1 = vec_dot(r, z);
   comm_allreduce(gsc, gs_double, gs_add, &rz1, 1, bfr);
 
   genmap_vector_copy(p, z);
@@ -52,13 +113,13 @@ int flex_cg(genmap_vector x, struct laplacian *gl, mgData d, genmap_vector ri,
     GenmapLaplacianWeighted(w->data, gl, p->data, buf);
     metric_toc(gsc, LAPLACIAN);
 
-    den = genmap_vector_dot(p, w);
+    den = vec_dot(p, w);
     comm_allreduce(gsc, gs_double, gs_add, &den, 1, bfr);
 
     alpha = rz1 / den;
 
-    genmap_vector_axpby(x, x, 1.0, p, alpha);
-    genmap_vector_axpby(r, r, 1.0, w, -alpha);
+    vec_axpby(x, x, 1.0, p, alpha);
+    vec_axpby(r, r, 1.0, w, -alpha);
 
     genmap_vector_copy(z0, z);
 #if PREC
@@ -67,23 +128,23 @@ int flex_cg(genmap_vector x, struct laplacian *gl, mgData d, genmap_vector ri,
     genmap_vector_copy(z, r);
 #endif
 #if ORTH
-    genmap_vector_ortho_one(gsc, z, nelg);
+    vec_ortho(gsc, z, nelg);
 #endif
 
     rz0 = rz1;
 
-    rz1 = genmap_vector_dot(r, z);
+    rz1 = vec_dot(r, z);
     comm_allreduce(gsc, gs_double, gs_add, &rz1, 1, bfr);
 
-    genmap_vector_axpby(dz, z, 1.0, z0, -1.0);
-    rz2 = genmap_vector_dot(r, dz);
+    vec_axpby(dz, z, 1.0, z0, -1.0);
+    rz2 = vec_dot(r, dz);
     comm_allreduce(gsc, gs_double, gs_add, &rz2, 1, bfr);
     beta = rz2 / rz0;
 
-    genmap_vector_axpby(p, z, 1.0, p, beta);
+    vec_axpby(p, z, 1.0, p, beta);
     i++;
 
-    rr = genmap_vector_dot(r, r);
+    rr = vec_dot(r, r);
     comm_allreduce(gsc, gs_double, gs_add, &rr, 1, bfr);
   }
 
@@ -200,10 +261,10 @@ int project(genmap_vector x, struct laplacian *gl, mgData d, genmap_vector ri,
   genmap_vector_copy(z, r);
   genmap_vector_copy(p, z);
 
-  GenmapScalar rz1 = genmap_vector_dot(r, z);
+  GenmapScalar rz1 = vec_dot(r, z);
   comm_allreduce(gsc, gs_double, gs_add, &rz1, 1, bfr);
 
-  GenmapScalar rr = genmap_vector_dot(r, r);
+  GenmapScalar rr = vec_dot(r, r);
   comm_allreduce(gsc, gs_double, gs_add, &rr, 1, bfr);
 
   GenmapScalar alpha, beta, rz0, rz2, scale;
@@ -218,7 +279,7 @@ int project(genmap_vector x, struct laplacian *gl, mgData d, genmap_vector ri,
     GenmapLaplacianWeighted(w->data, gl, p->data, buf);
     metric_toc(gsc, LAPLACIAN);
 
-    GenmapScalar den = genmap_vector_dot(p, w);
+    GenmapScalar den = vec_dot(p, w);
     comm_allreduce(gsc, gs_double, gs_add, &den, 1, bfr);
     alpha = rz1 / den;
 
@@ -228,35 +289,35 @@ int project(genmap_vector x, struct laplacian *gl, mgData d, genmap_vector ri,
       P[i * lelt + j] = scale * p->data[j];
     }
 
-    genmap_vector_axpby(x, x, 1.0, p, alpha);
-    genmap_vector_axpby(r, r, 1.0, w, -alpha);
+    vec_axpby(x, x, 1.0, p, alpha);
+    vec_axpby(r, r, 1.0, w, -alpha);
 
-    rr = genmap_vector_dot(r, r);
+    rr = vec_dot(r, r);
     comm_allreduce(gsc, gs_double, gs_add, &rr, 1, bfr);
 
     if (rr < res_tol || sqrt(rr) < tol)
       break;
 
-    GenmapScalar norm0 = genmap_vector_dot(z, z);
+    GenmapScalar norm0 = vec_dot(z, z);
     comm_allreduce(gsc, gs_double, gs_add, &norm0, 1, bfr);
 
     genmap_vector_copy(z0, z);
     mg_vcycle(z->data, r->data, d);
 
-    GenmapScalar norm1 = genmap_vector_dot(z, z);
+    GenmapScalar norm1 = vec_dot(z, z);
     comm_allreduce(gsc, gs_double, gs_add, &norm1, 1, bfr);
 
     rz0 = rz1;
-    genmap_vector_ortho_one(gsc, z, nelg);
-    rz1 = genmap_vector_dot(r, z);
+    vec_ortho(gsc, z, nelg);
+    rz1 = vec_dot(r, z);
     comm_allreduce(gsc, gs_double, gs_add, &rz1, 1, bfr);
 
-    genmap_vector_axpby(dz, z, 1.0, z0, -1.0);
-    rz2 = genmap_vector_dot(r, dz);
+    vec_axpby(dz, z, 1.0, z0, -1.0);
+    rz2 = vec_dot(r, dz);
     comm_allreduce(gsc, gs_double, gs_add, &rz2, 1, bfr);
 
     beta = rz2 / rz0;
-    genmap_vector_axpby(p, z, 1.0, p, beta);
+    vec_axpby(p, z, 1.0, p, beta);
 
     i++;
 
@@ -324,13 +385,13 @@ static int inverse(genmap_vector y, struct laplacian *gl, mgData d,
 
   uint i, j, k, l;
   for (i = 0; i < max_iter; i++) {
-    GenmapScalar norm = genmap_vector_dot(y, y);
+    GenmapScalar norm = vec_dot(y, y);
     comm_allreduce(gsc, gs_double, gs_add, &norm, 1, bfr);
     GenmapScalar normi = 1.0 / sqrt(norm);
 
     for (j = 0; j < lelt; j++)
       z->data[j] = y->data[j] * normi;
-    genmap_vector_ortho_one(gsc, z, nelg);
+    vec_ortho(gsc, z, nelg);
 
     int N = i + 1;
 
@@ -392,7 +453,7 @@ static int inverse(genmap_vector y, struct laplacian *gl, mgData d,
           for (k = 0; k < lelt; k++)
             z->data[k] += Z[j * lelt + k] * v[j];
         }
-        genmap_vector_ortho_one(gsc, z, nelg);
+        vec_ortho(gsc, z, nelg);
       } else {
         // Z(k,:) = z;
         for (l = 0; l < lelt; l++)
@@ -404,13 +465,13 @@ static int inverse(genmap_vector y, struct laplacian *gl, mgData d,
     ppfi = project(y, gl, d, z, 100, gsc, bff);
     metric_toc(gsc, PROJECT);
 
-    genmap_vector_ortho_one(gsc, y, nelg);
+    vec_ortho(gsc, y, nelg);
 
-    GenmapScalar lambda = genmap_vector_dot(y, z);
+    GenmapScalar lambda = vec_dot(y, z);
     comm_allreduce(gsc, gs_double, gs_add, &lambda, 1, bfr);
 
-    genmap_vector_axpby(err, y, 1.0, z, -lambda);
-    GenmapScalar norme = genmap_vector_dot(err, err);
+    vec_axpby(err, y, 1.0, z, -lambda);
+    GenmapScalar norme = vec_dot(err, err);
     comm_allreduce(gsc, gs_double, gs_add, &norme, 1, bfr);
     norme = sqrt(norme);
 
@@ -537,11 +598,11 @@ static int tqli(genmap_vector **eVectors, genmap_vector *eValues,
   }
 
   for (k = 0; k < n; k++) {
-    e->data[k] = genmap_vector_dot((*eVectors)[k], (*eVectors)[k]);
+    e->data[k] = vec_dot((*eVectors)[k], (*eVectors)[k]);
     if (e->data[k] > 0.0)
       e->data[k] = sqrt(fabs(e->data[k]));
     GenmapScalar scale = 1.0 / e->data[k];
-    genmap_vector_scale((*eVectors)[k], (*eVectors)[k], scale);
+    vec_scale((*eVectors)[k], (*eVectors)[k], scale);
   }
 
   genmap_vector_copy(*eValues, d);
@@ -585,14 +646,14 @@ static int lanczos_aux(genmap_vector diag, genmap_vector upper,
 
   genmap_vector_copy(r, f);
 
-  genmap_vector_ortho_one(gsc, r, nelg);
-  GenmapScalar rtr = genmap_vector_dot(r, r);
+  vec_ortho(gsc, r, nelg);
+  GenmapScalar rtr = vec_dot(r, r);
   comm_allreduce(gsc, gs_double, gs_add, &rtr, 1, buf);
   GenmapScalar rnorm = sqrt(rtr);
   GenmapScalar rni = 1.0 / rnorm;
 
   genmap_vector_create(&rr[0], lelt);
-  genmap_vector_scale(rr[0], r, rni);
+  vec_scale(rr[0], r, rni);
 
   GenmapScalar eps = 1.e-5;
   GenmapScalar rtol = rnorm * eps;
@@ -614,35 +675,35 @@ static int lanczos_aux(genmap_vector diag, genmap_vector upper,
     for (i = 0; i < lelt; i++)
       p->data[i] = beta * p->data[i] + r->data[i];
 
-    GenmapScalar pp = genmap_vector_dot(p, p);
+    GenmapScalar pp = vec_dot(p, p);
     comm_allreduce(gsc, gs_double, gs_add, &pp, 1, buf);
 
-    genmap_vector_ortho_one(gsc, p, nelg);
+    vec_ortho(gsc, p, nelg);
 
     metric_tic(gsc, LAPLACIAN);
     GenmapLaplacianWeighted(w->data, gl, p->data, bfr);
     metric_tic(gsc, LAPLACIAN);
 
-    GenmapScalar ww = genmap_vector_dot(w, w);
+    GenmapScalar ww = vec_dot(w, w);
     comm_allreduce(gsc, gs_double, gs_add, &ww, 1, buf);
 
     pap_old = pap;
-    pap = genmap_vector_dot(w, p);
+    pap = vec_dot(w, p);
     comm_allreduce(gsc, gs_double, gs_add, &pap, 1, buf);
     // if (gsc->id == 0)
     //   printf("iter = %d beta = %lf pp = %lf pap = %lf ww = %lf\n", iter,
     //          beta, pp, pap, ww);
 
     alpha = rtz1 / pap;
-    genmap_vector_axpby(r, r, 1.0, w, -1.0 * alpha);
+    vec_axpby(r, r, 1.0, w, -1.0 * alpha);
 
-    rtr = genmap_vector_dot(r, r);
+    rtr = vec_dot(r, r);
     comm_allreduce(gsc, gs_double, gs_add, &rtr, 1, buf);
     rnorm = sqrt(rtr);
     rni = 1.0 / rnorm;
 
     genmap_vector_create(&rr[iter + 1], lelt);
-    genmap_vector_scale(rr[iter + 1], r, rni);
+    vec_scale(rr[iter + 1], r, rni);
 
     if (iter == 0) {
       diag->data[iter] = pap / rtz1;
@@ -753,13 +814,13 @@ int fiedler(struct rsb_element *elems, uint lelt, int nv, int max_iter,
 
   int ipass = 0, iter = 0, global = 1;
   do {
-    genmap_vector_ortho_one(gsc, initv, nelg);
+    vec_ortho(gsc, initv, nelg);
 
-    double rtr = genmap_vector_dot(initv, initv);
+    double rtr = vec_dot(initv, initv);
     double rni;
     comm_allreduce(gsc, gs_double, gs_add, &rtr, 1, &rni);
     rni = 1.0 / sqrt(rtr);
-    genmap_vector_scale(initv, initv, rni);
+    vec_scale(initv, initv, rni);
 
     if (algo == 0)
       iter = lanczos(fiedler, lelt, max_iter, initv, &gl, gsc, buf);
@@ -775,7 +836,7 @@ int fiedler(struct rsb_element *elems, uint lelt, int nv, int max_iter,
     comm_allreduce(gsc, gs_double, gs_add, &norm, 1, &normi);
     normi = 1.0 / sqrt(norm);
 
-    genmap_vector_scale(fiedler, fiedler, normi);
+    vec_scale(fiedler, fiedler, normi);
     for (i = 0; i < lelt; i++)
       initv->data[i] = fiedler->data[i];
   } while (++ipass < max_pass && iter == max_iter);
