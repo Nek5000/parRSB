@@ -1,5 +1,5 @@
-#include <time.h>
 #include <math.h>
+#include <time.h>
 
 #include <genmap-impl.h>
 #include <genmap-multigrid-precon.h>
