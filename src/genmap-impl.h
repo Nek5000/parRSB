@@ -98,10 +98,10 @@ int GenmapInitLaplacian(struct csr_mat *M, struct rsb_element *elems, uint n,
 int GenmapLaplacian(GenmapScalar *v, struct csr_mat *M, GenmapScalar *u,
                     buffer *buf);
 
-int GenmapInitLaplacianWeighted(struct laplacian *gl, struct rsb_element *elems,
-                                uint lelt, int nv, struct comm *c, buffer *buf);
-int GenmapLaplacianWeighted(GenmapScalar *v, struct laplacian *gl,
-                            GenmapScalar *u, buffer *buf);
+int laplacian_weighted_init(struct laplacian *gl, struct rsb_element *elems,
+                            uint lelt, int nv, struct comm *c, buffer *buf);
+int laplacian_weighted(GenmapScalar *v, struct laplacian *gl, GenmapScalar *u,
+                       buffer *buf);
 void laplacian_free(struct laplacian *l);
 
 void matrix_inverse(int N, double *A);
@@ -109,7 +109,7 @@ void matrix_inverse(int N, double *A);
 int power_serial(double *y, int N, double *A, int verbose);
 
 int fiedler(struct rsb_element *elements, uint lelt, int nv, int max_iter,
-            int max_pass, int global, struct comm *gsc, buffer *buf);
+            int max_pass, int global, struct comm *gsc, buffer *buf, int gid);
 
 int repair_partitions(struct array *elements, int nv, struct comm *tc,
                       struct comm *lc, int bin, struct comm *gc, buffer *bfr);
@@ -165,6 +165,8 @@ int GenmapFiedlerDump(const char *fname, struct rsb_element *elm, uint nelt,
 int GenmapVectorDump(const char *fname, GenmapScalar *y,
                      struct rsb_element *elm, uint nelt, int nv,
                      struct comm *c);
+int GenmapElementDump(const char *fname, struct rsb_element *elm, uint nelt,
+                      int nv, struct comm *c, int dump);
 /* Misc */
 int log2ll(long long n);
 

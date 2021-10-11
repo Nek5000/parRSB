@@ -39,7 +39,7 @@ void metric_toc(struct comm *c, metric m) {
 }
 
 double metric_get_value(int level, metric m) {
-  if (level == stack_size)
+  if (level == -1)
     return metrics[m];
   else if (level < stack_size)
     return stack[level * MAXMETS + m];

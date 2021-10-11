@@ -3,9 +3,8 @@
 
 #define MIN(a, b) ((b) < (a) ? (b) : (a))
 
-static void genmap_find_neighbors(struct array *nbrs, struct rsb_element *elems,
-                                  sint nelt, int nv, struct comm *cc,
-                                  buffer *buf) {
+static void find_neighbors(struct array *nbrs, struct rsb_element *elems,
+                           sint nelt, int nv, struct comm *cc, buffer *buf) {
   slong out[2][1], bfr[2][1];
   slong lelt = nelt;
   comm_scan(out, cc, gs_long, gs_add, &lelt, 1, bfr);
@@ -98,7 +97,7 @@ static void genmap_find_neighbors(struct array *nbrs, struct rsb_element *elems,
 int GenmapInitLaplacian(struct csr_mat *M, struct rsb_element *elems, uint lelt,
                         int nv, struct comm *c, buffer *buf) {
   struct array entries;
-  genmap_find_neighbors(&entries, elems, lelt, nv, c, buf);
+  find_neighbors(&entries, elems, lelt, nv, c, buf);
   csr_mat_setup(M, &entries, c, buf);
   array_free(&entries);
 
@@ -111,9 +110,8 @@ int GenmapLaplacian(GenmapScalar *v, struct csr_mat *M, GenmapScalar *u,
   return 0;
 }
 
-int GenmapInitLaplacianWeighted(struct laplacian *gl, struct rsb_element *elems,
-                                uint lelt, int nv, struct comm *c,
-                                buffer *buf) {
+int laplacian_weighted_init(struct laplacian *gl, struct rsb_element *elems,
+                            uint lelt, int nv, struct comm *c, buffer *buf) {
   uint npts = nv * lelt;
 
   slong *vertices = tcalloc(slong, npts);
@@ -146,8 +144,8 @@ int GenmapInitLaplacianWeighted(struct laplacian *gl, struct rsb_element *elems,
   return 0;
 }
 
-int GenmapLaplacianWeighted(GenmapScalar *v, struct laplacian *gl,
-                            GenmapScalar *u, buffer *buf) {
+int laplacian_weighted(GenmapScalar *v, struct laplacian *gl, GenmapScalar *u,
+                       buffer *buf) {
   uint lelt = gl->lelt;
   int nv = gl->nv;
 
