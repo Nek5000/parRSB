@@ -352,7 +352,7 @@ int project(genmap_vector x, struct laplacian *gl, mgData d, genmap_vector ri,
 // inverse iteration should not change z.
 static int inverse(genmap_vector y, struct laplacian *gl, mgData d,
                    genmap_vector z, struct comm *gsc, int max_iter,
-                   int grammian, buffer *bff, int gid) {
+                   int grammian, struct array *fdlr, slong nelg, buffer *bff, int gid) {
   assert(z->size == y->size);
   assert(z->size == gl->lelt);
 
@@ -367,27 +367,11 @@ static int inverse(genmap_vector y, struct laplacian *gl, mgData d,
   GenmapMalloc(max_iter, &v);
   GenmapMalloc(max_iter * max_iter, &buf);
 
-  slong out[2][1], bfr[2][1];
-  slong in = lelt;
-  comm_scan(out, gsc, gs_long, gs_add, &in, 1, bfr);
-  slong nelg = out[1][0];
-
   genmap_vector err;
   genmap_vector_create(&err, lelt);
 
-  struct array fdlr;
-  array_init(struct fiedler, &fdlr, lelt);
-
-  uint i;
-  fdlr.n = lelt;
-  struct fiedler *ptr = fdlr.ptr;
-  for (i = 0; i < lelt; i++) {
-    ptr[i].seq = i;
-    ptr[i].proc = gsc->id;
-    ptr[i].part0 = 0;
-  }
-
-  uint j, k, l;
+  slong bfr[2];
+  uint i, j, k, l;
   for (i = 0; i < max_iter; i++) {
     metric_tic(gsc, PROJECT);
     int ppfi = project(y, gl, d, z, 100, gsc, bff, gid);
@@ -481,11 +465,9 @@ static int inverse(genmap_vector y, struct laplacian *gl, mgData d,
       }
     }
 
-    if (converged(&fdlr, z->data, gsc, nelg, bff) == 1)
+    if (converged(fdlr, z->data, gsc, nelg, bff) == 1)
       break;
   }
-
-  array_free(&fdlr);
 
   GenmapFree(Z);
   GenmapFree(GZ);
@@ -739,20 +721,21 @@ static int lanczos_aux(genmap_vector diag, genmap_vector upper,
   return iter;
 }
 
-static int lanczos(genmap_vector fiedler, uint lelt, int max_iter,
-                   genmap_vector initv, struct laplacian *gl, struct comm *gsc,
-                   buffer *buf) {
+static int lanczos(genmap_vector fiedler, struct laplacian *gl,
+                   genmap_vector initv, struct comm *gsc, int max_iter,
+                   struct array *fdlr, slong nelg, buffer *buf, int gid) {
   genmap_vector alphaVec, betaVec;
   genmap_vector_create(&alphaVec, max_iter);
   genmap_vector_create(&betaVec, max_iter - 1);
 
   metric_tic(gsc, LANCZOS);
 
+  uint lelt = initv->size;
   int iter, ipass = 0;
   do {
     genmap_vector *q = NULL;
-    iter = lanczos_aux(alphaVec, betaVec, &q, lelt, max_iter, initv, gl, gsc,
-                       buf);
+    iter =
+        lanczos_aux(alphaVec, betaVec, &q, lelt, max_iter, initv, gl, gsc, buf);
 
     genmap_vector evTriDiag;
     genmap_vector_create(&evTriDiag, iter);
@@ -778,6 +761,8 @@ static int lanczos(genmap_vector fiedler, uint lelt, int max_iter,
       for (j = 0; j < iter; j++)
         fiedler->data[i] += q[j]->data[i] * evTriDiag->data[j];
     }
+
+    vec_ortho(gsc, fiedler, nelg);
 
     genmap_destroy_vector(evTriDiag);
     genmap_destroy_vector(eValues);
@@ -836,12 +821,23 @@ int fiedler(struct rsb_element *elems, uint lelt, int nv, int max_iter,
   rni = 1.0 / sqrt(rtr);
   vec_scale(initv, initv, rni);
 
+  struct array fdlr;
+  array_init(struct fiedler, &fdlr, lelt);
+
+  fdlr.n = lelt;
+  struct fiedler *ptr = fdlr.ptr;
+  for (i = 0; i < lelt; i++) {
+    ptr[i].seq = i;
+    ptr[i].proc = gsc->id;
+    ptr[i].part0 = 0;
+  }
+
   int iter = 0;
   if (algo == 0)
-    iter = lanczos(fiedler, lelt, max_iter, initv, &gl, gsc, buf);
+    iter = lanczos(fiedler, &gl, initv, gsc, max_iter, &fdlr, nelg, buf, gid);
   else if (algo == 1)
     iter = inverse(fiedler, &gl, d, initv, gsc, max_iter, 0 /* grammian */,
-                   buf, gid);
+                   &fdlr, nelg, buf, gid);
   metric_acc(FIEDLER_NITER, iter);
 
   GenmapScalar norm = 0;
@@ -855,6 +851,8 @@ int fiedler(struct rsb_element *elems, uint lelt, int nv, int max_iter,
 
   for (i = 0; i < lelt; i++)
     elems[i].fiedler = fiedler->data[i];
+
+  array_free(&fdlr);
 
   genmap_destroy_vector(initv);
   genmap_destroy_vector(fiedler);
