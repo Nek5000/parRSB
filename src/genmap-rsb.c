@@ -135,7 +135,7 @@ static void rsb_local(struct rsb_element *elems, uint s, uint e, int nv,
   uint mid;
   uint size = e - s;
   if (size > 1) {
-    fiedler(elems + s, size, nv, max_iter, max_pass, 0, lc, buf, 0);
+    fiedler(elems + s, size, nv, max_iter, 0, lc, buf, 0);
     sarray_sort(struct rsb_element, elems + s, size, fiedler, 3, buf);
     mid = (s + e) / 2;
     rsb_local(elems, s, mid, nv, max_iter, max_pass, lc, buf);
@@ -172,8 +172,8 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
 
     /* Run fiedler */
     metric_tic(&lc, FIEDLER);
-    fiedler(elements->ptr, elements->n, nv, max_iter, max_pass,
-            options->rsb_algo, &lc, bfr, gc->id);
+    fiedler(elements->ptr, elements->n, nv, max_iter, options->rsb_algo, &lc,
+            bfr, gc->id);
     metric_toc(&lc, FIEDLER);
 
     /* Sort by Fiedler vector */

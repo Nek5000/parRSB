@@ -109,7 +109,7 @@ void matrix_inverse(int N, double *A);
 int power_serial(double *y, int N, double *A, int verbose);
 
 int fiedler(struct rsb_element *elements, uint lelt, int nv, int max_iter,
-            int max_pass, int global, struct comm *gsc, buffer *buf, int gid);
+            int global, struct comm *gsc, buffer *buf, int gid);
 
 int repair_partitions(struct array *elements, int nv, struct comm *tc,
                       struct comm *lc, int bin, struct comm *gc, buffer *bfr);
