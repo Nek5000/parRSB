@@ -1,13 +1,15 @@
 ## General build parameters ##
-DEBUG ?= 1
-MPI ?= 1
 CC ?= mpicc
 CFLAGS ?= -g -O2
+DEBUG ?= 1
+MPI ?= 1
 UNDERSCORE ?= 1
 SYNC_BY_REDUCTION ?= 1
 BLAS ?= 0
 BLASDIR ?=
 BLASFLAGS ?= -lblas -llapack
+OCCA ?= 1
+OCCADIR ?=
 
 ## Don't touch what follows ##
 MKFILEPATH = $(abspath $(lastword $(MAKEFILE_LIST)))
@@ -48,8 +50,16 @@ ifneq ($(DEBUG),0)
   PP += -g -DGENMAP_DEBUG
 endif
 
+ifneq ($(MPI),0)
+  PP += -DMPI
+endif
+
 ifneq ($(UNDERSCORE),0)
   PP += -DGENMAP_UNDERSCORE
+endif
+
+ifneq ($(SYNC_BY_REDUCTION),0)
+  PP += -DGENMAP_SYNC_BY_REDUCTION
 endif
 
 ifneq ($(BLAS),0)
@@ -60,12 +70,13 @@ ifneq ($(BLAS),0)
   LDFLAGS += $(BLASFLAGS)
 endif
 
-ifneq ($(MPI),0)
-  PP += -DMPI
-endif
-
-ifneq ($(SYNC_BY_REDUCTION),0)
-  PP += -DGENMAP_SYNC_BY_REDUCTION
+ifneq ($(OCCA),0)
+  PP += -DGENMAP_OCCA
+  ifneq ($(OCCADIR),)
+    LDFLAGS+= -L$(OCCADIR)/lib
+    INCFLAGS+= -I$(OCCADIR)/include
+  endif
+  LDFLAGS += -locca
 endif
 
 INSTALLDIR=

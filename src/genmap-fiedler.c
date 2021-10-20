@@ -267,7 +267,6 @@ int project(genmap_vector x, struct laplacian *gl, mgData d, genmap_vector ri,
   while (i < max_iter) {
     metric_tic(gsc, LAPLACIAN);
     laplacian_weighted(w->data, gl, p->data, buf);
-    GenmapLaplacian(w->data, d->levels[0]->M, p->data, buf);
     metric_toc(gsc, LAPLACIAN);
 
     GenmapScalar den = vec_dot(p, w);
@@ -465,7 +464,11 @@ static int inverse(genmap_vector y, struct laplacian *gl, mgData d,
       }
     }
 
+#if 1
+    if (ppfi == 1)
+#else
     if (converged(fdlr, z->data, gsc, nelg, bff) == 1)
+#endif
       break;
   }
 
@@ -478,7 +481,7 @@ static int inverse(genmap_vector y, struct laplacian *gl, mgData d,
 
   genmap_destroy_vector(err);
 
-  return i;
+  return i == max_iter ? i : i + 1;
 }
 
 static double sign(GenmapScalar a, GenmapScalar b) {
@@ -606,8 +609,6 @@ static int lanczos_aux(genmap_vector diag, genmap_vector upper,
                        genmap_vector **ri, uint lelt, int niter,
                        genmap_vector f, struct laplacian *gl, struct comm *gsc,
                        buffer *bfr) {
-  assert(diag->size == niter);
-  assert(diag->size == upper->size + 1);
   assert(f->size == lelt);
 
   slong out[2][1], buf[2][1];
@@ -773,14 +774,18 @@ static int lanczos(genmap_vector fiedler, struct laplacian *gl,
     for (i = 0; i < iter + 1; i++)
       genmap_destroy_vector(q[i]);
     GenmapFree(q);
+#if 1
   } while (iter == max_iter && ipass++ < max_iter);
+#else
+  } while (converged(fdlr, fiedler->data, gsc, nelg, buf) == 0 && ipass++ < max_iter);
+#endif
 
   metric_toc(gsc, LANCZOS);
 
   genmap_destroy_vector(alphaVec);
   genmap_destroy_vector(betaVec);
 
-  return iter;
+  return ipass;
 }
 
 int fiedler(struct rsb_element *elems, uint lelt, int nv, int max_iter,

@@ -1,0 +1,38 @@
+@kernel void uweighted_laplacian_csr(scalar *v, const uint nr,
+                                     const uint offsets, const ulong col,
+                                     const ulong *diag, const scalar *u) {
+  int i;
+  for (i = 0; i < nr; i++; @outer @inner) {
+    int j;
+    scalar s = 0.0;
+    for (j = offsets[i]; j < offsets[i + 1]; j++)
+      s += u[col[j]];
+    v[i] = (offsets[i + 1] - offsets[i]) * u[diag[i]] - s
+  }
+}
+
+@kernel vec_dot(double *blk_sum, const uint n, const double *a, const double *b) {
+  int i, j, k;
+  for (i = 0; i < (n + BLK_SIZE - 1)/BLK_SIZE; i++; @outer) {
+    @shared double st[BLK_SIZE];
+    for (j = 0; j < BLK_SIZE; j++; @inner) {
+      if (i * BLK_SIZE + j < n)
+        st[i] = a[i] * b[i];
+      else
+        st[i] = 0.0;
+    }
+
+    @barrier("local");
+
+    for (k = (BLK_SIZE + 1)/2; k > 0; k /= 2) {
+      for (j = 0; j < BLK_SIZE; j++; @inner) {
+        if (j < k)
+          st[j] += st[j + k];
+      }
+    }
+
+    @barrier("local");
+
+    blk_sum[i] = st[0];
+  }
+}
