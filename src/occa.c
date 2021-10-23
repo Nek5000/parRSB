@@ -1,4 +1,5 @@
 #include <genmap-impl.h>
+#include <ctype.h>
 
 #if defined(GENMAP_OCCA)
 
@@ -19,9 +20,9 @@ int occa_init(char *backend, int device_id, int platform_id) {
 
   char fmt[BUFSIZ];
   if (strncmp(backend, "opencl", BUFSIZ) == 0)
-    sprinf(fmt, fmt_ocl, "OpenCL", device_id, platform_id);
+    snprintf(fmt, BUFSIZ, fmt_ocl, "OpenCL", device_id, platform_id);
   else if (strncmp(backend, "cuda", BUFSIZ) == 0)
-    sprinf(fmt, fmt_cuda, "CUDA", device_id);
+    snprintf(fmt, BUFSIZ, fmt_cuda, "CUDA", device_id);
   else
     return 1;
 

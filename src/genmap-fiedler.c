@@ -2,7 +2,7 @@
 #include <time.h>
 
 #include <genmap-impl.h>
-#include <genmap-multigrid-precon.h>
+#include <genmap-multigrid.h>
 #include <sort.h>
 
 #define MM 500
@@ -219,8 +219,9 @@ int inv_power_serial(double *y, int N, double *A, int verbose) {
   return j;
 }
 
-int project(genmap_vector x, struct laplacian *gl, mgData d, genmap_vector ri,
-            int max_iter, struct comm *gsc, buffer *buf, int gid) {
+int project(genmap_vector x, struct laplacian *gl, struct mg_data *d,
+            genmap_vector ri, int max_iter, struct comm *gsc, buffer *buf,
+            int gid) {
   assert(x->size == ri->size);
   uint lelt = x->size;
 
@@ -349,9 +350,10 @@ int project(genmap_vector x, struct laplacian *gl, mgData d, genmap_vector ri,
 
 // Input z should be orthogonal to 1-vector, have unit norm.
 // inverse iteration should not change z.
-static int inverse(genmap_vector y, struct laplacian *gl, mgData d,
+static int inverse(genmap_vector y, struct laplacian *gl, struct mg_data *d,
                    genmap_vector z, struct comm *gsc, int max_iter,
-                   int grammian, struct array *fdlr, slong nelg, buffer *bff, int gid) {
+                   int grammian, struct array *fdlr, slong nelg, buffer *bff,
+                   int gid) {
   assert(z->size == y->size);
   assert(z->size == gl->lelt);
 
@@ -797,10 +799,10 @@ int fiedler(struct rsb_element *elems, uint lelt, int nv, int max_iter,
   slong nelg = out[1][0];
 
   struct csr_mat M;
-  mgData d;
+  struct mg_data d;
   if (algo == 1) {
     GenmapInitLaplacian(&M, elems, lelt, nv, gsc, buf);
-    mgSetup(gsc, &M, &d);
+    mg_setup(&d, 2, gsc, &M);
   }
 
   struct laplacian gl;
@@ -841,7 +843,7 @@ int fiedler(struct rsb_element *elems, uint lelt, int nv, int max_iter,
   if (algo == 0)
     iter = lanczos(fiedler, &gl, initv, gsc, max_iter, &fdlr, nelg, buf, gid);
   else if (algo == 1)
-    iter = inverse(fiedler, &gl, d, initv, gsc, max_iter, 0 /* grammian */,
+    iter = inverse(fiedler, &gl, &d, initv, gsc, max_iter, 0 /* grammian */,
                    &fdlr, nelg, buf, gid);
   metric_acc(FIEDLER_NITER, iter);
 
@@ -864,7 +866,7 @@ int fiedler(struct rsb_element *elems, uint lelt, int nv, int max_iter,
   laplacian_free(&gl);
 
   if (algo == 1) {
-    mgFree(d);
+    mg_free(&d);
     csr_mat_free(&M);
   }
 

@@ -1,5 +1,5 @@
 #include <genmap-impl.h>
-#include <genmap-multigrid-precon.h>
+#include <genmap-multigrid.h>
 
 #define ABS(i) ((i < 0) ? -i : i)
 

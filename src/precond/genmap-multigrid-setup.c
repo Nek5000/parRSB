@@ -1,8 +1,9 @@
-#include <genmap-impl.h>
-#include <genmap-multigrid-precon.h>
+#include <genmap-multigrid.h>
 
-void setOwner(char *ptr, sint n, size_t inOffset, size_t outOffset, slong lelg,
-              sint np) {
+#define GETPTR(p, i, off) ((char *)(p) + (off) + (i) * sizeof(entry))
+
+static void set_owner(char *ptr, sint n, size_t inOffset, size_t outOffset,
+                      slong lelg, sint np) {
   sint lelt = lelg / np;
   sint nrem = lelg % np;
 
@@ -30,7 +31,7 @@ void setOwner(char *ptr, sint n, size_t inOffset, size_t outOffset, slong lelg,
 }
 
 // Following two functions can be combined
-void compress_col(struct array *entries) {
+static void compress_col(struct array *entries) {
   GenmapScalar v;
   sint i, j;
 
@@ -45,7 +46,7 @@ void compress_col(struct array *entries) {
   }
 }
 
-void mgLevelSetup(mgData d, uint lvl) {
+static void mg_lvl_setup(struct mg_data *d, uint lvl) {
   assert(lvl > 0);
   struct csr_mat *M0 = d->levels[lvl - 1]->M;
   uint rn0 = M0->rn, nnz0 = M0->roff[rn0];
@@ -107,8 +108,8 @@ void mgLevelSetup(mgData d, uint lvl) {
   struct crystal cr;
   crystal_init(&cr, &d->c);
 
-  setOwner(entries.ptr, nnz0, offsetof(entry, rn), offsetof(entry, p), ngc,
-           npc);
+  set_owner(entries.ptr, nnz0, offsetof(entry, rn), offsetof(entry, p), ngc,
+            npc);
   sarray_transfer(entry, &entries, p, 1, &cr);
 
   // sort by rn and cn
@@ -125,7 +126,6 @@ void mgLevelSetup(mgData d, uint lvl) {
   /* create the matrix */
   GenmapMalloc(1, &d->levels[lvl]);
   mgLevel l = d->levels[lvl];
-  l->data = d;
 
   GenmapMalloc(1, &l->M);
   struct csr_mat *M1 = l->M;
@@ -208,15 +208,14 @@ void mgLevelSetup(mgData d, uint lvl) {
   array_free(&entries);
 }
 
-void mgSetup(struct comm *gsc, struct csr_mat *M, mgData *d_) {
-  GenmapMalloc(1, d_);
-  mgData d = *d_;
-  comm_dup(&d->c, gsc);
-
-  uint np = gsc->np;
+void mg_setup(struct mg_data *d, int factor, struct comm *c,
+              struct csr_mat *M) {
+  comm_dup(&d->c, c);
+  uint np = c->np;
   uint rn = M->rn;
 
-  slong out[2][1], bf[2][1], in = rn;
+  slong out[2][1], bf[2][1];
+  slong in = rn;
   comm_scan(out, &d->c, gs_long, gs_add, &in, 1, bf);
   slong rg = out[1][0];
 
@@ -226,14 +225,15 @@ void mgSetup(struct comm *gsc, struct csr_mat *M, mgData *d_) {
 
   GenmapMalloc(1, &d->levels[0]);
   d->levels[0]->M = M;
+  d->levels[0]->nsmooth = 2;
+  d->levels[0]->sigma = 0.6;
   d->level_off[0] = 0;
   d->level_off[1] = M->rn;
-  d->levels[0]->nsmooth = 2, d->levels[0]->sigma = 0.6;
 
   uint i;
   uint nnz = M->roff[M->rn];
   for (i = 1; i < d->nlevels; i++) {
-    mgLevelSetup(d, i);
+    mg_lvl_setup(d, i);
     struct csr_mat *Mi = d->levels[i]->M;
     if (Mi->roff[Mi->rn] > nnz)
       nnz = Mi->roff[Mi->rn];
@@ -250,7 +250,7 @@ void mgSetup(struct comm *gsc, struct csr_mat *M, mgData *d_) {
   GenmapMalloc(nnz, &d->buf);
 }
 
-void mgFree(mgData d) {
+void mg_free(struct mg_data *d) {
   mgLevel *l = d->levels;
   uint i;
   for (i = 0; i < d->nlevels; i++) {
@@ -272,5 +272,6 @@ void mgFree(mgData d) {
   GenmapFree(d->buf);
   GenmapFree(d->rhs);
   GenmapFree(d->u);
-  GenmapFree(d);
 }
+
+#undef GETPTR
