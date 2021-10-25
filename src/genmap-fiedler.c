@@ -802,7 +802,7 @@ int fiedler(struct rsb_element *elems, uint lelt, int nv, int max_iter,
   struct mg_data d;
   if (algo == 1) {
     GenmapInitLaplacian(&M, elems, lelt, nv, gsc, buf);
-    mg_setup(&d, 2, gsc, &M);
+    mg_setup(&d, 4, gsc, &M);
   }
 
   struct laplacian gl;

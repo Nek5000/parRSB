@@ -8,7 +8,7 @@ SYNC_BY_REDUCTION ?= 1
 BLAS ?= 0
 BLASDIR ?=
 BLASFLAGS ?= -lblas -llapack
-OCCA ?= 1
+OCCA ?= 0
 OCCADIR ?=
 
 ## Don't touch what follows ##

@@ -169,6 +169,7 @@ int GenmapElementDump(const char *fname, struct rsb_element *elm, uint nelt,
                       int nv, struct comm *c, int dump);
 /* Misc */
 int log2ll(long long n);
+int logbll(long long n, int a);
 
 void genmap_barrier(struct comm *c);
 void comm_split(struct comm *old, int bin, int key, struct comm *new_);

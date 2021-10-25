@@ -2,35 +2,34 @@
 
 #define GETPTR(p, i, off) ((char *)(p) + (off) + (i) * sizeof(entry))
 
-static void set_owner(char *ptr, sint n, size_t inOffset, size_t outOffset,
-                      slong lelg, sint np) {
+static void set_owner(char *ptr, sint n, size_t ioff, size_t ooff, slong lelg,
+                      sint np) {
   sint lelt = lelg / np;
   sint nrem = lelg % np;
 
-  ulong *inPtr;
-  sint *outPtr;
+  ulong *iptr;
+  sint *optr;
   sint i;
   slong row;
   for (i = 0; i < n; i++) {
-    inPtr = (ulong *)GETPTR(ptr, i, inOffset);
-    outPtr = (sint *)GETPTR(ptr, i, outOffset);
-    row = *inPtr - 1;
+    iptr = (ulong *)GETPTR(ptr, i, ioff);
+    optr = (sint *)GETPTR(ptr, i, ooff);
+    row = *iptr - 1;
     // FIXME: Assumes the 'reverse-Nek' element distribution
 #if 0
-    if(row<lelt*(np-nrem)) *outPtr=(sint) row/lelt;
-    else *outPtr=np-nrem+(sint) (row-lelt*(np-nrem))/(lelt+1);
+    if(row<lelt*(np-nrem)) *optr=(sint) row/lelt;
+    else *optr=np-nrem+(sint) (row-lelt*(np-nrem))/(lelt+1);
 #else
     if (nrem == 0)
-      *outPtr = (sint)row / lelt;
+      *optr = (sint)row / lelt;
     else if (row < (lelt + 1) * nrem)
-      *outPtr = (sint)row / (lelt + 1);
+      *optr = (sint)row / (lelt + 1);
     else
-      *outPtr = nrem + (sint)(row - (lelt + 1) * nrem) / lelt;
+      *optr = nrem + (sint)(row - (lelt + 1) * nrem) / lelt;
 #endif
   }
 }
 
-// Following two functions can be combined
 static void compress_col(struct array *entries) {
   GenmapScalar v;
   sint i, j;
@@ -46,7 +45,7 @@ static void compress_col(struct array *entries) {
   }
 }
 
-static void mg_lvl_setup(struct mg_data *d, uint lvl) {
+static void mg_lvl_setup(struct mg_data *d, uint lvl, int factor) {
   assert(lvl > 0);
   struct csr_mat *M0 = d->levels[lvl - 1]->M;
   uint rn0 = M0->rn, nnz0 = M0->roff[rn0];
@@ -57,30 +56,35 @@ static void mg_lvl_setup(struct mg_data *d, uint lvl) {
 
   uint i, j, nn = 0;
   entry *ptr = entries.ptr;
-  for (i = 0; i < rn0; i++)
+  for (i = 0; i < rn0; i++) {
     for (j = M0->roff[i]; j < M0->roff[i + 1]; j++) {
       ptr[nn].r = M0->row_start + i;
       ptr[nn].c = M0->col[j];
-      ptr[nn].rn = (ptr[nn].r + 1) / 2;
-      ptr[nn].cn = (ptr[nn].c + 1) / 2; // Let's collapse columns first
+      ptr[nn].rn = (ptr[nn].r + factor - 1) / factor;
+      ptr[nn].cn = (ptr[nn].c + factor - 1) / factor;
       ptr[nn].v = M0->v[j];
       nn++;
     }
+  }
   assert(nn == nnz0);
 
-  slong out[2][1], bf[2][1], in = rn0;
+  slong out[2][1], bf[2][1];
+  slong in = rn0;
   comm_scan(out, &d->c, gs_long, gs_add, &in, 1, bf);
   slong ng = out[1][0];
+  ulong ngc = (ng / factor) > 0 ? (ng / factor) : 1;
 
-  ulong ngc = ng / 2;
-  if (ngc == 0)
-    return;
+#if 0
+  if (d->c.id == 0)
+    printf("i = %d ng = %d, ngc = %d\n", i, ng, ngc);
+#endif
 
-  if (ng > 1 && ng % 2 == 1)
+  ulong ngp = ngc * factor;
+  if (ng > factor - 1 && ngp < ng)
     for (j = 0; j < M0->roff[rn0]; j++) {
-      if (ptr[j].c == ng)
+      if (ptr[j].c > ngp)
         ptr[j].cn -= 1;
-      if (ptr[j].r == ng)
+      if (ptr[j].r > ngp)
         ptr[j].rn -= 1;
     }
 
@@ -219,9 +223,14 @@ void mg_setup(struct mg_data *d, int factor, struct comm *c,
   comm_scan(out, &d->c, gs_long, gs_add, &in, 1, bf);
   slong rg = out[1][0];
 
-  d->nlevels = log2ll(rg) + 1;
+  d->nlevels = logbll(rg, factor) + 1;
   GenmapMalloc(d->nlevels, &d->levels);
   GenmapMalloc(d->nlevels + 1, &d->level_off);
+
+#if 0
+  if (c->id == 0)
+    printf("rg = %lld factor = %d nlevels = %d\n", rg, factor, d->nlevels);
+#endif
 
   GenmapMalloc(1, &d->levels[0]);
   d->levels[0]->M = M;
@@ -233,7 +242,7 @@ void mg_setup(struct mg_data *d, int factor, struct comm *c,
   uint i;
   uint nnz = M->roff[M->rn];
   for (i = 1; i < d->nlevels; i++) {
-    mg_lvl_setup(d, i);
+    mg_lvl_setup(d, i, factor);
     struct csr_mat *Mi = d->levels[i]->M;
     if (Mi->roff[Mi->rn] > nnz)
       nnz = Mi->roff[Mi->rn];
