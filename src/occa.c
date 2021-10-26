@@ -1,5 +1,5 @@
-#include <genmap-impl.h>
 #include <ctype.h>
+#include <genmap-impl.h>
 
 #if defined(GENMAP_OCCA)
 
@@ -26,7 +26,7 @@ int occa_init(char *backend, int device_id, int platform_id) {
   else
     return 1;
 
-  device =  occaCreateDeviceFromString(fmt);
+  device = occaCreateDeviceFromString(fmt);
 }
 
 int occa_ax() {}

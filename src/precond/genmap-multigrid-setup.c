@@ -68,29 +68,21 @@ static void mg_lvl_setup(struct mg_data *d, uint lvl, int factor) {
   }
   assert(nn == nnz0);
 
+  struct comm *c = &d->c;
   slong out[2][1], bf[2][1];
   slong in = rn0;
-  comm_scan(out, &d->c, gs_long, gs_add, &in, 1, bf);
+  comm_scan(out, c, gs_long, gs_add, &in, 1, bf);
   slong ng = out[1][0];
+
   ulong ngc = (ng / factor) > 0 ? (ng / factor) : 1;
-
-#if 0
-  if (d->c.id == 0)
-    printf("i = %d ng = %d, ngc = %d\n", i, ng, ngc);
-#endif
-
-  ulong ngp = ngc * factor;
-  if (ng > factor - 1 && ngp < ng)
+  ulong ng_ = ngc * factor;
+  if (ng > factor - 1 && ng_ < ng)
     for (j = 0; j < M0->roff[rn0]; j++) {
-      if (ptr[j].c > ngp)
+      if (ptr[j].c > ng_)
         ptr[j].cn -= 1;
-      if (ptr[j].r > ngp)
+      if (ptr[j].r > ng_)
         ptr[j].rn -= 1;
     }
-
-  uint npc = d->c.np;
-  if (ngc < npc)
-    npc = ngc;
 
   /* setup gs ids for fine level (rhs interpolation) */
   ptr = entries.ptr;
@@ -110,8 +102,9 @@ static void mg_lvl_setup(struct mg_data *d, uint lvl, int factor) {
   }
 
   struct crystal cr;
-  crystal_init(&cr, &d->c);
+  crystal_init(&cr, c);
 
+  uint npc = ngc < c->np ? ngc : c->np;
   set_owner(entries.ptr, nnz0, offsetof(entry, rn), offsetof(entry, p), ngc,
             npc);
   sarray_transfer(entry, &entries, p, 1, &cr);

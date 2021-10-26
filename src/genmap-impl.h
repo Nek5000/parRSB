@@ -16,17 +16,6 @@
 #define MAXDIM 3 /* Maximum dimension of the mesh */
 #define MAXNV 8  /* Maximum number of vertices per element */
 
-/* genmap_vector */
-struct genmap_vector_private {
-  GenmapInt size;
-  GenmapScalar *data;
-};
-typedef struct genmap_vector_private *genmap_vector;
-
-int genmap_vector_create(genmap_vector *x, GenmapInt size);
-int genmap_vector_create_zeros(genmap_vector *x, GenmapInt size);
-int genmap_destroy_vector(genmap_vector x);
-
 /* `struct rcb_element` is used for RCB and RIB partitioning.
    `struct rsb_element` should be a superset of `struct rcb_element` */
 struct rcb_element {
