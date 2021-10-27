@@ -8,43 +8,41 @@ SYNC_BY_REDUCTION ?= 1
 BLAS ?= 0
 BLASDIR ?=
 BLASFLAGS ?= -lblas -llapack
-OCCA ?= 0
+OCCA ?= 1
 OCCADIR ?=
 
 ## Don't touch what follows ##
+ifeq ($(GSLIBPATH),)
+  $(error Specify GSLIBPATH=<path to gslib>/build)
+endif
+
+ifneq ($(OCCA), 0)
+  ifeq ($(OCCADIR),)
+    $(error Specify OCCADIR=<path to occa> when using OCCA=1)
+  endif
+endif
+
 MKFILEPATH = $(abspath $(lastword $(MAKEFILE_LIST)))
 SRCROOT_ ?= $(patsubst %/,%,$(dir $(MKFILEPATH)))
 SRCROOT = $(realpath $(SRCROOT_))
-
+SRCDIR = $(SRCROOT)/src
 BUILDDIR = $(SRCROOT)/build
 
-SRCDIR = $(SRCROOT)/src
-SRCS = $(wildcard $(SRCDIR)/*.c)
-SRCOBJS = $(patsubst $(SRCROOT)/%.c,$(BUILDDIR)/%.o,$(SRCS))
+SRCS  = $(wildcard $(SRCDIR)/genmap*.c)
+SRCS += $(wildcard $(SRCDIR)/parrsb*.c)
+SRCS += $(wildcard $(SRCDIR)/sort/*.c)
+SRCS += $(wildcard $(SRCDIR)/precond/*.c)
+SRCS += $(wildcard $(SRCDIR)/gencon/*.c)
 
-SORTDIR = $(SRCROOT)/src/sort
-SORTSRCS = $(wildcard $(SORTDIR)/*.c)
-SRCOBJS += $(patsubst $(SRCROOT)/%.c,$(BUILDDIR)/%.o,$(SORTSRCS))
+EXAMPLES = $(wildcard $(EXAMPLEDIR)/*.c)
 
-PRECONDDIR = $(SRCROOT)/src/precond
-PRECONDSRCS = $(wildcard $(PRECONDDIR)/*.c)
-SRCOBJS += $(patsubst $(SRCROOT)/%.c,$(BUILDDIR)/%.o,$(PRECONDSRCS))
+INCFLAGS = -I$(SRCDIR) -I$(SRCDIR)/sort -I$(SRCDIR)/precond -I$(SRCDIR)/gencon \
+	-I$(GSLIBPATH)/include
+LDFLAGS = -L$(BUILDDIR)/lib -lparRSB -L$(GSLIBPATH)/lib -lgs -lm
 
-GENCONDIR = $(SRCROOT)/src/gencon
-GENCONSRCS = $(wildcard $(GENCONDIR)/*.c)
-SRCOBJS += $(patsubst $(SRCROOT)/%.c,$(BUILDDIR)/%.o,$(GENCONSRCS))
+LIB = $(BUILDDIR)/lib/libparRSB.a
 
-EXAMPLEDIR = $(SRCROOT)/examples
-EXAMPLESRCS = $(wildcard $(EXAMPLEDIR)/*.c)
-EXAMPLEOBJS = $(patsubst $(SRCROOT)/%.c,$(BUILDDIR)/%,$(EXAMPLESRCS))
-
-TARGET = parRSB
-LIB = $(BUILDDIR)/lib/lib$(TARGET).a
-
-INCFLAGS = -I$(SRCDIR) -I$(SORTDIR) -I$(PRECONDDIR) -I$(GENCONDIR) -I$(GSLIBPATH)/include
-LDFLAGS = -L$(BUILDDIR)/lib -l$(TARGET) -L$(GSLIBPATH)/lib -lgs -lm
-
-PP=
+PP =
 
 ifneq ($(DEBUG),0)
   PP += -g -DGENMAP_DEBUG
@@ -72,11 +70,9 @@ endif
 
 ifneq ($(OCCA),0)
   PP += -DGENMAP_OCCA
-  ifneq ($(OCCADIR),)
-    LDFLAGS+= -L$(OCCADIR)/lib
-    INCFLAGS+= -I$(OCCADIR)/include
-  endif
-  LDFLAGS += -locca
+  LDFLAGS+= -L$(OCCADIR)/lib -locca
+  INCFLAGS+= -I$(OCCADIR)/include
+  SRCS += $(wildcard $(SRCDIR)/occa*.c)
 endif
 
 INSTALLDIR=
@@ -84,14 +80,11 @@ ifneq (,$(strip $(DESTDIR)))
   INSTALLDIR = $(realpath $(DESTDIR))
 endif
 
-.PHONY: all
-all: check lib examples install
+SRCOBJS = $(patsubst $(SRCROOT)/%.c,$(BUILDDIR)/%.o,$(SRCS))
+EXAMPLEOBJS = $(patsubst $(SRCROOT)/%.c,$(BUILDDIR)/%,$(EXAMPLES))
 
-.PHONY: check
-check:
-ifeq ($(GSLIBPATH),)
-  $(error Specify GSLIBPATH=<path to gslib>/build)
-endif
+.PHONY: all
+all: lib examples install
 
 .PHONY: install
 install: lib
@@ -99,7 +92,7 @@ ifneq ($(INSTALLDIR),)
 	@mkdir -p $(INSTALLDIR)/lib 2>/dev/null
 	@cp -v $(LIB) $(INSTALLDIR)/lib 2>/dev/null
 	@mkdir -p $(INSTALLDIR)/include 2>/dev/null
-	@cp $(SRCDIR)/*.h $(SORTDIR)/*.h $(PRECONDDIR)/*.h \
+	@cp $(SRCDIR)/*.h $(SRCDIR)/sort/*.h $(SRCDIR)/precond/*.h \
 		$(INSTALLDIR)/include 2>/dev/null
 endif
 
