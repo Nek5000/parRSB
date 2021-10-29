@@ -38,23 +38,6 @@ void csr_mat_setup(struct csr_mat *M, struct array *entries, struct comm *c,
   entry *ptr = entries->ptr;
   sarray_sort_2(entry, ptr, entries->n, r, 1, c, 1, buf);
 
-  uint st = 0, e = 0;
-  sint diag;
-  while (st < entries->n) {
-    diag = -1;
-    e = st;
-    while (e < entries->n && ptr[st].r == ptr[e].r) {
-      if (ptr[e].r == ptr[e].c)
-        diag = e;
-      else
-        ptr[e].v = -1.0;
-      e++;
-    }
-    assert(diag >= 0);
-    ptr[diag].v = e - st - 1;
-    st = e;
-  }
-
   uint i = 0, j, n = 0;
   while (i < entries->n) {
     j = i + 1;
@@ -86,10 +69,10 @@ void csr_mat_setup(struct csr_mat *M, struct array *entries, struct comm *c,
   ptr = entries->ptr;
   uint rn = 0;
   for (i = 0; i < entries->n; i++) {
-    M->col[i] = ptr[i].c;
-    M->v[i] = ptr[i].v;
     if (ptr[i].r == ptr[i].c)
       M->diag[rn++] = ptr[i].v;
+    M->col[i] = ptr[i].c;
+    M->v[i] = ptr[i].v;
   }
   assert(rn == M->rn);
 
