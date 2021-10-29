@@ -850,15 +850,16 @@ int fiedler(struct rsb_element *elems, uint lelt, int nv, int max_iter,
   slong start = out[0][0];
   slong nelg = out[1][0];
 
-  struct csr_mat M;
+  struct laplacian l;
   struct mg_data d;
   if (algo == 1) {
-    GenmapInitLaplacian(&M, elems, lelt, nv, gsc, buf);
+    laplacian_init(&l, elems, lelt, nv, gsc, buf);
+    struct csr_mat M;
     mg_setup(&d, 4, gsc, &M);
   }
 
-  struct laplacian gl;
-  laplacian_weighted_init(&gl, elems, lelt, nv, gsc, buf);
+  struct laplacian wl;
+  laplacian_weighted_init(&wl, elems, lelt, nv, gsc, buf);
 
   genmap_vector initv, fiedler;
   vec_create(&initv, lelt);
@@ -893,9 +894,9 @@ int fiedler(struct rsb_element *elems, uint lelt, int nv, int max_iter,
 
   int iter = 0;
   if (algo == 0)
-    iter = lanczos(fiedler, &gl, initv, gsc, max_iter, &fdlr, nelg, buf, gid);
+    iter = lanczos(fiedler, &wl, initv, gsc, max_iter, &fdlr, nelg, buf, gid);
   else if (algo == 1)
-    iter = inverse(fiedler, &gl, &d, initv, gsc, max_iter, 0 /* grammian */,
+    iter = inverse(fiedler, &wl, &d, initv, gsc, max_iter, 0 /* grammian */,
                    &fdlr, nelg, buf, gid);
   metric_acc(FIEDLER_NITER, iter);
 
@@ -915,11 +916,11 @@ int fiedler(struct rsb_element *elems, uint lelt, int nv, int max_iter,
 
   vec_destroy(initv);
   vec_destroy(fiedler);
-  laplacian_free(&gl);
+  laplacian_free(&wl);
 
   if (algo == 1) {
     mg_free(&d);
-    csr_mat_free(&M);
+    laplacian_free(&l);
   }
 
   return 0;

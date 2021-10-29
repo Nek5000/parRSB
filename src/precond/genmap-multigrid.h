@@ -3,14 +3,6 @@
 
 #include <genmap-impl.h>
 
-// for the coarse level
-void csr_mat_setup(struct csr_mat *M, struct array *entries, struct comm *c,
-                   buffer *buf);
-void csr_mat_apply(GenmapScalar *y, struct csr_mat *M, GenmapScalar *x,
-                   buffer *buf);
-void csr_mat_print(struct csr_mat *M, struct comm *c);
-int csr_mat_free(struct csr_mat *M);
-
 struct mg_lvl {
   int nsmooth;
   GenmapScalar sigma;

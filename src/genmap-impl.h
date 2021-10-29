@@ -44,48 +44,23 @@ struct rsb_element {
   GenmapInt part;
 };
 
+/* Laplacian */
 struct laplacian {
-  struct gs_data *gsh;
+  int type;
+  uint lelt;
   GenmapScalar *weights;
   GenmapScalar *u;
-  uint lelt;
-  int nv;
-};
-
-typedef struct {
-  ulong r, c;
-  uint proc;
-} csr_entry;
-
-typedef struct {
-  ulong r, c, rn, cn;
-  uint p;
-  GenmapScalar v;
-} entry;
-
-struct csr_mat {
-  uint rn;
-  ulong row_start;
-
-  uint *roff;
-  ulong *col;
-  GenmapScalar *v, *diag, *buf;
-
+  /* gs based */
   struct gs_data *gsh;
+  int nv;
+  /* csr */
+  uint *off;
 };
 
-typedef struct {
-  GenmapULong sequenceId;
-  int nNeighbors;
-  GenmapULong elementId;
-  GenmapULong vertexId;
-  uint workProc;
-} vertex;
-
-int GenmapInitLaplacian(struct csr_mat *M, struct rsb_element *elems, uint n,
-                        int nv, struct comm *c, buffer *buf);
-int GenmapLaplacian(GenmapScalar *v, struct csr_mat *M, GenmapScalar *u,
-                    buffer *buf);
+int laplacian_init(struct laplacian *gl, struct rsb_element *elems, uint n,
+                   int nv, struct comm *c, buffer *buf);
+int laplacian(GenmapScalar *v, struct laplacian *gl, GenmapScalar *u,
+              buffer *buf);
 
 int laplacian_weighted_init(struct laplacian *gl, struct rsb_element *elems,
                             uint lelt, int nv, struct comm *c, buffer *buf);
@@ -107,6 +82,35 @@ int balance_partitions(struct array *elements, int nv, struct comm *lc,
 
 int rsb(struct array *elements, parrsb_options *options, int nv,
         struct comm *gc, buffer *bfr);
+
+/* CSR Matrix */
+struct csr_mat {
+  uint rn;
+  ulong row_start;
+
+  uint *roff;
+  ulong *col;
+  GenmapScalar *v;
+  GenmapScalar *diag;
+  GenmapScalar *buf;
+
+  struct gs_data *gsh;
+};
+
+void csr_mat_setup(struct csr_mat *M, struct array *entries, struct comm *c,
+                   buffer *buf);
+void csr_mat_apply(GenmapScalar *y, struct csr_mat *M, GenmapScalar *x,
+                   buffer *buf);
+void csr_mat_print(struct csr_mat *M, struct comm *c);
+int csr_mat_free(struct csr_mat *M);
+
+typedef struct {
+  GenmapULong sequenceId;
+  int nNeighbors;
+  GenmapULong elementId;
+  GenmapULong vertexId;
+  uint workProc;
+} vertex;
 
 /* Memory */
 int GenmapMallocArray(size_t n, size_t unit, void *p);

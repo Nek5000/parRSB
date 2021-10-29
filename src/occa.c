@@ -3,6 +3,8 @@
 
 #include <occa.h>
 
+#define scalar GenmapScalar
+
 static occaDevice device;
 
 int occa_init(char *backend, int device_id, int platform_id) {
@@ -35,7 +37,7 @@ int occa_lanczos_setup(struct laplacian *gl, uint lelt, int niter) {
   o_r = occaDeviceMalloc(device, sizeof(scalar) * lelt, NULL, occaDefault);
   o_p = occaDeviceMalloc(device, sizeof(scalar) * lelt, NULL, occaDefault);
   o_w = occaDeviceMalloc(device, sizeof(scalar) * lelt, NULL, occaDefault);
-  o_w = occaDeviceMalloc(device, sizeof(scalar) * lelt * (niter + 1), NULL, occaDefault);
+  o_rr = occaDeviceMalloc(device, sizeof(scalar) * lelt * (niter + 1), NULL, occaDefault);
 }
 
 int occa_lanczos_free() {}

@@ -2,6 +2,12 @@
 
 #define GETPTR(p, i, off) ((char *)(p) + (off) + (i) * sizeof(entry))
 
+typedef struct {
+  ulong r, c, rn, cn;
+  uint p;
+  GenmapScalar v;
+} entry;
+
 static void set_owner(char *ptr, sint n, size_t ioff, size_t ooff, slong lelg,
                       sint np) {
   sint lelt = lelg / np;

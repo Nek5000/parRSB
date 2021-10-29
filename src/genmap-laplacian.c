@@ -3,6 +3,22 @@
 
 #define MIN(a, b) ((b) < (a) ? (b) : (a))
 
+#define GS 1
+#define CSR 2
+#define WEIGHTED 4
+#define UNWEIGHTED 8
+
+typedef struct {
+  ulong r, c;
+  uint proc;
+} csr_entry;
+
+typedef struct {
+  ulong r, c;
+  uint p;
+  GenmapScalar v;
+} entry;
+
 static void find_neighbors(struct array *nbrs, struct rsb_element *elems,
                            sint nelt, int nv, struct comm *cc, buffer *buf) {
   slong out[2][1], bfr[2][1];
@@ -94,49 +110,65 @@ static void find_neighbors(struct array *nbrs, struct rsb_element *elems,
   array_free(&a);
 }
 
-int GenmapInitLaplacian(struct csr_mat *M, struct rsb_element *elems, uint lelt,
-                        int nv, struct comm *c, buffer *buf) {
+int laplacian_init(struct laplacian *l, struct rsb_element *elems, uint lelt,
+                   int nv, struct comm *c, buffer *buf) {
+  l->type = 0 | CSR | UNWEIGHTED;
+
   struct array entries;
   find_neighbors(&entries, elems, lelt, nv, c, buf);
-  csr_mat_setup(M, &entries, c, buf);
+
+  struct csr_mat M;
+  csr_mat_setup(&M, &entries, c, buf);
+
+  l->lelt = lelt;
+  l->nv = nv;
+
+  l->off = tcalloc(uint, M.rn + 1);
+  if (l->off != NULL)
+    memcpy(l->off, M.roff, sizeof(uint) * (M.rn + 1));
+
+  l->weights = tcalloc(GenmapScalar, M.rn);
+  if (l->weights != NULL)
+    memcpy(l->weights, M.diag, sizeof(GenmapScalar) * M.rn);
+
+  l->u = tcalloc(GenmapScalar, M.roff[M.rn]);
+  if (l->u != NULL)
+    memcpy(l->u, M.v, sizeof(GenmapScalar) * M.roff[M.rn]);
+
+  csr_mat_free(&M);
   array_free(&entries);
 
   return 0;
 }
 
-int GenmapLaplacian(GenmapScalar *v, struct csr_mat *M, GenmapScalar *u,
-                    buffer *buf) {
-  csr_mat_apply(v, M, u, buf);
-  return 0;
-}
-
-int laplacian_weighted_init(struct laplacian *gl, struct rsb_element *elems,
+int laplacian_weighted_init(struct laplacian *wl, struct rsb_element *elems,
                             uint lelt, int nv, struct comm *c, buffer *buf) {
-  uint npts = nv * lelt;
+  wl->type = 0 | GS | WEIGHTED;
 
+  uint npts = nv * lelt;
   slong *vertices = tcalloc(slong, npts);
-  GenmapInt i, j;
+  uint i, j;
   for (i = 0; i < lelt; i++)
     for (j = 0; j < nv; j++)
       vertices[i * nv + j] = elems[i].vertices[j];
 
-  gl->u = tcalloc(GenmapScalar, npts);
+  wl->u = tcalloc(GenmapScalar, npts);
   for (i = 0; i < lelt; i++)
     for (j = 0; j < nv; j++)
-      gl->u[nv * i + j] = 1.0;
+      wl->u[nv * i + j] = 1.0;
 
-  gl->gsh = gs_setup(vertices, npts, c, 0, gs_crystal_router, 0);
-  gs(gl->u, gs_double, gs_add, 0, gl->gsh, buf);
+  wl->gsh = gs_setup(vertices, npts, c, 0, gs_crystal_router, 0);
+  gs(wl->u, gs_double, gs_add, 0, wl->gsh, buf);
 
-  gl->weights = tcalloc(GenmapScalar, lelt);
+  wl->weights = tcalloc(GenmapScalar, lelt);
   for (i = 0; i < lelt; i++) {
-    gl->weights[i] = 0.0;
+    wl->weights[i] = 0.0;
     for (j = 0; j < nv; j++)
-      gl->weights[i] += gl->u[nv * i + j];
+      wl->weights[i] += wl->u[nv * i + j];
   }
 
-  gl->lelt = lelt;
-  gl->nv = nv;
+  wl->lelt = lelt;
+  wl->nv = nv;
 
   if (vertices != NULL)
     free(vertices);
@@ -144,24 +176,30 @@ int laplacian_weighted_init(struct laplacian *gl, struct rsb_element *elems,
   return 0;
 }
 
-int laplacian_weighted(GenmapScalar *v, struct laplacian *gl, GenmapScalar *u,
+int laplacian_weighted(GenmapScalar *v, struct laplacian *wl, GenmapScalar *u,
                        buffer *buf) {
-  uint lelt = gl->lelt;
-  int nv = gl->nv;
+  uint lelt = wl->lelt;
+  int nv = wl->nv;
 
   GenmapInt i, j;
   for (i = 0; i < lelt; i++)
     for (j = 0; j < nv; j++)
-      gl->u[nv * i + j] = u[i];
+      wl->u[nv * i + j] = u[i];
 
-  gs(gl->u, gs_double, gs_add, 0, gl->gsh, buf);
+  gs(wl->u, gs_double, gs_add, 0, wl->gsh, buf);
 
   for (i = 0; i < lelt; i++) {
-    v[i] = gl->weights[i] * u[i];
+    v[i] = wl->weights[i] * u[i];
     for (j = 0; j < nv; j++)
-      v[i] -= gl->u[nv * i + j];
+      v[i] -= wl->u[nv * i + j];
   }
 
+  return 0;
+}
+
+int laplacian(GenmapScalar *v, struct laplacian *l, GenmapScalar *u,
+              buffer *buf) {
+  // csr_mat_apply(v, M, u, buf);
   return 0;
 }
 
@@ -173,5 +211,10 @@ void laplacian_free(struct laplacian *l) {
   if (l->gsh != NULL)
     gs_free(l->gsh);
 }
+
+#undef GS
+#undef CSR
+#undef WEIGHTED
+#undef UNWEIGHTED
 
 #undef MIN

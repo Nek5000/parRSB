@@ -3,6 +3,12 @@
 
 #define ABS(i) ((i < 0) ? -i : i)
 
+typedef struct {
+  ulong r, c;
+  uint p;
+  GenmapScalar v;
+} entry;
+
 static struct gs_data *get_csr_top(struct csr_mat *M, struct comm *c) {
   const uint rn = M->rn;
   const uint n = M->roff[rn];
