@@ -48,13 +48,24 @@ struct rsb_element {
 struct laplacian {
   int type;
   uint lelt;
-  GenmapScalar *weights;
-  GenmapScalar *u;
-  /* gs based */
+  GenmapScalar *diag;
+  /*
+  * GS
+  */
   struct gs_data *gsh;
   int nv;
-  /* csr */
-  uint *off;
+  /*
+  * CSR
+  */
+  /* col ids of laplacian, diagonal ids first */
+  ulong *col_ids;
+  /* adj as csr, values are not stored as everything is -1 */
+  uint *adj_off;
+  uint *adj_ind;
+  /* WORK ARRAY
+  * size = lelt * nv for gs, lelt + adj_off[lelt] for csr
+  */
+  GenmapScalar *u;
 };
 
 int laplacian_init(struct laplacian *gl, struct rsb_element *elems, uint n,

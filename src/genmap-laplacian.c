@@ -8,18 +8,12 @@
 #define WEIGHTED 4
 #define UNWEIGHTED 8
 
-typedef struct {
+struct csr_entry {
   ulong r, c;
   uint proc;
-} csr_entry;
+};
 
-typedef struct {
-  ulong r, c;
-  uint p;
-  GenmapScalar v;
-} entry;
-
-static void find_neighbors(struct array *nbrs, struct rsb_element *elems,
+static void find_neighbors(struct array *arr, struct rsb_element *elems,
                            sint nelt, int nv, struct comm *cc, buffer *buf) {
   slong out[2][1], bfr[2][1];
   slong lelt = nelt;
@@ -54,12 +48,10 @@ static void find_neighbors(struct array *nbrs, struct rsb_element *elems,
 
   sarray_sort(vertex, vPtr, size, vertexId, 1, buf);
 
-  struct array a;
-  array_init(csr_entry, &a, 10);
-
   /* FIXME: Assumes quads or hexes */
+  array_init(struct csr_entry, arr, 10);
   sint s = 0, e;
-  csr_entry t;
+  struct csr_entry t;
   while (s < size) {
     e = s + 1;
     while (e < size && vPtr[s].vertexId == vPtr[e].vertexId)
@@ -71,43 +63,16 @@ static void find_neighbors(struct array *nbrs, struct rsb_element *elems,
       t.proc = vPtr[i].workProc;
       for (j = 0; j < nnbrs; j++) {
         t.c = vPtr[s + j].elementId;
-        array_cat(csr_entry, &a, &t, 1);
+        if (t.r != t.c)
+          array_cat(struct csr_entry, arr, &t, 1);
       }
     }
     s = e;
   }
 
-  sarray_transfer(csr_entry, &a, proc, 1, &cr);
-  array_init(entry, nbrs, lelt);
-  if (a.n == 0) {
-    crystal_free(&cr);
-    array_free(&vertices);
-    array_free(&a);
-  }
-
-  sarray_sort_2(csr_entry, a.ptr, a.n, r, 1, c, 1, buf);
-  csr_entry *aptr = a.ptr;
-  entry *nptr = nbrs->ptr;
-
-  entry ee = {0, 0, 0, 0, 0, 0.0}, ep = {0, 0, 0, 0, 0.0};
-  ep.r = aptr[0].r;
-  ep.c = aptr[0].c;
-  array_cat(entry, nbrs, &ep, 1);
-
-  for (i = 1; i < a.n; i++) {
-    ee.r = aptr[i].r;
-    ee.c = aptr[i].c;
-    if (ee.r != ep.r || ee.c != ep.c) {
-      array_cat(entry, nbrs, &ee, 1);
-      ep = ee;
-    }
-  }
-
-  sarray_sort_2(entry, nbrs->ptr, nbrs->n, r, 1, c, 1, buf);
-
+  sarray_transfer(struct csr_entry, arr, proc, 1, &cr);
   crystal_free(&cr);
   array_free(&vertices);
-  array_free(&a);
 }
 
 int laplacian_init(struct laplacian *l, struct rsb_element *elems, uint lelt,
@@ -116,26 +81,21 @@ int laplacian_init(struct laplacian *l, struct rsb_element *elems, uint lelt,
 
   struct array entries;
   find_neighbors(&entries, elems, lelt, nv, c, buf);
-
-  struct csr_mat M;
-  csr_mat_setup(&M, &entries, c, buf);
+  sarray_sort_2(struct csr_entry, entries.ptr, entries.n, r, 1, c, 1, buf);
 
   l->lelt = lelt;
   l->nv = nv;
 
-  l->off = tcalloc(uint, M.rn + 1);
-  if (l->off != NULL)
-    memcpy(l->off, M.roff, sizeof(uint) * (M.rn + 1));
+  uint i, rn = 0;
+  struct csr_entry *ptr = entries.ptr;
+  for (i = 0; i < entries.n; i++) {}
+  l->col_ids = tcalloc(ulong, entries.n);
 
-  l->weights = tcalloc(GenmapScalar, M.rn);
-  if (l->weights != NULL)
-    memcpy(l->weights, M.diag, sizeof(GenmapScalar) * M.rn);
+  l->adj_off = tcalloc(uint, lelt + 1);
+  l->adj_ind = tcalloc(uint, entries.n);
 
-  l->u = tcalloc(GenmapScalar, M.roff[M.rn]);
-  if (l->u != NULL)
-    memcpy(l->u, M.v, sizeof(GenmapScalar) * M.roff[M.rn]);
+  l->diag = tcalloc(GenmapScalar, lelt);
 
-  csr_mat_free(&M);
   array_free(&entries);
 
   return 0;
@@ -160,15 +120,18 @@ int laplacian_weighted_init(struct laplacian *wl, struct rsb_element *elems,
   wl->gsh = gs_setup(vertices, npts, c, 0, gs_crystal_router, 0);
   gs(wl->u, gs_double, gs_add, 0, wl->gsh, buf);
 
-  wl->weights = tcalloc(GenmapScalar, lelt);
+  wl->diag = tcalloc(GenmapScalar, lelt);
   for (i = 0; i < lelt; i++) {
-    wl->weights[i] = 0.0;
+    wl->diag[i] = 0.0;
     for (j = 0; j < nv; j++)
-      wl->weights[i] += wl->u[nv * i + j];
+      wl->diag[i] += wl->u[nv * i + j];
   }
 
   wl->lelt = lelt;
   wl->nv = nv;
+  wl->col_ids = NULL;
+  wl->adj_off = NULL;
+  wl->adj_ind = NULL;
 
   if (vertices != NULL)
     free(vertices);
@@ -189,7 +152,7 @@ int laplacian_weighted(GenmapScalar *v, struct laplacian *wl, GenmapScalar *u,
   gs(wl->u, gs_double, gs_add, 0, wl->gsh, buf);
 
   for (i = 0; i < lelt; i++) {
-    v[i] = wl->weights[i] * u[i];
+    v[i] = wl->diag[i] * u[i];
     for (j = 0; j < nv; j++)
       v[i] -= wl->u[nv * i + j];
   }
@@ -206,10 +169,16 @@ int laplacian(GenmapScalar *v, struct laplacian *l, GenmapScalar *u,
 void laplacian_free(struct laplacian *l) {
   if (l->u != NULL)
     free(l->u);
-  if (l->weights != NULL)
-    free(l->weights);
+  if (l->diag != NULL)
+    free(l->diag);
   if (l->gsh != NULL)
     gs_free(l->gsh);
+  if (l->col_ids != NULL)
+    free(l->col_ids);
+  if (l->adj_off != NULL)
+    free(l->adj_off);
+  if (l->adj_ind != NULL)
+    free(l->adj_ind);
 }
 
 #undef GS
