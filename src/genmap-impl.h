@@ -32,6 +32,27 @@ int rcb(struct array *elements, size_t unit_size, int ndim, struct comm *c,
 int rib(struct array *elements, size_t unit_size, int ndim, struct comm *c,
         buffer *bfr);
 
+/* CSR Matrix */
+struct csr_mat {
+  uint rn;
+  ulong row_start;
+
+  uint *roff;
+  ulong *col;
+  GenmapScalar *v;
+  GenmapScalar *diag;
+  GenmapScalar *buf;
+
+  struct gs_data *gsh;
+};
+
+void csr_mat_setup(struct csr_mat *M, struct array *entries, struct comm *c,
+                   buffer *buf);
+void csr_mat_apply(GenmapScalar *y, struct csr_mat *M, GenmapScalar *x,
+                   buffer *buf);
+void csr_mat_print(struct csr_mat *M, struct comm *c);
+int csr_mat_free(struct csr_mat *M);
+
 /* RSB */
 struct rsb_element {
   GenmapInt proc;
@@ -44,27 +65,30 @@ struct rsb_element {
   GenmapInt part;
 };
 
-/* Laplacian */
 struct laplacian {
   int type;
   uint lelt;
-  GenmapScalar *diag;
-  /*
-  * GS
-  */
-  struct gs_data *gsh;
   int nv;
-  /*
-  * CSR
-  */
-  /* col ids of laplacian, diagonal ids first */
+  /* GS */
+  GenmapScalar *diag;
+  struct gs_data *gsh;
+
+  /* CSR */
+  struct csr_mat M;
+
+  /* GPU */
+  /* unique column ids of local laplacian matrix, sorted */
   ulong *col_ids;
   /* adj as csr, values are not stored as everything is -1 */
   uint *adj_off;
   uint *adj_ind;
+  /* diagonal as an array */
+  uint *diag_ind;
+  uint *diag_val;
+
   /* WORK ARRAY
-  * size = lelt * nv for gs, lelt + adj_off[lelt] for csr
-  */
+   * size = lelt * nv for gs, # of unique column ids for csr
+   */
   GenmapScalar *u;
 };
 
@@ -93,27 +117,6 @@ int balance_partitions(struct array *elements, int nv, struct comm *lc,
 
 int rsb(struct array *elements, parrsb_options *options, int nv,
         struct comm *gc, buffer *bfr);
-
-/* CSR Matrix */
-struct csr_mat {
-  uint rn;
-  ulong row_start;
-
-  uint *roff;
-  ulong *col;
-  GenmapScalar *v;
-  GenmapScalar *diag;
-  GenmapScalar *buf;
-
-  struct gs_data *gsh;
-};
-
-void csr_mat_setup(struct csr_mat *M, struct array *entries, struct comm *c,
-                   buffer *buf);
-void csr_mat_apply(GenmapScalar *y, struct csr_mat *M, GenmapScalar *x,
-                   buffer *buf);
-void csr_mat_print(struct csr_mat *M, struct comm *c);
-int csr_mat_free(struct csr_mat *M);
 
 typedef struct {
   GenmapULong sequenceId;
