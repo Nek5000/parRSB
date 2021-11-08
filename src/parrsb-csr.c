@@ -46,7 +46,9 @@ void csr_mat_setup(struct csr_mat *M, struct array *entries, struct comm *c,
     i = j, n++;
   }
 
+  M->rn = n;
   GenmapMalloc(n + 1, &M->roff);
+
   if (n == 0) {
     M->col = NULL;
     M->v = NULL;
@@ -59,10 +61,8 @@ void csr_mat_setup(struct csr_mat *M, struct array *entries, struct comm *c,
     GenmapMalloc(M->rn, &M->diag);
   }
 
-  M->rn = n;
-
   slong out[2][1], bf[2][1];
-  slong in = n;
+  slong in = M->rn;
   comm_scan(out, c, gs_long, gs_add, &in, 1, bf);
   M->row_start = out[0][0] + 1;
 
@@ -74,9 +74,11 @@ void csr_mat_setup(struct csr_mat *M, struct array *entries, struct comm *c,
     M->col[i] = ptr[i].c;
     M->v[i] = ptr[i].v;
   }
+  printf("rn = %d, M->rn = %d\n", rn, M->rn);
   assert(rn == M->rn);
 
-  M->roff[0] = i = 0;
+  M->roff[0] = 0;
+  i = 0;
   uint nn = 0;
   while (i < entries->n) {
     j = i + 1;

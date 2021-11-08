@@ -27,6 +27,7 @@ SRCROOT_ ?= $(patsubst %/,%,$(dir $(MKFILEPATH)))
 SRCROOT = $(realpath $(SRCROOT_))
 SRCDIR = $(SRCROOT)/src
 BUILDDIR = $(SRCROOT)/build
+EXAMPLEDIR = $(SRCROOT)/examples
 
 SRCS  = $(wildcard $(SRCDIR)/genmap*.c)
 SRCS += $(wildcard $(SRCDIR)/parrsb*.c)

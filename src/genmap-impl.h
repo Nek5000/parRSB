@@ -65,10 +65,16 @@ struct rsb_element {
   GenmapInt part;
 };
 
+#define GS 1
+#define CSR 2
+#define WEIGHTED 4
+#define UNWEIGHTED 8
+
 struct laplacian {
   int type;
-  uint lelt;
+  uint nel;
   int nv;
+
   /* GS */
   GenmapScalar *diag;
   struct gs_data *gsh;
@@ -87,27 +93,22 @@ struct laplacian {
   uint *diag_val;
 
   /* WORK ARRAY
-   * size = lelt * nv for gs, # of unique column ids for csr
+   * size = nel * nv for gs, # of unique column ids for csr
    */
   GenmapScalar *u;
 };
 
-int laplacian_init(struct laplacian *gl, struct rsb_element *elems, uint n,
-                   int nv, struct comm *c, buffer *buf);
-int laplacian(GenmapScalar *v, struct laplacian *gl, GenmapScalar *u,
+int laplacian_init(struct laplacian *l, struct rsb_element *elems, uint nel,
+                   int nv, int type, struct comm *c, buffer *buf);
+int laplacian(GenmapScalar *v, struct laplacian *l, GenmapScalar *u,
               buffer *buf);
-
-int laplacian_weighted_init(struct laplacian *gl, struct rsb_element *elems,
-                            uint lelt, int nv, struct comm *c, buffer *buf);
-int laplacian_weighted(GenmapScalar *v, struct laplacian *gl, GenmapScalar *u,
-                       buffer *buf);
 void laplacian_free(struct laplacian *l);
 
 void matrix_inverse(int N, double *A);
 
 int power_serial(double *y, int N, double *A, int verbose);
 
-int fiedler(struct rsb_element *elements, uint lelt, int nv, int max_iter,
+int fiedler(struct rsb_element *elements, uint nel, int nv, int max_iter,
             int global, struct comm *gsc, buffer *buf, int gid);
 
 int repair_partitions(struct array *elements, int nv, struct comm *tc,

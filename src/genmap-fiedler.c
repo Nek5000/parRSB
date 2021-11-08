@@ -135,7 +135,7 @@ static int vec_ortho(struct comm *c, genmap_vector q1, GenmapULong n) {
 }
 
 static int vec_dssum(GenmapScalar *v, struct laplacian *gl, buffer *buf) {
-  uint lelt = gl->lelt;
+  uint lelt = gl->nel;
   int nv = gl->nv;
 
   GenmapInt i, j;
@@ -318,7 +318,7 @@ int project(genmap_vector x, struct laplacian *gl, struct mg_data *d,
   i = 0;
   while (i < max_iter) {
     metric_tic(gsc, LAPLACIAN);
-    laplacian_weighted(w->data, gl, p->data, buf);
+    laplacian(w->data, gl, p->data, buf);
     metric_toc(gsc, LAPLACIAN);
 
     GenmapScalar den = vec_dot(p, w);
@@ -406,9 +406,9 @@ static int inverse(genmap_vector y, struct laplacian *gl, struct mg_data *d,
                    int grammian, struct array *fdlr, slong nelg, buffer *bff,
                    int gid) {
   assert(z->size == y->size);
-  assert(z->size == gl->lelt);
+  assert(z->size == gl->nel);
 
-  uint lelt = gl->lelt;
+  uint lelt = gl->nel;
 
   // Grammian
   GenmapScalar *Z, *GZ, *M, *rhs, *v, *buf;
@@ -488,7 +488,7 @@ static int inverse(genmap_vector y, struct laplacian *gl, struct mg_data *d,
 
         // M=Z(1:k,:)*G*Z(1:k,:);
         for (j = 0; j < N; j++) {
-          laplacian_weighted(GZ, gl, &Z[j * lelt], bff);
+          laplacian(GZ, gl, &Z[j * lelt], bff);
           for (k = 0; k < N; k++) {
             M[k * N + j] = 0.0;
             for (l = 0; l < lelt; l++)
@@ -723,9 +723,7 @@ static int lanczos_aux(genmap_vector diag, genmap_vector upper,
 
     vec_ortho(gsc, p, nelg);
 
-    metric_tic(gsc, LAPLACIAN);
-    laplacian_weighted(w->data, gl, p->data, bfr);
-    metric_tic(gsc, LAPLACIAN);
+    laplacian(w->data, gl, p->data, bfr);
 
     GenmapScalar ww = vec_dot(w, w);
     comm_allreduce(gsc, gs_double, gs_add, &ww, 1, buf);
@@ -853,13 +851,13 @@ int fiedler(struct rsb_element *elems, uint lelt, int nv, int max_iter,
   struct laplacian l;
   struct mg_data d;
   if (algo == 1) {
-    laplacian_init(&l, elems, lelt, nv, gsc, buf);
+    laplacian_init(&l, elems, lelt, nv, CSR | UNWEIGHTED, gsc, buf);
     struct csr_mat M;
     mg_setup(&d, 4, gsc, &M);
   }
 
   struct laplacian wl;
-  laplacian_weighted_init(&wl, elems, lelt, nv, gsc, buf);
+  laplacian_init(&wl, elems, lelt, nv, GS | WEIGHTED, gsc, buf);
 
   genmap_vector initv, fiedler;
   vec_create(&initv, lelt);
