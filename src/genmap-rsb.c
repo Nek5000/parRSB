@@ -221,7 +221,9 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
 
     metric_push_level();
   }
+#if 0
   rsb_local(elements->ptr, 0, elements->n, nv, max_iter, max_pass, &lc, bfr);
+#endif
   comm_free(&lc);
 
   check_rsb_partition(gc, max_pass, max_iter);
