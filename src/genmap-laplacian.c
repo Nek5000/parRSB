@@ -274,23 +274,15 @@ static int csr_unweighted_init(struct laplacian *l, struct rsb_element *elems,
     }
   array_free(&entries);
 
-  csr_laplacian_setup(&l->M, &unique, c, buf);
+  csr_laplacian_setup(l->M, &unique, c, buf);
   array_free(&unique);
-
-  l->diag = NULL;
-  l->u = NULL;
-  l->col_ids = NULL;
-  l->adj_off = NULL;
-  l->adj_ind = NULL;
-  l->diag_ind = NULL;
-  l->diag_val = NULL;
 
   return 0;
 }
 
 static int csr_unweighted(GenmapScalar *v, struct laplacian *l, GenmapScalar *u,
                           buffer *buf) {
-  csr_mat_apply(v, &l->M, u, buf);
+  csr_mat_apply(v, l->M, u, buf);
   return 0;
 }
 
@@ -319,12 +311,6 @@ static int gs_weighted_init(struct laplacian *l, struct rsb_element *elems,
     for (j = 0; j < nv; j++)
       l->diag[i] += l->u[nv * i + j];
   }
-
-  l->col_ids = NULL;
-  l->adj_off = NULL;
-  l->adj_ind = NULL;
-  l->diag_ind = NULL;
-  l->diag_val = NULL;
 
   if (vertices != NULL)
     free(vertices);
@@ -357,8 +343,22 @@ int laplacian_init(struct laplacian *l, struct rsb_element *elems, uint nel,
                    int nv, int type, struct comm *c, buffer *buf) {
   l->type = type;
 
+  l->diag = NULL;
+  l->gsh = NULL;
+
+  l->M = NULL;
+
+  l->col_ids = NULL;
+  l->adj_off = NULL;
+  l->adj_ind = NULL;
+  l->diag_ind = NULL;
+  l->diag_val = NULL;
+
+  l->u = NULL;
+
   if ((type & CSR) == CSR) {
     assert((type & UNWEIGHTED) == UNWEIGHTED);
+    l->M = tcalloc(struct csr_mat, 1);
     csr_unweighted_init(l, elems, nel, nv, c, buf);
   } else if ((type & GS) == GS) {
     assert((type & WEIGHTED) == WEIGHTED);
@@ -385,12 +385,14 @@ int laplacian(GenmapScalar *v, struct laplacian *l, GenmapScalar *u,
 }
 
 void laplacian_free(struct laplacian *l) {
-  if (l->u != NULL)
-    free(l->u);
   if (l->diag != NULL)
     free(l->diag);
   if (l->gsh != NULL)
     gs_free(l->gsh);
+
+  if (l->M != NULL)
+    csr_mat_free(l->M);
+
   if (l->col_ids != NULL)
     free(l->col_ids);
   if (l->adj_off != NULL)
@@ -401,6 +403,9 @@ void laplacian_free(struct laplacian *l) {
     free(l->diag_ind);
   if (l->diag_val != NULL)
     free(l->diag_val);
+
+  if (l->u != NULL)
+    free(l->u);
 }
 
 #undef MIN

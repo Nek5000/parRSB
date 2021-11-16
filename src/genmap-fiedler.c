@@ -852,12 +852,15 @@ int fiedler(struct rsb_element *elems, uint lelt, int nv, int max_iter,
   struct mg_data d;
   if (algo == 1) {
     laplacian_init(&l, elems, lelt, nv, CSR | UNWEIGHTED, gsc, buf);
-    struct csr_mat M;
-    mg_setup(&d, 4, gsc, &M);
+    mg_setup(&d, 4, gsc, l.M);
   }
 
   struct laplacian wl;
+#if 1
   laplacian_init(&wl, elems, lelt, nv, GS | WEIGHTED, gsc, buf);
+#else
+  laplacian_init(&wl, elems, lelt, nv, CSR | UNWEIGHTED, gsc, buf);
+#endif
 
   genmap_vector initv, fiedler;
   vec_create(&initv, lelt);

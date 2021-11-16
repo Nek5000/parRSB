@@ -80,7 +80,7 @@ struct laplacian {
   struct gs_data *gsh;
 
   /* CSR */
-  struct csr_mat M;
+  struct csr_mat *M;
 
   /* GPU */
   /* unique column ids of local laplacian matrix, sorted */
