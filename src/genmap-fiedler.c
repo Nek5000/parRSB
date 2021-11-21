@@ -856,11 +856,13 @@ int fiedler(struct rsb_element *elems, uint lelt, int nv, int max_iter,
   }
 
   struct laplacian wl;
-#if 1
+#if 0
   laplacian_init(&wl, elems, lelt, nv, GS | WEIGHTED, gsc, buf);
 #else
   laplacian_init(&wl, elems, lelt, nv, CSR | UNWEIGHTED, gsc, buf);
 #endif
+
+  occa_lanczos_init(&wl, max_iter);
 
   genmap_vector initv, fiedler;
   vec_create(&initv, lelt);

@@ -13,8 +13,10 @@ struct csr_entry {
   GenmapScalar v;
 };
 
-struct col {
-  ulong c;
+struct vertex0 {
+  GenmapULong elementId;
+  GenmapULong vertexId;
+  uint workProc;
 };
 
 static void find_neighbors(struct array *arr, struct rsb_element *elems,
@@ -27,18 +29,15 @@ static void find_neighbors(struct array *arr, struct rsb_element *elems,
 
   struct array vertices;
   size_t size = nelt * nv;
-  array_init(vertex, &vertices, size);
+  array_init(struct vertex0, &vertices, size);
 
   sint i, j;
   for (i = 0; i < lelt; i++) {
     for (j = 0; j < nv; j++) {
-      vertex vrt = {.sequenceId = sequence_id,
-                    .nNeighbors = 0,
-                    .elementId = elem_id,
+      struct vertex0 vrt = {.elementId = elem_id,
                     .vertexId = elems[i].vertices[j],
                     .workProc = elems[i].vertices[j] % cc->np};
-      array_cat(vertex, &vertices, &vrt, 1);
-      sequence_id++;
+      array_cat(struct vertex0, &vertices, &vrt, 1);
     }
     elem_id++;
   }
@@ -46,11 +45,11 @@ static void find_neighbors(struct array *arr, struct rsb_element *elems,
   struct crystal cr;
   crystal_init(&cr, cc);
 
-  sarray_transfer(vertex, &vertices, workProc, 1, &cr);
+  sarray_transfer(struct vertex0, &vertices, workProc, 1, &cr);
   size = vertices.n;
-  vertex *vPtr = vertices.ptr;
+  struct vertex0 *vPtr = vertices.ptr;
 
-  sarray_sort(vertex, vPtr, size, vertexId, 1, buf);
+  sarray_sort(struct vertex0, vPtr, size, vertexId, 1, buf);
 
   /* FIXME: Assumes quads or hexes */
   array_init(struct nbr_entry, arr, 10);
@@ -79,6 +78,10 @@ static void find_neighbors(struct array *arr, struct rsb_element *elems,
 }
 
 #if 0
+struct col {
+  ulong c;
+};
+
 int laplacian_init(struct laplacian *l, struct rsb_element *elems, uint lelt,
                    int nv, struct comm *c, buffer *buf) {
   assert(lelt > 0);

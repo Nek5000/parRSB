@@ -148,6 +148,8 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
   int max_iter = 50;
   int max_pass = 50;
 
+  occa_init("CUDA", 0, 0);
+
   struct comm lc;
   comm_dup(&lc, gc);
 
@@ -164,11 +166,6 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
     else if (options->rsb_pre == 2) // RIB
       rib(elements, sizeof(struct rsb_element), ndim, &lc, bfr);
     metric_toc(&lc, PRE);
-
-#if 0
-    double nbrs =
-        get_avg_nbrs(elements->ptr, elements->n, nv, &lc, lc.np == gc->np);
-#endif
 
     /* Run fiedler */
     metric_tic(&lc, FIEDLER);
@@ -187,11 +184,6 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
     if (lc.id < (lc.np + 1) / 2)
       bin = 0;
 
-#if 0
-     get_sep_size(elements->ptr, elements->n, nv, &lc, bin, lc.np == gc->np,
-                  bfr);
-#endif
-
     struct comm tc;
     comm_split(&lc, bin, lc.id, &tc);
 
@@ -201,19 +193,6 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
       balance_partitions(elements, nv, &tc, &lc, bin, bfr);
     }
     metric_toc(&lc, REPAIR_BALANCE);
-
-#if 0
-    if (get_avg_nbrs(elements->ptr, elements->n, nv, &lc, 0) > nbrs) {
-      /* Run RCB, RIB pre-step or just sort by global id */
-      if (options->rsb_pre == 0) // Sort by global id
-        parallel_sort(struct rsb_element, elements, globalId, gs_long, 0, 1,
-                      &lc, bfr);
-      else if (options->rsb_pre == 1) // RCB
-        rcb(elements, sizeof(struct rsb_element), ndim, &lc, bfr);
-      else if (options->rsb_pre == 2) // RIB
-        rib(elements, sizeof(struct rsb_element), ndim, &lc, bfr);
-    }
-#endif
 
     comm_free(&lc);
     comm_dup(&lc, &tc);
