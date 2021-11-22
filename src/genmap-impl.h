@@ -122,7 +122,7 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
 /* occa */
 
 int occa_init(char *backend, int device_id, int platform_id);
-int occa_lanczos_init(struct laplacian *l, int niter);
+int occa_lanczos_init(struct comm *c, struct laplacian *l, int niter);
 int occa_lanczos(GenmapScalar *diag, GenmapScalar *upper, GenmapScalar *rr,
                  GenmapScalar *f, struct comm *c, buffer *bfr);
 int occa_lanczos_free();

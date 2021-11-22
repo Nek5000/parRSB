@@ -862,7 +862,7 @@ int fiedler(struct rsb_element *elems, uint lelt, int nv, int max_iter,
   laplacian_init(&wl, elems, lelt, nv, CSR | UNWEIGHTED, gsc, buf);
 #endif
 
-  occa_lanczos_init(&wl, max_iter);
+  occa_lanczos_init(gsc, &wl, max_iter);
 
   genmap_vector initv, fiedler;
   vec_create(&initv, lelt);

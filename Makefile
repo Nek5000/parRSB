@@ -95,6 +95,7 @@ ifneq ($(INSTALLDIR),)
 	@mkdir -p $(INSTALLDIR)/include 2>/dev/null
 	@cp $(SRCDIR)/*.h $(SRCDIR)/sort/*.h $(SRCDIR)/precond/*.h \
 		$(INSTALLDIR)/include 2>/dev/null
+	@cp -r okl $(INSTALLDIR)/ 2>/dev/null
 endif
 
 .PHONY: lib
