@@ -56,6 +56,11 @@ int occa_lanczos_init(struct comm *c, struct laplacian *l, int niter) {
   strncat(okl, "/occa.okl", PATH_MAX);
 
   props = occaCreateJson();
+  occaJsonObjectSet(props, "defines/BLK_SIZE", occaInt(512));
+  occaJsonObjectSet(props, "defines/uint", occaString("unsigned int"));
+  occaJsonObjectSet(props, "defines/ulong", occaString("unsigned long"));
+  occaJsonObjectSet(props, "defines/scalar", occaString("double"));
+
   if (c->id == 0) {
     copy = occaDeviceBuildKernel(device, okl, "copy", props);
     sum = occaDeviceBuildKernel(device, okl, "sum", props);
@@ -66,6 +71,13 @@ int occa_lanczos_init(struct comm *c, struct laplacian *l, int niter) {
   }
 
   comm_barrier(c);
+
+  copy = occaDeviceBuildKernel(device, okl, "copy", props);
+  sum = occaDeviceBuildKernel(device, okl, "sum", props);
+  scale = occaDeviceBuildKernel(device, okl, "scale", props);
+  dot = occaDeviceBuildKernel(device, okl, "dot", props);
+  add2s1 = occaDeviceBuildKernel(device, okl, "add2s1", props);
+  add2s2 = occaDeviceBuildKernel(device, okl, "add2s2", props);
 
   return 0;
 }
