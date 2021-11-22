@@ -48,6 +48,8 @@ struct csr_mat {
 
 void csr_mat_setup(struct csr_mat *M, struct array *entries, struct comm *c,
                    buffer *buf);
+void csr_mat_gather(GenmapScalar *buf, struct csr_mat *M, GenmapScalar *x,
+                    buffer *bfr);
 void csr_mat_apply(GenmapScalar *y, struct csr_mat *M, GenmapScalar *x,
                    buffer *buf);
 void csr_mat_print(struct csr_mat *M, struct comm *c);
@@ -69,6 +71,12 @@ struct rsb_element {
 #define CSR 2
 #define WEIGHTED 4
 #define UNWEIGHTED 8
+
+struct vector {
+  GenmapInt size;
+  GenmapScalar *data;
+};
+typedef struct vector *genmap_vector;
 
 struct laplacian {
   int type;

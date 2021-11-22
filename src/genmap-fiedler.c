@@ -7,12 +7,6 @@
 
 #define MM 500
 
-struct vector {
-  GenmapInt size;
-  GenmapScalar *data;
-};
-typedef struct vector *genmap_vector;
-
 static int vec_create(genmap_vector *x, GenmapInt size) {
   /* Asserts:
        - size > 0
@@ -517,11 +511,7 @@ static int inverse(genmap_vector y, struct laplacian *gl, struct mg_data *d,
       }
     }
 
-#if 1
     if (ppfi == 1)
-#else
-    if (converged(fdlr, z->data, gsc, nelg, bff) == 1)
-#endif
       break;
   }
 
@@ -825,12 +815,7 @@ static int lanczos(genmap_vector fiedler, struct laplacian *gl,
     for (i = 0; i < iter + 1; i++)
       vec_destroy(q[i]);
     GenmapFree(q);
-#if 1
   } while (iter == max_iter && ipass++ < max_iter);
-#else
-  } while (converged(fdlr, fiedler->data, gsc, nelg, buf) == 0 &&
-           ipass++ < max_iter);
-#endif
 
   metric_toc(gsc, LANCZOS);
 

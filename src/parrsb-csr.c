@@ -92,8 +92,8 @@ void csr_mat_setup(struct csr_mat *M, struct array *entries, struct comm *c,
   M->gsh = get_csr_top(M, c);
 }
 
-static void mat_gather(GenmapScalar *buf, struct csr_mat *M, GenmapScalar *x,
-                       buffer *bfr) {
+void csr_mat_gather(GenmapScalar *buf, struct csr_mat *M, GenmapScalar *x,
+                    buffer *bfr) {
   ulong s = M->row_start;
   sint i, j;
   for (i = 0; i < M->rn; i++)
@@ -108,7 +108,7 @@ static void mat_gather(GenmapScalar *buf, struct csr_mat *M, GenmapScalar *x,
 
 void csr_mat_apply(GenmapScalar *y, struct csr_mat *M, GenmapScalar *x,
                    buffer *bfr) {
-  mat_gather(M->buf, M, x, bfr);
+  csr_mat_gather(M->buf, M, x, bfr);
 
   const uint rn = M->rn;
   const uint *offsets = M->roff;

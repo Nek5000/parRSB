@@ -11,6 +11,12 @@
   }
 }
 
+@kernel void add_const(scalar *v, scalar alpha, const uint n) {
+  for (int i = 0; i < n; i++; @tile(BLK_SIZE, @outer, @inner)) {
+    v[i] = v[i] + alpha;
+  }
+}
+
 @kernel void sum(scalar *blk_sum, const scalar *v, uint n) {
   for (int i = 0; i < (n + BLK_SIZE - 1) / BLK_SIZE; i++; @outer) {
     @shared scalar s[BLK_SIZE];
@@ -19,6 +25,36 @@
       int t = i * BLK_SIZE + j;
       if (t < n)
         s[j] = v[t];
+      else
+        s[j] = 0.0;
+    }
+
+    @barrier("warp");
+
+    for (int k = (BLK_SIZE + 1) / 2; k > 0; k /= 2) {
+      for (int j = 0; j < BLK_SIZE; j++; @inner) {
+        if (j < k)
+          s[j] += s[j + k];
+      }
+
+      @barrier("warp");
+    }
+
+    for (int j = 0; j < BLK_SIZE; j++; @inner) {
+      if (j == 0)
+        blk_sum[i] = s[0];
+    }
+  }
+}
+
+@kernel void norm(scalar *blk_sum, const uint n, const scalar *a) {
+  for (int i = 0; i < (n + BLK_SIZE - 1) / BLK_SIZE; i++; @outer) {
+    @shared scalar s[BLK_SIZE];
+
+    for (int j = 0; j < BLK_SIZE; j++; @inner) {
+      int t = i * BLK_SIZE + j;
+      if (t < n)
+        s[j] = a[t] * a[t];
       else
         s[j] = 0.0;
     }
@@ -72,10 +108,10 @@
   }
 }
 
-@kernel void scale(scalar *v, scalar *u, const scalar alpha,
+@kernel void scale(scalar *v, const uint start, scalar *u, const scalar alpha,
                    const uint n) {
   for (int i = 0; i < n; i++; @tile(BLK_SIZE, @outer, @inner)) {
-    v[i] = alpha * u[i];
+    v[start + i] = alpha * u[i];
   }
 }
 
@@ -89,20 +125,16 @@
 @kernel void add2s2(scalar *p, scalar *r, const scalar alpha,
                     const uint n) {
   for (int i = 0; i < n; i++; @tile(BLK_SIZE, @outer, @inner)) {
-    p[i] = p[i] - alpha * r[i];
+    p[i] = p[i] + alpha * r[i];
   }
 }
 
-// @kernel void laplacian_csr(scalar *v, const uint nr, const unsigned
-// int *offsets,
-//                            const ulong *col, const ulong
-//                            *diag, const scalar *u) {
-//   uint i;
-//   for (i = 0; i < nr; i++; @tile(BLK_SIZE, @outer, @inner)) {
-//     int j;
-//     scalar s = 0.0;
-//     for (j = offsets[i]; j < offsets[i + 1]; j++)
-//       s += u[col[j]];
-//     v[i] = (offsets[i + 1] - offsets[i]) * u[diag[i]] - s;
-//   }
-// }
+@kernel void laplacian_csr(scalar *y, const uint nr, const uint *offsets,
+                           const uint *v, const scalar *x) {
+  for (int i = 0; i < nr; i++; @tile(BLK_SIZE, @outer, @inner)) {
+    scalar s = 0.0;
+    for (int j = offsets[i]; j < offsets[i + 1]; j++)
+      s += v[j] * x[j];
+    y[i] = s;
+  }
+}
