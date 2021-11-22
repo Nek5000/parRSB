@@ -12,7 +12,7 @@
 }
 
 @kernel void sum(double *blk_sum, const double *v, unsigned int n) {
-  for (int i = 0; i < (n + 512 - 1)/512; i++; @outer) {
+  for (int i = 0; i < (n + 512 - 1) / 512; i++; @outer) {
     @shared double s[512];
 
     for (int j = 0; j < 512; j++; @inner) {
@@ -41,7 +41,8 @@
   }
 }
 
-@kernel void dot(double *blk_sum, const unsigned int n, const double *a, const double *b) {
+@kernel void dot(double *blk_sum, const unsigned int n, const double *a,
+                 const double *b) {
   for (int i = 0; i < (n + 512 - 1) / 512; i++; @outer) {
     @shared double s[512];
 
@@ -64,7 +65,6 @@
       @barrier("warp");
     }
 
-
     for (int j = 0; j < 512; j++; @inner) {
       if (j == 0)
         blk_sum[i] = s[0];
@@ -72,27 +72,31 @@
   }
 }
 
-@kernel void scale(double *v, double *u, const double alpha, const unsigned int n) {
+@kernel void scale(double *v, double *u, const double alpha,
+                   const unsigned int n) {
   for (int i = 0; i < n; i++; @tile(512, @outer, @inner)) {
     v[i] = alpha * u[i];
   }
 }
 
-@kernel void add2s1(double *p, double *r, const double beta, const unsigned int n) {
+@kernel void add2s1(double *p, double *r, const double beta,
+                    const unsigned int n) {
   for (int i = 0; i < n; i++; @tile(512, @outer, @inner)) {
     p[i] = beta * p[i] + r[i];
   }
 }
 
-@kernel void add2s2(double *p, double *r, const double alpha, const unsigned int n) {
+@kernel void add2s2(double *p, double *r, const double alpha,
+                    const unsigned int n) {
   for (int i = 0; i < n; i++; @tile(512, @outer, @inner)) {
     p[i] = p[i] - alpha * r[i];
   }
 }
 
-// @kernel void laplacian_csr(double *v, const unsigned int nr, const unsigned int *offsets,
-//                            const unsigned long *col, const unsigned long *diag,
-//                            const double *u) {
+// @kernel void laplacian_csr(double *v, const unsigned int nr, const unsigned
+// int *offsets,
+//                            const unsigned long *col, const unsigned long
+//                            *diag, const double *u) {
 //   unsigned int i;
 //   for (i = 0; i < nr; i++; @tile(512, @outer, @inner)) {
 //     int j;

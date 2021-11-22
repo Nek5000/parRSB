@@ -40,11 +40,14 @@ int occa_lanczos_init(struct comm *c, struct laplacian *l, int niter) {
   assert((type & CSR) == CSR);
 
   uint lelt = l->nel;
-  o_r = occaDeviceMalloc(device, sizeof(GenmapScalar) * lelt, NULL, occaDefault);
-  o_p = occaDeviceMalloc(device, sizeof(GenmapScalar) * lelt, NULL, occaDefault);
-  o_w = occaDeviceMalloc(device, sizeof(GenmapScalar) * lelt, NULL, occaDefault);
-  o_rr = occaDeviceMalloc(device, sizeof(GenmapScalar) * lelt * (niter + 1), NULL,
-                          occaDefault);
+  o_r =
+      occaDeviceMalloc(device, sizeof(GenmapScalar) * lelt, NULL, occaDefault);
+  o_p =
+      occaDeviceMalloc(device, sizeof(GenmapScalar) * lelt, NULL, occaDefault);
+  o_w =
+      occaDeviceMalloc(device, sizeof(GenmapScalar) * lelt, NULL, occaDefault);
+  o_rr = occaDeviceMalloc(device, sizeof(GenmapScalar) * lelt * (niter + 1),
+                          NULL, occaDefault);
 
   char okl[PATH_MAX];
   char *okl_dir = getenv("PARRSB_OKL_DIR");
@@ -67,8 +70,8 @@ int occa_lanczos_init(struct comm *c, struct laplacian *l, int niter) {
   return 0;
 }
 
-int occa_lanczos(GenmapScalar *diag, GenmapScalar *upper, GenmapScalar *rr, GenmapScalar *f,
-                 struct comm *c, buffer *bfr) {
+int occa_lanczos(GenmapScalar *diag, GenmapScalar *upper, GenmapScalar *rr,
+                 GenmapScalar *f, struct comm *c, buffer *bfr) {
   return 0;
 }
 

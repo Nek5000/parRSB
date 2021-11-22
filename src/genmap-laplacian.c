@@ -35,8 +35,8 @@ static void find_neighbors(struct array *arr, struct rsb_element *elems,
   for (i = 0; i < lelt; i++) {
     for (j = 0; j < nv; j++) {
       struct vertex0 vrt = {.elementId = elem_id,
-                    .vertexId = elems[i].vertices[j],
-                    .workProc = elems[i].vertices[j] % cc->np};
+                            .vertexId = elems[i].vertices[j],
+                            .workProc = elems[i].vertices[j] % cc->np};
       array_cat(struct vertex0, &vertices, &vrt, 1);
     }
     elem_id++;
