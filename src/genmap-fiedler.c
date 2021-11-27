@@ -649,28 +649,10 @@ static int tqli(genmap_vector **eVectors, genmap_vector *eValues,
 }
 
 static int lanczos_aux(genmap_vector diag, genmap_vector upper,
-                       genmap_vector **ri, uint lelt, int niter,
+                       genmap_vector *rr, uint lelt, ulong nelg, int niter,
                        genmap_vector f, struct laplacian *gl, struct comm *gsc,
                        buffer *bfr) {
   assert(f->size == lelt);
-
-  slong out[2][1], buf[2][1];
-  slong in = lelt;
-  comm_scan(out, gsc, gs_long, gs_add, &in, 1, buf);
-  slong start = out[0][0];
-  slong nelg = out[1][0];
-
-  if (nelg < niter) {
-    niter = nelg;
-    diag->size = niter;
-    upper->size = niter - 1;
-  }
-
-  GenmapMalloc(niter + 1, ri);
-  genmap_vector *rr = *ri;
-  GenmapInt i;
-  for (i = 0; i < niter + 1; ++i)
-    rr[i] = NULL;
 
   genmap_vector r, p, w;
   vec_create_zeros(&p, lelt);
@@ -680,12 +662,12 @@ static int lanczos_aux(genmap_vector diag, genmap_vector upper,
   vec_copy(r, f);
 
   vec_ortho(gsc, r, nelg);
+
+  GenmapScalar buf[2];
   GenmapScalar rtr = vec_dot(r, r);
   comm_allreduce(gsc, gs_double, gs_add, &rtr, 1, buf);
   GenmapScalar rnorm = sqrt(rtr);
   GenmapScalar rni = 1.0 / rnorm;
-
-  vec_create(&rr[0], lelt);
   vec_scale(rr[0], r, rni);
 
   GenmapScalar eps = 1.e-5;
@@ -705,6 +687,7 @@ static int lanczos_aux(genmap_vector diag, genmap_vector upper,
       beta = 0.0;
 
     /* add2s1(p,r,beta,n) */
+    uint i;
     for (i = 0; i < lelt; i++)
       p->data[i] = beta * p->data[i] + r->data[i];
 
@@ -735,7 +718,6 @@ static int lanczos_aux(genmap_vector diag, genmap_vector upper,
     rnorm = sqrt(rtr);
     rni = 1.0 / rnorm;
 
-    vec_create(&rr[iter + 1], lelt);
     vec_scale(rr[iter + 1], r, rni);
 
     if (iter == 0) {
@@ -765,26 +747,38 @@ static int lanczos_aux(genmap_vector diag, genmap_vector upper,
 
 static int lanczos(genmap_vector fiedler, struct laplacian *gl,
                    genmap_vector initv, struct comm *gsc, int max_iter,
-                   struct array *fdlr, slong nelg, buffer *buf, int gid) {
-  genmap_vector alphaVec, betaVec;
-  vec_create(&alphaVec, max_iter);
-  vec_create(&betaVec, max_iter - 1);
-
+                   struct array *fdlr, slong nelg, buffer *bfr) {
   metric_tic(gsc, LANCZOS);
 
+  genmap_vector alpha, beta;
+  vec_create(&alpha, max_iter);
+  vec_create(&beta, max_iter - 1);
+
+  if (nelg < max_iter) {
+    max_iter = nelg;
+    alpha->size = max_iter;
+    beta->size = max_iter - 1;
+  }
+
+  genmap_vector *rr;
+  GenmapMalloc(max_iter + 1, &rr);
+
   uint lelt = initv->size;
+  uint i;
+  for (i = 0; i < max_iter + 1; ++i)
+    vec_create(&rr[i], lelt);
+
   int iter, ipass = 0;
   do {
-    genmap_vector *q = NULL;
-    iter =
-        lanczos_aux(alphaVec, betaVec, &q, lelt, max_iter, initv, gl, gsc, buf);
+    iter = lanczos_aux(alpha, beta, rr, lelt, nelg, max_iter, initv, gl, gsc,
+                       bfr);
 
     genmap_vector evTriDiag;
     vec_create(&evTriDiag, iter);
 
     /* Use TQLI and find the minimum eigenvalue and associated vector */
     genmap_vector *eVectors, eValues;
-    tqli(&eVectors, &eValues, alphaVec, betaVec, gsc->id);
+    tqli(&eVectors, &eValues, alpha, beta, gsc->id);
 
     GenmapScalar eValMin = fabs(eValues->data[0]);
     GenmapInt eValMinI = 0;
@@ -801,7 +795,7 @@ static int lanczos(genmap_vector fiedler, struct laplacian *gl,
     for (i = 0; i < lelt; i++) {
       fiedler->data[i] = 0.0;
       for (j = 0; j < iter; j++)
-        fiedler->data[i] += q[j]->data[i] * evTriDiag->data[j];
+        fiedler->data[i] += rr[j]->data[i] * evTriDiag->data[j];
     }
 
     vec_ortho(gsc, fiedler, nelg);
@@ -811,16 +805,14 @@ static int lanczos(genmap_vector fiedler, struct laplacian *gl,
     for (i = 0; i < iter; i++)
       vec_destroy(eVectors[i]);
     GenmapFree(eVectors);
-
-    for (i = 0; i < iter + 1; i++)
-      vec_destroy(q[i]);
-    GenmapFree(q);
   } while (iter == max_iter && ipass++ < max_iter);
 
   metric_toc(gsc, LANCZOS);
 
-  vec_destroy(alphaVec);
-  vec_destroy(betaVec);
+  for (i = 0; i < max_iter + 1; ++i)
+    vec_destroy(rr[i]);
+  vec_destroy(alpha);
+  vec_destroy(beta);
 
   return ipass;
 }
@@ -841,13 +833,15 @@ int fiedler(struct rsb_element *elems, uint lelt, int nv, int max_iter,
   }
 
   struct laplacian wl;
-#if 0
+#if 1
   laplacian_init(&wl, elems, lelt, nv, GS | WEIGHTED, gsc, buf);
 #else
   laplacian_init(&wl, elems, lelt, nv, CSR | UNWEIGHTED, gsc, buf);
 #endif
 
-  occa_lanczos_init(gsc, &wl, max_iter);
+#if defined(GENMAP_OCCA)
+  // occa_lanczos_init(gsc, &wl, max_iter);
+#endif
 
   genmap_vector initv, fiedler;
   vec_create(&initv, lelt);
@@ -882,7 +876,7 @@ int fiedler(struct rsb_element *elems, uint lelt, int nv, int max_iter,
 
   int iter = 0;
   if (algo == 0)
-    iter = lanczos(fiedler, &wl, initv, gsc, max_iter, &fdlr, nelg, buf, gid);
+    iter = lanczos(fiedler, &wl, initv, gsc, max_iter, &fdlr, nelg, buf);
   else if (algo == 1)
     iter = inverse(fiedler, &wl, &d, initv, gsc, max_iter, 0 /* grammian */,
                    &fdlr, nelg, buf, gid);
@@ -906,6 +900,9 @@ int fiedler(struct rsb_element *elems, uint lelt, int nv, int max_iter,
   vec_destroy(fiedler);
   laplacian_free(&wl);
 
+#if defined(GENMAP_OCCA)
+  // occa_lanczos_free();
+#endif
   if (algo == 1) {
     mg_free(&d);
     laplacian_free(&l);

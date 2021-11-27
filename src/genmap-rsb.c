@@ -148,7 +148,9 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
   int max_iter = 50;
   int max_pass = 50;
 
+#if defined(GENMAP_OCCA)
   occa_init("CUDA", 0, 0);
+#endif
 
   struct comm lc;
   comm_dup(&lc, gc);

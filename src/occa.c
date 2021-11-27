@@ -56,7 +56,7 @@ int occa_lanczos_init(struct comm *c, struct laplacian *l, int niter) {
   o_rr = occaDeviceMalloc(device, sizeof(GenmapScalar) * lelt * (niter + 1),
                           NULL, occaDefault);
 
-  uint wrk_size = (lelt + BLK_SIZE - 1)/BLK_SIZE;
+  uint wrk_size = (lelt + BLK_SIZE - 1) / BLK_SIZE;
   o_wrk = occaDeviceMalloc(device, sizeof(GenmapScalar) * wrk_size, NULL,
                            occaDefault);
   wrk = tcalloc(GenmapScalar, (niter + 1) * lelt);
@@ -69,8 +69,8 @@ int occa_lanczos_init(struct comm *c, struct laplacian *l, int niter) {
   o_v = occaDeviceMalloc(device, sizeof(GenmapScalar) * nnz, NULL, occaDefault);
   occaCopyPtrToMem(o_v, M->v, occaAllBytes, 0, occaDefault);
 
-  o_off = occaDeviceMalloc(device, sizeof(uint) * (lelt + 1), NULL,
-                               occaDefault);
+  o_off =
+      occaDeviceMalloc(device, sizeof(uint) * (lelt + 1), NULL, occaDefault);
   occaCopyPtrToMem(o_off, M->roff, occaAllBytes, 0, occaDefault);
 
   o_x = occaDeviceMalloc(device, sizeof(GenmapScalar) * nnz, NULL, occaDefault);
@@ -115,30 +115,9 @@ int occa_lanczos_init(struct comm *c, struct laplacian *l, int niter) {
   return 0;
 }
 
-int occa_lanczos_aux(genmap_vector diag, genmap_vector upper,
-                     genmap_vector **ri, uint lelt, int niter,
-                     genmap_vector f, struct laplacian *gl,
-                     struct comm *gsc, buffer *bfr) {
-  assert(f->size == lelt);
-
-  slong out[2][1], buf[2][1];
-  slong in = lelt;
-  comm_scan(out, gsc, gs_long, gs_add, &in, 1, buf);
-  slong start = out[0][0];
-  slong nelg = out[1][0];
-
-  if (nelg < niter) {
-    niter = nelg;
-    diag->size = niter;
-    upper->size = niter - 1;
-  }
-
-  GenmapMalloc(niter + 1, ri);
-  genmap_vector *rr = *ri;
-  uint i;
-  for (i = 0; i < niter + 1; ++i)
-    rr[i] = NULL;
-
+int occa_lanczos_aux(genmap_vector diag, genmap_vector upper, genmap_vector *rr,
+                     uint lelt, ulong nelg, int niter, genmap_vector f,
+                     struct laplacian *gl, struct comm *gsc, buffer *bfr) {
   occaCopyPtrToMem(o_r, f->data, occaAllBytes, 0, occaDefault);
 
   // vec_ortho(gsc, r, nelg);
@@ -147,6 +126,7 @@ int occa_lanczos_aux(genmap_vector diag, genmap_vector upper,
   occaCopyMemToPtr(wrk, o_wrk, occaAllBytes, 0, occaDefault);
 
   GenmapScalar tmp = 0.0;
+  uint i;
   for (i = 0; i < wrk_size; i++)
     tmp += wrk[i];
   GenmapScalar rtr;
@@ -261,10 +241,8 @@ int occa_lanczos_aux(genmap_vector diag, genmap_vector upper,
     }
   }
 
-
   occaCopyMemToPtr(wrk, o_rr, occaAllBytes, 0, occaDefault);
   for (i = 0; i < iter + 1; i++) {
-    vec_create(&rr[i], lelt);
     indx = i * lelt;
     memcpy(rr[i]->data, &wrk[indx], sizeof(GenmapScalar) * lelt);
   }
