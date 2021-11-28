@@ -207,6 +207,10 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
 #endif
   comm_free(&lc);
 
+#if defined(GENMAP_OCCA)
+  occa_free();
+#endif
+
   check_rsb_partition(gc, max_pass, max_iter);
 
   return 0;

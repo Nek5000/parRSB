@@ -833,14 +833,14 @@ int fiedler(struct rsb_element *elems, uint lelt, int nv, int max_iter,
   }
 
   struct laplacian wl;
-#if 1
+#if 0
   laplacian_init(&wl, elems, lelt, nv, GS | WEIGHTED, gsc, buf);
 #else
-  laplacian_init(&wl, elems, lelt, nv, CSR | UNWEIGHTED, gsc, buf);
+  laplacian_init(&wl, elems, lelt, nv, CSR | WEIGHTED, gsc, buf);
 #endif
 
 #if defined(GENMAP_OCCA)
-  // occa_lanczos_init(gsc, &wl, max_iter);
+  occa_lanczos_init(gsc, &wl, max_iter);
 #endif
 
   genmap_vector initv, fiedler;
@@ -901,7 +901,7 @@ int fiedler(struct rsb_element *elems, uint lelt, int nv, int max_iter,
   laplacian_free(&wl);
 
 #if defined(GENMAP_OCCA)
-  // occa_lanczos_free();
+  occa_lanczos_free();
 #endif
   if (algo == 1) {
     mg_free(&d);

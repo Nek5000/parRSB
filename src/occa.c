@@ -277,7 +277,10 @@ int occa_lanczos_free() {
   occaFree(&add2s2);
   occaFree(&addc);
 
-  occaFree(&device);
+  return 0;
+}
 
+int occa_free() {
+  occaFree(&device);
   return 0;
 }

@@ -11,7 +11,7 @@
   }
 }
 
-@kernel void add_const(scalar *v, scalar alpha, const uint n) {
+@kernel void addc(scalar *v, scalar alpha, const uint n) {
   for (int i = 0; i < n; i++; @tile(BLK_SIZE, @outer, @inner)) {
     v[i] = v[i] + alpha;
   }

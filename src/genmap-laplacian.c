@@ -252,10 +252,8 @@ static void csr_laplacian_setup(struct csr_mat *M, struct array *entries,
   M->gsh = get_csr_top(M, c);
 }
 
-static int csr_unweighted_init(struct laplacian *l, struct rsb_element *elems,
-                               uint lelt, int nv, struct comm *c, buffer *buf) {
-  l->type = CSR | UNWEIGHTED;
-
+static int csr_init(struct laplacian *l, struct rsb_element *elems,
+                    uint lelt, int nv, struct comm *c, int type, buffer *buf) {
   struct array entries;
   find_neighbors(&entries, elems, lelt, nv, c, buf);
 
@@ -266,33 +264,41 @@ static int csr_unweighted_init(struct laplacian *l, struct rsb_element *elems,
   array_init(struct csr_entry, &unique, entries.n);
 
   struct csr_entry t = {.r = ptr[0].r, .c = ptr[0].c, .v = -1.0};
+  uint i;
+  if (type & UNWEIGHTED) {
+    for (i = 1; i < entries.n; i++)
+      if (t.r != ptr[i].r || t.c != ptr[i].c) {
+        array_cat(struct csr_entry, &unique, &t, 1);
+        t.r = ptr[i].r;
+        t.c = ptr[i].c;
+      }
+  } else if (type & WEIGHTED) {
+    for (i = 1; i < entries.n; i++)
+      if (t.r != ptr[i].r || t.c != ptr[i].c) {
+        array_cat(struct csr_entry, &unique, &t, 1);
+        t.r = ptr[i].r;
+        t.c = ptr[i].c;
+        t.v = -1.0;
+      } else t.v -= 1.0;
+  }
   array_cat(struct csr_entry, &unique, &t, 1);
 
-  uint i;
-  for (i = 1; i < entries.n; i++)
-    if (t.r != ptr[i].r && t.c != ptr[i].c) {
-      t.r = ptr[i].r;
-      t.c = ptr[i].c;
-      array_cat(struct csr_entry, &unique, &t, 1);
-    }
-  array_free(&entries);
-
   csr_laplacian_setup(l->M, &unique, c, buf);
+
   array_free(&unique);
+  array_free(&entries);
 
   return 0;
 }
 
-static int csr_unweighted(GenmapScalar *v, struct laplacian *l, GenmapScalar *u,
-                          buffer *buf) {
+static int csr(GenmapScalar *v, struct laplacian *l, GenmapScalar *u,
+               buffer *buf) {
   csr_mat_apply(v, l->M, u, buf);
   return 0;
 }
 
 static int gs_weighted_init(struct laplacian *l, struct rsb_element *elems,
                             uint lelt, int nv, struct comm *c, buffer *buf) {
-  l->type = GS | WEIGHTED;
-
   uint npts = nv * lelt;
   slong *vertices = tcalloc(slong, npts);
   uint i, j;
@@ -345,12 +351,17 @@ static int gs_weighted(GenmapScalar *v, struct laplacian *l, GenmapScalar *u,
 int laplacian_init(struct laplacian *l, struct rsb_element *elems, uint nel,
                    int nv, int type, struct comm *c, buffer *buf) {
   l->type = type;
+  l->nv = nv;
+  l->nel = nel;
 
+  /* gs */
   l->diag = NULL;
   l->gsh = NULL;
 
+  /* csr */
   l->M = NULL;
 
+  /* simplified laplacian */
   l->col_ids = NULL;
   l->adj_off = NULL;
   l->adj_ind = NULL;
@@ -360,16 +371,12 @@ int laplacian_init(struct laplacian *l, struct rsb_element *elems, uint nel,
   l->u = NULL;
 
   if ((type & CSR) == CSR) {
-    assert((type & UNWEIGHTED) == UNWEIGHTED);
     l->M = tcalloc(struct csr_mat, 1);
-    csr_unweighted_init(l, elems, nel, nv, c, buf);
+    csr_init(l, elems, nel, nv, c, type - CSR, buf);
   } else if ((type & GS) == GS) {
     assert((type & WEIGHTED) == WEIGHTED);
     gs_weighted_init(l, elems, nel, nv, c, buf);
   }
-
-  l->nv = nv;
-  l->nel = nel;
 
   return 0;
 }
@@ -377,8 +384,7 @@ int laplacian_init(struct laplacian *l, struct rsb_element *elems, uint nel,
 int laplacian(GenmapScalar *v, struct laplacian *l, GenmapScalar *u,
               buffer *buf) {
   if ((l->type & CSR) == CSR) {
-    assert((l->type & UNWEIGHTED) == UNWEIGHTED);
-    csr_unweighted(v, l, u, buf);
+    csr(v, l, u, buf);
   } else if ((l->type & GS) == GS) {
     assert((l->type & WEIGHTED) == WEIGHTED);
     gs_weighted(v, l, u, buf);
