@@ -227,19 +227,22 @@ static void csr_laplacian_setup(struct csr_mat *M, struct array *entries,
     M->col[i] = ptr[i].c;
     M->v[i] = ptr[i].v;
 
-    double diag = ptr[i].v;
+    double diag = 0.0;
     uint idx;
     if (ptr[i].r == ptr[i].c)
       idx = i;
+    else
+      diag = ptr[i].v;
 
     j = i + 1;
     while (j < entries->n && ptr[i].r == ptr[j].r) {
       M->col[j] = ptr[j].c;
       M->v[j] = ptr[j].v;
 
-      diag += ptr[j].v;
       if (ptr[j].r == ptr[j].c)
         idx = j;
+      else
+        diag += ptr[j].v;
 
       j++;
     }
@@ -252,8 +255,8 @@ static void csr_laplacian_setup(struct csr_mat *M, struct array *entries,
   M->gsh = get_csr_top(M, c);
 }
 
-static int csr_init(struct laplacian *l, struct rsb_element *elems,
-                    uint lelt, int nv, struct comm *c, int type, buffer *buf) {
+static int csr_init(struct laplacian *l, struct rsb_element *elems, uint lelt,
+                    int nv, struct comm *c, int type, buffer *buf) {
   struct array entries;
   find_neighbors(&entries, elems, lelt, nv, c, buf);
 
@@ -279,7 +282,8 @@ static int csr_init(struct laplacian *l, struct rsb_element *elems,
         t.r = ptr[i].r;
         t.c = ptr[i].c;
         t.v = -1.0;
-      } else t.v -= 1.0;
+      } else
+        t.v -= 1.0;
   }
   array_cat(struct csr_entry, &unique, &t, 1);
 
@@ -320,6 +324,23 @@ static int gs_weighted_init(struct laplacian *l, struct rsb_element *elems,
     for (j = 0; j < nv; j++)
       l->diag[i] += l->u[nv * i + j];
   }
+
+#if 0
+  slong out[2][1], bf[2][1];
+  slong in = lelt;
+  comm_scan(out, c, gs_long, gs_add, &in, 1, bf);
+  slong row_start = out[0][0] + 1;
+
+  int k;
+  for (k = 0; k < c->np; k++) {
+    genmap_barrier(c);
+    if (c->id == k) {
+      for (i = 0; i < lelt; i++)
+        fprintf(stderr, "gs %lld: %.10lf\n", row_start + i, l->diag[i]);
+    }
+    fflush(stderr);
+  }
+#endif
 
   if (vertices != NULL)
     free(vertices);

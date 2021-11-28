@@ -770,8 +770,8 @@ static int lanczos(genmap_vector fiedler, struct laplacian *gl,
 
   int iter, ipass = 0;
   do {
-    iter = lanczos_aux(alpha, beta, rr, lelt, nelg, max_iter, initv, gl, gsc,
-                       bfr);
+    iter =
+        lanczos_aux(alpha, beta, rr, lelt, nelg, max_iter, initv, gl, gsc, bfr);
 
     genmap_vector evTriDiag;
     vec_create(&evTriDiag, iter);
@@ -836,7 +836,11 @@ int fiedler(struct rsb_element *elems, uint lelt, int nv, int max_iter,
 #if 0
   laplacian_init(&wl, elems, lelt, nv, GS | WEIGHTED, gsc, buf);
 #else
+  // struct laplacian gsl;
+  // laplacian_init(&gsl, elems, lelt, nv, GS | WEIGHTED, gsc, buf);
+  // laplacian_free(&gsl);
   laplacian_init(&wl, elems, lelt, nv, CSR | WEIGHTED, gsc, buf);
+  // csr_mat_print(wl.M, gsc);
 #endif
 
 #if defined(GENMAP_OCCA)
