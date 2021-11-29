@@ -5,44 +5,53 @@
  * - BLK_SIZE
  */
 
+@kernel void zero(scalar *p, const uint n) {
+  for (int i = 0; i < n; i++; @tile(BLK_SIZE, @outer, @inner)) {
+    p[i] = 0.0;
+  }
+}
+
 @kernel void copy(scalar *v, scalar *u, const uint n) {
   for (int i = 0; i < n; i++; @tile(BLK_SIZE, @outer, @inner)) {
     v[i] = u[i];
   }
 }
 
-@kernel void addc(scalar *v, scalar alpha, const uint n) {
+@kernel void addc(scalar *v, const scalar alpha, const uint n) {
   for (int i = 0; i < n; i++; @tile(BLK_SIZE, @outer, @inner)) {
     v[i] = v[i] + alpha;
   }
 }
 
-@kernel void sum(scalar *blk_sum, const scalar *v, uint n) {
+@kernel void sum(const uint n, const scalar *v, scalar *blk_sum) {
   for (int i = 0; i < (n + BLK_SIZE - 1) / BLK_SIZE; i++; @outer) {
     @shared scalar s[BLK_SIZE];
 
     for (int j = 0; j < BLK_SIZE; j++; @inner) {
       int t = i * BLK_SIZE + j;
-      if (t < n)
+      if (t < n) {
         s[j] = v[t];
-      else
+      } else {
         s[j] = 0.0;
+      }
     }
 
     @barrier("warp");
 
     for (int k = (BLK_SIZE + 1) / 2; k > 0; k /= 2) {
       for (int j = 0; j < BLK_SIZE; j++; @inner) {
-        if (j < k)
+        if (j < k) {
           s[j] += s[j + k];
+        }
       }
-
-      @barrier("warp");
     }
 
+    @barrier("warp");
+
     for (int j = 0; j < BLK_SIZE; j++; @inner) {
-      if (j == 0)
+      if (j == 0) {
         blk_sum[i] = s[0];
+      }
     }
   }
 }
@@ -115,7 +124,7 @@
   }
 }
 
-@kernel void add2s1(scalar *p, scalar *r, const scalar beta, const uint n) {
+@kernel void add2s1(scalar *p, const scalar *r, const scalar beta, const uint n) {
   for (int i = 0; i < n; i++; @tile(BLK_SIZE, @outer, @inner)) {
     p[i] = beta * p[i] + r[i];
   }

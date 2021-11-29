@@ -149,7 +149,7 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
   int max_pass = 50;
 
 #if defined(GENMAP_OCCA)
-  occa_init("CUDA", 0, 0);
+  occa_init("CUDA", gc->id, 0);
 #endif
 
   struct comm lc;

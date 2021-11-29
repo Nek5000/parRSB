@@ -691,8 +691,12 @@ static int lanczos_aux(genmap_vector diag, genmap_vector upper,
     for (i = 0; i < lelt; i++)
       p->data[i] = beta * p->data[i] + r->data[i];
 
+#if 0
     GenmapScalar pp = vec_dot(p, p);
     comm_allreduce(gsc, gs_double, gs_add, &pp, 1, buf);
+    if (gsc->id == 0 && iter == 0)
+      printf("pp = %lf\n", pp);
+#endif
 
     vec_ortho(gsc, p, nelg);
 
@@ -770,8 +774,13 @@ static int lanczos(genmap_vector fiedler, struct laplacian *gl,
 
   int iter, ipass = 0;
   do {
+#if defined(GENMAP_OCCA)
+    iter = occa_lanczos_aux(alpha, beta, rr, lelt, nelg, max_iter, initv, gl,
+                            gsc, bfr);
+#else
     iter =
         lanczos_aux(alpha, beta, rr, lelt, nelg, max_iter, initv, gl, gsc, bfr);
+#endif
 
     genmap_vector evTriDiag;
     vec_create(&evTriDiag, iter);
@@ -833,15 +842,8 @@ int fiedler(struct rsb_element *elems, uint lelt, int nv, int max_iter,
   }
 
   struct laplacian wl;
-#if 0
-  laplacian_init(&wl, elems, lelt, nv, GS | WEIGHTED, gsc, buf);
-#else
-  // struct laplacian gsl;
-  // laplacian_init(&gsl, elems, lelt, nv, GS | WEIGHTED, gsc, buf);
-  // laplacian_free(&gsl);
+  // laplacian_init(&wl, elems, lelt, nv, GS | WEIGHTED, gsc, buf);
   laplacian_init(&wl, elems, lelt, nv, CSR | WEIGHTED, gsc, buf);
-  // csr_mat_print(wl.M, gsc);
-#endif
 
 #if defined(GENMAP_OCCA)
   occa_lanczos_init(gsc, &wl, max_iter);

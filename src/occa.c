@@ -15,23 +15,25 @@ int occa_init(char *backend_, int device_id, int platform_id) {
   for (i = 0; i < len; i++)
     backend[i] = tolower(backend_[i]);
 
-  char *fmt_ocl = "{{mode: '%s'}, {device_id: %d}, {platform_id: %d}}";
-  char *fmt_cuda = "{{mode: '%s'}, {device_id: %d}}";
+  char *fmt_ocl = "{mode: 'OpenCL', device_id: %d, platform_id: %d}";
+  char *fmt_cuda = "{mode: 'CUDA', device_id: %d}";
+  char *fmt_serial = "{mode: 'Serial'}";
 
   char fmt[BUFSIZ] = {'\0'};
   if (strncmp(backend, "opencl", BUFSIZ) == 0)
-    snprintf(fmt, BUFSIZ, fmt_ocl, "OpenCL", device_id, platform_id);
+    snprintf(fmt, BUFSIZ, fmt_ocl, device_id, platform_id);
   else if (strncmp(backend, "cuda", BUFSIZ) == 0)
-    snprintf(fmt, BUFSIZ, fmt_cuda, "CUDA", device_id);
+    snprintf(fmt, BUFSIZ, fmt_cuda, device_id);
   else
-    return 1;
+    snprintf(fmt, BUFSIZ, fmt_serial);
 
   device = occaCreateDeviceFromString(fmt);
 
   return 0;
 }
 
-static occaKernel copy, sum, scale, dot, norm, add2s1, add2s2, addc, lplcn;
+static occaKernel zero, copy, sum, scale, dot, norm, add2s1, add2s2, addc,
+                  lplcn;
 static occaMemory o_p, o_w, o_r, o_rr, o_v, o_off, o_x, o_y;
 static occaJson props;
 
@@ -40,8 +42,7 @@ static GenmapScalar *wrk;
 static size_t wrk_size;
 
 int occa_lanczos_init(struct comm *c, struct laplacian *l, int niter) {
-  int type = l->type;
-  assert((type & CSR) == CSR);
+  assert((l->type & CSR) == CSR);
 
   /* device alloc */
   uint lelt = l->nel;
@@ -56,7 +57,7 @@ int occa_lanczos_init(struct comm *c, struct laplacian *l, int niter) {
   o_rr = occaDeviceMalloc(device, sizeof(GenmapScalar) * lelt * (niter + 1),
                           NULL, occaDefault);
 
-  uint wrk_size = (lelt + BLK_SIZE - 1) / BLK_SIZE;
+  wrk_size = (lelt + BLK_SIZE - 1) / BLK_SIZE;
   o_wrk = occaDeviceMalloc(device, sizeof(GenmapScalar) * wrk_size, NULL,
                            occaDefault);
   wrk = tcalloc(GenmapScalar, (niter + 1) * lelt);
@@ -89,6 +90,7 @@ int occa_lanczos_init(struct comm *c, struct laplacian *l, int niter) {
   occaJsonObjectSet(props, "defines/scalar", occaString("double"));
 
   if (c->id == 0) {
+    zero = occaDeviceBuildKernel(device, okl, "zero", props);
     copy = occaDeviceBuildKernel(device, okl, "copy", props);
     sum = occaDeviceBuildKernel(device, okl, "sum", props);
     scale = occaDeviceBuildKernel(device, okl, "scale", props);
@@ -102,6 +104,7 @@ int occa_lanczos_init(struct comm *c, struct laplacian *l, int niter) {
 
   comm_barrier(c);
 
+  zero = occaDeviceBuildKernel(device, okl, "zero", props);
   copy = occaDeviceBuildKernel(device, okl, "copy", props);
   sum = occaDeviceBuildKernel(device, okl, "sum", props);
   scale = occaDeviceBuildKernel(device, okl, "scale", props);
@@ -118,11 +121,15 @@ int occa_lanczos_init(struct comm *c, struct laplacian *l, int niter) {
 int occa_lanczos_aux(genmap_vector diag, genmap_vector upper, genmap_vector *rr,
                      uint lelt, ulong nelg, int niter, genmap_vector f,
                      struct laplacian *gl, struct comm *gsc, buffer *bfr) {
+  // vec_create_zeros(p, ...)
+  occaKernelRun(zero, o_p, occaUInt(lelt));
+
+  // vec_copy(r, f)
   occaCopyPtrToMem(o_r, f->data, occaAllBytes, 0, occaDefault);
 
   // vec_ortho(gsc, r, nelg);
   /* orthogonalize */
-  occaKernelRun(sum, o_wrk, o_r, occaInt(lelt));
+  occaKernelRun(sum, occaUInt(lelt), o_r, o_wrk);
   occaCopyMemToPtr(wrk, o_wrk, occaAllBytes, 0, occaDefault);
 
   GenmapScalar tmp = 0.0;
@@ -167,20 +174,31 @@ int occa_lanczos_aux(genmap_vector diag, genmap_vector upper, genmap_vector *rr,
       beta = 0.0;
 
     // add2s1(p, r, beta, n)
-    occaKernelRun(add2s1, o_p, o_r, occaDouble(beta), occaInt(lelt));
+    occaKernelRun(add2s1, o_p, o_r, occaDouble(beta), occaUInt(lelt));
+
+#if 0
+    occaKernelRun(norm, o_wrk, occaInt(lelt), o_p);
+    occaCopyMemToPtr(wrk, o_wrk, occaAllBytes, 0, occaDefault);
+    rtr = 0.0;
+    for (i = 0; i < wrk_size; i++)
+      rtr += wrk[i];
+    comm_allreduce(gsc, gs_double, gs_add, &rtr, 1, &tmp);
+    if (gsc->id == 0 && iter == 0)
+      printf("pp = %lf\n", rtr);
+#endif
 
     // vec_ortho(gsc, p, nelg);
     /* orthogonalize */
-    occaKernelRun(sum, o_wrk, o_p, occaInt(lelt));
+    occaKernelRun(sum, occaInt(lelt), o_p, o_wrk);
     occaCopyMemToPtr(wrk, o_wrk, occaAllBytes, 0, occaDefault);
 
     tmp = 0.0;
-    for (int i = 0; i < wrk_size; i++)
+    for (i = 0; i < wrk_size; i++)
       tmp += wrk[i];
     comm_allreduce(gsc, gs_double, gs_add, &tmp, 1, &rtr);
     tmp /= nelg;
 
-    occaKernelRun(addc, o_r, occaDouble(-1.0 * tmp), occaInt(lelt));
+    occaKernelRun(addc, o_p, occaDouble(-1.0 * tmp), occaInt(lelt));
 
     // laplacian
     occaCopyMemToPtr(wrk, o_p, occaAllBytes, 0, occaDefault);
@@ -195,7 +213,7 @@ int occa_lanczos_aux(genmap_vector diag, genmap_vector upper, genmap_vector *rr,
     occaCopyMemToPtr(wrk, o_wrk, occaAllBytes, 0, occaDefault);
 
     pap = 0.0;
-    for (int i = 0; i < wrk_size; i++)
+    for (i = 0; i < wrk_size; i++)
       pap += wrk[i];
     comm_allreduce(gsc, gs_double, gs_add, &pap, 1, &tmp);
 
