@@ -691,11 +691,9 @@ static int lanczos_aux(genmap_vector diag, genmap_vector upper,
     for (i = 0; i < lelt; i++)
       p->data[i] = beta * p->data[i] + r->data[i];
 
-#if 0
+#if 1
     GenmapScalar pp = vec_dot(p, p);
     comm_allreduce(gsc, gs_double, gs_add, &pp, 1, buf);
-    if (gsc->id == 0 && iter == 0)
-      printf("pp = %lf\n", pp);
 #endif
 
     vec_ortho(gsc, p, nelg);
@@ -710,8 +708,8 @@ static int lanczos_aux(genmap_vector diag, genmap_vector upper,
     comm_allreduce(gsc, gs_double, gs_add, &pap, 1, buf);
 #if 0
     if (gsc->id == 0)
-      printf("iter = %d beta = %lf pp = %lf pap = %lf ww = %lf\n", iter,
-             beta, pp, pap, ww);
+      printf("host iter = %d beta = %lf pp = %lf pap = %lf\n", iter, beta, pp,
+             pap);
 #endif
 
     alpha = rtz1 / pap;

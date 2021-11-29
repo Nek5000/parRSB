@@ -33,7 +33,7 @@ int occa_init(char *backend_, int device_id, int platform_id) {
 }
 
 static occaKernel zero, copy, sum, scale, dot, norm, add2s1, add2s2, addc,
-                  lplcn;
+    lplcn;
 static occaMemory o_p, o_w, o_r, o_rr, o_v, o_off, o_x, o_y;
 static occaJson props;
 
@@ -64,7 +64,6 @@ int occa_lanczos_init(struct comm *c, struct laplacian *l, int niter) {
 
   /* laplacian */
   struct csr_mat *M = l->M;
-  assert(M->rn == lelt);
   uint nnz = M->roff[M->rn];
 
   o_v = occaDeviceMalloc(device, sizeof(GenmapScalar) * nnz, NULL, occaDefault);
@@ -176,15 +175,13 @@ int occa_lanczos_aux(genmap_vector diag, genmap_vector upper, genmap_vector *rr,
     // add2s1(p, r, beta, n)
     occaKernelRun(add2s1, o_p, o_r, occaDouble(beta), occaUInt(lelt));
 
-#if 0
+#if 1
     occaKernelRun(norm, o_wrk, occaInt(lelt), o_p);
     occaCopyMemToPtr(wrk, o_wrk, occaAllBytes, 0, occaDefault);
-    rtr = 0.0;
+    GenmapScalar pp = 0.0;
     for (i = 0; i < wrk_size; i++)
-      rtr += wrk[i];
-    comm_allreduce(gsc, gs_double, gs_add, &rtr, 1, &tmp);
-    if (gsc->id == 0 && iter == 0)
-      printf("pp = %lf\n", rtr);
+      pp += wrk[i];
+    comm_allreduce(gsc, gs_double, gs_add, &pp, 1, &tmp);
 #endif
 
     // vec_ortho(gsc, p, nelg);
@@ -204,7 +201,7 @@ int occa_lanczos_aux(genmap_vector diag, genmap_vector upper, genmap_vector *rr,
     occaCopyMemToPtr(wrk, o_p, occaAllBytes, 0, occaDefault);
     csr_mat_gather(gl->M->buf, gl->M, wrk, bfr);
     occaCopyPtrToMem(o_x, gl->M->buf, occaAllBytes, 0, occaDefault);
-    occaKernelRun(lplcn, o_w, occaInt(gl->M->rn), o_off, o_v, o_x);
+    occaKernelRun(lplcn, o_w, occaUInt(lelt), o_off, o_v, o_x);
 
     pap_old = pap;
 
@@ -219,8 +216,8 @@ int occa_lanczos_aux(genmap_vector diag, genmap_vector upper, genmap_vector *rr,
 
 #if 0
     if (gsc->id == 0)
-      printf("iter = %d beta = %lf pp = %lf pap = %lf ww = %lf\n", iter,
-             beta, pp, pap, ww);
+      printf("occa iter = %d beta = %lf pp = %lf pap = %lf\n", iter, beta, pp,
+             pap);
 #endif
 
     alpha = rtz1 / pap;
