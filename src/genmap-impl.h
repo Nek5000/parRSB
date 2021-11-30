@@ -35,12 +35,15 @@ int rib(struct array *elements, size_t unit_size, int ndim, struct comm *c,
 /* CSR Matrix */
 struct csr_mat {
   uint rn;
-  ulong row_start;
-
+  ulong rstart;
   uint *roff;
+
   ulong *col;
+
   GenmapScalar *v;
+
   GenmapScalar *diag;
+
   GenmapScalar *buf;
 
   struct gs_data *gsh;

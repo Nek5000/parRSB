@@ -64,7 +64,7 @@ static void mg_lvl_setup(struct mg_data *d, uint lvl, int factor) {
   entry *ptr = entries.ptr;
   for (i = 0; i < rn0; i++) {
     for (j = M0->roff[i]; j < M0->roff[i + 1]; j++) {
-      ptr[nn].r = M0->row_start + i;
+      ptr[nn].r = M0->rstart + i;
       ptr[nn].c = M0->col[j];
       ptr[nn].rn = (ptr[nn].r + factor - 1) / factor;
       ptr[nn].cn = (ptr[nn].c + factor - 1) / factor;
@@ -137,7 +137,7 @@ static void mg_lvl_setup(struct mg_data *d, uint lvl, int factor) {
 
   slong cn = nn;
   comm_scan(out, &d->c, gs_long, gs_add, &cn, 1, bf);
-  M1->row_start = out[0][0] + 1;
+  M1->rstart = out[0][0] + 1;
 
   uint nnz1 = 0;
   i = j = 0;
@@ -184,7 +184,7 @@ static void mg_lvl_setup(struct mg_data *d, uint lvl, int factor) {
   GenmapRealloc(rn0 + rn1, &ids);
   for (i = nn = 0; i < rn1; i++)
     for (j = M1->roff[i]; j < M1->roff[i + 1]; j++)
-      if (M1->row_start + i == M1->col[j]) {
+      if (M1->rstart + i == M1->col[j]) {
         ids[rn0 + nn] = M1->col[j];
         M1->diag[i] = M1->v[j];
         nn++;
@@ -198,7 +198,7 @@ static void mg_lvl_setup(struct mg_data *d, uint lvl, int factor) {
   GenmapRealloc(nnz1, &ids);
   for (i = 0; i < M1->rn; i++)
     for (j = M1->roff[i]; j < M1->roff[i + 1]; j++)
-      if (M1->row_start + i == M1->col[j])
+      if (M1->rstart + i == M1->col[j])
         ids[j] = M1->col[j];
       else
         ids[j] = -M1->col[j];

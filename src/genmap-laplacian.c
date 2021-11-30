@@ -171,7 +171,7 @@ static struct gs_data *get_csr_top(struct csr_mat *M, struct comm *c) {
   uint i, j;
   for (i = 0; i < rn; i++)
     for (j = M->roff[i]; j < M->roff[i + 1]; j++)
-      if (M->row_start + i == M->col[j])
+      if (M->rstart + i == M->col[j])
         ids[j] = M->col[j];
       else
         ids[j] = -M->col[j];
@@ -217,7 +217,7 @@ static void csr_laplacian_setup(struct csr_mat *M, struct array *entries,
   slong out[2][1], bf[2][1];
   slong in = M->rn;
   comm_scan(out, c, gs_long, gs_add, &in, 1, bf);
-  M->row_start = out[0][0] + 1;
+  M->rstart = out[0][0] + 1;
 
   M->roff[0] = 0;
   rn = 0;

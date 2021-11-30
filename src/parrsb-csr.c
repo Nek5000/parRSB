@@ -20,7 +20,7 @@ static struct gs_data *get_csr_top(struct csr_mat *M, struct comm *c) {
   uint i, j;
   for (i = 0; i < rn; i++)
     for (j = M->roff[i]; j < M->roff[i + 1]; j++)
-      if (M->row_start + i == M->col[j])
+      if (M->rstart + i == M->col[j])
         ids[j] = M->col[j];
       else
         ids[j] = -M->col[j];
@@ -64,7 +64,7 @@ void csr_mat_setup(struct csr_mat *M, struct array *entries, struct comm *c,
   slong out[2][1], bf[2][1];
   slong in = M->rn;
   comm_scan(out, c, gs_long, gs_add, &in, 1, bf);
-  M->row_start = out[0][0] + 1;
+  M->rstart = out[0][0] + 1;
 
   ptr = entries->ptr;
   uint rn = 0;
@@ -94,7 +94,7 @@ void csr_mat_setup(struct csr_mat *M, struct array *entries, struct comm *c,
 
 void csr_mat_gather(GenmapScalar *buf, struct csr_mat *M, GenmapScalar *x,
                     buffer *bfr) {
-  ulong s = M->row_start;
+  ulong s = M->rstart;
   sint i, j;
   for (i = 0; i < M->rn; i++)
     for (j = M->roff[i]; j < M->roff[i + 1]; j++)
@@ -133,7 +133,7 @@ void csr_mat_print(struct csr_mat *M, struct comm *c) {
     genmap_barrier(c);
     if (c->id == k) {
       for (i = 0; i < rn; i++)
-        fprintf(stderr, "csr %lld: %.10lf\n", M->row_start + i, M->diag[i]);
+        fprintf(stderr, "csr %lld: %.10lf\n", M->rstart + i, M->diag[i]);
     }
     fflush(stderr);
   }
