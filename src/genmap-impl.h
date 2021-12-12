@@ -134,9 +134,11 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
 
 int occa_init(char *backend, int device_id, int platform_id);
 int occa_lanczos_init(struct comm *c, struct laplacian *l, int niter);
-int occa_lanczos(GenmapScalar *diag, GenmapScalar *upper, GenmapScalar *rr,
-                 GenmapScalar *f, struct comm *c, buffer *bfr);
+int occa_lanczos_aux(genmap_vector diag, genmap_vector upper, genmap_vector *rr,
+                     uint lelt, ulong nelg, int niter, genmap_vector f,
+                     struct laplacian *gl, struct comm *gsc, buffer *bfr);
 int occa_lanczos_free();
+int occa_free();
 
 typedef struct {
   GenmapULong sequenceId;
