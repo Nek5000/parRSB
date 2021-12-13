@@ -77,89 +77,6 @@ static void find_neighbors(struct array *arr, struct rsb_element *elems,
   array_free(&vertices);
 }
 
-#if 0
-struct col {
-  ulong c;
-};
-
-int laplacian_init(struct laplacian *l, struct rsb_element *elems, uint lelt,
-                   int nv, struct comm *c, buffer *buf) {
-  assert(lelt > 0);
-
-  l->type = 0 | CSR | UNWEIGHTED;
-  l->nel = lelt;
-  l->nv = nv;
-
-  struct array entries;
-  find_neighbors(&entries, elems, lelt, nv, c, buf);
-
-  slong out[2][1], bf[2][1];
-  slong in = lelt;
-  comm_scan(out, c, gs_long, gs_add, &in, 1, bf);
-  ulong start = out[0][0] + 1;
-
-  struct array ucols;
-  array_init(struct col, &ucols, 10);
-
-  sarray_sort(struct csr_entry, entries.ptr, entries.n, c, 1, buf);
-  struct csr_entry *ptr = entries.ptr;
-  if (entries.n > 0) {
-    array_cat(struct col, &ucols, &ptr[0], 1);
-    ptr[0].idx = 0;
-  }
-
-  uint i;
-  uint ncol = 0;
-  for (i = 1; i < entries.n; i++) {
-    if (ptr[i - 1].c != ptr[i].c) {
-      array_cat(struct col, &ucols, &ptr[i].c, 1);
-      ptr[i].idx = ++ncol;
-    } else
-      ptr[i].idx = ptr[i - 1].idx;
-  }
-
-  l->col_ids = tcalloc(ulong, ucols.n);
-  memcpy(l->col_ids, ucols.ptr, sizeof(struct col) * ucols.n);
-
-  sarray_sort_2(struct csr_entry, entries.ptr, entries.n, r, 1, c, 1, buf);
-  ptr = entries.ptr;
-
-  uint adjn = 0;
-  for (i = 0; i < entries.n; i++)
-    if (ptr[i].r != ptr[i].c)
-      adjn++;
-
-  l->adj_off = tcalloc(uint, lelt + 1);
-  l->adj_ind = tcalloc(uint, adjn);
-  adjn = 0;
-
-  l->diag_ind = tcalloc(uint, lelt);
-  l->diag_val = tcalloc(uint, lelt);
-  uint diag_n = 0;
-
-  uint rn = 0;
-  l->adj_off[0] = 0;
-  uint diag = 0;
-  for (i = 0; i < entries.n; i++) {
-    if (ptr[i].r != ptr[i].c)
-      l->adj_ind[adjn++] = ptr[i].idx, diag++;
-    else
-      l->diag_ind[diag_n] = ptr[i].idx;
-    if (ptr[i - 1].r != ptr[i].r) {
-      l->adj_off[++rn] = adjn;
-      l->diag[diag_n++] = diag;
-    }
-  }
-  assert(rn == lelt);
-  assert(diag_n == lelt);
-
-  array_free(&ucols);
-  array_free(&entries);
-
-  return 0;
-}
-#endif
-
 static struct gs_data *get_csr_top(struct csr_mat *M, struct comm *c) {
   const uint rn = M->rn;
   const uint n = M->roff[rn];
@@ -379,16 +296,10 @@ int laplacian_init(struct laplacian *l, struct rsb_element *elems, uint nel,
   l->diag = NULL;
   l->gsh = NULL;
 
-  /* csr */
+  /* CSR */
   l->M = NULL;
 
-  /* simplified laplacian */
-  l->col_ids = NULL;
-  l->adj_off = NULL;
-  l->adj_ind = NULL;
-  l->diag_ind = NULL;
-  l->diag_val = NULL;
-
+  /* Work array */
   l->u = NULL;
 
   if ((type & CSR) == CSR) {
@@ -423,19 +334,104 @@ void laplacian_free(struct laplacian *l) {
   if (l->M != NULL)
     csr_mat_free(l->M);
 
-  if (l->col_ids != NULL)
-    free(l->col_ids);
-  if (l->adj_off != NULL)
-    free(l->adj_off);
-  if (l->adj_ind != NULL)
-    free(l->adj_ind);
-  if (l->diag_ind != NULL)
-    free(l->diag_ind);
-  if (l->diag_val != NULL)
-    free(l->diag_val);
-
   if (l->u != NULL)
     free(l->u);
+}
+
+//-----------------------------------------------------------------------------
+// GPU friendly way to store and evaluate the Laplacian
+struct col {
+  ulong c;
+};
+
+struct laplacian_gpu {
+  uint rn;
+
+  /* unique column ids of local laplacian matrix, sorted */
+  ulong *col_ids;
+
+  /* adj as csr, values are not stored as everything is -1 */
+  uint *adj_off;
+  uint *adj_ind;
+
+  /* diagonal as an array */
+  uint *diag_ind;
+  uint *diag_val;
+};
+
+static int laplacian_gpu_init(struct laplacian_gpu *l, struct rsb_element *elems,
+                              uint lelt, int nv, struct comm *c, buffer *buf) {
+  assert(lelt > 0);
+
+  struct array entries;
+  find_neighbors(&entries, elems, lelt, nv, c, buf);
+
+  slong out[2][1], bf[2][1];
+  slong in = lelt;
+  comm_scan(out, c, gs_long, gs_add, &in, 1, bf);
+  ulong start = out[0][0] + 1;
+
+  struct array ucols;
+  array_init(struct col, &ucols, 10);
+
+#if 0
+  sarray_sort(struct csr_entry, entries.ptr, entries.n, c, 1, buf);
+  struct csr_entry *ptr = entries.ptr;
+  if (entries.n > 0) {
+    array_cat(struct col, &ucols, &ptr[0], 1);
+    ptr[0].idx = 0;
+  }
+
+  uint i;
+  uint ncol = 0;
+  for (i = 1; i < entries.n; i++) {
+    if (ptr[i - 1].c != ptr[i].c) {
+      array_cat(struct col, &ucols, &ptr[i].c, 1);
+      ptr[i].idx = ++ncol;
+    } else
+      ptr[i].idx = ptr[i - 1].idx;
+  }
+
+  l->col_ids = tcalloc(ulong, ucols.n);
+  memcpy(l->col_ids, ucols.ptr, sizeof(struct col) * ucols.n);
+
+  sarray_sort_2(struct csr_entry, entries.ptr, entries.n, r, 1, c, 1, buf);
+  ptr = entries.ptr;
+
+  uint adjn = 0;
+  for (i = 0; i < entries.n; i++)
+    if (ptr[i].r != ptr[i].c)
+      adjn++;
+
+  l->adj_off = tcalloc(uint, lelt + 1);
+  l->adj_ind = tcalloc(uint, adjn);
+  adjn = 0;
+
+  l->diag_ind = tcalloc(uint, lelt);
+  l->diag_val = tcalloc(uint, lelt);
+  uint diag_n = 0;
+
+  uint rn = 0;
+  l->adj_off[0] = 0;
+  uint diag = 0;
+  for (i = 0; i < entries.n; i++) {
+    if (ptr[i].r != ptr[i].c)
+      l->adj_ind[adjn++] = ptr[i].idx, diag++;
+    else
+      l->diag_ind[diag_n] = ptr[i].idx;
+    if (ptr[i - 1].r != ptr[i].r) {
+      l->adj_off[++rn] = adjn;
+      l->diag[diag_n++] = diag;
+    }
+  }
+  assert(rn == lelt);
+  assert(diag_n == lelt);
+
+  array_free(&ucols);
+  array_free(&entries);
+#endif
+
+  return 0;
 }
 
 #undef MIN

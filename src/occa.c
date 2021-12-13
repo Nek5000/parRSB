@@ -184,8 +184,7 @@ int occa_lanczos_aux(genmap_vector diag, genmap_vector upper, genmap_vector *rr,
     comm_allreduce(gsc, gs_double, gs_add, &pp, 1, &tmp);
 #endif
 
-    // vec_ortho(gsc, p, nelg);
-    /* orthogonalize */
+    // orthogonalize
     occaKernelRun(sum, occaInt(lelt), o_p, o_wrk);
     occaCopyMemToPtr(wrk, o_wrk, occaAllBytes, 0, occaDefault);
 

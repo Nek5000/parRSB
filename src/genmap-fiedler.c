@@ -265,8 +265,7 @@ int inv_power_serial(double *y, int N, double *A, int verbose) {
 }
 
 int project(genmap_vector x, struct laplacian *gl, struct mg_data *d,
-            genmap_vector ri, int max_iter, struct comm *gsc, buffer *buf,
-            int gid) {
+            genmap_vector ri, int max_iter, struct comm *gsc, buffer *buf) {
   assert(x->size == ri->size);
   uint lelt = x->size;
 
@@ -395,16 +394,22 @@ int project(genmap_vector x, struct laplacian *gl, struct mg_data *d,
 
 // Input z should be orthogonal to 1-vector, have unit norm.
 // inverse iteration should not change z.
-static int inverse(genmap_vector y, struct laplacian *gl, struct mg_data *d,
-                   genmap_vector z, struct comm *gsc, int max_iter,
-                   int grammian, struct array *fdlr, slong nelg, buffer *bff,
-                   int gid) {
+static int inverse(genmap_vector y, struct rsb_element *elems, int nv,
+                   genmap_vector z, struct comm *gsc, int max_iter, slong nelg,
+                   buffer *bff) {
   assert(z->size == y->size);
-  assert(z->size == gl->nel);
+  uint lelt = z->size;
 
-  uint lelt = gl->nel;
+  struct laplacian ul;
+  laplacian_init(&ul, elems, lelt, nv, CSR | UNWEIGHTED, gsc, bff);
+  struct mg_data d;
+  mg_setup(&d, 4, gsc, ul.M);
 
-  // Grammian
+  struct laplacian wl;
+  laplacian_init(&wl, elems, lelt, nv, GS | WEIGHTED, gsc, bff);
+
+  int grammian = 0;
+
   GenmapScalar *Z, *GZ, *M, *rhs, *v, *buf;
   GenmapMalloc(max_iter * lelt, &Z);
   GenmapMalloc(lelt, &GZ);
@@ -420,7 +425,7 @@ static int inverse(genmap_vector y, struct laplacian *gl, struct mg_data *d,
   uint i, j, k, l;
   for (i = 0; i < max_iter; i++) {
     metric_tic(gsc, PROJECT);
-    int ppfi = project(y, gl, d, z, 100, gsc, bff, gid);
+    int ppfi = project(y, &wl, &d, z, 100, gsc, bff);
     metric_toc(gsc, PROJECT);
 
     vec_ortho(gsc, y, nelg);
@@ -482,7 +487,7 @@ static int inverse(genmap_vector y, struct laplacian *gl, struct mg_data *d,
 
         // M=Z(1:k,:)*G*Z(1:k,:);
         for (j = 0; j < N; j++) {
-          laplacian(GZ, gl, &Z[j * lelt], bff);
+          laplacian(GZ, &wl, &Z[j * lelt], bff);
           for (k = 0; k < N; k++) {
             M[k * N + j] = 0.0;
             for (l = 0; l < lelt; l++)
@@ -523,6 +528,10 @@ static int inverse(genmap_vector y, struct laplacian *gl, struct mg_data *d,
   GenmapFree(buf);
 
   vec_destroy(err);
+
+  laplacian_free(&wl);
+  mg_free(&d);
+  laplacian_free(&ul);
 
   return i == max_iter ? i : i + 1;
 }
@@ -706,7 +715,7 @@ static int lanczos_aux(genmap_vector diag, genmap_vector upper,
     pap_old = pap;
     pap = vec_dot(w, p);
     comm_allreduce(gsc, gs_double, gs_add, &pap, 1, buf);
-#if 0
+#if 1
     if (gsc->id == 0)
       printf("host iter = %d beta = %lf pp = %lf pap = %lf\n", iter, beta, pp,
              pap);
@@ -747,10 +756,21 @@ static int lanczos_aux(genmap_vector diag, genmap_vector upper,
   return iter;
 }
 
-static int lanczos(genmap_vector fiedler, struct laplacian *gl,
+static int lanczos(genmap_vector fiedler, struct rsb_element *elems, int nv,
                    genmap_vector initv, struct comm *gsc, int max_iter,
-                   struct array *fdlr, slong nelg, buffer *bfr) {
+                   slong nelg, buffer *bfr) {
   metric_tic(gsc, LANCZOS);
+
+  assert(fiedler->size == initv->size);
+  uint lelt = fiedler->size;
+
+  struct laplacian wl;
+#if defined(GENMAP_OCCA)
+  laplacian_init(&wl, elems, lelt, nv, CSR | WEIGHTED, gsc, bfr);
+  occa_lanczos_init(gsc, &wl, max_iter);
+#else
+  laplacian_init(&wl, elems, lelt, nv, GS | WEIGHTED, gsc, bfr);
+#endif
 
   genmap_vector alpha, beta;
   vec_create(&alpha, max_iter);
@@ -765,7 +785,6 @@ static int lanczos(genmap_vector fiedler, struct laplacian *gl,
   genmap_vector *rr;
   GenmapMalloc(max_iter + 1, &rr);
 
-  uint lelt = initv->size;
   uint i;
   for (i = 0; i < max_iter + 1; ++i)
     vec_create(&rr[i], lelt);
@@ -773,11 +792,11 @@ static int lanczos(genmap_vector fiedler, struct laplacian *gl,
   int iter, ipass = 0;
   do {
 #if defined(GENMAP_OCCA)
-    iter = occa_lanczos_aux(alpha, beta, rr, lelt, nelg, max_iter, initv, gl,
+    iter = occa_lanczos_aux(alpha, beta, rr, lelt, nelg, max_iter, initv, &wl,
                             gsc, bfr);
 #else
-    iter =
-        lanczos_aux(alpha, beta, rr, lelt, nelg, max_iter, initv, gl, gsc, bfr);
+    iter = lanczos_aux(alpha, beta, rr, lelt, nelg, max_iter, initv, &wl, gsc,
+                       bfr);
 #endif
 
     genmap_vector evTriDiag;
@@ -821,31 +840,22 @@ static int lanczos(genmap_vector fiedler, struct laplacian *gl,
   vec_destroy(alpha);
   vec_destroy(beta);
 
+#if defined(GENMAP_OCCA)
+  occa_lanczos_free();
+#endif
+
+  laplacian_free(&wl);
+
   return ipass;
 }
 
 int fiedler(struct rsb_element *elems, uint lelt, int nv, int max_iter,
-            int algo, struct comm *gsc, buffer *buf, int gid) {
+            int algo, struct comm *gsc, buffer *buf) {
   slong out[2][1], bfr[2][1];
   slong in = lelt;
   comm_scan(out, gsc, gs_long, gs_add, &in, 1, bfr);
   slong start = out[0][0];
   slong nelg = out[1][0];
-
-  struct laplacian l;
-  struct mg_data d;
-  if (algo == 1) {
-    laplacian_init(&l, elems, lelt, nv, CSR | UNWEIGHTED, gsc, buf);
-    mg_setup(&d, 4, gsc, l.M);
-  }
-
-  struct laplacian wl;
-  // laplacian_init(&wl, elems, lelt, nv, GS | WEIGHTED, gsc, buf);
-  laplacian_init(&wl, elems, lelt, nv, CSR | WEIGHTED, gsc, buf);
-
-#if defined(GENMAP_OCCA)
-  occa_lanczos_init(gsc, &wl, max_iter);
-#endif
 
   genmap_vector initv, fiedler;
   vec_create(&initv, lelt);
@@ -867,23 +877,11 @@ int fiedler(struct rsb_element *elems, uint lelt, int nv, int max_iter,
   rni = 1.0 / sqrt(rtr);
   vec_scale(initv, initv, rni);
 
-  struct array fdlr;
-  array_init(struct fiedler, &fdlr, lelt);
-
-  fdlr.n = lelt;
-  struct fiedler *ptr = fdlr.ptr;
-  for (i = 0; i < lelt; i++) {
-    ptr[i].seq = i;
-    ptr[i].proc = gsc->id;
-    ptr[i].part0 = 0;
-  }
-
   int iter = 0;
   if (algo == 0)
-    iter = lanczos(fiedler, &wl, initv, gsc, max_iter, &fdlr, nelg, buf);
+    iter = lanczos(fiedler, elems, nv, initv, gsc, max_iter, nelg, buf);
   else if (algo == 1)
-    iter = inverse(fiedler, &wl, &d, initv, gsc, max_iter, 0 /* grammian */,
-                   &fdlr, nelg, buf, gid);
+    iter = inverse(fiedler, elems, nv, initv, gsc, max_iter, nelg, buf);
   metric_acc(FIEDLER_NITER, iter);
 
   GenmapScalar norm = 0;
@@ -898,19 +896,8 @@ int fiedler(struct rsb_element *elems, uint lelt, int nv, int max_iter,
   for (i = 0; i < lelt; i++)
     elems[i].fiedler = fiedler->data[i];
 
-  array_free(&fdlr);
-
   vec_destroy(initv);
   vec_destroy(fiedler);
-  laplacian_free(&wl);
-
-#if defined(GENMAP_OCCA)
-  occa_lanczos_free();
-#endif
-  if (algo == 1) {
-    mg_free(&d);
-    laplacian_free(&l);
-  }
 
   return 0;
 }
