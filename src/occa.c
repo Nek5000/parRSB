@@ -98,7 +98,7 @@ int occa_lanczos_init(struct comm *c, struct laplacian *l, int niter) {
     add2s1 = occaDeviceBuildKernel(device, okl, "add2s1", props);
     add2s2 = occaDeviceBuildKernel(device, okl, "add2s2", props);
     addc = occaDeviceBuildKernel(device, okl, "addc", props);
-    lplcn = occaDeviceBuildKernel(device, okl, "laplacian_csr", props);
+    lplcn = occaDeviceBuildKernel(device, okl, "laplacian_v00", props);
   }
 
   comm_barrier(c);
@@ -112,7 +112,7 @@ int occa_lanczos_init(struct comm *c, struct laplacian *l, int niter) {
   add2s1 = occaDeviceBuildKernel(device, okl, "add2s1", props);
   add2s2 = occaDeviceBuildKernel(device, okl, "add2s2", props);
   addc = occaDeviceBuildKernel(device, okl, "addc", props);
-  lplcn = occaDeviceBuildKernel(device, okl, "laplacian_csr", props);
+  lplcn = occaDeviceBuildKernel(device, okl, "laplacian_v00", props);
 
   return 0;
 }

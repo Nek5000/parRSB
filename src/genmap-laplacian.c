@@ -77,7 +77,7 @@ static void find_neighbors(struct array *arr, struct rsb_element *elems,
   array_free(&vertices);
 }
 
-static struct gs_data *get_csr_top(struct csr_mat *M, struct comm *c) {
+static struct gs_data *csr_gs_top(struct csr_mat *M, struct comm *c) {
   const uint rn = M->rn;
   const uint n = M->roff[rn];
 
@@ -101,8 +101,8 @@ static struct gs_data *get_csr_top(struct csr_mat *M, struct comm *c) {
   return gsh;
 }
 
-static void csr_laplacian_setup(struct csr_mat *M, struct array *entries,
-                                struct comm *c, buffer *buf) {
+static void csr_init_aux(struct csr_mat *M, struct array *entries,
+                         struct comm *c, buffer *buf) {
   uint i = 0;
   uint rn = 0;
   uint j;
@@ -169,7 +169,7 @@ static void csr_laplacian_setup(struct csr_mat *M, struct array *entries,
   }
   assert(rn == M->rn);
 
-  M->gsh = get_csr_top(M, c);
+  M->gsh = csr_gs_top(M, c);
 }
 
 static int csr_init(struct laplacian *l, struct rsb_element *elems, uint lelt,
@@ -204,7 +204,7 @@ static int csr_init(struct laplacian *l, struct rsb_element *elems, uint lelt,
   }
   array_cat(struct csr_entry, &unique, &t, 1);
 
-  csr_laplacian_setup(l->M, &unique, c, buf);
+  csr_init_aux(l->M, &unique, c, buf);
 
   array_free(&unique);
   array_free(&entries);
