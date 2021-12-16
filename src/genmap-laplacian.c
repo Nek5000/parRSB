@@ -340,96 +340,150 @@ void laplacian_free(struct laplacian *l) {
 
 //-----------------------------------------------------------------------------
 // GPU friendly way to store and evaluate the Laplacian
-struct col {
-  ulong c;
+struct gpu_csr_entry {
+  ulong r, c;
+  GenmapScalar v;
+  uint idx;
 };
 
 struct laplacian_gpu {
   uint rn;
 
-  /* unique column ids of local laplacian matrix, sorted */
+  // unique column ids of local laplacian matrix, sorted
   ulong *col_ids;
 
-  /* adj as csr, values are not stored as everything is -1 */
+  // adj as csr, for unweighted case, adj_val is null as the values are all -1
   uint *adj_off;
   uint *adj_ind;
+  GenmapScalar *adj_val;
 
   /* diagonal as an array */
   uint *diag_ind;
-  uint *diag_val;
+  GenmapScalar *diag_val;
+
+  // gs for host side communication
 };
 
-static int laplacian_gpu_init(struct laplacian_gpu *l, struct rsb_element *elems,
-                              uint lelt, int nv, struct comm *c, buffer *buf) {
-  assert(lelt > 0);
+int laplacian_gpu_init(struct laplacian_gpu *l, struct rsb_element *elems,
+                       uint lelt, int nv, int type, struct comm *c,
+                       buffer *buf) {
+  struct array nbrs;
+  find_neighbors(&nbrs, elems, lelt, nv, c, buf);
+  sarray_sort(struct nbr_entry, nbrs.ptr, nbrs.n, c, 1, buf);
+  // Sanity check
+  assert(nbrs.n > 0);
+
+  struct nbr_entry *ptr = nbrs.ptr;
+  struct gpu_csr_entry t = {.r = ptr[0].r, .c = ptr[0].c, .v = -1.0, .idx = 0};
 
   struct array entries;
-  find_neighbors(&entries, elems, lelt, nv, c, buf);
+  array_init(struct gpu_csr_entry, &entries, 10);
+  array_cat(struct gpu_csr_entry, &entries, &t, 1);
 
-  slong out[2][1], bf[2][1];
-  slong in = lelt;
-  comm_scan(out, c, gs_long, gs_add, &in, 1, bf);
-  ulong start = out[0][0] + 1;
+  uint max_col = lelt;
+  l->col_ids = tcalloc(ulong, max_col);
+  l->col_ids[0] = ptr[0].c;
 
-  struct array ucols;
-  array_init(struct col, &ucols, 10);
-
-#if 0
-  sarray_sort(struct csr_entry, entries.ptr, entries.n, c, 1, buf);
-  struct csr_entry *ptr = entries.ptr;
-  if (entries.n > 0) {
-    array_cat(struct col, &ucols, &ptr[0], 1);
-    ptr[0].idx = 0;
-  }
-
-  uint i;
-  uint ncol = 0;
-  for (i = 1; i < entries.n; i++) {
+  uint i, cid;
+  for (i = 1, cid = 0; i < nbrs.n; i++) {
+    t.c = ptr[i].c;
+    t.r = ptr[i].r;
     if (ptr[i - 1].c != ptr[i].c) {
-      array_cat(struct col, &ucols, &ptr[i].c, 1);
-      ptr[i].idx = ++ncol;
-    } else
-      ptr[i].idx = ptr[i - 1].idx;
+      t.idx = ++cid;
+      if (cid == max_col) {
+        max_col += max_col / 2 + 1;
+        l->col_ids = realloc(l->col_ids, sizeof(ulong) * max_col);
+      }
+      l->col_ids[cid] = ptr[i].c;
+    }
+    array_cat(struct gpu_csr_entry, &entries, &t, 1);
   }
+  array_free(&nbrs);
 
-  l->col_ids = tcalloc(ulong, ucols.n);
-  memcpy(l->col_ids, ucols.ptr, sizeof(struct col) * ucols.n);
+  sarray_sort_2(struct gpu_csr_entry, entries.ptr, entries.n, r, 1, c, 1, buf);
+  struct gpu_csr_entry *gptr = entries.ptr;
+  t = gptr[0];
 
-  sarray_sort_2(struct csr_entry, entries.ptr, entries.n, r, 1, c, 1, buf);
-  ptr = entries.ptr;
+  // Compress the entries array
+  struct array unique;
+  array_init(struct gpu_csr_entry, &unique, 10);
 
-  uint adjn = 0;
-  for (i = 0; i < entries.n; i++)
-    if (ptr[i].r != ptr[i].c)
-      adjn++;
-
-  l->adj_off = tcalloc(uint, lelt + 1);
-  l->adj_ind = tcalloc(uint, adjn);
-  adjn = 0;
+  if (type & UNWEIGHTED) {
+    for (i = 1; i < entries.n; i++)
+      if (gptr[i].r != t.r || gptr[i].c != t.c) {
+        array_cat(struct gpu_csr_entry, &unique, &t, 1);
+        t = gptr[i];
+      }
+  } else if (type & WEIGHTED) {
+    for (i = 1; i < entries.n; i++)
+      if (gptr[i].r != t.r || gptr[i].c != t.c) {
+        array_cat(struct gpu_csr_entry, &unique, &t, 1);
+        t = gptr[i];
+        t.v = -1.0;
+      } else
+        t.v -= 1.0;
+  }
+  array_free(&entries);
 
   l->diag_ind = tcalloc(uint, lelt);
   l->diag_val = tcalloc(uint, lelt);
-  uint diag_n = 0;
+  l->adj_off = tcalloc(uint, lelt);
+  l->adj_ind = tcalloc(uint, unique.n - lelt);
+  l->adj_val = NULL;
 
+  gptr = unique.ptr;
   uint rn = 0;
-  l->adj_off[0] = 0;
-  uint diag = 0;
-  for (i = 0; i < entries.n; i++) {
-    if (ptr[i].r != ptr[i].c)
-      l->adj_ind[adjn++] = ptr[i].idx, diag++;
-    else
-      l->diag_ind[diag_n] = ptr[i].idx;
-    if (ptr[i - 1].r != ptr[i].r) {
-      l->adj_off[++rn] = adjn;
-      l->diag[diag_n++] = diag;
+  GenmapScalar diag = 0.0;
+
+  if (type & WEIGHTED) {
+    l->adj_val = tcalloc(GenmapScalar, unique.n - lelt);
+
+    l->adj_off[0] = 0;
+    uint adjn = 0;
+    if (gptr[0].r != gptr[0].c) {
+      l->adj_ind[adjn] = gptr[0].idx;
+      l->adj_val[adjn++] = gptr[0].v;
+      diag += gptr[0].v;
+    } else
+      l->diag_ind[rn] = gptr[0].idx;
+
+    for (i = 1; i < unique.n; i++) {
+      if (gptr[i - 1].r != gptr[i].r) {
+        l->diag_val[rn++] = diag, diag = 0.0;
+        l->adj_off[rn] = adjn;
+      }
+      if (gptr[i].r != gptr[i].c) {
+        l->adj_ind[adjn] = gptr[i].idx;
+        l->adj_val[adjn++] = gptr[i].v;
+        diag += gptr[i].v;
+      } else
+        l->diag_ind[rn] = gptr[i].idx;
+    }
+  } else if (type & UNWEIGHTED) {
+    l->adj_off[0] = 0;
+    uint adjn = 0;
+    if (gptr[0].r != gptr[0].c) {
+      l->adj_ind[adjn++] = gptr[0].idx;
+      diag += gptr[0].v;
+    } else
+      l->diag_ind[rn] = gptr[0].idx;
+
+    for (i = 1; i < unique.n; i++) {
+      if (gptr[i - 1].r != gptr[i].r) {
+        l->diag_val[rn++] = diag, diag = 0.0;
+        l->adj_off[rn] = adjn;
+      }
+      if (gptr[i].r != gptr[i].c) {
+        l->adj_ind[adjn++] = gptr[i].idx;
+        diag += gptr[i].v;
+      } else
+        l->diag_ind[rn] = gptr[i].idx;
     }
   }
-  assert(rn == lelt);
-  assert(diag_n == lelt);
+  array_free(&unique);
 
-  array_free(&ucols);
-  array_free(&entries);
-#endif
+  // Sanity check
+  assert(rn == lelt);
 
   return 0;
 }
