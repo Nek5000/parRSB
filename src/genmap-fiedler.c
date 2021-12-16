@@ -128,26 +128,6 @@ static int vec_ortho(struct comm *c, genmap_vector q1, GenmapULong n) {
   return 0;
 }
 
-static int vec_dssum(GenmapScalar *v, struct laplacian *gl, buffer *buf) {
-  uint lelt = gl->nel;
-  int nv = gl->nv;
-
-  GenmapInt i, j;
-  for (i = 0; i < lelt; i++)
-    for (j = 0; j < nv; j++)
-      gl->u[nv * i + j] = v[i];
-
-  gs(gl->u, gs_double, gs_add, 0, gl->gsh, buf);
-
-  for (i = 0; i < lelt; i++) {
-    v[i] = 0.0;
-    for (j = 0; j < nv; j++)
-      v[i] += gl->u[nv * i + j];
-  }
-
-  return 0;
-}
-
 struct fiedler {
   GenmapScalar fiedler;
   uint proc, seq;
@@ -403,7 +383,7 @@ static int inverse(genmap_vector y, struct rsb_element *elems, int nv,
   struct laplacian ul;
   laplacian_init(&ul, elems, lelt, nv, CSR | UNWEIGHTED, gsc, bff);
   struct mg_data d;
-  mg_setup(&d, 4, gsc, ul.M);
+  mg_setup(&d, 4, gsc, (struct csr_mat *)ul.data);
 
   struct laplacian wl;
   laplacian_init(&wl, elems, lelt, nv, GS | WEIGHTED, gsc, bff);

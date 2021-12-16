@@ -63,7 +63,7 @@ int occa_lanczos_init(struct comm *c, struct laplacian *l, int niter) {
   wrk = tcalloc(GenmapScalar, (niter + 1) * lelt);
 
   /* laplacian */
-  struct csr_mat *M = l->M;
+  struct csr_mat *M = (struct csr_mat *) l->data;
   uint nnz = M->roff[M->rn];
 
   o_v = occaDeviceMalloc(device, sizeof(GenmapScalar) * nnz, NULL, occaDefault);
@@ -198,8 +198,9 @@ int occa_lanczos_aux(genmap_vector diag, genmap_vector upper, genmap_vector *rr,
 
     // laplacian
     occaCopyMemToPtr(wrk, o_p, occaAllBytes, 0, occaDefault);
-    csr_mat_gather(gl->M->buf, gl->M, wrk, bfr);
-    occaCopyPtrToMem(o_x, gl->M->buf, occaAllBytes, 0, occaDefault);
+    struct csr_mat *M = (struct csr_mat *)gl->data;
+    csr_mat_gather(M->buf, M, wrk, bfr);
+    occaCopyPtrToMem(o_x, M->buf, occaAllBytes, 0, occaDefault);
     occaKernelRun(lplcn, o_w, occaUInt(lelt), o_off, o_v, o_x);
 
     pap_old = pap;

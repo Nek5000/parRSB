@@ -532,9 +532,9 @@ int laplacian(GenmapScalar *v, struct laplacian *l, GenmapScalar *u,
 }
 
 void laplacian_free(struct laplacian *l) {
-  if (l->type & GS)
+  if (l->type & CSR)
     csr_free(l);
-  else if (l->type & CSR) {
+  else if (l->type & GS) {
     assert(l->type & WEIGHTED);
     gs_weighted_free(l);
   } else if (l->type & GPU)

@@ -13,8 +13,8 @@
 #define GENMAP_ALIGN 32
 #define GENMAP_TOL 1e-12
 
-#define MAXDIM 3 /* Maximum dimension of the mesh */
-#define MAXNV 8  /* Maximum number of vertices per element */
+#define MAXDIM 3 // Maximum dimension of the mesh
+#define MAXNV 8  // Maximum number of vertices per element
 
 //------------------------------------------------------------------------------
 // RCB / RIB
