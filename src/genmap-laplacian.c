@@ -77,6 +77,9 @@ static void find_neighbors(struct array *arr, struct rsb_element *elems,
   array_free(&vertices);
 }
 
+//------------------------------------------------------------------------------
+// Laplacian - CSR
+//
 static struct gs_data *csr_gs_top(struct csr_mat *M, struct comm *c) {
   const uint rn = M->rn;
   const uint n = M->roff[rn];
@@ -173,7 +176,7 @@ static void csr_init_aux(struct csr_mat *M, struct array *entries,
 }
 
 static int csr_init(struct laplacian *l, struct rsb_element *elems, uint lelt,
-                    int nv, struct comm *c, int type, buffer *buf) {
+                    int nv, struct comm *c, buffer *buf) {
   struct array entries;
   find_neighbors(&entries, elems, lelt, nv, c, buf);
 
@@ -185,14 +188,14 @@ static int csr_init(struct laplacian *l, struct rsb_element *elems, uint lelt,
 
   struct csr_entry t = {.r = ptr[0].r, .c = ptr[0].c, .v = -1.0};
   uint i;
-  if (type & UNWEIGHTED) {
+  if (l->type & UNWEIGHTED) {
     for (i = 1; i < entries.n; i++)
       if (t.r != ptr[i].r || t.c != ptr[i].c) {
         array_cat(struct csr_entry, &unique, &t, 1);
         t.r = ptr[i].r;
         t.c = ptr[i].c;
       }
-  } else if (type & WEIGHTED) {
+  } else if (l->type & WEIGHTED) {
     for (i = 1; i < entries.n; i++)
       if (t.r != ptr[i].r || t.c != ptr[i].c) {
         array_cat(struct csr_entry, &unique, &t, 1);
@@ -204,7 +207,8 @@ static int csr_init(struct laplacian *l, struct rsb_element *elems, uint lelt,
   }
   array_cat(struct csr_entry, &unique, &t, 1);
 
-  csr_init_aux(l->M, &unique, c, buf);
+  l->data = tcalloc(struct csr_mat, 1);
+  csr_init_aux((struct csr_mat *)l->data, &unique, c, buf);
 
   array_free(&unique);
   array_free(&entries);
@@ -214,12 +218,30 @@ static int csr_init(struct laplacian *l, struct rsb_element *elems, uint lelt,
 
 static int csr(GenmapScalar *v, struct laplacian *l, GenmapScalar *u,
                buffer *buf) {
-  csr_mat_apply(v, l->M, u, buf);
+  csr_mat_apply(v, (struct csr_mat *)l->data, u, buf);
   return 0;
 }
 
+static int csr_free(struct laplacian *l) {
+  struct csr_mat *M = l->data;
+  if (M != NULL)
+    csr_mat_free(M);
+  free(l->data);
+  l->data = NULL;
+}
+
+//------------------------------------------------------------------------------
+// Laplacian - GS
+//
+
+struct gs_laplacian {
+  GenmapScalar *diag, *u;
+  struct gs_data *gsh;
+};
+
 static int gs_weighted_init(struct laplacian *l, struct rsb_element *elems,
                             uint lelt, int nv, struct comm *c, buffer *buf) {
+
   uint npts = nv * lelt;
   slong *vertices = tcalloc(slong, npts);
   uint i, j;
@@ -227,19 +249,20 @@ static int gs_weighted_init(struct laplacian *l, struct rsb_element *elems,
     for (j = 0; j < nv; j++)
       vertices[i * nv + j] = elems[i].vertices[j];
 
-  l->u = tcalloc(GenmapScalar, npts);
+  struct gs_laplacian *gl = l->data = tcalloc(struct gs_laplacian, 1);
+  gl->u = tcalloc(GenmapScalar, npts);
   for (i = 0; i < lelt; i++)
     for (j = 0; j < nv; j++)
-      l->u[nv * i + j] = 1.0;
+      gl->u[nv * i + j] = 1.0;
 
-  l->gsh = gs_setup(vertices, npts, c, 0, gs_crystal_router, 0);
-  gs(l->u, gs_double, gs_add, 0, l->gsh, buf);
+  gl->gsh = gs_setup(vertices, npts, c, 0, gs_crystal_router, 0);
+  gs(gl->u, gs_double, gs_add, 0, gl->gsh, buf);
 
-  l->diag = tcalloc(GenmapScalar, lelt);
+  gl->diag = tcalloc(GenmapScalar, lelt);
   for (i = 0; i < lelt; i++) {
-    l->diag[i] = 0.0;
+    gl->diag[i] = 0.0;
     for (j = 0; j < nv; j++)
-      l->diag[i] += l->u[nv * i + j];
+      gl->diag[i] += gl->u[nv * i + j];
   }
 
 #if 0
@@ -270,83 +293,47 @@ static int gs_weighted(GenmapScalar *v, struct laplacian *l, GenmapScalar *u,
   uint lelt = l->nel;
   int nv = l->nv;
 
+  struct gs_laplacian *gl = l->data;
+
   GenmapInt i, j;
   for (i = 0; i < lelt; i++)
     for (j = 0; j < nv; j++)
-      l->u[nv * i + j] = u[i];
+      gl->u[nv * i + j] = u[i];
 
-  gs(l->u, gs_double, gs_add, 0, l->gsh, buf);
+  gs(gl->u, gs_double, gs_add, 0, gl->gsh, buf);
 
   for (i = 0; i < lelt; i++) {
-    v[i] = l->diag[i] * u[i];
+    v[i] = gl->diag[i] * u[i];
     for (j = 0; j < nv; j++)
-      v[i] -= l->u[nv * i + j];
+      v[i] -= gl->u[nv * i + j];
   }
 
   return 0;
 }
 
-int laplacian_init(struct laplacian *l, struct rsb_element *elems, uint nel,
-                   int nv, int type, struct comm *c, buffer *buf) {
-  l->type = type;
-  l->nv = nv;
-  l->nel = nel;
+static int gs_weighted_free(struct laplacian *l) {
+  struct gs_laplacian *gl = l->data;
 
-  /* gs */
-  l->diag = NULL;
-  l->gsh = NULL;
+  if (gl->u != NULL)
+    free(gl->u);
+  if (gl->diag != NULL)
+    free(gl->diag);
+  gs_free(gl->gsh);
 
-  /* CSR */
-  l->M = NULL;
-
-  /* Work array */
-  l->u = NULL;
-
-  if ((type & CSR) == CSR) {
-    l->M = tcalloc(struct csr_mat, 1);
-    csr_init(l, elems, nel, nv, c, type - CSR, buf);
-  } else if ((type & GS) == GS) {
-    assert((type & WEIGHTED) == WEIGHTED);
-    gs_weighted_init(l, elems, nel, nv, c, buf);
-  }
-
-  return 0;
-}
-
-int laplacian(GenmapScalar *v, struct laplacian *l, GenmapScalar *u,
-              buffer *buf) {
-  if ((l->type & CSR) == CSR) {
-    csr(v, l, u, buf);
-  } else if ((l->type & GS) == GS) {
-    assert((l->type & WEIGHTED) == WEIGHTED);
-    gs_weighted(v, l, u, buf);
-  }
-
-  return 0;
-}
-
-void laplacian_free(struct laplacian *l) {
-  if (l->diag != NULL)
-    free(l->diag);
-  if (l->gsh != NULL)
-    gs_free(l->gsh);
-
-  if (l->M != NULL)
-    csr_mat_free(l->M);
-
-  if (l->u != NULL)
-    free(l->u);
+  free(l->data);
+  l->data = NULL;
 }
 
 //-----------------------------------------------------------------------------
-// GPU friendly way to store and evaluate the Laplacian
+// Laplacian - GPU
+//
 struct gpu_csr_entry {
   ulong r, c;
   GenmapScalar v;
   uint idx;
 };
 
-struct laplacian_gpu {
+struct gpu_laplacian {
   uint rn;
 
   // unique column ids of local laplacian matrix, sorted
@@ -364,14 +351,12 @@ struct laplacian_gpu {
   // gs for host side communication
 };
 
-int laplacian_gpu_init(struct laplacian_gpu *l, struct rsb_element *elems,
-                       uint lelt, int nv, int type, struct comm *c,
-                       buffer *buf) {
+int gpu_init(struct laplacian *l, struct rsb_element *elems, uint lelt, int nv,
+             struct comm *c, buffer *buf) {
   struct array nbrs;
   find_neighbors(&nbrs, elems, lelt, nv, c, buf);
   sarray_sort(struct nbr_entry, nbrs.ptr, nbrs.n, c, 1, buf);
-  // Sanity check
-  assert(nbrs.n > 0);
+  assert(nbrs.n > 0); // Sanity check
 
   struct nbr_entry *ptr = nbrs.ptr;
   struct gpu_csr_entry t = {.r = ptr[0].r, .c = ptr[0].c, .v = -1.0, .idx = 0};
@@ -380,9 +365,11 @@ int laplacian_gpu_init(struct laplacian_gpu *l, struct rsb_element *elems,
   array_init(struct gpu_csr_entry, &entries, 10);
   array_cat(struct gpu_csr_entry, &entries, &t, 1);
 
+  struct gpu_laplacian *gl = l->data = tcalloc(struct gpu_laplacian, 1);
+
   uint max_col = lelt;
-  l->col_ids = tcalloc(ulong, max_col);
-  l->col_ids[0] = ptr[0].c;
+  gl->col_ids = tcalloc(ulong, max_col);
+  gl->col_ids[0] = ptr[0].c;
 
   uint i, cid;
   for (i = 1, cid = 0; i < nbrs.n; i++) {
@@ -392,9 +379,9 @@ int laplacian_gpu_init(struct laplacian_gpu *l, struct rsb_element *elems,
       t.idx = ++cid;
       if (cid == max_col) {
         max_col += max_col / 2 + 1;
-        l->col_ids = realloc(l->col_ids, sizeof(ulong) * max_col);
+        gl->col_ids = realloc(gl->col_ids, sizeof(ulong) * max_col);
       }
-      l->col_ids[cid] = ptr[i].c;
+      gl->col_ids[cid] = ptr[i].c;
     }
     array_cat(struct gpu_csr_entry, &entries, &t, 1);
   }
@@ -408,13 +395,13 @@ int laplacian_gpu_init(struct laplacian_gpu *l, struct rsb_element *elems,
   struct array unique;
   array_init(struct gpu_csr_entry, &unique, 10);
 
-  if (type & UNWEIGHTED) {
+  if (l->type & UNWEIGHTED) {
     for (i = 1; i < entries.n; i++)
       if (gptr[i].r != t.r || gptr[i].c != t.c) {
         array_cat(struct gpu_csr_entry, &unique, &t, 1);
         t = gptr[i];
       }
-  } else if (type & WEIGHTED) {
+  } else if (l->type & WEIGHTED) {
     for (i = 1; i < entries.n; i++)
       if (gptr[i].r != t.r || gptr[i].c != t.c) {
         array_cat(struct gpu_csr_entry, &unique, &t, 1);
@@ -425,67 +412,133 @@ int laplacian_gpu_init(struct laplacian_gpu *l, struct rsb_element *elems,
   }
   array_free(&entries);
 
-  l->diag_ind = tcalloc(uint, lelt);
-  l->diag_val = tcalloc(uint, lelt);
-  l->adj_off = tcalloc(uint, lelt);
-  l->adj_ind = tcalloc(uint, unique.n - lelt);
-  l->adj_val = NULL;
+  gl->diag_ind = tcalloc(uint, lelt);
+  gl->diag_val = tcalloc(GenmapScalar, lelt);
+  gl->adj_off = tcalloc(uint, lelt);
+  gl->adj_ind = tcalloc(uint, unique.n - lelt);
+  gl->adj_val = NULL;
 
   gptr = unique.ptr;
   uint rn = 0;
   GenmapScalar diag = 0.0;
 
-  if (type & WEIGHTED) {
-    l->adj_val = tcalloc(GenmapScalar, unique.n - lelt);
+  if (l->type & WEIGHTED) {
+    gl->adj_val = tcalloc(GenmapScalar, unique.n - lelt);
 
-    l->adj_off[0] = 0;
+    gl->adj_off[0] = 0;
     uint adjn = 0;
     if (gptr[0].r != gptr[0].c) {
-      l->adj_ind[adjn] = gptr[0].idx;
-      l->adj_val[adjn++] = gptr[0].v;
+      gl->adj_ind[adjn] = gptr[0].idx;
+      gl->adj_val[adjn++] = gptr[0].v;
       diag += gptr[0].v;
     } else
-      l->diag_ind[rn] = gptr[0].idx;
+      gl->diag_ind[rn] = gptr[0].idx;
 
     for (i = 1; i < unique.n; i++) {
       if (gptr[i - 1].r != gptr[i].r) {
-        l->diag_val[rn++] = diag, diag = 0.0;
-        l->adj_off[rn] = adjn;
+        gl->diag_val[rn++] = diag, diag = 0.0;
+        gl->adj_off[rn] = adjn;
       }
       if (gptr[i].r != gptr[i].c) {
-        l->adj_ind[adjn] = gptr[i].idx;
-        l->adj_val[adjn++] = gptr[i].v;
+        gl->adj_ind[adjn] = gptr[i].idx;
+        gl->adj_val[adjn++] = gptr[i].v;
         diag += gptr[i].v;
       } else
-        l->diag_ind[rn] = gptr[i].idx;
+        gl->diag_ind[rn] = gptr[i].idx;
     }
-  } else if (type & UNWEIGHTED) {
-    l->adj_off[0] = 0;
+  } else if (l->type & UNWEIGHTED) {
+    gl->adj_off[0] = 0;
     uint adjn = 0;
     if (gptr[0].r != gptr[0].c) {
-      l->adj_ind[adjn++] = gptr[0].idx;
+      gl->adj_ind[adjn++] = gptr[0].idx;
       diag += gptr[0].v;
     } else
-      l->diag_ind[rn] = gptr[0].idx;
+      gl->diag_ind[rn] = gptr[0].idx;
 
     for (i = 1; i < unique.n; i++) {
       if (gptr[i - 1].r != gptr[i].r) {
-        l->diag_val[rn++] = diag, diag = 0.0;
-        l->adj_off[rn] = adjn;
+        gl->diag_val[rn++] = diag, diag = 0.0;
+        gl->adj_off[rn] = adjn;
       }
       if (gptr[i].r != gptr[i].c) {
-        l->adj_ind[adjn++] = gptr[i].idx;
+        gl->adj_ind[adjn++] = gptr[i].idx;
         diag += gptr[i].v;
       } else
-        l->diag_ind[rn] = gptr[i].idx;
+        gl->diag_ind[rn] = gptr[i].idx;
     }
   }
   array_free(&unique);
 
-  // Sanity check
-  assert(rn == lelt);
+  assert(rn == lelt); // Sanity check
 
   return 0;
+}
+
+static int gpu_free(struct laplacian *l) {
+  struct gpu_laplacian *gl = l->data;
+
+  if (gl->adj_off != NULL)
+    free(gl->adj_off);
+  if (gl->adj_ind != NULL)
+    free(gl->adj_ind);
+  if (gl->adj_val != NULL)
+    free(gl->adj_val);
+
+  if (gl->diag_ind != NULL)
+    free(gl->diag_ind);
+  if (gl->diag_val != NULL)
+    free(gl->diag_val);
+
+  if (gl->col_ids != NULL)
+    free(gl->col_ids);
+
+  free(l->data);
+  l->data = NULL;
+}
+
+//------------------------------------------------------------------------------
+// Laplacian
+//
+int laplacian_init(struct laplacian *l, struct rsb_element *elems, uint nel,
+                   int nv, int type, struct comm *c, buffer *buf) {
+  l->type = type;
+  l->nv = nv;
+  l->nel = nel;
+
+  if (type & CSR) {
+    csr_init(l, elems, nel, nv, c, buf);
+  } else if (type & GS) {
+    assert(type & WEIGHTED);
+    gs_weighted_init(l, elems, nel, nv, c, buf);
+  } else if (type & GPU) {
+    gpu_init(l, elems, nel, nv, c, buf);
+  }
+
+  return 0;
+}
+
+int laplacian(GenmapScalar *v, struct laplacian *l, GenmapScalar *u,
+              buffer *buf) {
+  if (l->type & CSR) {
+    csr(v, l, u, buf);
+  } else if (l->type & GS) {
+    assert(l->type & WEIGHTED);
+    gs_weighted(v, l, u, buf);
+  } else if (l->type & GPU) {
+    // gpu(v, l, u, buf);
+  }
+
+  return 0;
+}
+
+void laplacian_free(struct laplacian *l) {
+  if (l->type & GS)
+    csr_free(l);
+  else if (l->type & CSR) {
+    assert(l->type & WEIGHTED);
+    gs_weighted_free(l);
+  } else if (l->type & GPU)
+    gpu_free(l);
 }
 
 #undef MIN

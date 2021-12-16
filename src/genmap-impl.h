@@ -79,26 +79,16 @@ struct rsb_element {
 //------------------------------------------------------------------------------
 // Laplacian
 //
-
 #define GS 1
 #define CSR 2
-#define WEIGHTED 4
-#define UNWEIGHTED 8
+#define GPU 4
+#define WEIGHTED 1024
+#define UNWEIGHTED 2048
 
 struct laplacian {
-  int type;
+  int type, nv;
   uint nel;
-  int nv;
-
-  /* GS */
-  GenmapScalar *diag;
-  struct gs_data *gsh;
-
-  /* CSR */
-  struct csr_mat *M;
-
-  /* Work array */
-  GenmapScalar *u;
+  void *data;
 };
 
 int laplacian_init(struct laplacian *l, struct rsb_element *elems, uint nel,
