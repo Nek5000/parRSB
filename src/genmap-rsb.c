@@ -158,7 +158,7 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
   int ndim = (nv == 8) ? 3 : 2;
 
   while (lc.np > 1) {
-    /* Run RCB, RIB pre-step or just sort by global id */
+    // Run RCB, RIB pre-step or just sort by global id
     metric_tic(&lc, PRE);
     if (options->rsb_pre == 0) // Sort by global id
       parallel_sort(struct rsb_element, elements, globalId, gs_long, 0, 1, &lc,
@@ -169,19 +169,19 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
       rib(elements, sizeof(struct rsb_element), ndim, &lc, bfr);
     metric_toc(&lc, PRE);
 
-    /* Run fiedler */
+    // Run fiedler
     metric_tic(&lc, FIEDLER);
     fiedler(elements->ptr, elements->n, nv, max_iter, options->rsb_algo, &lc,
             bfr);
     metric_toc(&lc, FIEDLER);
 
-    /* Sort by Fiedler vector */
+    // Sort by Fiedler vector
     metric_tic(&lc, FIEDLER_SORT);
     parallel_sort_2(struct rsb_element, elements, fiedler, gs_double, globalId,
                     gs_long, 0, 1, &lc, bfr);
     metric_toc(&lc, FIEDLER_SORT);
 
-    /* Bisect, repair and balance */
+    // Bisect, repair and balance
     int bin = 1;
     if (lc.id < (lc.np + 1) / 2)
       bin = 0;

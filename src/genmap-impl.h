@@ -35,34 +35,6 @@ int rib(struct array *elements, size_t unit_size, int ndim, struct comm *c,
         buffer *bfr);
 
 //------------------------------------------------------------------------------
-// CSR Matrix
-//
-struct csr_mat {
-  uint rn;
-  ulong rstart;
-  uint *roff;
-
-  ulong *col;
-
-  GenmapScalar *v;
-
-  GenmapScalar *diag;
-
-  GenmapScalar *buf;
-
-  struct gs_data *gsh;
-};
-
-void csr_mat_setup(struct csr_mat *M, struct array *entries, struct comm *c,
-                   buffer *buf);
-void csr_mat_gather(GenmapScalar *buf, struct csr_mat *M, GenmapScalar *x,
-                    buffer *bfr);
-void csr_mat_apply(GenmapScalar *y, struct csr_mat *M, GenmapScalar *x,
-                   buffer *buf);
-void csr_mat_print(struct csr_mat *M, struct comm *c);
-int csr_mat_free(struct csr_mat *M);
-
-//------------------------------------------------------------------------------
 // RSB
 //
 struct rsb_element {
@@ -89,6 +61,52 @@ struct laplacian {
   int type, nv;
   uint nel;
   void *data;
+};
+
+struct csr_mat {
+  uint rn;
+  ulong rstart;
+  uint *roff;
+
+  ulong *col;
+
+  GenmapScalar *v;
+
+  GenmapScalar *diag;
+
+  GenmapScalar *buf;
+
+  struct gs_data *gsh;
+};
+
+void csr_mat_gather(GenmapScalar *buf, struct csr_mat *M, GenmapScalar *x,
+                    buffer *bfr);
+void csr_mat_apply(GenmapScalar *y, struct csr_mat *M, GenmapScalar *x,
+                   buffer *buf);
+int csr_mat_free(struct csr_mat *M);
+
+struct gs_laplacian {
+  GenmapScalar *diag, *u;
+  struct gs_data *gsh;
+};
+
+struct gpu_laplacian {
+  uint rn;
+
+  // unique column ids of local laplacian matrix, sorted
+  ulong *col_ids;
+
+  // adj as csr, for unweighted case, adj_val is null as the values are all -1
+  uint *adj_off;
+  uint *adj_ind;
+  GenmapScalar *adj_val;
+
+  /* diagonal as an array */
+  uint *diag_ind;
+  GenmapScalar *diag_val;
+
+  // gs for host side communication
+  struct gs_data *gsh;
 };
 
 int laplacian_init(struct laplacian *l, struct rsb_element *elems, uint nel,

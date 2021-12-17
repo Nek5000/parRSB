@@ -206,12 +206,12 @@ static int csr_init(struct laplacian *l, struct rsb_element *elems, uint lelt,
         t.v -= 1.0;
   }
   array_cat(struct csr_entry, &unique, &t, 1);
+  array_free(&entries);
 
   l->data = tcalloc(struct csr_mat, 1);
   csr_init_aux((struct csr_mat *)l->data, &unique, c, buf);
 
   array_free(&unique);
-  array_free(&entries);
 
   return 0;
 }
@@ -233,11 +233,6 @@ static int csr_free(struct laplacian *l) {
 //------------------------------------------------------------------------------
 // Laplacian - GS
 //
-
-struct gs_laplacian {
-  GenmapScalar *diag, *u;
-  struct gs_data *gsh;
-};
 
 static int gs_weighted_init(struct laplacian *l, struct rsb_element *elems,
                             uint lelt, int nv, struct comm *c, buffer *buf) {
@@ -333,26 +328,52 @@ struct gpu_csr_entry {
   uint idx;
 };
 
-struct gpu_laplacian {
-  uint rn;
+static int gpu_init_aux(struct gpu_laplacian *gl, struct array *unique,
+                        uint lelt, int weighted) {
+  gl->diag_ind = tcalloc(uint, lelt);
+  gl->diag_val = tcalloc(GenmapScalar, lelt);
+  gl->adj_off = tcalloc(uint, lelt);
+  gl->adj_ind = tcalloc(uint, unique->n - lelt);
+  gl->adj_val = NULL;
+  if (weighted)
+    gl->adj_val = tcalloc(GenmapScalar, unique->n - lelt);
 
-  // unique column ids of local laplacian matrix, sorted
-  ulong *col_ids;
+  struct gpu_csr_entry *ptr = unique->ptr;
+  uint rn = 0;
+  GenmapScalar diag = 0.0;
 
-  // adj as csr, for unweighted case, adj_val is null as the values are all -1
-  uint *adj_off;
-  uint *adj_ind;
-  GenmapScalar *adj_val;
+  gl->adj_off[0] = 0;
+  uint adjn = 0;
+  if (ptr[0].r != ptr[0].c) {
+    if (weighted)
+      gl->adj_val[adjn] = ptr[0].v;
+    gl->adj_ind[adjn++] = ptr[0].idx;
+    diag += ptr[0].v;
+  } else
+    gl->diag_ind[rn] = ptr[0].idx;
 
-  /* diagonal as an array */
-  uint *diag_ind;
-  GenmapScalar *diag_val;
+  uint i;
+  for (i = 1; i < unique->n; i++) {
+    if (ptr[i - 1].r != ptr[i].r) {
+      gl->diag_val[rn++] = diag, diag = 0.0;
+      gl->adj_off[rn] = adjn;
+    }
+    if (ptr[i].r != ptr[i].c) {
+      if (weighted)
+        gl->adj_val[adjn] = ptr[i].v;
+      gl->adj_ind[adjn++] = ptr[i].idx;
+      diag += ptr[i].v;
+    } else
+      gl->diag_ind[rn] = ptr[i].idx;
+  }
 
-  // gs for host side communication
-};
+  assert(rn + 1 == lelt); // Sanity check
 
-int gpu_init(struct laplacian *l, struct rsb_element *elems, uint lelt, int nv,
-             struct comm *c, buffer *buf) {
+  return 0;
+}
+
+static int gpu_init(struct laplacian *l, struct rsb_element *elems, uint lelt,
+                    int nv, struct comm *c, buffer *buf) {
   struct array nbrs;
   find_neighbors(&nbrs, elems, lelt, nv, c, buf);
   sarray_sort(struct nbr_entry, nbrs.ptr, nbrs.n, c, 1, buf);
@@ -410,66 +431,11 @@ int gpu_init(struct laplacian *l, struct rsb_element *elems, uint lelt, int nv,
       } else
         t.v -= 1.0;
   }
+  array_cat(struct gpu_csr_entry, &unique, &t, 1);
   array_free(&entries);
 
-  gl->diag_ind = tcalloc(uint, lelt);
-  gl->diag_val = tcalloc(GenmapScalar, lelt);
-  gl->adj_off = tcalloc(uint, lelt);
-  gl->adj_ind = tcalloc(uint, unique.n - lelt);
-  gl->adj_val = NULL;
-
-  gptr = unique.ptr;
-  uint rn = 0;
-  GenmapScalar diag = 0.0;
-
-  if (l->type & WEIGHTED) {
-    gl->adj_val = tcalloc(GenmapScalar, unique.n - lelt);
-
-    gl->adj_off[0] = 0;
-    uint adjn = 0;
-    if (gptr[0].r != gptr[0].c) {
-      gl->adj_ind[adjn] = gptr[0].idx;
-      gl->adj_val[adjn++] = gptr[0].v;
-      diag += gptr[0].v;
-    } else
-      gl->diag_ind[rn] = gptr[0].idx;
-
-    for (i = 1; i < unique.n; i++) {
-      if (gptr[i - 1].r != gptr[i].r) {
-        gl->diag_val[rn++] = diag, diag = 0.0;
-        gl->adj_off[rn] = adjn;
-      }
-      if (gptr[i].r != gptr[i].c) {
-        gl->adj_ind[adjn] = gptr[i].idx;
-        gl->adj_val[adjn++] = gptr[i].v;
-        diag += gptr[i].v;
-      } else
-        gl->diag_ind[rn] = gptr[i].idx;
-    }
-  } else if (l->type & UNWEIGHTED) {
-    gl->adj_off[0] = 0;
-    uint adjn = 0;
-    if (gptr[0].r != gptr[0].c) {
-      gl->adj_ind[adjn++] = gptr[0].idx;
-      diag += gptr[0].v;
-    } else
-      gl->diag_ind[rn] = gptr[0].idx;
-
-    for (i = 1; i < unique.n; i++) {
-      if (gptr[i - 1].r != gptr[i].r) {
-        gl->diag_val[rn++] = diag, diag = 0.0;
-        gl->adj_off[rn] = adjn;
-      }
-      if (gptr[i].r != gptr[i].c) {
-        gl->adj_ind[adjn++] = gptr[i].idx;
-        diag += gptr[i].v;
-      } else
-        gl->diag_ind[rn] = gptr[i].idx;
-    }
-  }
+  gpu_init_aux(gl, &unique, lelt, l->type & WEIGHTED);
   array_free(&unique);
-
-  assert(rn == lelt); // Sanity check
 
   return 0;
 }

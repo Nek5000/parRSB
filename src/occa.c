@@ -15,8 +15,8 @@ int occa_init(char *backend_, int device_id, int platform_id) {
   for (i = 0; i < len; i++)
     backend[i] = tolower(backend_[i]);
 
-  char *fmt_ocl = "{mode: 'OpenCL', device_id: %d, platform_id: %d}";
-  char *fmt_cuda = "{mode: 'CUDA', device_id: %d}";
+  char *fmt_ocl = "{{mode: 'OpenCL'}, {device_id: %d}, {platform_id: %d}}";
+  char *fmt_cuda = "{{mode: 'CUDA'}, {device_id: %d}}";
   char *fmt_serial = "{mode: 'Serial'}";
 
   char fmt[BUFSIZ] = {'\0'};
@@ -63,7 +63,7 @@ int occa_lanczos_init(struct comm *c, struct laplacian *l, int niter) {
   wrk = tcalloc(GenmapScalar, (niter + 1) * lelt);
 
   /* laplacian */
-  struct csr_mat *M = (struct csr_mat *) l->data;
+  struct csr_mat *M = (struct csr_mat *)l->data;
   uint nnz = M->roff[M->rn];
 
   o_v = occaDeviceMalloc(device, sizeof(GenmapScalar) * nnz, NULL, occaDefault);
