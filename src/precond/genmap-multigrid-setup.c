@@ -53,7 +53,7 @@ static void compress_col(struct array *entries) {
 
 static void mg_lvl_setup(struct mg_data *d, uint lvl, int factor) {
   assert(lvl > 0);
-  struct csr_mat *M0 = d->levels[lvl - 1]->M;
+  struct csr_laplacian *M0 = d->levels[lvl - 1]->M;
   uint rn0 = M0->rn, nnz0 = M0->roff[rn0];
 
   struct array entries = null_array;
@@ -131,7 +131,7 @@ static void mg_lvl_setup(struct mg_data *d, uint lvl, int factor) {
   mgLevel l = d->levels[lvl];
 
   GenmapMalloc(1, &l->M);
-  struct csr_mat *M1 = l->M;
+  struct csr_laplacian *M1 = l->M;
   M1->rn = nn;
   GenmapMalloc(M1->rn + 1, &M1->roff);
 
@@ -212,7 +212,7 @@ static void mg_lvl_setup(struct mg_data *d, uint lvl, int factor) {
 }
 
 void mg_setup(struct mg_data *d, int factor, struct comm *c,
-              struct csr_mat *M) {
+              struct csr_laplacian *M) {
   comm_dup(&d->c, c);
   uint np = c->np;
   uint rn = M->rn;
@@ -242,7 +242,7 @@ void mg_setup(struct mg_data *d, int factor, struct comm *c,
   uint nnz = M->roff[M->rn];
   for (i = 1; i < d->nlevels; i++) {
     mg_lvl_setup(d, i, factor);
-    struct csr_mat *Mi = d->levels[i]->M;
+    struct csr_laplacian *Mi = d->levels[i]->M;
     if (Mi->roff[Mi->rn] > nnz)
       nnz = Mi->roff[Mi->rn];
     d->level_off[i + 1] = d->level_off[i] + Mi->rn;

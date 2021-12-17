@@ -80,7 +80,7 @@ static void find_neighbors(struct array *arr, struct rsb_element *elems,
 //------------------------------------------------------------------------------
 // Laplacian - CSR
 //
-static struct gs_data *csr_gs_top(struct csr_mat *M, struct comm *c) {
+static struct gs_data *csr_gs_top(struct csr_laplacian *M, struct comm *c) {
   const uint rn = M->rn;
   const uint n = M->roff[rn];
 
@@ -104,7 +104,7 @@ static struct gs_data *csr_gs_top(struct csr_mat *M, struct comm *c) {
   return gsh;
 }
 
-static void csr_init_aux(struct csr_mat *M, struct array *entries,
+static void csr_init_aux(struct csr_laplacian *M, struct array *entries,
                          struct comm *c, buffer *buf) {
   uint i = 0;
   uint rn = 0;
@@ -208,8 +208,8 @@ static int csr_init(struct laplacian *l, struct rsb_element *elems, uint lelt,
   array_cat(struct csr_entry, &unique, &t, 1);
   array_free(&entries);
 
-  l->data = tcalloc(struct csr_mat, 1);
-  csr_init_aux((struct csr_mat *)l->data, &unique, c, buf);
+  l->data = tcalloc(struct csr_laplacian, 1);
+  csr_init_aux((struct csr_laplacian *)l->data, &unique, c, buf);
 
   array_free(&unique);
 
@@ -218,12 +218,12 @@ static int csr_init(struct laplacian *l, struct rsb_element *elems, uint lelt,
 
 static int csr(GenmapScalar *v, struct laplacian *l, GenmapScalar *u,
                buffer *buf) {
-  csr_mat_apply(v, (struct csr_mat *)l->data, u, buf);
+  csr_mat_apply(v, (struct csr_laplacian *)l->data, u, buf);
   return 0;
 }
 
 static int csr_free(struct laplacian *l) {
-  struct csr_mat *M = l->data;
+  struct csr_laplacian *M = l->data;
   if (M != NULL)
     csr_mat_free(M);
   free(l->data);

@@ -10,7 +10,7 @@ void mg_vcycle(GenmapScalar *u1, GenmapScalar *rhs, struct mg_data *d) {
   mgLevel *lvls = d->levels;
   uint *lvl_off = d->level_off;
   mgLevel l;
-  struct csr_mat *M;
+  struct csr_laplacian *M;
 
   buffer buf;
   buffer_init(&buf, 1024);

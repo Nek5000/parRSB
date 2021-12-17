@@ -63,7 +63,7 @@ struct laplacian {
   void *data;
 };
 
-struct csr_mat {
+struct csr_laplacian {
   uint rn;
   ulong rstart;
   uint *roff;
@@ -79,11 +79,11 @@ struct csr_mat {
   struct gs_data *gsh;
 };
 
-void csr_mat_gather(GenmapScalar *buf, struct csr_mat *M, GenmapScalar *x,
+void csr_mat_gather(GenmapScalar *buf, struct csr_laplacian *M, GenmapScalar *x,
                     buffer *bfr);
-void csr_mat_apply(GenmapScalar *y, struct csr_mat *M, GenmapScalar *x,
+void csr_mat_apply(GenmapScalar *y, struct csr_laplacian *M, GenmapScalar *x,
                    buffer *buf);
-int csr_mat_free(struct csr_mat *M);
+int csr_mat_free(struct csr_laplacian *M);
 
 struct gs_laplacian {
   GenmapScalar *diag, *u;

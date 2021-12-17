@@ -383,7 +383,7 @@ static int inverse(genmap_vector y, struct rsb_element *elems, int nv,
   struct laplacian ul;
   laplacian_init(&ul, elems, lelt, nv, CSR | UNWEIGHTED, gsc, bff);
   struct mg_data d;
-  mg_setup(&d, 4, gsc, (struct csr_mat *)ul.data);
+  mg_setup(&d, 4, gsc, (struct csr_laplacian *)ul.data);
 
   struct laplacian wl;
   laplacian_init(&wl, elems, lelt, nv, GS | WEIGHTED, gsc, bff);

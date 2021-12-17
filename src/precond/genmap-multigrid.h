@@ -8,7 +8,7 @@ struct mg_lvl {
   GenmapScalar sigma;
   struct gs_data *J; // interpolation from level i to i+1
   struct gs_data *Q; // global to local conversion of a vector
-  struct csr_mat *M;
+  struct csr_laplacian *M;
 };
 typedef struct mg_lvl *mgLevel;
 
@@ -22,7 +22,7 @@ struct mg_data {
   GenmapScalar *y, *x, *b, *u, *rhs, *buf;
 };
 
-void mg_setup(struct mg_data *d, int factor, struct comm *c, struct csr_mat *M);
+void mg_setup(struct mg_data *d, int factor, struct comm *c, struct csr_laplacian *M);
 void mg_vcycle(GenmapScalar *u, GenmapScalar *rhs, struct mg_data *d);
 void mg_free(struct mg_data *d);
 

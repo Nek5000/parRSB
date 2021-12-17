@@ -9,7 +9,7 @@ typedef struct {
   GenmapScalar v;
 } entry;
 
-static struct gs_data *get_csr_top(struct csr_mat *M, struct comm *c) {
+static struct gs_data *get_csr_top(struct csr_laplacian *M, struct comm *c) {
   const uint rn = M->rn;
   const uint n = M->roff[rn];
 
@@ -33,7 +33,7 @@ static struct gs_data *get_csr_top(struct csr_mat *M, struct comm *c) {
   return gsh;
 }
 
-void csr_mat_gather(GenmapScalar *buf, struct csr_mat *M, GenmapScalar *x,
+void csr_mat_gather(GenmapScalar *buf, struct csr_laplacian *M, GenmapScalar *x,
                     buffer *bfr) {
   ulong s = M->rstart;
   sint i, j;
@@ -47,7 +47,7 @@ void csr_mat_gather(GenmapScalar *buf, struct csr_mat *M, GenmapScalar *x,
   gs(buf, gs_scalar, gs_add, 0, M->gsh, bfr);
 }
 
-void csr_mat_apply(GenmapScalar *y, struct csr_mat *M, GenmapScalar *x,
+void csr_mat_apply(GenmapScalar *y, struct csr_laplacian *M, GenmapScalar *x,
                    buffer *bfr) {
   csr_mat_gather(M->buf, M, x, bfr);
 
@@ -62,7 +62,7 @@ void csr_mat_apply(GenmapScalar *y, struct csr_mat *M, GenmapScalar *x,
   }
 }
 
-int csr_mat_free(struct csr_mat *M) {
+int csr_mat_free(struct csr_laplacian *M) {
   if (M->col)
     GenmapFree(M->col);
   if (M->v)
