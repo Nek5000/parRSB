@@ -782,7 +782,7 @@ static int lanczos(genmap_vector fiedler, struct rsb_element *elems, int nv,
     genmap_vector evTriDiag;
     vec_create(&evTriDiag, iter);
 
-    /* Use TQLI and find the minimum eigenvalue and associated vector */
+    // Use TQLI and find the minimum eigenvalue and associated vector
     genmap_vector *eVectors, eValues;
     tqli(&eVectors, &eValues, alpha, beta, gsc->id);
 

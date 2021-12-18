@@ -6,11 +6,16 @@
 #define BLK_SIZE 512
 
 static occaDevice device;
+static occaJson props;
+static occaKernel zero, copy, sum, scale, dot, norm, add2s1, add2s2, addc;
+static occaKernel lplcn00, lplcn01;
 
-int occa_init(char *backend_, int device_id, int platform_id) {
-  size_t len = strnlen(backend_, BUFSIZ);
 
+int occa_init(const char *backend_, int device_id, int platform_id,
+              struct comm *c) {
+  // Initialize backend
   char backend[BUFSIZ] = {'\0'};
+  size_t len = strnlen(backend_, BUFSIZ);
   int i;
   for (i = 0; i < len; i++)
     backend[i] = tolower(backend_[i]);
@@ -29,57 +34,12 @@ int occa_init(char *backend_, int device_id, int platform_id) {
 
   device = occaCreateDeviceFromString(fmt);
 
-  return 0;
-}
-
-static occaKernel zero, copy, sum, scale, dot, norm, add2s1, add2s2, addc,
-    lplcn;
-static occaMemory o_p, o_w, o_r, o_rr, o_v, o_off, o_x, o_y;
-static occaJson props;
-
-static occaMemory o_wrk;
-static GenmapScalar *wrk;
-static size_t wrk_size;
-
-int occa_lanczos_init(struct comm *c, struct laplacian *l, int niter) {
-  assert((l->type & CSR) == CSR);
-
-  /* device alloc */
-  uint lelt = l->nel;
-  o_p =
-      occaDeviceMalloc(device, sizeof(GenmapScalar) * lelt, NULL, occaDefault);
-  o_w =
-      occaDeviceMalloc(device, sizeof(GenmapScalar) * lelt, NULL, occaDefault);
-  o_r =
-      occaDeviceMalloc(device, sizeof(GenmapScalar) * lelt, NULL, occaDefault);
-  o_y =
-      occaDeviceMalloc(device, sizeof(GenmapScalar) * lelt, NULL, occaDefault);
-  o_rr = occaDeviceMalloc(device, sizeof(GenmapScalar) * lelt * (niter + 1),
-                          NULL, occaDefault);
-
-  wrk_size = (lelt + BLK_SIZE - 1) / BLK_SIZE;
-  o_wrk = occaDeviceMalloc(device, sizeof(GenmapScalar) * wrk_size, NULL,
-                           occaDefault);
-  wrk = tcalloc(GenmapScalar, (niter + 1) * lelt);
-
-  /* laplacian */
-  struct csr_laplacian *M = (struct csr_laplacian *)l->data;
-  uint nnz = M->roff[M->rn];
-
-  o_v = occaDeviceMalloc(device, sizeof(GenmapScalar) * nnz, NULL, occaDefault);
-  occaCopyPtrToMem(o_v, M->v, occaAllBytes, 0, occaDefault);
-
-  o_off =
-      occaDeviceMalloc(device, sizeof(uint) * (lelt + 1), NULL, occaDefault);
-  occaCopyPtrToMem(o_off, M->roff, occaAllBytes, 0, occaDefault);
-
-  o_x = occaDeviceMalloc(device, sizeof(GenmapScalar) * nnz, NULL, occaDefault);
-
-  /* occa kernels */
+  // OCCA Kernels
   char okl[PATH_MAX];
   char *okl_dir = getenv("PARRSB_OKL_DIR");
   if (okl_dir != NULL)
     strncpy(okl, okl_dir, PATH_MAX);
+  else {}
   strncat(okl, "/occa.okl", PATH_MAX);
 
   props = occaCreateJson();
@@ -98,7 +58,8 @@ int occa_lanczos_init(struct comm *c, struct laplacian *l, int niter) {
     add2s1 = occaDeviceBuildKernel(device, okl, "add2s1", props);
     add2s2 = occaDeviceBuildKernel(device, okl, "add2s2", props);
     addc = occaDeviceBuildKernel(device, okl, "addc", props);
-    lplcn = occaDeviceBuildKernel(device, okl, "laplacian_v00", props);
+    lplcn00 = occaDeviceBuildKernel(device, okl, "laplacian_v00", props);
+    lplcn01 = occaDeviceBuildKernel(device, okl, "laplacian_v01", props);
   }
 
   comm_barrier(c);
@@ -112,7 +73,85 @@ int occa_lanczos_init(struct comm *c, struct laplacian *l, int niter) {
   add2s1 = occaDeviceBuildKernel(device, okl, "add2s1", props);
   add2s2 = occaDeviceBuildKernel(device, okl, "add2s2", props);
   addc = occaDeviceBuildKernel(device, okl, "addc", props);
-  lplcn = occaDeviceBuildKernel(device, okl, "laplacian_v00", props);
+  lplcn00 = occaDeviceBuildKernel(device, okl, "laplacian_v00", props);
+  lplcn01 = occaDeviceBuildKernel(device, okl, "laplacian_v01", props);
+
+  return 0;
+}
+
+// Work arrays
+static occaMemory o_p, o_w, o_r, o_rr, o_x, o_y;
+static occaMemory o_wrk;
+static GenmapScalar *wrk;
+static size_t wrk_size;
+
+// CSR laplacian
+static occaMemory o_csr_val, o_csr_off;
+
+// GPU laplacian
+static occaMemory o_col_val;
+static occaMemory o_adj_off, o_adj_ind, o_adj_val;
+static occaMemory o_diag_ind, o_diag_val;
+
+int occa_lanczos_init(struct comm *c, struct laplacian *l, int niter) {
+  uint lelt = l->nel;
+  o_p =
+      occaDeviceMalloc(device, sizeof(GenmapScalar) * lelt, NULL, occaDefault);
+  o_w =
+      occaDeviceMalloc(device, sizeof(GenmapScalar) * lelt, NULL, occaDefault);
+  o_r =
+      occaDeviceMalloc(device, sizeof(GenmapScalar) * lelt, NULL, occaDefault);
+  o_y =
+      occaDeviceMalloc(device, sizeof(GenmapScalar) * lelt, NULL, occaDefault);
+  o_rr = occaDeviceMalloc(device, sizeof(GenmapScalar) * lelt * (niter + 1),
+                          NULL, occaDefault);
+
+  wrk_size = (lelt + BLK_SIZE - 1) / BLK_SIZE;
+  o_wrk = occaDeviceMalloc(device, sizeof(GenmapScalar) * wrk_size, NULL,
+                           occaDefault);
+  wrk = tcalloc(GenmapScalar, (niter + 1) * lelt);
+
+  // Laplacian
+  if (l->type & CSR) {
+    struct csr_laplacian *M = (struct csr_laplacian *)l->data;
+
+    o_csr_off =
+        occaDeviceMalloc(device, sizeof(uint) * (M->rn + 1), NULL, occaDefault);
+    occaCopyPtrToMem(o_csr_off, M->roff, occaAllBytes, 0, occaDefault);
+
+    uint nnz = M->roff[M->rn];
+    o_csr_val =
+        occaDeviceMalloc(device, sizeof(GenmapScalar) * nnz, NULL, occaDefault);
+    occaCopyPtrToMem(o_csr_val, M->v, occaAllBytes, 0, occaDefault);
+
+    o_x =
+        occaDeviceMalloc(device, sizeof(GenmapScalar) * nnz, NULL, occaDefault);
+  } else if (l->type & GPU) {
+    struct gpu_laplacian *gl = (struct gpu_laplacian *)l->data;
+
+    o_col_val = occaDeviceMalloc(device, sizeof(GenmapScalar) * gl->cn, NULL,
+                                 occaDefault);
+
+    o_adj_off = occaDeviceMalloc(device, sizeof(uint) * (gl->rn + 1), NULL,
+                                 occaDefault);
+    occaCopyPtrToMem(o_adj_off, gl->adj_off, occaAllBytes, 0, occaDefault);
+
+    uint nnz = gl->adj_off[gl->rn];
+    o_adj_ind = occaDeviceMalloc(device, sizeof(uint) * nnz, NULL, occaDefault);
+    occaCopyPtrToMem(o_adj_ind, gl->adj_ind, occaAllBytes, 0, occaDefault);
+
+    o_adj_val = occaDeviceMalloc(device, sizeof(GenmapScalar) * nnz, NULL,
+                                 occaDefault);
+    occaCopyPtrToMem(o_adj_val, gl->adj_val, occaAllBytes, 0, occaDefault);
+
+    o_diag_ind =
+        occaDeviceMalloc(device, sizeof(uint) * gl->rn, NULL, occaDefault);
+    occaCopyPtrToMem(o_diag_ind, gl->diag_ind, occaAllBytes, 0, occaDefault);
+
+    o_diag_val = occaDeviceMalloc(device, sizeof(GenmapScalar) * gl->rn, NULL,
+                                 occaDefault);
+    occaCopyPtrToMem(o_diag_val, gl->diag_val, occaAllBytes, 0, occaDefault);
+  }
 
   return 0;
 }
@@ -201,7 +240,7 @@ int occa_lanczos_aux(genmap_vector diag, genmap_vector upper, genmap_vector *rr,
     struct csr_laplacian *M = (struct csr_laplacian *)gl->data;
     csr_mat_gather(M->buf, M, wrk, bfr);
     occaCopyPtrToMem(o_x, M->buf, occaAllBytes, 0, occaDefault);
-    occaKernelRun(lplcn, o_w, occaUInt(lelt), o_off, o_v, o_x);
+    occaKernelRun(lplcn00, o_w, occaUInt(lelt), o_csr_off, o_csr_val, o_x);
 
     pap_old = pap;
 
@@ -273,16 +312,29 @@ int occa_lanczos_free() {
   occaFree(&o_w);
   occaFree(&o_r);
   occaFree(&o_y);
-  occaFree(&o_rr);
-
-  occaFree(&o_v);
-  occaFree(&o_off);
   occaFree(&o_x);
+  occaFree(&o_rr);
 
   occaFree(&o_wrk);
   if (wrk != NULL)
     free(wrk);
 
+  if (1) {
+    occaFree(&o_csr_val);
+    occaFree(&o_csr_off);
+  } else {
+    occaFree(&o_col_val);
+    occaFree(&o_adj_off);
+    occaFree(&o_adj_ind);
+    occaFree(&o_adj_val);
+    occaFree(&o_diag_ind);
+    occaFree(&o_diag_val);
+  }
+
+  return 0;
+}
+
+int occa_free() {
   occaFree(&copy);
   occaFree(&sum);
   occaFree(&scale);
@@ -292,10 +344,7 @@ int occa_lanczos_free() {
   occaFree(&add2s2);
   occaFree(&addc);
 
-  return 0;
-}
-
-int occa_free() {
   occaFree(&device);
+
   return 0;
 }

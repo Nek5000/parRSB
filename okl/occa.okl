@@ -146,3 +146,11 @@
     y[i] = s;
   }
 }
+
+@kernel void laplacian_v01(scalar *y, const uint nr, const uint *adj_off,
+                           const uint *adj_ind, const scalar *adj_val,
+                           const uint *diag_ind, const scalar *diag_val,
+                           const scalar *x) {
+  for (int i = 0; i < nr; i++; @tile(BLK_SIZE, @outer, @inner)) {
+  }
+}

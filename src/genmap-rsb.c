@@ -148,10 +148,6 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
   int max_iter = 50;
   int max_pass = 50;
 
-#if defined(GENMAP_OCCA)
-  occa_init("CUDA", gc->id, 0);
-#endif
-
   struct comm lc;
   comm_dup(&lc, gc);
 
@@ -206,10 +202,6 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
   rsb_local(elements->ptr, 0, elements->n, nv, max_iter, max_pass, &lc, bfr);
 #endif
   comm_free(&lc);
-
-#if defined(GENMAP_OCCA)
-  occa_free();
-#endif
 
   check_rsb_partition(gc, max_pass, max_iter);
 

@@ -366,8 +366,9 @@ static int gpu_init_aux(struct gpu_laplacian *gl, struct array *unique,
     } else
       gl->diag_ind[rn] = ptr[i].idx;
   }
+  gl->rn = rn;
 
-  assert(rn + 1 == lelt); // Sanity check
+  assert(rn == lelt); // Sanity check
 
   return 0;
 }
@@ -406,6 +407,7 @@ static int gpu_init(struct laplacian *l, struct rsb_element *elems, uint lelt,
     }
     array_cat(struct gpu_csr_entry, &entries, &t, 1);
   }
+  gl->cn = cid + 1;
   array_free(&nbrs);
 
   sarray_sort_2(struct gpu_csr_entry, entries.ptr, entries.n, r, 1, c, 1, buf);
@@ -437,6 +439,9 @@ static int gpu_init(struct laplacian *l, struct rsb_element *elems, uint lelt,
   gpu_init_aux(gl, &unique, lelt, l->type & WEIGHTED);
   array_free(&unique);
 
+  // slong *col_ids = tcalloc(slong, gl->cn);
+  //
+  // gl->gsh = gs_setup(col_ids, ...);
   return 0;
 }
 

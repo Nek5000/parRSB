@@ -91,17 +91,17 @@ struct gs_laplacian {
 };
 
 struct gpu_laplacian {
-  uint rn;
-
   // unique column ids of local laplacian matrix, sorted
+  uint cn;
   ulong *col_ids;
 
   // adj as csr, for unweighted case, adj_val is null as the values are all -1
+  uint rn;
   uint *adj_off;
   uint *adj_ind;
   GenmapScalar *adj_val;
 
-  /* diagonal as an array */
+  // diagonal as an array
   uint *diag_ind;
   GenmapScalar *diag_val;
 
@@ -133,13 +133,13 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
 //------------------------------------------------------------------------------
 // OCCA
 typedef struct vector *genmap_vector;
-int occa_init(char *backend, int device_id, int platform_id);
+int occa_init(const char *backend, int device_id, int platform_id,
+              struct comm *c);
 int occa_lanczos_init(struct comm *c, struct laplacian *l, int niter);
 int occa_lanczos_aux(genmap_vector diag, genmap_vector upper, genmap_vector *rr,
                      uint lelt, ulong nelg, int niter, genmap_vector f,
                      struct laplacian *gl, struct comm *gsc, buffer *bfr);
 int occa_lanczos_free();
-int occa_free();
 
 //------------------------------------------------------------------------------
 // Memory
