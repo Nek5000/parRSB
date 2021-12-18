@@ -93,6 +93,7 @@ struct gs_laplacian {
 struct gpu_laplacian {
   // unique column ids of local laplacian matrix, sorted
   uint cn;
+  uint ls;
   ulong *col_ids;
 
   // adj as csr, for unweighted case, adj_val is null as the values are all -1

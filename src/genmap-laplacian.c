@@ -439,9 +439,27 @@ static int gpu_init(struct laplacian *l, struct rsb_element *elems, uint lelt,
   gpu_init_aux(gl, &unique, lelt, l->type & WEIGHTED);
   array_free(&unique);
 
-  // slong *col_ids = tcalloc(slong, gl->cn);
-  //
-  // gl->gsh = gs_setup(col_ids, ...);
+  slong out[2][1], bf[2][1];
+  slong in = lelt;
+  comm_scan(out, c, gs_long, gs_add, &in, 1, bf);
+  slong row_start = out[0][0] + 1;
+
+  slong *col_ids = tcalloc(slong, gl->cn);
+
+  for (i = 0; gl->col_ids[i] < row_start; i++)
+    col_ids[i] = -gl->col_ids[i];
+
+  gl->ls = i;
+  for (; i < gl->ls + lelt; i++)
+    col_ids[i] = gl->col_ids[i];
+
+  for (i = i + lelt; i < gl->cn; i++)
+    col_ids[i] = -gl->col_ids[i];
+
+  gl->gsh = gs_setup(col_ids, gl->cn, c, 0, gs_pairwise, 0);
+
+  free(col_ids);
+
   return 0;
 }
 
@@ -462,6 +480,8 @@ static int gpu_free(struct laplacian *l) {
 
   if (gl->col_ids != NULL)
     free(gl->col_ids);
+
+  gs_free(gl->gsh);
 
   free(l->data);
   l->data = NULL;

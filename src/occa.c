@@ -10,7 +10,6 @@ static occaJson props;
 static occaKernel zero, copy, sum, scale, dot, norm, add2s1, add2s2, addc;
 static occaKernel lplcn00, lplcn01;
 
-
 int occa_init(const char *backend_, int device_id, int platform_id,
               struct comm *c) {
   // Initialize backend
@@ -79,19 +78,108 @@ int occa_init(const char *backend_, int device_id, int platform_id,
   return 0;
 }
 
-// Work arrays
-static occaMemory o_p, o_w, o_r, o_rr, o_x, o_y;
-static occaMemory o_wrk;
-static GenmapScalar *wrk;
+// Work arrays for Reduction
+static size_t nblocks;
+static occaMemory o_blocks;
 static size_t wrk_size;
+static GenmapScalar *wrk;
+
+// Type of laplacian
+static int type;
 
 // CSR laplacian
 static occaMemory o_csr_val, o_csr_off;
 
 // GPU laplacian
-static occaMemory o_col_val;
 static occaMemory o_adj_off, o_adj_ind, o_adj_val;
 static occaMemory o_diag_ind, o_diag_val;
+
+static int vec_ortho(occaMemory o_in, ulong nelg, uint lelt, struct comm *c) {
+  occaKernelRun(sum, occaUInt(lelt), o_in, o_blocks);
+  occaCopyMemToPtr(wrk, o_blocks, occaAllBytes, 0, occaDefault);
+
+  GenmapScalar tmp = 0.0, rtr;
+  uint i;
+  for (i = 0; i < nblocks; i++)
+    tmp += wrk[i];
+  comm_allreduce(c, gs_double, gs_add, &tmp, 1, &rtr);
+  tmp /= nelg;
+
+  occaKernelRun(addc, o_in, occaDouble(-1.0 * tmp), occaInt(lelt));
+
+  return 0;
+}
+
+static GenmapScalar vec_norm(occaMemory o_a, uint lelt, struct comm *c) {
+  occaKernelRun(norm, o_blocks, occaInt(lelt), o_a);
+  occaCopyMemToPtr(wrk, o_blocks, occaAllBytes, 0, occaDefault);
+
+  GenmapScalar pp = 0.0, tmp;
+  uint i;
+  for (i = 0; i < nblocks; i++)
+    pp += wrk[i];
+  comm_allreduce(c, gs_double, gs_add, &pp, 1, &tmp);
+
+  return pp;
+}
+
+static GenmapScalar vec_dot(occaMemory o_a, occaMemory o_b, uint lelt,
+                            struct comm *c) {
+  occaKernelRun(dot, o_blocks, occaInt(lelt), o_a, o_b);
+  occaCopyMemToPtr(wrk, o_blocks, occaAllBytes, 0, occaDefault);
+
+  GenmapScalar pap = 0.0, tmp;
+  uint i;
+  for (i = 0; i < nblocks; i++)
+    pap += wrk[i];
+  comm_allreduce(c, gs_double, gs_add, &pap, 1, &tmp);
+
+  return pap;
+}
+
+static GenmapScalar vec_normalize(occaMemory o_scaled, uint indx,
+                                  occaMemory o_a, uint lelt, struct comm *c) {
+  occaKernelRun(norm, o_blocks, occaInt(lelt), o_a);
+  occaCopyMemToPtr(wrk, o_blocks, occaAllBytes, 0, occaDefault);
+
+  GenmapScalar rtr = 0, tmp;
+  uint i;
+  for (i = 0; i < nblocks; i++)
+    rtr += wrk[i];
+  comm_allreduce(c, gs_double, gs_add, &rtr, 1, &tmp);
+  GenmapScalar rnorm = sqrt(rtr);
+  GenmapScalar rni = 1.0 / rnorm;
+
+  occaKernelRun(scale, o_scaled, occaUInt(indx), o_a, occaDouble(rni),
+                occaUInt(lelt));
+
+  return rnorm;
+}
+
+static void laplacian_op(occaMemory o_w, occaMemory o_p, uint lelt,
+                         occaMemory o_x, void *ld, buffer *bfr) {
+  if (type & CSR) {
+    struct csr_laplacian *M = (struct csr_laplacian *)ld;
+
+    occaCopyMemToPtr(wrk, o_p, occaAllBytes, 0, occaDefault);
+    csr_mat_gather(M->buf, M, wrk, bfr);
+    occaCopyPtrToMem(o_x, M->buf, occaAllBytes, 0, occaDefault);
+
+    occaKernelRun(lplcn00, o_w, occaUInt(lelt), o_csr_off, o_csr_val, o_x);
+  } else if (type & GPU) {
+    struct gpu_laplacian *gl = (struct gpu_laplacian *)ld;
+
+    occaCopyMemToPtr((void *)(wrk + gl->ls), o_p, occaAllBytes, 0, occaDefault);
+    gs(wrk, gs_scalar, gs_add, 0, gl->gsh, bfr);
+    occaCopyPtrToMem(o_x, wrk, occaAllBytes, 0, occaDefault);
+
+    occaKernelRun(lplcn01, o_w, occaUInt(lelt), o_adj_off, o_adj_ind,
+                  o_adj_val, o_diag_ind, o_diag_val, o_x);
+  }
+}
+
+// Work arrays for CG
+static occaMemory o_p, o_w, o_r, o_rr, o_x, o_y;
 
 int occa_lanczos_init(struct comm *c, struct laplacian *l, int niter) {
   uint lelt = l->nel;
@@ -106,13 +194,14 @@ int occa_lanczos_init(struct comm *c, struct laplacian *l, int niter) {
   o_rr = occaDeviceMalloc(device, sizeof(GenmapScalar) * lelt * (niter + 1),
                           NULL, occaDefault);
 
-  wrk_size = (lelt + BLK_SIZE - 1) / BLK_SIZE;
-  o_wrk = occaDeviceMalloc(device, sizeof(GenmapScalar) * wrk_size, NULL,
-                           occaDefault);
-  wrk = tcalloc(GenmapScalar, (niter + 1) * lelt);
+  nblocks = (lelt + BLK_SIZE - 1) / BLK_SIZE;
+  o_blocks = occaDeviceMalloc(device, sizeof(GenmapScalar) * nblocks, NULL,
+                              occaDefault);
 
+  wrk_size = (niter + 1) * lelt;
+  type = l->type;
   // Laplacian
-  if (l->type & CSR) {
+  if (type & CSR) {
     struct csr_laplacian *M = (struct csr_laplacian *)l->data;
 
     o_csr_off =
@@ -126,11 +215,10 @@ int occa_lanczos_init(struct comm *c, struct laplacian *l, int niter) {
 
     o_x =
         occaDeviceMalloc(device, sizeof(GenmapScalar) * nnz, NULL, occaDefault);
-  } else if (l->type & GPU) {
-    struct gpu_laplacian *gl = (struct gpu_laplacian *)l->data;
 
-    o_col_val = occaDeviceMalloc(device, sizeof(GenmapScalar) * gl->cn, NULL,
-                                 occaDefault);
+    if (wrk_size < nnz) wrk_size = nnz;
+  } else if (type & GPU) {
+    struct gpu_laplacian *gl = (struct gpu_laplacian *)l->data;
 
     o_adj_off = occaDeviceMalloc(device, sizeof(uint) * (gl->rn + 1), NULL,
                                  occaDefault);
@@ -151,71 +239,16 @@ int occa_lanczos_init(struct comm *c, struct laplacian *l, int niter) {
     o_diag_val = occaDeviceMalloc(device, sizeof(GenmapScalar) * gl->rn, NULL,
                                  occaDefault);
     occaCopyPtrToMem(o_diag_val, gl->diag_val, occaAllBytes, 0, occaDefault);
+
+    o_x = occaDeviceMalloc(device, sizeof(GenmapScalar) * gl->cn, NULL,
+                           occaDefault);
+
+    if (wrk_size < gl->cn) wrk_size = gl->cn;
   }
 
-  return 0;
-}
-
-static int vec_ortho(occaMemory o_in, ulong nelg, uint lelt, struct comm *c) {
-  occaKernelRun(sum, occaUInt(lelt), o_in, o_wrk);
-  occaCopyMemToPtr(wrk, o_wrk, occaAllBytes, 0, occaDefault);
-
-  GenmapScalar tmp = 0.0, rtr;
-  uint i;
-  for (i = 0; i < wrk_size; i++)
-    tmp += wrk[i];
-  comm_allreduce(c, gs_double, gs_add, &tmp, 1, &rtr);
-  tmp /= nelg;
-
-  occaKernelRun(addc, o_in, occaDouble(-1.0 * tmp), occaInt(lelt));
+  wrk = tcalloc(GenmapScalar, wrk_size);
 
   return 0;
-}
-
-static GenmapScalar vec_norm(occaMemory o_a, uint lelt, struct comm *c) {
-  occaKernelRun(norm, o_wrk, occaInt(lelt), o_a);
-  occaCopyMemToPtr(wrk, o_wrk, occaAllBytes, 0, occaDefault);
-
-  GenmapScalar pp = 0.0, tmp;
-  uint i;
-  for (i = 0; i < wrk_size; i++)
-    pp += wrk[i];
-  comm_allreduce(c, gs_double, gs_add, &pp, 1, &tmp);
-
-  return pp;
-}
-
-static GenmapScalar vec_dot(occaMemory o_a, occaMemory o_b, uint lelt,
-                            struct comm *c) {
-  occaKernelRun(dot, o_wrk, occaInt(lelt), o_a, o_b);
-  occaCopyMemToPtr(wrk, o_wrk, occaAllBytes, 0, occaDefault);
-
-  GenmapScalar pap = 0.0, tmp;
-  uint i;
-  for (i = 0; i < wrk_size; i++)
-    pap += wrk[i];
-  comm_allreduce(c, gs_double, gs_add, &pap, 1, &tmp);
-
-  return pap;
-}
-
-static GenmapScalar vec_normalize(occaMemory o_scaled, uint indx,
-                                  occaMemory o_a, uint lelt, struct comm *c) {
-  occaKernelRun(norm, o_wrk, occaInt(lelt), o_r);
-  occaCopyMemToPtr(wrk, o_wrk, occaAllBytes, 0, occaDefault);
-
-  GenmapScalar rtr = 0, tmp;
-  uint i;
-  for (i = 0; i < wrk_size; i++)
-    rtr += wrk[i];
-  comm_allreduce(c, gs_double, gs_add, &rtr, 1, &tmp);
-  GenmapScalar rnorm = sqrt(rtr);
-  GenmapScalar rni = 1.0 / rnorm;
-
-  occaKernelRun(scale, o_scaled, occaUInt(indx), o_a, occaDouble(rni),
-                occaUInt(lelt));
-
-  return rnorm;
 }
 
 int occa_lanczos_aux(genmap_vector diag, genmap_vector upper, genmap_vector *rr,
@@ -260,11 +293,7 @@ int occa_lanczos_aux(genmap_vector diag, genmap_vector upper, genmap_vector *rr,
     vec_ortho(o_p, nelg, lelt, gsc);
 
     // laplacian
-    occaCopyMemToPtr(wrk, o_p, occaAllBytes, 0, occaDefault);
-    struct csr_laplacian *M = (struct csr_laplacian *)gl->data;
-    csr_mat_gather(M->buf, M, wrk, bfr);
-    occaCopyPtrToMem(o_x, M->buf, occaAllBytes, 0, occaDefault);
-    occaKernelRun(lplcn00, o_w, occaUInt(lelt), o_csr_off, o_csr_val, o_x);
+    laplacian_op(o_w, o_p, lelt, o_x, gl->data, bfr);
 
     pap_old = pap;
 
@@ -323,15 +352,14 @@ int occa_lanczos_free() {
   occaFree(&o_x);
   occaFree(&o_rr);
 
-  occaFree(&o_wrk);
+  occaFree(&o_blocks);
   if (wrk != NULL)
     free(wrk);
 
-  if (1) {
+  if (type & CSR) {
     occaFree(&o_csr_val);
     occaFree(&o_csr_off);
-  } else {
-    occaFree(&o_col_val);
+  } else if (type & GPU) {
     occaFree(&o_adj_off);
     occaFree(&o_adj_ind);
     occaFree(&o_adj_val);
