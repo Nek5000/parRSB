@@ -156,6 +156,68 @@ int occa_lanczos_init(struct comm *c, struct laplacian *l, int niter) {
   return 0;
 }
 
+static int vec_ortho(occaMemory o_in, ulong nelg, uint lelt, struct comm *c) {
+  occaKernelRun(sum, occaUInt(lelt), o_in, o_wrk);
+  occaCopyMemToPtr(wrk, o_wrk, occaAllBytes, 0, occaDefault);
+
+  GenmapScalar tmp = 0.0, rtr;
+  uint i;
+  for (i = 0; i < wrk_size; i++)
+    tmp += wrk[i];
+  comm_allreduce(c, gs_double, gs_add, &tmp, 1, &rtr);
+  tmp /= nelg;
+
+  occaKernelRun(addc, o_in, occaDouble(-1.0 * tmp), occaInt(lelt));
+
+  return 0;
+}
+
+static GenmapScalar vec_norm(occaMemory o_a, uint lelt, struct comm *c) {
+  occaKernelRun(norm, o_wrk, occaInt(lelt), o_a);
+  occaCopyMemToPtr(wrk, o_wrk, occaAllBytes, 0, occaDefault);
+
+  GenmapScalar pp = 0.0, tmp;
+  uint i;
+  for (i = 0; i < wrk_size; i++)
+    pp += wrk[i];
+  comm_allreduce(c, gs_double, gs_add, &pp, 1, &tmp);
+
+  return pp;
+}
+
+static GenmapScalar vec_dot(occaMemory o_a, occaMemory o_b, uint lelt,
+                            struct comm *c) {
+  occaKernelRun(dot, o_wrk, occaInt(lelt), o_a, o_b);
+  occaCopyMemToPtr(wrk, o_wrk, occaAllBytes, 0, occaDefault);
+
+  GenmapScalar pap = 0.0, tmp;
+  uint i;
+  for (i = 0; i < wrk_size; i++)
+    pap += wrk[i];
+  comm_allreduce(c, gs_double, gs_add, &pap, 1, &tmp);
+
+  return pap;
+}
+
+static GenmapScalar vec_normalize(occaMemory o_scaled, uint indx,
+                                  occaMemory o_a, uint lelt, struct comm *c) {
+  occaKernelRun(norm, o_wrk, occaInt(lelt), o_r);
+  occaCopyMemToPtr(wrk, o_wrk, occaAllBytes, 0, occaDefault);
+
+  GenmapScalar rtr = 0, tmp;
+  uint i;
+  for (i = 0; i < wrk_size; i++)
+    rtr += wrk[i];
+  comm_allreduce(c, gs_double, gs_add, &rtr, 1, &tmp);
+  GenmapScalar rnorm = sqrt(rtr);
+  GenmapScalar rni = 1.0 / rnorm;
+
+  occaKernelRun(scale, o_scaled, occaUInt(indx), o_a, occaDouble(rni),
+                occaUInt(lelt));
+
+  return rnorm;
+}
+
 int occa_lanczos_aux(genmap_vector diag, genmap_vector upper, genmap_vector *rr,
                      uint lelt, ulong nelg, int niter, genmap_vector f,
                      struct laplacian *gl, struct comm *gsc, buffer *bfr) {
@@ -166,43 +228,21 @@ int occa_lanczos_aux(genmap_vector diag, genmap_vector upper, genmap_vector *rr,
   occaCopyPtrToMem(o_r, f->data, occaAllBytes, 0, occaDefault);
 
   // vec_ortho(gsc, r, nelg);
-  /* orthogonalize */
-  occaKernelRun(sum, occaUInt(lelt), o_r, o_wrk);
-  occaCopyMemToPtr(wrk, o_wrk, occaAllBytes, 0, occaDefault);
-
-  GenmapScalar tmp = 0.0;
-  uint i;
-  for (i = 0; i < wrk_size; i++)
-    tmp += wrk[i];
-  GenmapScalar rtr;
-  comm_allreduce(gsc, gs_double, gs_add, &tmp, 1, &rtr);
-  tmp /= nelg;
-
-  occaKernelRun(addc, o_r, occaDouble(-1.0 * tmp), occaInt(lelt));
-
-  /* normalize */
-  occaKernelRun(norm, o_wrk, occaInt(lelt), o_r);
-  occaCopyMemToPtr(wrk, o_wrk, occaAllBytes, 0, occaDefault);
-
-  rtr = 0;
-  for (i = 0; i < wrk_size; i++)
-    rtr += wrk[i];
-  comm_allreduce(gsc, gs_double, gs_add, &rtr, 1, &tmp);
-  GenmapScalar rnorm = sqrt(rtr);
-  GenmapScalar rni = 1.0 / rnorm;
+  vec_ortho(o_r, nelg, lelt, gsc);
 
   // vec_scale(rr[0], r, rni);
+  GenmapScalar rtr = vec_norm(o_r, lelt, gsc);
+  GenmapScalar rnorm = sqrt(rtr);
+  GenmapScalar rni = 1.0 / rni;
   occaKernelRun(scale, o_rr, occaUInt(0), o_r, occaDouble(rni), occaUInt(lelt));
 
   GenmapScalar eps = 1.e-5;
   GenmapScalar rtol = rnorm * eps;
 
-  GenmapScalar rtz1 = 1.0;
-  GenmapScalar pap = 0.0;
+  GenmapScalar rtz1 = 1.0, rtz2;
+  GenmapScalar pap = 0.0, pap_old;
   GenmapScalar alpha, beta;
-  GenmapScalar rtz2, pap_old;
 
-  uint indx;
   int iter;
   for (iter = 0; iter < niter; iter++) {
     rtz2 = rtz1;
@@ -214,26 +254,10 @@ int occa_lanczos_aux(genmap_vector diag, genmap_vector upper, genmap_vector *rr,
     // add2s1(p, r, beta, n)
     occaKernelRun(add2s1, o_p, o_r, occaDouble(beta), occaUInt(lelt));
 
-#if 1
-    occaKernelRun(norm, o_wrk, occaInt(lelt), o_p);
-    occaCopyMemToPtr(wrk, o_wrk, occaAllBytes, 0, occaDefault);
-    GenmapScalar pp = 0.0;
-    for (i = 0; i < wrk_size; i++)
-      pp += wrk[i];
-    comm_allreduce(gsc, gs_double, gs_add, &pp, 1, &tmp);
-#endif
+    GenmapScalar pp = vec_norm(o_p, lelt, gsc);
 
     // orthogonalize
-    occaKernelRun(sum, occaInt(lelt), o_p, o_wrk);
-    occaCopyMemToPtr(wrk, o_wrk, occaAllBytes, 0, occaDefault);
-
-    tmp = 0.0;
-    for (i = 0; i < wrk_size; i++)
-      tmp += wrk[i];
-    comm_allreduce(gsc, gs_double, gs_add, &tmp, 1, &rtr);
-    tmp /= nelg;
-
-    occaKernelRun(addc, o_p, occaDouble(-1.0 * tmp), occaInt(lelt));
+    vec_ortho(o_p, nelg, lelt, gsc);
 
     // laplacian
     occaCopyMemToPtr(wrk, o_p, occaAllBytes, 0, occaDefault);
@@ -245,15 +269,9 @@ int occa_lanczos_aux(genmap_vector diag, genmap_vector upper, genmap_vector *rr,
     pap_old = pap;
 
     // pap = vec_dot(w, p);
-    occaKernelRun(dot, o_wrk, occaInt(lelt), o_w, o_p);
-    occaCopyMemToPtr(wrk, o_wrk, occaAllBytes, 0, occaDefault);
+    pap = vec_dot(o_w, o_p, lelt, gsc);
 
-    pap = 0.0;
-    for (i = 0; i < wrk_size; i++)
-      pap += wrk[i];
-    comm_allreduce(gsc, gs_double, gs_add, &pap, 1, &tmp);
-
-#if 0
+#if 1
     if (gsc->id == 0)
       printf("occa iter = %d beta = %lf pp = %lf pap = %lf\n", iter, beta, pp,
              pap);
@@ -264,21 +282,12 @@ int occa_lanczos_aux(genmap_vector diag, genmap_vector upper, genmap_vector *rr,
     // add2s2(r, w, -1.0 * alpha, n);
     occaKernelRun(add2s2, o_r, o_w, occaDouble(-1.0 * alpha), occaInt(lelt));
 
-    // rtr = vec_dot(r, r);
-    occaKernelRun(norm, o_wrk, occaInt(lelt), o_r);
-    occaCopyMemToPtr(wrk, o_wrk, occaAllBytes, 0, occaDefault);
-
-    rtr = 0;
-    for (int i = 0; i < wrk_size; i++)
-      rtr += wrk[i];
-    comm_allreduce(gsc, gs_double, gs_add, &rtr, 1, &tmp);
+    // vec_scale(rr[iter + 1], r, rni);
+    rtr = vec_norm(o_r, lelt, gsc);
     rnorm = sqrt(rtr);
     rni = 1.0 / rnorm;
-
-    // vec_scale(rr[iter + 1], r, rni);
-    indx = (iter + 1) * lelt;
-    occaKernelRun(scale, o_rr, occaUInt(indx), o_r, occaDouble(rni),
-                  occaUInt(lelt));
+    occaKernelRun(scale, o_rr, occaUInt((iter + 1) * lelt), o_r,
+                  occaDouble(rni), occaUInt(lelt));
 
     if (iter == 0) {
       diag->data[iter] = pap / rtz1;
@@ -296,10 +305,9 @@ int occa_lanczos_aux(genmap_vector diag, genmap_vector upper, genmap_vector *rr,
   }
 
   occaCopyMemToPtr(wrk, o_rr, occaAllBytes, 0, occaDefault);
-  for (i = 0; i < iter + 1; i++) {
-    indx = i * lelt;
-    memcpy(rr[i]->data, &wrk[indx], sizeof(GenmapScalar) * lelt);
-  }
+  uint i;
+  for (i = 0; i < iter + 1; i++)
+    memcpy(rr[i]->data, &wrk[i * lelt], sizeof(GenmapScalar) * lelt);
 
   metric_acc(TOL_FINAL, rnorm);
   metric_acc(TOL_TARGET, rtol);
