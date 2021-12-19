@@ -27,7 +27,7 @@ static void check_partitions(struct comm *gc, int max_pass, int max_iter) {
 
       if (gc->id == 0) {
         printf("Warning: Partitioner only reached a tolerance of %lf given %lf "
-               "after %d x %d iterations in Level=%d!\n",
+               "after %d x %d iterations in Level = %d!\n",
                final, target, max_pass, max_iter, i);
         fflush(stdout);
       }
@@ -40,8 +40,8 @@ static void check_partitions(struct comm *gc, int max_pass, int max_iter) {
 
     if (maxc > 1 && gc->id == 0) {
       printf("Warning: Partition created %d/%d (min/max) disconnected "
-             "components.\n",
-             minc, maxc);
+             "components in Level = %d!\n",
+             minc, maxc, i);
       fflush(stdout);
     }
   }
