@@ -104,7 +104,7 @@ int main(int argc, char *argv[]) {
 
   /* Write connectivity to .co2 file */
   if (in->dump == 1)
-    err |= parrsb_dump_con(vl, nelt, nv, in->mesh, MPI_COMM_WORLD);
+    err |= parrsb_dump_con(in->mesh, nelt, nv, vl, MPI_COMM_WORLD);
   parrsb_check_error(err, MPI_COMM_WORLD);
 
   /* Free resources */
