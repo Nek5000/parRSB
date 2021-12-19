@@ -38,7 +38,10 @@ int occa_init(const char *backend_, int device_id, int platform_id,
   char *okl_dir = getenv("PARRSB_OKL_DIR");
   if (okl_dir != NULL)
     strncpy(okl, okl_dir, PATH_MAX);
-  else {}
+  else if (c->id == 0) {
+    printf("PARRSB_OKL_DIR is not defined !\n");
+    exit(1);
+  }
   strncat(okl, "/occa.okl", PATH_MAX);
 
   props = occaCreateJson();
@@ -173,8 +176,8 @@ static void laplacian_op(occaMemory o_w, occaMemory o_p, uint lelt,
     gs(wrk, gs_scalar, gs_add, 0, gl->gsh, bfr);
     occaCopyPtrToMem(o_x, wrk, occaAllBytes, 0, occaDefault);
 
-    occaKernelRun(lplcn01, o_w, occaUInt(lelt), o_adj_off, o_adj_ind,
-                  o_adj_val, o_diag_ind, o_diag_val, o_x);
+    occaKernelRun(lplcn01, o_w, occaUInt(lelt), o_adj_off, o_adj_ind, o_adj_val,
+                  o_diag_ind, o_diag_val, o_x);
   }
 }
 
@@ -216,7 +219,8 @@ int occa_lanczos_init(struct comm *c, struct laplacian *l, int niter) {
     o_x =
         occaDeviceMalloc(device, sizeof(GenmapScalar) * nnz, NULL, occaDefault);
 
-    if (wrk_size < nnz) wrk_size = nnz;
+    if (wrk_size < nnz)
+      wrk_size = nnz;
   } else if (type & GPU) {
     struct gpu_laplacian *gl = (struct gpu_laplacian *)l->data;
 
@@ -228,8 +232,8 @@ int occa_lanczos_init(struct comm *c, struct laplacian *l, int niter) {
     o_adj_ind = occaDeviceMalloc(device, sizeof(uint) * nnz, NULL, occaDefault);
     occaCopyPtrToMem(o_adj_ind, gl->adj_ind, occaAllBytes, 0, occaDefault);
 
-    o_adj_val = occaDeviceMalloc(device, sizeof(GenmapScalar) * nnz, NULL,
-                                 occaDefault);
+    o_adj_val =
+        occaDeviceMalloc(device, sizeof(GenmapScalar) * nnz, NULL, occaDefault);
     occaCopyPtrToMem(o_adj_val, gl->adj_val, occaAllBytes, 0, occaDefault);
 
     o_diag_ind =
@@ -237,13 +241,14 @@ int occa_lanczos_init(struct comm *c, struct laplacian *l, int niter) {
     occaCopyPtrToMem(o_diag_ind, gl->diag_ind, occaAllBytes, 0, occaDefault);
 
     o_diag_val = occaDeviceMalloc(device, sizeof(GenmapScalar) * gl->rn, NULL,
-                                 occaDefault);
+                                  occaDefault);
     occaCopyPtrToMem(o_diag_val, gl->diag_val, occaAllBytes, 0, occaDefault);
 
     o_x = occaDeviceMalloc(device, sizeof(GenmapScalar) * gl->cn, NULL,
                            occaDefault);
 
-    if (wrk_size < gl->cn) wrk_size = gl->cn;
+    if (wrk_size < gl->cn)
+      wrk_size = gl->cn;
   }
 
   wrk = tcalloc(GenmapScalar, wrk_size);

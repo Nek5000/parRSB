@@ -22,7 +22,8 @@ struct mg_data {
   GenmapScalar *y, *x, *b, *u, *rhs, *buf;
 };
 
-void mg_setup(struct mg_data *d, int factor, struct comm *c, struct csr_laplacian *M);
+void mg_setup(struct mg_data *d, int factor, struct comm *c,
+              struct csr_laplacian *M);
 void mg_vcycle(GenmapScalar *u, GenmapScalar *rhs, struct mg_data *d);
 void mg_free(struct mg_data *d);
 
