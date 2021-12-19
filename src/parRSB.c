@@ -9,6 +9,8 @@
 
 parrsb_options parrsb_default_options = {0, 0, 0, 0, 1, 0, 1};
 
+static char *ALGO[3] = {"RSB", "RCB", "RIB"};
+
 static int if_number(const char *c) {
   int i;
   for (i = 0; i < strlen(c); i++)
@@ -18,11 +20,11 @@ static int if_number(const char *c) {
 }
 
 #define INIT_OPTION(opt, str)                                                  \
-  do {                                                                         \
+  {                                                                            \
     const char *val = getenv(str);                                             \
     if (val != NULL && if_number(val))                                         \
       options->opt = atoi(val);                                                \
-  } while (0)
+  }
 
 static void init_options(parrsb_options *options) {
   INIT_OPTION(partitioner, "PARRSB_PARTITIONER");
@@ -81,12 +83,12 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
   buffer bfr;
   buffer_init(&bfr, 1024);
 
-  /* Load balance input data */
+  // Load balance input data
   struct array elist;
   size_t elem_size =
       genmap_load_balance(&elist, nel, nv, coord, vtx, &cr, &bfr);
 
-  /* Run RSB now */
+  // Run RSB now
   comm_ext comm_rsb;
 #ifdef MPI
   MPI_Comm_split(c.c, nel > 0, rank, &comm_rsb);
@@ -143,11 +145,11 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
 
   genmap_restore_original(part, seq, &cr, &elist, &bfr);
 
-  /* Report time and finish */
+  // Report time and finish
   genmap_barrier(&c);
   t = comm_time() - t;
   if (rank == 0) {
-    printf("parRSB finished in %g s\n", t);
+    printf("par%s finished in %g s\n", ALGO[options.partitioner], t);
     fflush(stdout);
   }
 
@@ -163,7 +165,7 @@ void fparrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
                        int *nel, int *nv, int *options, int *comm, int *err) {
   *err = 1;
   comm_ext c = MPI_Comm_f2c(*comm);
-  /* TODO: Convert int options to parrsb_options instead of default options */
+  // TODO: Convert int options to parrsb_options instead of default options
   parrsb_options opt = parrsb_default_options;
   *err = parrsb_part_mesh(part, seq, vtx, coord, *nel, *nv, opt, c);
 }
