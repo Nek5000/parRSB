@@ -1,5 +1,5 @@
 name: parRSB CI Tests
-on: [push, pull_request]
+on: [push]
 env:
   GITHUB.TOKEN: ${{ secrets.token }}
 jobs:
