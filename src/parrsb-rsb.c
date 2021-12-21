@@ -50,7 +50,7 @@ static void print_options(parrsb_options *options) {
 
 #undef PRINT_OPTION
 
-/* Load balance input data */
+// Load balance input data
 static size_t load_balance(struct array *eList, uint nel, int nv, double *coord,
                            long long *vtx, struct crystal *cr, buffer *bfr) {
   slong in = nel;
@@ -170,17 +170,21 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
     fflush(stdout);
   }
 
+#if defined(GENMAP_OCCA)
+  occa_init("CUDA", 0, 0, &c);
+#endif
+
   struct crystal cr;
   crystal_init(&cr, &c);
 
   buffer bfr;
   buffer_init(&bfr, 1024);
 
-  /* Load balance input data */
+  // Load balance input data
   struct array elist;
   size_t elem_size = load_balance(&elist, nel, nv, coord, vtx, &cr, &bfr);
 
-  /* Run RSB now */
+  // Run RSB now
   MPI_Comm comma;
   MPI_Comm_split(c.c, nel > 0, c.id, &comma);
 
@@ -224,11 +228,15 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
     metric_finalize();
   }
 
+#if defined(GENMAP_OCCA)
+  occa_free();
+#endif
+
   MPI_Comm_free(&comma);
 
   restore_original(part, seq, &cr, &elist, elem_size, &bfr);
 
-  /* Report time and finish */
+  // Report time and finish
   genmap_barrier(&c);
   t = comm_time() - t;
   if (c.id == 0 && options.verbose_level > 0) {

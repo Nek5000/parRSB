@@ -29,8 +29,7 @@ SRCDIR = $(SRCROOT)/src
 BUILDDIR = $(SRCROOT)/build
 EXAMPLEDIR = $(SRCROOT)/examples
 
-SRCS  = $(wildcard $(SRCDIR)/genmap*.c)
-SRCS += $(wildcard $(SRCDIR)/parrsb*.c)
+SRCS  = $(wildcard $(SRCDIR)/*.c)
 SRCS += $(wildcard $(SRCDIR)/sort/*.c)
 SRCS += $(wildcard $(SRCDIR)/precond/*.c)
 SRCS += $(wildcard $(SRCDIR)/gencon/*.c)
@@ -73,7 +72,7 @@ ifneq ($(OCCA),0)
   PP += -DGENMAP_OCCA
   LDFLAGS+= -L$(OCCADIR)/lib -locca
   INCFLAGS+= -I$(OCCADIR)/include
-  SRCS += $(wildcard $(SRCDIR)/occa*.c)
+  SRCS += $(wildcard $(SRCDIR)/occa/*.c)
 endif
 
 INSTALLDIR=
@@ -132,4 +131,5 @@ print-%:
 $(shell mkdir -p $(BUILDDIR)/src/sort)
 $(shell mkdir -p $(BUILDDIR)/src/precond)
 $(shell mkdir -p $(BUILDDIR)/src/gencon)
+$(shell mkdir -p $(BUILDDIR)/src/occa)
 $(shell mkdir -p $(BUILDDIR)/examples)

@@ -141,6 +141,7 @@ int occa_lanczos_aux(genmap_vector diag, genmap_vector upper, genmap_vector *rr,
                      uint lelt, ulong nelg, int niter, genmap_vector f,
                      struct laplacian *gl, struct comm *gsc, buffer *bfr);
 int occa_lanczos_free();
+int occa_free();
 
 //------------------------------------------------------------------------------
 // Memory
