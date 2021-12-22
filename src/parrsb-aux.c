@@ -5,12 +5,6 @@
 #include <genmap-impl.h>
 #include <parRSB.h>
 
-/* elem_data must always start with vtx_data */
-typedef struct {
-  int proc;
-  long long vtx[MAXNV];
-} vtx_data;
-
 typedef struct {
   int proc;
   long long vtx[MAXNV];

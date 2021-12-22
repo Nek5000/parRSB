@@ -11,30 +11,30 @@ parrsb_options parrsb_default_options = {0, 2, 1, 0, 1, 0, 1};
 
 static int if_number(const char *c) {
   int i;
-  for (i = 0; i < strlen(c); i++)
+  for (i = 0; i < strnlen(c, 32); i++)
     if (!isdigit(c[i]))
       return 0;
   return 1;
 }
 
-#define INIT_OPTION(opt, str)                                                  \
-  do {                                                                         \
+#define UPDATE_OPTION(opt, str)                                                  \
+  {                                                                            \
     const char *val = getenv(str);                                             \
     if (val != NULL && if_number(val))                                         \
       options->opt = atoi(val);                                                \
-  } while (0)
+  }
 
-static void init_options(parrsb_options *options) {
-  INIT_OPTION(partitioner, "PARRSB_PARTITIONER");
-  INIT_OPTION(verbose_level, "PARRSB_VERBOSE_LEVEL");
-  INIT_OPTION(profile_level, "PARRSB_PROFILE_LEVEL");
-  INIT_OPTION(rsb_algo, "PARRSB_RSB_ALGO");
-  INIT_OPTION(rsb_pre, "PARRSB_RSB_PRE");
-  INIT_OPTION(rsb_grammian, "PARRSB_RSB_GRAMMIAN");
-  INIT_OPTION(repair, "PARRSB_REPAIR");
+static void update_options(parrsb_options *options) {
+  UPDATE_OPTION(partitioner, "PARRSB_PARTITIONER");
+  UPDATE_OPTION(verbose_level, "PARRSB_VERBOSE_LEVEL");
+  UPDATE_OPTION(profile_level, "PARRSB_PROFILE_LEVEL");
+  UPDATE_OPTION(rsb_algo, "PARRSB_RSB_ALGO");
+  UPDATE_OPTION(rsb_pre, "PARRSB_RSB_PRE");
+  UPDATE_OPTION(rsb_grammian, "PARRSB_RSB_GRAMMIAN");
+  UPDATE_OPTION(repair, "PARRSB_REPAIR");
 }
 
-#undef INIT_OPTION
+#undef UPDATE_OPTION
 
 #define PRINT_OPTION(opt, str) printf("%s = %d\n", str, options->opt)
 
@@ -51,10 +51,10 @@ static void print_options(parrsb_options *options) {
 #undef PRINT_OPTION
 
 // Load balance input data
-static size_t load_balance(struct array *eList, uint nel, int nv, double *coord,
+static size_t load_balance(struct array *elist, uint nel, int nv, double *coord,
                            long long *vtx, struct crystal *cr, buffer *bfr) {
-  slong in = nel;
   slong out[2][1], buf[2][1];
+  slong in = nel;
   comm_scan(out, &cr->comm, gs_long, gs_add, &in, 1, buf);
   slong start = out[0][0];
   slong nelg = out[1][0];
@@ -67,17 +67,15 @@ static size_t load_balance(struct array *eList, uint nel, int nv, double *coord,
   size_t unit_size;
   struct rcb_element *element = NULL;
 
-  if (vtx == NULL) { // RCB
+  if (vtx == NULL) // RCB
     unit_size = sizeof(struct rcb_element);
-    element = calloc(1, sizeof(struct rcb_element));
-  } else {
+  else
     unit_size = sizeof(struct rsb_element);
-    element = calloc(1, sizeof(struct rsb_element));
-  }
 
+  element = (struct rcb_element *)calloc(1, unit_size);
   element->origin = cr->comm.id;
 
-  array_init_(eList, nel, unit_size, __FILE__, __LINE__);
+  array_init_(elist, nel, unit_size, __FILE__, __LINE__);
 
   int ndim = (nv == 8) ? 3 : 2;
   int e, n, v;
@@ -95,26 +93,27 @@ static size_t load_balance(struct array *eList, uint nel, int nv, double *coord,
     for (n = 0; n < ndim; n++)
       element->coord[n] /= nv;
 
-    array_cat_(unit_size, eList, element, 1, __FILE__, __LINE__);
+    array_cat_(unit_size, elist, element, 1, __FILE__, __LINE__);
   }
-  assert(eList->n == nel);
+  // Sanity check
+  assert(elist->n == nel);
 
   if (vtx != NULL) { // RSB
-    struct rsb_element *elements = eList->ptr;
-    for (e = 0; e < nel; e++) {
+    struct rsb_element *elements = elist->ptr;
+    for (e = 0; e < nel; e++)
       for (v = 0; v < nv; v++)
         elements[e].vertices[v] = vtx[e * nv + v];
-    }
   }
 
-  sarray_transfer_(eList, unit_size, offsetof(struct rcb_element, proc), 1, cr);
-  nel = eList->n;
+  sarray_transfer_(elist, unit_size, offsetof(struct rcb_element, proc), 1, cr);
+  nel = elist->n;
   if (vtx != NULL) // RSB
-    sarray_sort(struct rsb_element, eList->ptr, nel, globalId, 1, bfr);
+    sarray_sort(struct rsb_element, elist->ptr, nel, globalId, 1, bfr);
   else
-    sarray_sort(struct rcb_element, eList->ptr, nel, globalId, 1, bfr);
+    sarray_sort(struct rcb_element, elist->ptr, nel, globalId, 1, bfr);
 
   free(element);
+
   return unit_size;
 }
 
@@ -137,12 +136,14 @@ static void restore_original(int *part, int *seq, struct crystal *cr,
     part[e] = element->origin; // element[e].origin;
   }
 
-  if (seq != NULL)
+  if (seq != NULL) {
     for (e = 0; e < nel; e++) {
       element = (struct rcb_element *)((char *)elist->ptr + e * unit_size);
       seq[e] = element->seq; // element[e].seq;
     }
+  }
 }
+
 /*
  * part = [nel], out,
  * seq = [nel], out,
@@ -153,22 +154,20 @@ static void restore_original(int *part, int *seq, struct crystal *cr,
  * options = in */
 int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
                      int nel, int nv, parrsb_options options, MPI_Comm comm) {
+  update_options(&options);
+
   struct comm c;
   comm_init(&c, comm);
-
-  if (c.id == 0 && options.verbose_level > 0) {
-    printf("Running parRSB ...\n");
+  if (c.id == 0) {
+    if (options.verbose_level > 0)
+      printf("Running parRSB ...\n");
+    if (options.verbose_level > 1)
+      print_options(&options);
     fflush(stdout);
   }
 
   genmap_barrier(&c);
   double t = comm_time();
-
-  init_options(&options);
-  if (c.id == 0 && options.verbose_level > 1) {
-    print_options(&options);
-    fflush(stdout);
-  }
 
 #if defined(GENMAP_OCCA)
   occa_init("CUDA", 0, 0, &c);
@@ -178,7 +177,7 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
   crystal_init(&cr, &c);
 
   buffer bfr;
-  buffer_init(&bfr, 1024);
+  buffer_init(&bfr, nel * sizeof(struct rsb_element));
 
   // Load balance input data
   struct array elist;
@@ -188,7 +187,6 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
   MPI_Comm comma;
   MPI_Comm_split(c.c, nel > 0, c.id, &comma);
 
-  int ndim = (nv == 8) ? 3 : 2;
   if (nel > 0) {
     metric_init();
 
@@ -208,6 +206,7 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
       return 1;
     }
 
+    int ndim = (nv == 8) ? 3 : 2;
     switch (options.partitioner) {
     case 0:
       rsb(&elist, &options, nv, &ca, &bfr);
@@ -256,7 +255,7 @@ void fparrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
                        int *nel, int *nv, int *options, int *comm, int *err) {
   *err = 1;
   comm_ext c = MPI_Comm_f2c(*comm);
-  /* TODO: Convert int options to parrsb_options instead of default options */
+  // TODO: Convert int options to parrsb_options instead of default options
   parrsb_options opt = parrsb_default_options;
   *err = parrsb_part_mesh(part, seq, vtx, coord, *nel, *nv, opt, c);
 }
