@@ -695,7 +695,7 @@ static int lanczos_aux(genmap_vector diag, genmap_vector upper,
     pap_old = pap;
     pap = vec_dot(w, p);
     comm_allreduce(gsc, gs_double, gs_add, &pap, 1, buf);
-#if 1
+#if 0
     if (gsc->id == 0)
       printf("host iter = %d beta = %lf pp = %lf pap = %lf\n", iter, beta, pp,
              pap);
