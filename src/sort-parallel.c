@@ -1,10 +1,11 @@
-#include <float.h>
 #include "sort.h"
+#include <float.h>
+#include <math.h>
 
 #define min(a, b) ((a) < (b) ? (a) : (b))
 
-double get_scalar(struct array *a, uint i, uint offset, uint usize,
-                  gs_dom type) {
+static double get_scalar(struct array *a, uint i, uint offset, uint usize,
+                         gs_dom type) {
   char *v = (char *)a->ptr + i * usize + offset;
 
   double data;
@@ -25,8 +26,8 @@ double get_scalar(struct array *a, uint i, uint offset, uint usize,
   return data;
 }
 
-void get_extrema(void *extrema_, struct sort *data, uint field,
-                 struct comm *c) {
+static void get_extrema(void *extrema_, struct sort *data, uint field,
+                        struct comm *c) {
   struct array *a = data->a;
   uint usize = data->unit_size;
   uint offset = data->offset[field];
@@ -47,7 +48,7 @@ void get_extrema(void *extrema_, struct sort *data, uint field,
   extrema[0] *= -1;
 }
 
-int set_dest(uint *proc, uint size, sint np, slong start, slong nelem) {
+static int set_dest(uint *proc, uint size, sint np, slong start, slong nelem) {
   uint i;
   if (nelem < np) {
     for (i = 0; i < size; i++)
@@ -88,7 +89,7 @@ int set_dest(uint *proc, uint size, sint np, slong start, slong nelem) {
 //-----------------------------------------------------------------------------
 // Parallel Bin-Sort
 //
-int set_bin(uint **proc_, struct sort *s, uint field, struct comm *c) {
+static int set_bin(uint **proc_, struct sort *s, uint field, struct comm *c) {
   struct array *a = s->a;
   gs_dom t = s->t[field];
   uint offset = s->offset[field];
@@ -121,7 +122,7 @@ int set_bin(uint **proc_, struct sort *s, uint field, struct comm *c) {
     proc[index] = np - 1;
 }
 
-int parallel_bin_sort(struct sort *s, struct comm *c) {
+static int parallel_bin_sort(struct sort *s, struct comm *c) {
   // Local sort
   sort_local(s);
 
@@ -153,7 +154,7 @@ struct hypercube {
   ulong *probe_cnt;
 };
 
-int init_probes(struct hypercube *data, struct comm *c) {
+static int init_probes(struct hypercube *data, struct comm *c) {
   struct sort *input = data->data;
 
   // Allocate space for probes and counts
@@ -175,7 +176,7 @@ int init_probes(struct hypercube *data, struct comm *c) {
   return 0;
 }
 
-int update_probe_counts(struct hypercube *data, struct comm *c) {
+static int update_probe_counts(struct hypercube *data, struct comm *c) {
   struct sort *input = data->data;
   uint offset = input->offset[0];
   gs_dom t = input->t[0];
@@ -200,8 +201,8 @@ int update_probe_counts(struct hypercube *data, struct comm *c) {
   return 0;
 }
 
-int update_probes(slong nelem, double *probes, ulong *probe_cnt,
-                  uint threshold) {
+static int update_probes(slong nelem, double *probes, ulong *probe_cnt,
+                         uint threshold) {
   slong expected = nelem / 2;
   if (llabs(expected - probe_cnt[1]) < threshold)
     return 0;
@@ -216,7 +217,7 @@ int update_probes(slong nelem, double *probes, ulong *probe_cnt,
   return 0;
 }
 
-int transfer_elem(struct hypercube *data, struct comm *c) {
+static int transfer_elem(struct hypercube *data, struct comm *c) {
   struct sort *input = data->data;
   uint usize = input->unit_size;
   uint offset = input->offset[0];
@@ -259,7 +260,7 @@ int transfer_elem(struct hypercube *data, struct comm *c) {
   return 0;
 }
 
-int parallel_hypercube_sort(struct hypercube *data, struct comm *c) {
+static int parallel_hypercube_sort(struct hypercube *data, struct comm *c) {
   struct sort *input = data->data;
   struct array *a = input->a;
   gs_dom t = input->t[0];
@@ -313,8 +314,8 @@ int parallel_hypercube_sort(struct hypercube *data, struct comm *c) {
   return 0;
 }
 
-int load_balance(struct array *a, size_t size, struct comm *c,
-                 struct crystal *cr) {
+static int load_balance(struct array *a, size_t size, struct comm *c,
+                        struct crystal *cr) {
   slong out[2][1], buf[2][1];
   slong in = a->n;
   comm_scan(out, c, gs_long, gs_add, &in, 1, buf);

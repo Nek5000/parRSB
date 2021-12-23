@@ -442,7 +442,7 @@ int parrsb_dump_map(char *name, unsigned int nelt, int nv, long long *vtx,
   MPI_Allreduce(&nelt, &nelgt, 1, MPI_INT, MPI_SUM, comm);
 
   const int npts = nelgt * nv;
-  const int depth = (int)log2(1.0 * nelgt);
+  const int depth = (int)log2ll(1.0 * nelgt);
   const int d2 = (int)(pow(2, depth) + 0.5);
   int nactive = nelgt;
   int nrnk = nelgt;
