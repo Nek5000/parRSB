@@ -1,8 +1,8 @@
 #include <math.h>
 #include <time.h>
 
-#include <genmap-impl.h>
-#include <genmap-multigrid.h>
+#include "genmap-impl.h"
+#include "multigrid.h"
 #include <sort.h>
 
 #define MM 500

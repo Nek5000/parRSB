@@ -31,7 +31,6 @@ EXAMPLEDIR = $(SRCROOT)/examples
 
 SRCS  = $(wildcard $(SRCDIR)/*.c)
 SRCS += $(wildcard $(SRCDIR)/sort/*.c)
-SRCS += $(wildcard $(SRCDIR)/precond/*.c)
 SRCS += $(wildcard $(SRCDIR)/gencon/*.c)
 
 EXAMPLES = $(wildcard $(EXAMPLEDIR)/*.c)
@@ -80,7 +79,7 @@ ifneq (,$(strip $(DESTDIR)))
   INSTALLDIR = $(realpath $(DESTDIR))
 endif
 
-SRCOBJS = $(patsubst $(SRCROOT)/%.c,$(BUILDDIR)/%.o,$(SRCS))
+SRCOBJS = $(patsubst $(SRCDIR)/%.c,$(BUILDDIR)/%.o,$(SRCS))
 EXAMPLEOBJS = $(patsubst $(SRCROOT)/%.c,$(BUILDDIR)/%,$(EXAMPLES))
 
 .PHONY: all
@@ -92,8 +91,7 @@ ifneq ($(INSTALLDIR),)
 	@mkdir -p $(INSTALLDIR)/lib 2>/dev/null
 	@cp -v $(LIB) $(INSTALLDIR)/lib 2>/dev/null
 	@mkdir -p $(INSTALLDIR)/include 2>/dev/null
-	@cp $(SRCDIR)/*.h $(SRCDIR)/sort/*.h $(SRCDIR)/precond/*.h \
-		$(INSTALLDIR)/include 2>/dev/null
+	@cp $(SRCDIR)/*.h $(SRCDIR)/sort/*.h $(INSTALLDIR)/include 2>/dev/null
 	@cp -r okl $(INSTALLDIR)/ 2>/dev/null
 endif
 
@@ -103,7 +101,7 @@ lib: $(SRCOBJS)
 	@$(AR) cr $(LIB) $(SRCOBJS)
 	@ranlib $(LIB)
 
-$(BUILDDIR)/src/%.o: $(SRCROOT)/src/%.c
+$(BUILDDIR)/%.o: $(SRCROOT)/src/%.c
 	$(CC) $(CFLAGS) $(PP) $(INCFLAGS) -c $< -o $@
 
 .PHONY: examples
@@ -128,8 +126,7 @@ print-%:
 	$(info)
 	@true
 
-$(shell mkdir -p $(BUILDDIR)/src/sort)
-$(shell mkdir -p $(BUILDDIR)/src/precond)
-$(shell mkdir -p $(BUILDDIR)/src/gencon)
-$(shell mkdir -p $(BUILDDIR)/src/occa)
+$(shell mkdir -p $(BUILDDIR)/sort)
+$(shell mkdir -p $(BUILDDIR)/gencon)
+$(shell mkdir -p $(BUILDDIR)/occa)
 $(shell mkdir -p $(BUILDDIR)/examples)
