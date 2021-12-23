@@ -1,4 +1,5 @@
-#include <sort-impl.h>
+#include <float.h>
+#include "sort.h"
 
 static int sort_field(struct array *arr, size_t usize, gs_dom t, uint off,
                       buffer *buf, int keep) {

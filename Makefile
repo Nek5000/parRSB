@@ -11,7 +11,7 @@ BLASFLAGS ?= -lblas -llapack
 OCCA ?= 0
 OCCADIR ?=
 
-## Don't touch what follows ##
+########################## Don't touch what follows ###########################
 ifeq ($(GSLIBPATH),)
   $(error Specify GSLIBPATH=<path to gslib>/build)
 endif
@@ -25,21 +25,21 @@ endif
 MKFILEPATH = $(abspath $(lastword $(MAKEFILE_LIST)))
 SRCROOT_ ?= $(patsubst %/,%,$(dir $(MKFILEPATH)))
 SRCROOT = $(realpath $(SRCROOT_))
+
 SRCDIR = $(SRCROOT)/src
 BUILDDIR = $(SRCROOT)/build
 EXAMPLEDIR = $(SRCROOT)/examples
 
-SRCS  = $(wildcard $(SRCDIR)/*.c)
-SRCS += $(wildcard $(SRCDIR)/sort/*.c)
-SRCS += $(wildcard $(SRCDIR)/gencon/*.c)
-
-EXAMPLES = $(wildcard $(EXAMPLEDIR)/*.c)
-
-INCFLAGS = -I$(SRCDIR) -I$(SRCDIR)/sort -I$(SRCDIR)/precond -I$(SRCDIR)/gencon \
-	-I$(GSLIBPATH)/include
+INCFLAGS = -I$(SRCDIR) -I$(SRCDIR)/precond -I$(SRCDIR)/gencon -I$(GSLIBPATH)/include
 LDFLAGS = -L$(BUILDDIR)/lib -lparRSB -L$(GSLIBPATH)/lib -lgs -lm
 
+SRCS  = $(wildcard $(SRCDIR)/*.c)
+SRCS += $(wildcard $(SRCDIR)/gencon/*.c)
+EXAMPLES = $(wildcard $(EXAMPLEDIR)/*.c)
 LIB = $(BUILDDIR)/lib/libparRSB.a
+
+SRCOBJS = $(patsubst $(SRCDIR)/%.c,$(BUILDDIR)/%.o,$(SRCS))
+EXAMPLEOBJS = $(patsubst $(SRCROOT)/%.c,$(BUILDDIR)/%,$(EXAMPLES))
 
 PP =
 
@@ -79,9 +79,6 @@ ifneq (,$(strip $(DESTDIR)))
   INSTALLDIR = $(realpath $(DESTDIR))
 endif
 
-SRCOBJS = $(patsubst $(SRCDIR)/%.c,$(BUILDDIR)/%.o,$(SRCS))
-EXAMPLEOBJS = $(patsubst $(SRCROOT)/%.c,$(BUILDDIR)/%,$(EXAMPLES))
-
 .PHONY: all
 all: lib examples install
 
@@ -91,7 +88,7 @@ ifneq ($(INSTALLDIR),)
 	@mkdir -p $(INSTALLDIR)/lib 2>/dev/null
 	@cp -v $(LIB) $(INSTALLDIR)/lib 2>/dev/null
 	@mkdir -p $(INSTALLDIR)/include 2>/dev/null
-	@cp $(SRCDIR)/*.h $(SRCDIR)/sort/*.h $(INSTALLDIR)/include 2>/dev/null
+	@cp $(SRCDIR)/*.h $(INSTALLDIR)/include 2>/dev/null
 	@cp -r okl $(INSTALLDIR)/ 2>/dev/null
 endif
 
@@ -126,7 +123,6 @@ print-%:
 	$(info)
 	@true
 
-$(shell mkdir -p $(BUILDDIR)/sort)
 $(shell mkdir -p $(BUILDDIR)/gencon)
 $(shell mkdir -p $(BUILDDIR)/occa)
 $(shell mkdir -p $(BUILDDIR)/examples)
