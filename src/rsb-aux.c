@@ -1,6 +1,7 @@
 #include <limits.h>
 #include <time.h>
 
+#include "coarse.h"
 #include <genmap-impl.h>
 #include <sort.h>
 
@@ -8,6 +9,21 @@ struct gid {
   ulong gid;
   uint proc;
 };
+
+static void coarse_system(struct rsb_element *elems, uint nelt, int nv,
+                          struct comm *cin, buffer *bfr) {
+  uint npts = nelt * nv;
+  slong *ids = (slong *)tcalloc(slong, npts);
+
+  uint i, j;
+  for (i = 0; i < nelt; i++)
+    for (j = 0; j < nv; j++)
+      ids[i * nv + j] = elems[i].vertices[j];
+
+  struct coarse *crs = coarse_setup(nelt, nv, ids, cin, bfr);
+  coarse_free(crs);
+  free(ids);
+}
 
 static void count_interface_dofs(struct rsb_element *elems, uint nelt, int nv,
                                  struct comm *cin, buffer *bfr) {
@@ -296,8 +312,8 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
 #endif
   comm_free(&lc);
 
+  coarse_system(elements->ptr, elements->n, nv, gc, bfr);
   // count_interface_dofs(elements->ptr, elements->n, nv, gc, bfr);
-
   check_rsb_partition(gc, max_pass, max_iter);
 
   return 0;

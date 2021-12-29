@@ -25,14 +25,13 @@ static void find_neighbors(struct array *arr, struct rsb_element *elems,
   slong lelt = nelt;
   comm_scan(out, cc, gs_long, gs_add, &lelt, 1, bfr);
   ulong elem_id = out[0][0] + 1;
-  ulong sequence_id = elem_id * nv;
 
   struct array vertices;
   size_t size = nelt * nv;
   array_init(struct vertex0, &vertices, size);
 
   sint i, j;
-  for (i = 0; i < lelt; i++) {
+  for (i = 0; i < nelt; i++) {
     for (j = 0; j < nv; j++) {
       struct vertex0 vrt = {.elementId = elem_id,
                             .vertexId = elems[i].vertices[j],

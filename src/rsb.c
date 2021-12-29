@@ -11,10 +11,9 @@ parrsb_options parrsb_default_options = {0, 2, 1, 0, 1, 0, 1};
 
 static int if_number(const char *c) {
   int i;
-  for (i = 0; i < strnlen(c, 32); i++)
-    if (!isdigit(c[i]))
-      return 0;
-  return 1;
+  for (i = 0; i < strnlen(c, 32) && isdigit(c[i]); i++)
+    ;
+  return i == strnlen(c, 32);
 }
 
 #define UPDATE_OPTION(opt, str)                                                \
@@ -35,7 +34,6 @@ static void update_options(parrsb_options *options) {
 }
 
 #undef UPDATE_OPTION
-
 #define PRINT_OPTION(opt, str) printf("%s = %d\n", str, options->opt)
 
 static void print_options(parrsb_options *options) {

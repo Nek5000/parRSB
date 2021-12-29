@@ -344,7 +344,7 @@ void mg_vcycle(GenmapScalar *u1, GenmapScalar *rhs, struct mg_data *d) {
     // J*e
     gs(r + off, gs_double, gs_add, 0, l->J, &buf);
 
-    // u=u+over*J*e
+    // u = u + over * J * e
     n = lvl_off[lvl + 1] - off;
     for (j = 0; j < n; j++)
       r[off + j] = over * r[off + j] + u[off + j];
