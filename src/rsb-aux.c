@@ -312,9 +312,9 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
 #endif
   comm_free(&lc);
 
+  check_rsb_partition(gc, max_pass, max_iter);
   coarse_system(elements->ptr, elements->n, nv, gc, bfr);
   // count_interface_dofs(elements->ptr, elements->n, nv, gc, bfr);
-  check_rsb_partition(gc, max_pass, max_iter);
 
   return 0;
 }

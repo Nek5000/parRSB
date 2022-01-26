@@ -22,6 +22,7 @@
 //#define DUMPS
 //#define DUMPG
 //#define DUMPW
+//#define DUMPWG
 //#define DUMPP
 
 static void comm_split(const struct comm *old, const int bin, const int key,
@@ -572,10 +573,9 @@ linear in the number of nonzeros of L
 */
 static uint *cholesky_symbolic(struct mat *L, uint n, uint const *Ap,
                                uint const *Ai, buffer *buf) {
-  uint *parent = tcalloc(uint, 2 * n), *visit = parent + n;
-
   L->n = n;
 
+  uint *parent = tcalloc(uint, 2 * n), *visit = parent + n;
   uint i, j, nz = 0;
   for (i = 0; i < n; i++) {
     parent[i] = n, visit[i] = i;

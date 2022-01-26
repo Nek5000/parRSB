@@ -382,8 +382,7 @@ static int inverse(genmap_vector y, struct rsb_element *elems, int nv,
 
   struct laplacian ul;
   laplacian_init(&ul, elems, lelt, nv, CSR | UNWEIGHTED, gsc, bff);
-  struct mg_data d;
-  mg_setup(&d, 4, gsc, (struct csr_laplacian *)ul.data);
+  struct mg_data *d = mg_setup(4, gsc, (struct csr_laplacian *)ul.data);
 
   struct laplacian wl;
   laplacian_init(&wl, elems, lelt, nv, GS | WEIGHTED, gsc, bff);
@@ -405,7 +404,7 @@ static int inverse(genmap_vector y, struct rsb_element *elems, int nv,
   uint i, j, k, l;
   for (i = 0; i < max_iter; i++) {
     metric_tic(gsc, PROJECT);
-    int ppfi = project(y, &wl, &d, z, 100, gsc, bff);
+    int ppfi = project(y, &wl, d, z, 100, gsc, bff);
     metric_toc(gsc, PROJECT);
 
     vec_ortho(gsc, y, nelg);
@@ -510,7 +509,7 @@ static int inverse(genmap_vector y, struct rsb_element *elems, int nv,
   vec_destroy(err);
 
   laplacian_free(&wl);
-  mg_free(&d);
+  mg_free(d);
   laplacian_free(&ul);
 
   return i == max_iter ? i : i + 1;

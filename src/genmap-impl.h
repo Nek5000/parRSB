@@ -64,17 +64,11 @@ struct laplacian {
 };
 
 struct csr_laplacian {
-  uint rn;
-  ulong rstart;
-  uint *roff;
+  uint rn, *roff;
 
-  ulong *col;
+  ulong rstart, *col;
 
-  GenmapScalar *v;
-
-  GenmapScalar *diag;
-
-  GenmapScalar *buf;
+  GenmapScalar *v, *diag, *buf;
 
   struct gs_data *gsh;
 };

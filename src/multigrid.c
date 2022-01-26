@@ -2,6 +2,24 @@
 
 #define GETPTR(p, i, off) ((char *)(p) + (off) + (i) * sizeof(entry))
 
+struct mg_lvl {
+  int nsmooth;
+  GenmapScalar sigma;
+  struct gs_data *J; // interpolation from level i to i+1
+  struct gs_data *Q; // global to local conversion of a vector
+  struct csr_laplacian *M;
+};
+
+struct mg_data {
+  struct comm c;
+  struct gs_data *top;
+  buffer bfr;
+  int nlevels;
+  struct mg_lvl **levels;
+  uint *level_off;
+  GenmapScalar *y, *x, *b, *u, *rhs, *buf;
+};
+
 typedef struct {
   ulong r, c, rn, cn;
   uint p;
@@ -128,7 +146,7 @@ static void mg_lvl_setup(struct mg_data *d, uint lvl, int factor) {
 
   /* create the matrix */
   GenmapMalloc(1, &d->levels[lvl]);
-  mgLevel l = d->levels[lvl];
+  struct mg_lvl *l = d->levels[lvl];
 
   GenmapMalloc(1, &l->M);
   struct csr_laplacian *M1 = l->M;
@@ -211,12 +229,11 @@ static void mg_lvl_setup(struct mg_data *d, uint lvl, int factor) {
   array_free(&entries);
 }
 
-void mg_setup(struct mg_data *d, int factor, struct comm *c,
-              struct csr_laplacian *M) {
+struct mg_data* mg_setup(int factor, struct comm *c, struct csr_laplacian *M) {
+  struct mg_data *d = tcalloc(struct mg_data, 1);
   comm_dup(&d->c, c);
-  uint np = c->np;
-  uint rn = M->rn;
 
+  uint np = c->np, rn = M->rn;
   slong out[2][1], bf[2][1];
   slong in = rn;
   comm_scan(out, &d->c, gs_long, gs_add, &in, 1, bf);
@@ -256,6 +273,8 @@ void mg_setup(struct mg_data *d, int factor, struct comm *c,
   GenmapMalloc(d->level_off[d->nlevels], &d->u);
   GenmapMalloc(d->level_off[d->nlevels], &d->rhs);
   GenmapMalloc(nnz, &d->buf);
+
+  return d;
 }
 
 void mg_vcycle(GenmapScalar *u1, GenmapScalar *rhs, struct mg_data *d) {
@@ -264,9 +283,9 @@ void mg_vcycle(GenmapScalar *u1, GenmapScalar *rhs, struct mg_data *d) {
   GenmapScalar *r = d->b;
   GenmapScalar *u = d->u;
 
-  mgLevel *lvls = d->levels;
+  struct mg_lvl **lvls = d->levels;
   uint *lvl_off = d->level_off;
-  mgLevel l;
+  struct mg_lvl *l;
   struct csr_laplacian *M;
 
   buffer buf;
@@ -358,27 +377,30 @@ void mg_vcycle(GenmapScalar *u1, GenmapScalar *rhs, struct mg_data *d) {
 }
 
 void mg_free(struct mg_data *d) {
-  mgLevel *l = d->levels;
-  uint i;
-  for (i = 0; i < d->nlevels; i++) {
-    if (i > 0)
-      csr_mat_free(l[i]->M);
-    if (i < d->nlevels - 1)
-      gs_free(l[i]->J);
-    GenmapFree(l[i]);
+  if (d != NULL) {
+    struct mg_lvl **l = d->levels;
+    for (uint i = 0; i < d->nlevels; i++) {
+      if (i > 0)
+        csr_mat_free(l[i]->M);
+      if (i < d->nlevels - 1)
+        gs_free(l[i]->J);
+      GenmapFree(l[i]);
+    }
+
+    // comm_free
+    comm_free(&d->c);
+
+    GenmapFree(l);
+    GenmapFree(d->level_off);
+    GenmapFree(d->y);
+    GenmapFree(d->x);
+    GenmapFree(d->b);
+    GenmapFree(d->buf);
+    GenmapFree(d->rhs);
+    GenmapFree(d->u);
+
+    free(d);
   }
-
-  // comm_free
-  comm_free(&d->c);
-
-  GenmapFree(l);
-  GenmapFree(d->level_off);
-  GenmapFree(d->y);
-  GenmapFree(d->x);
-  GenmapFree(d->b);
-  GenmapFree(d->buf);
-  GenmapFree(d->rhs);
-  GenmapFree(d->u);
 }
 
 #undef GETPTR
