@@ -53,9 +53,8 @@ struct rsb_element {
 //
 #define GS 1
 #define CSR 2
-#define GPU 4
-#define WEIGHTED 1024
-#define UNWEIGHTED 2048
+#define WEIGHTED 128
+#define UNWEIGHTED 256
 
 struct laplacian {
   int type, nv;
@@ -65,11 +64,8 @@ struct laplacian {
 
 struct csr_laplacian {
   uint rn, *roff;
-
   ulong rstart, *col;
-
   GenmapScalar *v, *diag, *buf;
-
   struct gs_data *gsh;
 };
 
@@ -81,26 +77,6 @@ int csr_mat_free(struct csr_laplacian *M);
 
 struct gs_laplacian {
   GenmapScalar *diag, *u;
-  struct gs_data *gsh;
-};
-
-struct gpu_laplacian {
-  // unique column ids of local laplacian matrix, sorted
-  uint cn;
-  uint ls;
-  ulong *col_ids;
-
-  // adj as csr, for unweighted case, adj_val is null as the values are all -1
-  uint rn;
-  uint *adj_off;
-  uint *adj_ind;
-  GenmapScalar *adj_val;
-
-  // diagonal as an array
-  uint *diag_ind;
-  GenmapScalar *diag_val;
-
-  // gs for host side communication
   struct gs_data *gsh;
 };
 
@@ -208,7 +184,6 @@ int GenmapVectorDump(const char *fname, GenmapScalar *y,
 int GenmapElementDump(const char *fname, struct rsb_element *elm, uint nelt,
                       int nv, struct comm *c, int dump);
 int log2ll(long long n);
-int logbll(long long n, int a);
 
 void genmap_barrier(struct comm *c);
 void comm_split(struct comm *old, int bin, int key, struct comm *new_);

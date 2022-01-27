@@ -117,17 +117,18 @@ struct nbr {
   uint proc;
 };
 
-static void find_nbrs(struct array *arr, const ulong *eid, const slong *vtx,
-                      const uint nelt, const int nv, const struct comm *c,
-                      buffer *buf) {
+void find_nbrs(struct array *arr, const ulong *eid, const slong *vtx,
+               const uint nelt, const int nv, const struct comm *c,
+               buffer *buf) {
   struct array vertices;
   array_init(struct nbr, &vertices, nelt * nv);
 
   struct nbr v;
   uint i, j;
   for (i = 0; i < nelt; i++) {
+    v.r = eid[i];
     for (j = 0; j < nv; j++) {
-      v.r = eid[i], v.c = vtx[i * nv + j], v.proc = v.c % c->np;
+      v.c = vtx[i * nv + j], v.proc = v.c % c->np;
       array_cat(struct nbr, &vertices, &v, 1);
     }
   }
@@ -137,7 +138,7 @@ static void find_nbrs(struct array *arr, const ulong *eid, const slong *vtx,
   sarray_transfer(struct nbr, &vertices, proc, 1, &cr);
 
   sarray_sort(struct nbr, vertices.ptr, vertices.n, c, 1, buf);
-  struct nbr *vptr = vertices.ptr;
+  struct nbr *vptr = (struct nbr *)vertices.ptr;
   uint vn = vertices.n;
 
   // FIXME: Assumes quads or hexes
@@ -167,16 +168,21 @@ static void find_nbrs(struct array *arr, const ulong *eid, const slong *vtx,
 //
 struct mat_ij {
   ulong r, c;
-  uint idx;
+  uint idx, p;
   scalar v;
-  uint p;
+};
+
+struct mat {
+  ulong start, *col;
+  uint n, *Lp, *Li;
+  scalar *L, *D;
 };
 
 // Compress array by summing up entries which share the same (r, c) values
 // and the array is modified in place. Also, the diagonal entries are modified
 // to ensure all the
-static int compress_local_laplacian(struct array *eij, struct array *nbr,
-                                    buffer *bfr) {
+static int compress_nbrs(struct array *eij, struct array *nbr, buffer *bfr) {
+  eij->n = 0;
   if (nbr->n == 0)
     return 1;
 
@@ -217,20 +223,14 @@ static int compress_local_laplacian(struct array *eij, struct array *nbr,
   }
 }
 
-struct mat {
-  ulong start;
-  uint n, *Lp, *Li;
-  scalar *L, *D;
-};
-
-static int mat_setup(struct mat *mat, struct array *entries, int sep,
+static int csr_setup(struct mat *mat, struct array *entries, int sep,
                      buffer *buf) {
   uint nnz = entries->n;
   if (nnz == 0) {
-    mat->n = 0;
-    mat->start = 0;
+    mat->start = mat->n = 0;
     mat->Lp = mat->Li = NULL;
     mat->L = mat->D = NULL;
+    mat->col = NULL;
     return 0;
   }
 
@@ -238,14 +238,24 @@ static int mat_setup(struct mat *mat, struct array *entries, int sep,
   sarray_sort(struct mat_ij, entries->ptr, entries->n, c, 1, buf);
   struct mat_ij *ptr = (struct mat_ij *)entries->ptr;
 
-  ulong n = ptr[0].c;
+  // Reserve enough memory for work arrays
+  buffer_reserve(buf, sizeof(ulong) * nnz);
+  ulong *cols = (ulong *)buf->ptr;
+
+  ulong n = cols[0] = ptr[0].c;
   uint i;
-  for (ptr[0].c = 0, i = 1; i < nnz; i++)
+  for (ptr[0].c = 0, i = 1; i < nnz; i++) {
     if (ptr[i].c == n)
       ptr[i].c = ptr[i - 1].c;
-    else
+    else {
       n = ptr[i].c, ptr[i].c = ptr[i - 1].c + 1;
+      cols[ptr[i].c] = n;
+    }
+  }
   uint nc = ptr[nnz - 1].c + 1;
+
+  mat->col = tcalloc(ulong, nc);
+  memcpy(mat->col, cols, sizeof(ulong) * nc);
 
   sarray_sort(struct mat_ij, entries->ptr, entries->n, r, 1, buf);
   ptr = (struct mat_ij *)entries->ptr;
@@ -257,7 +267,6 @@ static int mat_setup(struct mat *mat, struct array *entries, int sep,
     else
       n = ptr[i].r, ptr[i].r = ptr[i - 1].r + 1;
   uint nr = ptr[nnz - 1].r + 1;
-  assert(nr == nc); // Sanity check
 
   // Reserve enough memory for work arrays
   buffer_reserve(buf, sizeof(struct mat_ij) * nnz);
@@ -283,15 +292,15 @@ static int mat_setup(struct mat *mat, struct array *entries, int sep,
   }
   Lp[mat->n] = ++j - sep * mat->n;
 
-  mat->Li = (uint *)tcalloc(uint, j);
-  mat->L = (scalar *)tcalloc(scalar, j);
+  mat->Li = (uint *)tcalloc(uint, j - sep * mat->n);
+  mat->L = (scalar *)tcalloc(scalar, j - sep * mat->n);
 
   uint nadj;
   if (sep) {
     mat->D = (scalar *)tcalloc(scalar, mat->n);
     uint ndiag;
     for (i = ndiag = nadj = 0; i < j; i++) {
-      if (unique[i].r == unique[i].c)
+      if (mat->start + unique[i].r == mat->col[unique[i].c])
         mat->D[ndiag++] = unique[i].v;
       else
         mat->L[nadj] = unique[i].v, mat->Li[nadj++] = unique[i].c;
@@ -305,12 +314,11 @@ static int mat_setup(struct mat *mat, struct array *entries, int sep,
   return 0;
 }
 
-static int mat_print(struct mat *mat) {
+int mat_print(struct mat *mat) {
   uint i, j;
   for (i = 0; i < mat->n; i++) {
     for (j = mat->Lp[i]; j < mat->Lp[i + 1]; j++)
-      printf("%ld %ld %lf\n", mat->start + i, mat->start + mat->Li[j],
-             mat->L[j]);
+      printf("%ld %ld %lf\n", mat->start + i, mat->col[mat->Li[j]], mat->L[j]);
     if (mat->D != NULL)
       printf("%ld %ld %lf\n", mat->start + i, mat->start + i, mat->D[i]);
   }
@@ -318,16 +326,97 @@ static int mat_print(struct mat *mat) {
   return 0;
 }
 
-static int mat_free(struct mat *mat) {
+int mat_free(struct mat *mat) {
   FREE(mat, Lp);
   FREE(mat, Li);
   FREE(mat, L);
   FREE(mat, D);
+  FREE(mat, col);
   return 0;
+}
+
+struct mat *csr_from_conn(const uint nelt, const ulong *eid, const slong *vtx,
+                          int nv, int sep, struct comm *c, buffer *bfr) {
+  struct array nbrs, eij;
+  array_init(struct nbr, &nbrs, 100);
+  array_init(struct mat_ij, &eij, 100);
+
+  find_nbrs(&nbrs, eid, vtx, nelt, nv, c, bfr);
+  compress_nbrs(&eij, &nbrs, bfr);
+  struct mat *M = tcalloc(struct mat, 1);
+  csr_setup(M, &eij, sep, bfr);
+
+  array_free(&nbrs);
+  array_free(&eij);
+
+  return M;
+}
+
+static int compress_mat_ij(struct array *eij, struct array *entries,
+                           buffer *bfr) {
+  eij->n = 0;
+  if (entries->n == 0)
+    return 1;
+
+  sarray_sort_2(struct mat_ij, entries->ptr, entries->n, r, 1, c, 1, bfr);
+  struct mat_ij *ptr = (struct mat_ij *)entries->ptr;
+
+  struct mat_ij m;
+  m.idx = 0;
+
+  uint i = 0;
+  while (i < entries->n) {
+    m = ptr[i];
+    uint j = i + 1;
+    while (j < entries->n && ptr[j].r == ptr[i].r && ptr[j].c == ptr[i].c)
+      m.v += ptr[j].v, j++;
+
+    array_cat(struct mat_ij, eij, &m, 1);
+    i = j;
+  }
+
+  // Now make sure the row sum is zero
+  struct mat_ij *pe = (struct mat_ij *)eij->ptr;
+  i = 0;
+  while (i < eij->n) {
+    sint j = i, k = -1, s = 0;
+    while (j < eij->n && pe[j].r == pe[i].r) {
+#if 0
+      if (eij->n < 5)
+        printf("r = %lld c = %lld\n", pe[j].r, pe[j].c);
+#endif
+      if (pe[j].r == pe[j].c)
+        k = j;
+      else
+        s += pe[j].v;
+      j++;
+    }
+#if 0
+    printf("ii = %d n = %d\n", i, eij->n);
+#endif
+    assert(k >= 0);
+    pe[k].v = -s;
+    i = j;
+  }
+}
+
+struct mat *csr_setup_ext(struct array *entries, int sep, buffer *bfr) {
+  struct array eij;
+  array_init(struct mat_ij, &eij, 100);
+
+  compress_mat_ij(&eij, entries, bfr);
+
+  struct mat *M = tcalloc(struct mat, 1);
+  csr_setup(M, &eij, sep, bfr);
+
+  array_free(&eij);
+
+  return M;
 }
 
 //------------------------------------------------------------------------------
 // `par_mat` matrix for parallel distributed matrices
+//
 //
 struct par_mat {
   // CSC or CSR or whatever
@@ -816,7 +905,7 @@ static int schur_setup_G(struct par_mat *G, const struct mat *L,
   array_init(struct mat_ij, &unique, 100);
   for (i = k = 0; i < gij.n; k++) {
     for (j = i + 1; j < gij.n && ptr[j].r == ptr[i].r && ptr[j].c == ptr[i].c;
-      j++)
+         j++)
       ptr[i].v += ptr[j].v;
 
     array_cat(struct mat_ij, &unique, &ptr[i], 1);
@@ -953,7 +1042,7 @@ static int schur_setup_W(struct par_mat *W, const struct mat *L,
   array_init(struct mat_ij, &unique, 100);
   for (i = k = 0; i < wij.n; k++) {
     for (j = i + 1; j < wij.n && ptr[j].r == ptr[i].r && ptr[j].c == ptr[i].c;
-      j++)
+         j++)
       ptr[i].v += ptr[j].v;
 
     array_cat(struct mat_ij, &unique, &ptr[i], 1);
@@ -1136,7 +1225,7 @@ static int schur_precond_setup(const struct mat *L, const struct par_mat *F,
   return 0;
 }
 
-static int mat_zero_sum(struct mat *A) {
+int mat_zero_sum(struct mat *A) {
   for (uint i = 0, n = A->n; i != n; i++) {
     scalar s = 0;
     uint k;
@@ -1192,7 +1281,7 @@ struct coarse *coarse_setup(uint nelt, int nv, slong const *vtx, struct comm *c,
   // Be a bit smarter than just using 100?
   struct array eij;
   array_init(struct mat_ij, &eij, 100);
-  compress_local_laplacian(&eij, &nbrs, bfr);
+  compress_nbrs(&eij, &nbrs, bfr);
   array_free(&nbrs);
 
   // Setup A_ll
@@ -1220,7 +1309,7 @@ struct coarse *coarse_setup(uint nelt, int nv, slong const *vtx, struct comm *c,
 
   // Setup local block diagonal (B)
   struct mat A_ll;
-  mat_setup(&A_ll, &ll, 0, bfr);
+  csr_setup(&A_ll, &ll, 0, bfr);
 #ifdef DUMPB
   mat_print(&A_ll);
 #endif

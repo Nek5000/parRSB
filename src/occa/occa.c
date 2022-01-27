@@ -159,6 +159,26 @@ static GenmapScalar vec_normalize(occaMemory o_scaled, uint indx,
   return rnorm;
 }
 
+struct gpu_laplacian {
+  // unique column ids of local laplacian matrix, sorted
+  uint cn;
+  uint ls;
+  ulong *col_ids;
+
+  // adj as csr, for unweighted case, adj_val is null as the values are all -1
+  uint rn;
+  uint *adj_off;
+  uint *adj_ind;
+  GenmapScalar *adj_val;
+
+  // diagonal as an array
+  uint *diag_ind;
+  GenmapScalar *diag_val;
+
+  // gs for host side communication
+  struct gs_data *gsh;
+};
+
 static void laplacian_op(occaMemory o_w, occaMemory o_p, uint lelt,
                          occaMemory o_x, void *ld, buffer *bfr) {
   if (type & CSR) {

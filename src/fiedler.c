@@ -8,9 +8,6 @@
 #define MM 500
 
 static int vec_create(genmap_vector *x, GenmapInt size) {
-  /* Asserts:
-       - size > 0
-  */
   assert(size > 0);
 
   GenmapMalloc(1, x);
@@ -267,8 +264,7 @@ int project(genmap_vector x, struct laplacian *gl, struct mg_data *d,
     r->data[i] = ri->data[i];
   }
 
-  slong out[2][1], bfr[2][1];
-  slong in = lelt;
+  slong out[2][1], bfr[2][1], in = lelt;
   comm_scan(out, gsc, gs_long, gs_add, &in, 1, bfr);
   slong nelg = out[1][0];
 
@@ -318,7 +314,7 @@ int project(genmap_vector x, struct laplacian *gl, struct mg_data *d,
 
     vec_copy(z0, z);
 #if 1
-    mg_vcycle(z->data, r->data, d);
+    mg_vcycle(z->data, r->data, d, gsc, buf);
 #else
     vec_copy(z, r);
 #endif
@@ -376,35 +372,51 @@ int project(genmap_vector x, struct laplacian *gl, struct mg_data *d,
 // inverse iteration should not change z.
 static int inverse(genmap_vector y, struct rsb_element *elems, int nv,
                    genmap_vector z, struct comm *gsc, int max_iter, slong nelg,
-                   buffer *bff) {
+                   buffer *buf) {
   assert(z->size == y->size);
   uint lelt = z->size;
 
-  struct laplacian ul;
-  laplacian_init(&ul, elems, lelt, nv, CSR | UNWEIGHTED, gsc, bff);
-  struct mg_data *d = mg_setup(4, gsc, (struct csr_laplacian *)ul.data);
-
   struct laplacian wl;
-  laplacian_init(&wl, elems, lelt, nv, GS | WEIGHTED, gsc, bff);
+  laplacian_init(&wl, elems, lelt, nv, GS | WEIGHTED, gsc, buf);
+
+  // Reserve enough memory in buffer
+  size_t wrk = sizeof(ulong) * lelt + sizeof(slong) * nv * lelt;
+  buffer_reserve(buf, wrk);
+
+  slong out[2][1], bfr[2][1], in = lelt;
+  comm_scan(out, gsc, gs_long, gs_add, &in, 1, bfr);
+  slong start = out[0][0];
+
+  ulong *eid = (ulong *)buf->ptr;
+  slong *vtx = (slong *)(eid + lelt);
+  uint i, j, k;
+  for (i = k = 0; i < lelt; i++) {
+    eid[i] = start + i + 1;
+    for (j = 0; j < nv; j++)
+      vtx[k++] = elems[i].vertices[j];
+  }
+
+  struct mg_data *d = mg_setup(lelt, eid, vtx, nv, 4, gsc, buf);
+
+  wrk = sizeof(GenmapScalar) *
+        (max_iter * lelt + lelt + max_iter * max_iter + 2 * max_iter);
+  buffer_reserve(buf, wrk);
+
+  GenmapScalar *Z = (GenmapScalar *)buf->ptr;
+  GenmapScalar *GZ = Z + max_iter * lelt;
+  GenmapScalar *M = GZ + lelt;
+  GenmapScalar *rhs = M + max_iter * max_iter;
+  GenmapScalar *v = rhs + max_iter;
 
   int grammian = 0;
-
-  GenmapScalar *Z, *GZ, *M, *rhs, *v, *buf;
-  GenmapMalloc(max_iter * lelt, &Z);
-  GenmapMalloc(lelt, &GZ);
-  GenmapMalloc(max_iter * max_iter, &M);
-  GenmapMalloc(max_iter, &rhs);
-  GenmapMalloc(max_iter, &v);
-  GenmapMalloc(max_iter * max_iter, &buf);
 
   genmap_vector err;
   vec_create(&err, lelt);
 
-  slong bfr[2];
-  uint i, j, k, l;
+  uint l;
   for (i = 0; i < max_iter; i++) {
     metric_tic(gsc, PROJECT);
-    int ppfi = project(y, &wl, d, z, 100, gsc, bff);
+    int ppfi = project(y, &wl, d, z, 100, gsc, buf);
     metric_toc(gsc, PROJECT);
 
     vec_ortho(gsc, y, nelg);
@@ -466,7 +478,7 @@ static int inverse(genmap_vector y, struct rsb_element *elems, int nv,
 
         // M=Z(1:k,:)*G*Z(1:k,:);
         for (j = 0; j < N; j++) {
-          laplacian(GZ, &wl, &Z[j * lelt], bff);
+          laplacian(GZ, &wl, &Z[j * lelt], buf);
           for (k = 0; k < N; k++) {
             M[k * N + j] = 0.0;
             for (l = 0; l < lelt; l++)
@@ -475,7 +487,7 @@ static int inverse(genmap_vector y, struct rsb_element *elems, int nv,
         }
 
         // Global reduction of M
-        comm_allreduce(gsc, gs_double, gs_add, M, N * N, buf);
+        comm_allreduce(gsc, gs_double, gs_add, M, N * N, buf->ptr);
 
         // Inverse power iterarion on M
         inv_power_serial(v, N, M, 0);
@@ -499,18 +511,9 @@ static int inverse(genmap_vector y, struct rsb_element *elems, int nv,
       break;
   }
 
-  GenmapFree(Z);
-  GenmapFree(GZ);
-  GenmapFree(M);
-  GenmapFree(rhs);
-  GenmapFree(v);
-  GenmapFree(buf);
-
   vec_destroy(err);
-
   laplacian_free(&wl);
   mg_free(d);
-  laplacian_free(&ul);
 
   return i == max_iter ? i : i + 1;
 }
@@ -830,11 +833,9 @@ static int lanczos(genmap_vector fiedler, struct rsb_element *elems, int nv,
 
 int fiedler(struct rsb_element *elems, uint lelt, int nv, int max_iter,
             int algo, struct comm *gsc, buffer *buf) {
-  slong out[2][1], bfr[2][1];
-  slong in = lelt;
+  slong out[2][1], bfr[2][1], in = lelt;
   comm_scan(out, gsc, gs_long, gs_add, &in, 1, bfr);
-  slong start = out[0][0];
-  slong nelg = out[1][0];
+  slong start = out[0][0], nelg = out[1][0];
 
   genmap_vector initv, fiedler;
   vec_create(&initv, lelt);

@@ -60,13 +60,3 @@ int log2ll(long long n) {
 
   return k;
 }
-
-int logbll(long long n, int a) {
-  assert(a > 0);
-
-  int k = 0;
-  while (n > 1)
-    n /= a, k++;
-
-  return k;
-}
