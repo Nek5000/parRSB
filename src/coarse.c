@@ -95,8 +95,8 @@ static int number_rows(ulong *elem, ulong ng[2], const slong *vtx,
 
   slong in[2] = {nl, ni}, out[2][2], buf[2][2];
   comm_scan(out, ci, gs_long, gs_add, in, 2, buf);
-  slong sl = out[0][0], si = out[0][1];
-  slong gl = out[1][0];
+  slong sl = out[0][0] + 1, si = out[0][1];
+  slong gl = out[1][0] + 1;
 
   for (i = 0; i < nelt; i++)
     if (elem[i] > 0)
@@ -309,11 +309,10 @@ static int mat_print(struct mat *mat) {
   uint i, j;
   for (i = 0; i < mat->n; i++) {
     for (j = mat->Lp[i]; j < mat->Lp[i + 1]; j++)
-      printf("%ld %ld %lf\n", mat->start + i + 1, mat->start + mat->Li[j] + 1,
+      printf("%ld %ld %lf\n", mat->start + i, mat->start + mat->Li[j],
              mat->L[j]);
     if (mat->D != NULL)
-      printf("%ld %ld %lf\n", mat->start + i + 1, mat->start + i + 1,
-             mat->D[i]);
+      printf("%ld %ld %lf\n", mat->start + i, mat->start + i, mat->D[i]);
   }
 
   return 0;
@@ -527,18 +526,18 @@ static void par_mat_print(struct par_mat *A) {
   if (IS_CSR(A)) {
     for (i = 0; i < A->rn; i++) {
       for (j = A->adj_off[i]; j < A->adj_off[i + 1]; j++)
-        printf("%ld %ld %lf\n", A->rows[i] + 1, A->cols[A->adj_idx[j]] + 1,
+        printf("%ld %ld %lf\n", A->rows[i], A->cols[A->adj_idx[j]],
                A->adj_val[j]);
       if (A->diag_val != NULL)
-        printf("%ld %ld %lf\n", A->rows[i] + 1, A->rows[i] + 1, A->diag_val[i]);
+        printf("%ld %ld %lf\n", A->rows[i], A->rows[i], A->diag_val[i]);
     }
   } else if (IS_CSC(A)) {
     for (i = 0; i < A->cn; i++) {
       for (j = A->adj_off[i]; j < A->adj_off[i + 1]; j++)
-        printf("%ld %ld %lf\n", A->rows[A->adj_idx[j]] + 1, A->cols[i] + 1,
+        printf("%ld %ld %lf\n", A->rows[A->adj_idx[j]], A->cols[i],
                A->adj_val[j]);
       if (A->diag_val != NULL)
-        printf("%ld %ld %lf\n", A->cols[i] + 1, A->cols[i] + 1, A->diag_val[i]);
+        printf("%ld %ld %lf\n", A->cols[i], A->cols[i], A->diag_val[i]);
     }
   }
 }
@@ -770,11 +769,6 @@ static int schur_setup_G(struct par_mat *G, const struct mat *L,
   assert(IS_CSR(F));
   assert(NO_DIAG(F));
 
-  if (F->rn == 0) {
-    par_csc_setup(G, NULL, 0, bfr);
-    return 0;
-  }
-
   uint n = L->n;
   scalar *b = tcalloc(scalar, 2 * n);
   scalar *x = b + n;
@@ -787,7 +781,6 @@ static int schur_setup_G(struct par_mat *G, const struct mat *L,
   for (i = 0; i < F->rn; i++) {
     b[F->rows[i] - L->start] = 1;
     cholesky_lower_solve(x, L, b);
-
 #if 0
     printf("L = ");
     for (j = 0; j < n; j++)
@@ -821,25 +814,23 @@ static int schur_setup_G(struct par_mat *G, const struct mat *L,
 
   struct array unique;
   array_init(struct mat_ij, &unique, 100);
-  for (j = k = 0, i = 1; i < gij.n; i++) {
-    if ((ptr[j].r != ptr[i].r) || (ptr[j].c != ptr[i].c)) {
-      array_cat(struct mat_ij, &unique, &ptr[j], 1);
-      cols[k] = ptr[j].c;
-      owners[k] = S_owns_row(cols[k], srows, srn) < srn ? c->id : -1, k++;
-      j = i;
-    } else
-      ptr[j].v += ptr[i].v;
+  for (i = k = 0; i < gij.n; k++) {
+    for (j = i + 1; j < gij.n && ptr[j].r == ptr[i].r && ptr[j].c == ptr[i].c;
+      j++)
+      ptr[i].v += ptr[j].v;
+
+    array_cat(struct mat_ij, &unique, &ptr[i], 1);
+    cols[k] = ptr[i].c;
+    owners[k] = S_owns_row(cols[k], srows, srn) < srn ? c->id : -1;
+    i = j;
   }
-  array_cat(struct mat_ij, &unique, &ptr[j], 1);
-  cols[k] = ptr[j].c;
-  owners[k] = S_owns_row(cols[k], srows, srn) < srn ? c->id : -1, k++;
   array_free(&gij);
   assert(k == unique.n); // Sanity check
 
   // Set the destination processor for elements in unique. Since W will be in
   // CSR and share the same row distribution as S, we use gslib and row
   // distribution of S to find the destination processor.
-  struct gs_data *gsh = gs_setup(cols, k, c, 0, gs_pairwise, 0);
+  struct gs_data *gsh = gs_setup(cols, k, c, 0, gs_pairwise, 1);
   gs(owners, gs_int, gs_max, 0, gsh, bfr);
   free(gsh);
 
@@ -869,15 +860,13 @@ static int schur_setup_W(struct par_mat *W, const struct mat *L,
   assert(IS_CSR(Er));
   assert(NO_DIAG(Er));
 
-  if (Er->rn == 0) {
-    par_csr_setup(W, NULL, 0, bfr);
-    return 0;
-  }
+  uint nnz = 0;
+  if (Er->rn > 0)
+    nnz = Er->adj_off[Er->rn];
 
   // Setup E as a CSC matrix. First, find the owner processor of each column
   // with gslib. Then send the matrix entries to relevant processor and setup
   // E as a CSC matrix.
-  uint nnz = Er->adj_off[Er->rn];
   buffer_reserve(bfr, (sizeof(sint) + sizeof(slong)) * nnz);
   slong *cols = (slong *)bfr->ptr;
   sint *owners = (sint *)(cols + nnz);
@@ -929,7 +918,6 @@ static int schur_setup_W(struct par_mat *W, const struct mat *L,
   for (i = 0; i < n; i++) {
     b[i] = 1;
     cholesky_upper_solve(x, L, b);
-
 #if 0
     printf("U = ");
     for (j = 0; j < n; j++)
@@ -963,18 +951,16 @@ static int schur_setup_W(struct par_mat *W, const struct mat *L,
 
   struct array unique;
   array_init(struct mat_ij, &unique, 100);
-  for (j = k = 0, i = 1; i < wij.n; i++) {
-    if ((ptr[j].r != ptr[i].r) || (ptr[j].c != ptr[i].c)) {
-      array_cat(struct mat_ij, &unique, &ptr[j], 1);
-      rows[k] = ptr[j].r;
-      owners[k] = S_owns_row(rows[k], srows, srn) < srn ? c->id : -1, k++;
-      j = i;
-    } else
-      ptr[j].v += ptr[i].v;
+  for (i = k = 0; i < wij.n; k++) {
+    for (j = i + 1; j < wij.n && ptr[j].r == ptr[i].r && ptr[j].c == ptr[i].c;
+      j++)
+      ptr[i].v += ptr[j].v;
+
+    array_cat(struct mat_ij, &unique, &ptr[i], 1);
+    rows[k] = ptr[i].r;
+    owners[k] = S_owns_row(rows[k], srows, srn) < srn ? c->id : -1;
+    i = j;
   }
-  array_cat(struct mat_ij, &unique, &ptr[j], 1);
-  rows[k] = ptr[j].r;
-  owners[k] = S_owns_row(rows[k], srows, srn) < srn ? c->id : -1, k++;
   array_free(&wij);
   assert(k == unique.n); // Sanity check
 
@@ -1103,7 +1089,7 @@ static int spgemm(struct par_mat *S, const struct par_mat *W,
       }
     }
 
-    uint next = (c->id + 1) % c->np;
+    sint next = (c->id + 1) % c->np;
     for (i = 0; i < gij.n; i++)
       ptr[i].p = next;
     sarray_transfer(struct mat_ij, &gij, p, 0, cr);
