@@ -1,9 +1,9 @@
-#include <math.h>
-#include <time.h>
-
+#include "coarse.h"
 #include "genmap-impl.h"
 #include "multigrid.h"
-#include <sort.h>
+#include "sort.h"
+#include <math.h>
+#include <time.h>
 
 #define MM 500
 
@@ -396,7 +396,11 @@ static int inverse(genmap_vector y, struct rsb_element *elems, int nv,
       vtx[k++] = elems[i].vertices[j];
   }
 
-  struct mg_data *d = mg_setup(lelt, eid, vtx, nv, 4, gsc, buf);
+  struct crystal cr;
+  crystal_init(&cr, gsc);
+  struct par_mat *L = par_csr_setup_con(lelt, eid, vtx, nv, 1, gsc, &cr, buf);
+  struct mg_data *d = mg_setup(L, 4, gsc, &cr, buf);
+  crystal_free(&cr);
 
   wrk = sizeof(GenmapScalar) *
         (max_iter * lelt + lelt + max_iter * max_iter + 2 * max_iter);

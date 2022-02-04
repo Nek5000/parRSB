@@ -1,4 +1,5 @@
 #include "coarse.h"
+#include "multigrid.h"
 #include <math.h>
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
@@ -119,7 +120,7 @@ struct nbr {
 
 void find_nbrs(struct array *arr, const ulong *eid, const slong *vtx,
                const uint nelt, const int nv, const struct comm *c,
-               buffer *buf) {
+               struct crystal *cr, buffer *buf) {
   struct array vertices;
   array_init(struct nbr, &vertices, nelt * nv);
 
@@ -133,9 +134,7 @@ void find_nbrs(struct array *arr, const ulong *eid, const slong *vtx,
     }
   }
 
-  struct crystal cr;
-  crystal_init(&cr, c);
-  sarray_transfer(struct nbr, &vertices, proc, 1, &cr);
+  sarray_transfer(struct nbr, &vertices, proc, 1, cr);
 
   sarray_sort(struct nbr, vertices.ptr, vertices.n, c, 1, buf);
   struct nbr *vptr = (struct nbr *)vertices.ptr;
@@ -158,8 +157,7 @@ void find_nbrs(struct array *arr, const ulong *eid, const slong *vtx,
     s = e;
   }
 
-  sarray_transfer(struct nbr, arr, proc, 1, &cr);
-  crystal_free(&cr);
+  sarray_transfer(struct nbr, arr, proc, 1, cr);
   array_free(&vertices);
 }
 
@@ -333,85 +331,6 @@ int mat_free(struct mat *mat) {
   FREE(mat, D);
   FREE(mat, col);
   return 0;
-}
-
-struct mat *csr_from_conn(const uint nelt, const ulong *eid, const slong *vtx,
-                          int nv, int sep, struct comm *c, buffer *bfr) {
-  struct array nbrs, eij;
-  array_init(struct nbr, &nbrs, 100);
-  array_init(struct mat_ij, &eij, 100);
-
-  find_nbrs(&nbrs, eid, vtx, nelt, nv, c, bfr);
-  compress_nbrs(&eij, &nbrs, bfr);
-  struct mat *M = tcalloc(struct mat, 1);
-  csr_setup(M, &eij, sep, bfr);
-
-  array_free(&nbrs);
-  array_free(&eij);
-
-  return M;
-}
-
-static int compress_mat_ij(struct array *eij, struct array *entries,
-                           buffer *bfr) {
-  eij->n = 0;
-  if (entries->n == 0)
-    return 1;
-
-  sarray_sort_2(struct mat_ij, entries->ptr, entries->n, r, 1, c, 1, bfr);
-  struct mat_ij *ptr = (struct mat_ij *)entries->ptr;
-
-  struct mat_ij m;
-  m.idx = 0;
-
-  uint i = 0;
-  while (i < entries->n) {
-    m = ptr[i];
-    uint j = i + 1;
-    while (j < entries->n && ptr[j].r == ptr[i].r && ptr[j].c == ptr[i].c)
-      m.v += ptr[j].v, j++;
-
-    array_cat(struct mat_ij, eij, &m, 1);
-    i = j;
-  }
-
-  // Now make sure the row sum is zero
-  struct mat_ij *pe = (struct mat_ij *)eij->ptr;
-  i = 0;
-  while (i < eij->n) {
-    sint j = i, k = -1, s = 0;
-    while (j < eij->n && pe[j].r == pe[i].r) {
-#if 0
-      if (eij->n < 5)
-        printf("r = %lld c = %lld\n", pe[j].r, pe[j].c);
-#endif
-      if (pe[j].r == pe[j].c)
-        k = j;
-      else
-        s += pe[j].v;
-      j++;
-    }
-#if 0
-    printf("ii = %d n = %d\n", i, eij->n);
-#endif
-    assert(k >= 0);
-    pe[k].v = -s;
-    i = j;
-  }
-}
-
-struct mat *csr_setup_ext(struct array *entries, int sep, buffer *bfr) {
-  struct array eij;
-  array_init(struct mat_ij, &eij, 100);
-
-  compress_mat_ij(&eij, entries, bfr);
-
-  struct mat *M = tcalloc(struct mat, 1);
-  csr_setup(M, &eij, sep, bfr);
-
-  array_free(&eij);
-
-  return M;
 }
 
 //------------------------------------------------------------------------------
@@ -641,6 +560,87 @@ static int par_mat_free(struct par_mat *A) {
   FREE(A, diag_val);
 
   return 0;
+}
+
+struct par_mat *par_csr_setup_con(const uint nelt, const ulong *eid,
+                                  const slong *vtx, int nv, int sep,
+                                  struct comm *c, struct crystal *cr,
+                                  buffer *bfr) {
+  struct array nbrs, eij;
+  array_init(struct nbr, &nbrs, 100);
+  array_init(struct mat_ij, &eij, 100);
+
+  find_nbrs(&nbrs, eid, vtx, nelt, nv, c, cr, bfr);
+  compress_nbrs(&eij, &nbrs, bfr);
+  array_free(&nbrs);
+
+  struct par_mat *M = tcalloc(struct par_mat, 1);
+  par_csr_setup(M, &eij, sep, bfr);
+  array_free(&eij);
+
+  return M;
+}
+
+static int compress_mat_ij(struct array *eij, struct array *entries,
+                           buffer *bfr) {
+  eij->n = 0;
+  if (entries->n == 0)
+    return 1;
+
+  sarray_sort_2(struct mat_ij, entries->ptr, entries->n, r, 1, c, 1, bfr);
+  struct mat_ij *ptr = (struct mat_ij *)entries->ptr;
+
+  struct mat_ij m;
+  m.idx = 0;
+
+  uint i = 0;
+  while (i < entries->n) {
+    m = ptr[i];
+    uint j = i + 1;
+    while (j < entries->n && ptr[j].r == ptr[i].r && ptr[j].c == ptr[i].c)
+      m.v += ptr[j].v, j++;
+
+    array_cat(struct mat_ij, eij, &m, 1);
+    i = j;
+  }
+
+  // Now make sure the row sum is zero
+  struct mat_ij *pe = (struct mat_ij *)eij->ptr;
+  i = 0;
+  while (i < eij->n) {
+    sint j = i, k = -1, s = 0;
+    while (j < eij->n && pe[j].r == pe[i].r) {
+#if 0
+      if (eij->n < 5)
+        printf("r = %lld c = %lld\n", pe[j].r, pe[j].c);
+#endif
+      if (pe[j].r == pe[j].c)
+        k = j;
+      else
+        s += pe[j].v;
+      j++;
+    }
+#if 0
+    printf("ii = %d n = %d\n", i, eij->n);
+#endif
+    assert(k >= 0);
+    pe[k].v = -s;
+    i = j;
+  }
+}
+
+struct par_mat *par_csr_setup_ext(struct array *entries, int sep, buffer *bfr) {
+  struct array eij;
+  array_init(struct mat_ij, &eij, 100);
+
+  compress_mat_ij(&eij, entries, bfr);
+
+  struct par_mat *M = tcalloc(struct par_mat, 1);
+  par_csr_setup(M, &eij, sep, bfr);
+
+  array_free(&eij);
+
+  return M;
 }
 
 //------------------------------------------------------------------------------
@@ -1126,7 +1126,7 @@ static int spsub(struct par_mat *C, const struct par_mat *A,
   }
   array_free(&cij);
 
-  par_csr_setup(C, &unique, 0, bfr);
+  par_csr_setup(C, &unique, 1, bfr);
   array_free(&unique);
 
   return 0;
@@ -1197,26 +1197,27 @@ static int spgemm(struct par_mat *S, const struct par_mat *W,
 
 static int schur_precond_setup(const struct mat *L, const struct par_mat *F,
                                const struct par_mat *S, const struct par_mat *E,
-                               const struct comm *c, buffer *bfr) {
-  struct crystal cr;
-  crystal_init(&cr, c);
-
+                               const struct comm *c, struct crystal *cr,
+                               buffer *bfr) {
   // TODO: Sparsify W and G when they are built
   struct par_mat W, G, WG;
-  schur_setup_G(&G, L, F, S->rows, S->rn, c, &cr, bfr);
-  schur_setup_W(&W, L, E, S->rows, S->rn, c, &cr, bfr);
-  spgemm(&WG, &W, &G, &cr, c, bfr);
+  schur_setup_G(&G, L, F, S->rows, S->rn, c, cr, bfr);
+  schur_setup_W(&W, L, E, S->rows, S->rn, c, cr, bfr);
+  spgemm(&WG, &W, &G, cr, c, bfr);
 #ifdef DUMPWG
   par_mat_print(&WG);
 #endif
 
+  // P is CSR
   struct par_mat P;
-  spsub(&P, S, &WG, c, &cr, bfr);
+  spsub(&P, S, &WG, c, cr, bfr);
 #ifdef DUMPP
   par_mat_print(&P);
 #endif
 
-  crystal_free(&cr);
+  struct mg_data *d = mg_setup(&P, 2, c, cr, bfr);
+  mg_free(d);
+
   par_mat_free(&W);
   par_mat_free(&G);
   par_mat_free(&WG);
@@ -1270,9 +1271,12 @@ struct coarse *coarse_setup(uint nelt, int nv, slong const *vtx, struct comm *c,
   ulong *eid = tcalloc(ulong, nelt), ng[2];
   number_rows(eid, ng, vtx, nelt, nv, c, bfr);
 
+  struct crystal cr;
+  crystal_init(&cr, c);
+
   struct array nbrs;
   array_init(struct nbr, &nbrs, nelt);
-  find_nbrs(&nbrs, eid, vtx, nelt, nv, c, bfr);
+  find_nbrs(&nbrs, eid, vtx, nelt, nv, c, &cr, bfr);
 
   // convert `struct nbr` -> `struct mat_ij` and compress
   // entries which share the same (r, c) values. Set the
@@ -1336,13 +1340,15 @@ struct coarse *coarse_setup(uint nelt, int nv, slong const *vtx, struct comm *c,
 #endif
 
   // Setup the preconditioner for the Schur complement matrix
-  schur_precond_setup(&crs->A_ll, &crs->A_sl, &crs->A_ss, &crs->A_ls, c, bfr);
+  schur_precond_setup(&crs->A_ll, &crs->A_sl, &crs->A_ss, &crs->A_ls, c, &cr,
+                      bfr);
 
   array_free(&ll);
   array_free(&ls);
   array_free(&sl);
   array_free(&ss);
   free(eid);
+  crystal_free(&cr);
 
   return crs;
 }
