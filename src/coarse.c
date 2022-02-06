@@ -324,7 +324,7 @@ int mat_print(struct mat *mat) {
   return 0;
 }
 
-int mat_free(struct mat *mat) {
+static int mat_free(struct mat *mat) {
   FREE(mat, Lp);
   FREE(mat, Li);
   FREE(mat, L);
@@ -550,7 +550,7 @@ static void par_mat_print(struct par_mat *A) {
   }
 }
 
-static int par_mat_free(struct par_mat *A) {
+int par_mat_free(struct par_mat *A) {
   FREE(A, rows);
   FREE(A, cols);
   FREE(A, adj_off);
@@ -827,19 +827,9 @@ static void cholesky_lower_solve(scalar *x, const struct mat *A, scalar *b) {
     x[i] *= sqrt(D[i]);
 }
 
-//------------------------------------------------------------------------------
-// Setup coarse grid system
-// A_ll: Local dof of a processor (block diagonal across processors)
-// A_sl (= A_ls^T): shared - local matrix
-// A_ss: Shared dof freedom (matrix is split row wise)
-//     |A_ll (B)  A_ls (F)|
-//  A= |                  |
-//     |A_sl (E)  A_ss (S)|
-struct coarse {
-  struct par_mat A_ls, A_ss, A_sl;
-  struct mat A_ll;
-};
-
+//-----------------------------------------------------------------------------
+// Schur setup
+//
 static int S_owns_row(const ulong r, const ulong *rows, const uint n) {
   // We can do a binary search instead of linear search
   uint i = 0;
@@ -1079,9 +1069,9 @@ static int schur_setup_W(struct par_mat *W, const struct mat *L,
 
 // C = A - B; A and B should be in CSR format with the same row
 // distribution
-static int spsub(struct par_mat *C, const struct par_mat *A,
-                 const struct par_mat *B, const struct comm *c,
-                 struct crystal *const cr, buffer *bfr) {
+static int sparse_sub(struct par_mat *C, const struct par_mat *A,
+                      const struct par_mat *B, const struct comm *c,
+                      struct crystal *const cr, buffer *bfr) {
   assert(IS_CSR(A));
   assert(IS_CSR(B));
 
@@ -1132,9 +1122,9 @@ static int spsub(struct par_mat *C, const struct par_mat *A,
   return 0;
 }
 
-static int spgemm(struct par_mat *S, const struct par_mat *W,
-                  const struct par_mat *G, struct crystal *cr,
-                  const struct comm *c, buffer *bfr) {
+static int sparse_gemm(struct par_mat *S, const struct par_mat *W,
+                       const struct par_mat *G, struct crystal *cr,
+                       const struct comm *c, buffer *bfr) {
   // W is in CSR, G is in CSC; we multiply rows of W by shifting
   // the columns of G from processor to processor. This is not scalable
   // at all -- need to do a 2D partition of the matrices W and G.
@@ -1195,79 +1185,112 @@ static int spgemm(struct par_mat *S, const struct par_mat *W,
   return 0;
 }
 
-static int schur_precond_setup(const struct mat *L, const struct par_mat *F,
-                               const struct par_mat *S, const struct par_mat *E,
-                               const struct comm *c, struct crystal *cr,
-                               buffer *bfr) {
+static struct mg_data *
+schur_precond_setup(const struct mat *L, const struct par_mat *F,
+                    const struct par_mat *S, const struct par_mat *E,
+                    const struct comm *c, struct crystal *cr, buffer *bfr) {
   // TODO: Sparsify W and G when they are built
   struct par_mat W, G, WG;
   schur_setup_G(&G, L, F, S->rows, S->rn, c, cr, bfr);
   schur_setup_W(&W, L, E, S->rows, S->rn, c, cr, bfr);
-  spgemm(&WG, &W, &G, cr, c, bfr);
+  sparse_gemm(&WG, &W, &G, cr, c, bfr);
 #ifdef DUMPWG
   par_mat_print(&WG);
 #endif
 
   // P is CSR
-  struct par_mat P;
-  spsub(&P, S, &WG, c, cr, bfr);
+  struct par_mat *P = tcalloc(struct par_mat, 1);
+  sparse_sub(P, S, &WG, c, cr, bfr);
 #ifdef DUMPP
   par_mat_print(&P);
 #endif
 
-  struct mg_data *d = mg_setup(&P, 2, c, cr, bfr);
-  mg_free(d);
-
   par_mat_free(&W);
   par_mat_free(&G);
   par_mat_free(&WG);
-  par_mat_free(&P);
 
-  return 0;
+  return mg_setup(P, 2, c, cr, bfr);
 }
 
-int mat_zero_sum(struct mat *A) {
-  for (uint i = 0, n = A->n; i != n; i++) {
-    scalar s = 0;
-    uint k;
-    for (uint j = A->Lp[i], je = A->Lp[i + 1]; j != je; j++) {
-      if (i != A->Li[j])
-        s += A->L[j];
+static struct mg_data *schur_setup(struct mat *A_ll, struct par_mat *A_ls,
+                                   struct par_mat *A_sl, struct par_mat *A_ss,
+                                   struct array *eij, const ulong ng[2],
+                                   struct comm *c, struct crystal *cr,
+                                   buffer *bfr) {
+  // Setup A_ll
+  struct array ll, ls, sl, ss;
+  array_init(struct mat_ij, &ll, eij->n / 4 + 1);
+  array_init(struct mat_ij, &ls, eij->n / 4 + 1);
+  array_init(struct mat_ij, &sl, eij->n / 4 + 1);
+  array_init(struct mat_ij, &ss, eij->n / 4 + 1);
+
+  struct mat_ij *ptr = (struct mat_ij *)eij->ptr;
+  for (uint i = 0; i < eij->n; i++) {
+    if (ptr[i].r < ng[0])
+      if (ptr[i].c < ng[0])
+        array_cat(struct mat_ij, &ll, &ptr[i], 1);
       else
-        k = j;
-    }
-    A->L[k] = -s;
+        array_cat(struct mat_ij, &sl, &ptr[i], 1);
+    else if (ptr[i].c < ng[0])
+      array_cat(struct mat_ij, &ls, &ptr[i], 1);
+    else
+      array_cat(struct mat_ij, &ss, &ptr[i], 1);
   }
 
-  return 0;
+  // Setup local block diagonal (B)
+  struct mat All;
+  csr_setup(&All, &ll, 0, bfr);
+  cholesky_factor(A_ll, &All, bfr);
+#ifdef DUMPB
+  mat_print(&A_ll);
+#endif
+  mat_free(&All);
+
+  // Setup E
+  par_csr_setup(A_ls, &ls, 0, bfr);
+#ifdef DUMPE
+  par_mat_print(A_ls);
+#endif
+
+  // Setup F
+  par_csr_setup(A_sl, &sl, 0, bfr);
+#ifdef DUMPF
+  par_mat_print(A_sl);
+#endif
+
+  // Setup S
+  par_csr_setup(A_ss, &ss, 0, bfr);
+#ifdef DUMPS
+  par_mat_print(A_ss);
+#endif
+
+  array_free(&ll);
+  array_free(&ls);
+  array_free(&sl);
+  array_free(&ss);
+
+  // Setup the preconditioner for the Schur complement matrix
+  return schur_precond_setup(A_ll, A_sl, A_ss, A_ls, c, cr, bfr);
 }
 
-static int par_mat_zero_sum(struct par_mat *A) {
-  ulong *a, *b;
-  if (IS_CSR(A))
-    a = A->rows, b = A->cols;
-  else if (IS_CSC(A))
-    a = A->cols, b = A->rows;
-  else
-    return 1;
-
-  for (uint i = 0, n = A->rn; i != n; i++) {
-    scalar s = 0;
-    uint k;
-    for (uint j = A->adj_off[i], je = A->adj_off[i + 1]; j != je; j++) {
-      if (a[i] != b[A->adj_idx[j]])
-        s += A->adj_val[j];
-      else
-        k = j;
-    }
-    A->adj_val[k] = -s;
-  }
-
-  return 0;
-}
+//------------------------------------------------------------------------------
+// Setup coarse grid system
+// A_ll: Local dof of a processor (block diagonal across processors)
+// A_sl (= A_ls^T): shared - local matrix
+// A_ss: Shared dof freedom (matrix is split row wise)
+//     |A_ll (B)  A_ls (F)|
+//  A= |                  |
+//     |A_sl (E)  A_ss (S)|
+struct coarse {
+  struct par_mat A_ls, A_ss, A_sl;
+  struct mat A_ll;
+  struct mg_data *M;
+};
 
 struct coarse *coarse_setup(uint nelt, int nv, slong const *vtx, struct comm *c,
                             buffer *bfr) {
+  struct coarse *crs = tcalloc(struct coarse, 1);
+
   ulong *eid = tcalloc(ulong, nelt), ng[2];
   number_rows(eid, ng, vtx, nelt, nv, c, bfr);
 
@@ -1277,6 +1300,7 @@ struct coarse *coarse_setup(uint nelt, int nv, slong const *vtx, struct comm *c,
   struct array nbrs;
   array_init(struct nbr, &nbrs, nelt);
   find_nbrs(&nbrs, eid, vtx, nelt, nv, c, &cr, bfr);
+  free(eid);
 
   // convert `struct nbr` -> `struct mat_ij` and compress
   // entries which share the same (r, c) values. Set the
@@ -1288,66 +1312,9 @@ struct coarse *coarse_setup(uint nelt, int nv, slong const *vtx, struct comm *c,
   compress_nbrs(&eij, &nbrs, bfr);
   array_free(&nbrs);
 
-  // Setup A_ll
-  struct array ll, ls, sl, ss;
-  array_init(struct mat_ij, &ll, nbrs.n / 4 + 1);
-  array_init(struct mat_ij, &ls, nbrs.n / 4 + 1);
-  array_init(struct mat_ij, &sl, nbrs.n / 4 + 1);
-  array_init(struct mat_ij, &ss, nbrs.n / 4 + 1);
-
-  struct mat_ij *ptr = (struct mat_ij *)eij.ptr;
-  for (uint i = 0; i < eij.n; i++) {
-    if (ptr[i].r < ng[0])
-      if (ptr[i].c < ng[0])
-        array_cat(struct mat_ij, &ll, &ptr[i], 1);
-      else
-        array_cat(struct mat_ij, &sl, &ptr[i], 1);
-    else if (ptr[i].c < ng[0])
-      array_cat(struct mat_ij, &ls, &ptr[i], 1);
-    else
-      array_cat(struct mat_ij, &ss, &ptr[i], 1);
-  }
+  crs->M = schur_setup(&crs->A_ll, &crs->A_ls, &crs->A_sl, &crs->A_ss, &eij, ng,
+                       c, &cr, bfr);
   array_free(&eij);
-
-  struct coarse *crs = tcalloc(struct coarse, 1);
-
-  // Setup local block diagonal (B)
-  struct mat A_ll;
-  csr_setup(&A_ll, &ll, 0, bfr);
-#ifdef DUMPB
-  mat_print(&A_ll);
-#endif
-
-  cholesky_factor(&crs->A_ll, &A_ll, bfr);
-  mat_free(&A_ll);
-
-  // Setup E
-  par_csr_setup(&crs->A_ls, &ls, 0, bfr);
-#ifdef DUMPE
-  par_mat_print(&crs->A_ls);
-#endif
-
-  // Setup F
-  par_csr_setup(&crs->A_sl, &sl, 0, bfr);
-#ifdef DUMPF
-  par_mat_print(&crs->A_sl);
-#endif
-
-  // Setup S
-  par_csr_setup(&crs->A_ss, &ss, 0, bfr);
-#ifdef DUMPS
-  par_mat_print(&crs->A_ss);
-#endif
-
-  // Setup the preconditioner for the Schur complement matrix
-  schur_precond_setup(&crs->A_ll, &crs->A_sl, &crs->A_ss, &crs->A_ls, c, &cr,
-                      bfr);
-
-  array_free(&ll);
-  array_free(&ls);
-  array_free(&sl);
-  array_free(&ss);
-  free(eid);
   crystal_free(&cr);
 
   return crs;
@@ -1363,6 +1330,7 @@ int coarse_free(struct coarse *crs) {
   par_mat_free(&crs->A_ls);
   par_mat_free(&crs->A_sl);
   par_mat_free(&crs->A_ss);
+  mg_free(crs->M);
   free(crs);
   return 0;
 }

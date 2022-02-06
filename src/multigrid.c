@@ -311,10 +311,9 @@ void mg_vcycle(scalar *u1, scalar *rhs, struct mg_data *d, struct comm *c,
 void mg_free(struct mg_data *d) {
   if (d != NULL) {
     struct mg_lvl **l = d->levels;
-#if 0
     for (uint i = 0; i < d->nlevels; i++) {
       if (l[i]->M != NULL)
-        mat_free(l[i]->M), l[i]->M = NULL;
+        par_mat_free(l[i]->M), l[i]->M = NULL;
       if (l[i]->J != NULL)
         gs_free(l[i]->J), l[i]->J = NULL;
       if (l[i]->Q != NULL)
@@ -322,7 +321,6 @@ void mg_free(struct mg_data *d) {
       if (l[i] != NULL)
         free(l[i]), l[i] = NULL;
     }
-#endif
 
     if (d->levels != NULL)
       free(d->levels), d->levels = NULL;
