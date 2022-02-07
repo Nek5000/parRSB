@@ -38,7 +38,6 @@ struct par_mat {
   scalar *adj_val;
 
   // Diagonal
-  uint *diag_idx;
   scalar *diag_val;
 };
 
@@ -52,21 +51,34 @@ static int logbll(slong n, int a) {
   return k;
 }
 
-static struct gs_data *setup_Q(const struct par_mat *M, const struct comm *c,
-                               buffer *bfr) {
+struct gs_data *setup_Q(const struct par_mat *M, const struct comm *c,
+                        buffer *bfr) {
+  uint n;
+  ulong *ids, *diag;
+  if (IS_CSR(M))
+    n = M->rn, ids = M->cols, diag = M->rows;
+  else if (IS_CSC(M))
+    n = M->cn, ids = M->rows, diag = M->cols;
+  else {
+    fprintf(stderr, "%s:%d Wrong matrix type !\n", __FILE__, __LINE__);
+    exit(1);
+  }
+
+  assert(n == 0 || IS_DIAG(M));
+
   // Setup gs handle for the mat-vec
-  uint nnz = M->rn > 0 ? M->adj_off[M->rn] + (M->diag_val != NULL) * M->rn : 0;
+  uint nnz = n > 0 ? M->adj_off[n] + n : 0;
   buffer_reserve(bfr, nnz * sizeof(slong));
+  slong *sids = (slong *)bfr->ptr;
 
-  slong *ids = (slong *)bfr->ptr;
   uint i, j;
-  for (i = 0; i < M->rn; i++)
+  for (i = 0; i < n; i++)
     for (j = M->adj_off[i]; j < M->adj_off[i + 1]; j++)
-      ids[j] = -M->cols[M->adj_idx[j]];
-  for (i = 0; i < M->rn; i++)
-    ids[j++] = M->rows[i];
+      sids[j] = -ids[M->adj_idx[j]];
+  for (i = 0; i < n; i++)
+    sids[j++] = diag[i];
 
-  return gs_setup(ids, nnz, c, 0, gs_crystal_router, 0);
+  return gs_setup(sids, nnz, c, 0, gs_crystal_router, 0);
 }
 
 static void mg_lvl_setup(struct mg_data *d, const uint lvl, const int factor,
@@ -74,7 +86,7 @@ static void mg_lvl_setup(struct mg_data *d, const uint lvl, const int factor,
                          struct array *entries, buffer *bfr) {
   assert(lvl > 0);
   struct par_mat *M = d->levels[lvl - 1]->M;
-  uint nnz = M->rn > 0 ? M->adj_off[M->rn] + (M->diag_val != NULL) * M->rn : 0;
+  uint nnz = M->rn > 0 ? M->adj_off[M->rn] + IS_DIAG(M) * M->rn : 0;
 
   // Reserve enough space in the array
   array_reserve(struct mat_ij, entries, nnz);
@@ -126,7 +138,6 @@ static void mg_lvl_setup(struct mg_data *d, const uint lvl, const int factor,
       m.r--;
     m.c = m.r;
     assert(m.r > 0);
-    assert(m.c > 0);
     m.v = M->diag_val[i];
     SETP(m.p, m.r, npc, nelt, nrem);
     ids[k++] = -m.c;
@@ -147,8 +158,8 @@ static void mg_lvl_setup(struct mg_data *d, const uint lvl, const int factor,
     ids[k++] = M->rows[i];
 
   d->levels[lvl - 1]->J = gs_setup(ids, k, c, 0, gs_pairwise, 0);
-  free(ids);
   d->levels[lvl]->Q = setup_Q(M, c, bfr);
+  free(ids);
 }
 
 struct mg_data *mg_setup(const struct par_mat *M, const int factor,
@@ -205,22 +216,23 @@ struct mg_data *mg_setup(const struct par_mat *M, const int factor,
   return d;
 }
 
-static void mat_vec(scalar *y, struct par_mat *M, scalar *x,
-                    struct gs_data *gsh, scalar *buf, buffer *bfr) {
-  uint n = M->rn > 0 ? M->rn : 0;
-  uint nnz = n > 0 ? M->adj_off[n] : 0;
-  uint i;
+void mat_vec_csr(scalar *y, scalar *x, struct par_mat *M, struct gs_data *gsh,
+                 scalar *buf, buffer *bfr) {
+  assert(IS_CSR(M));
+
+  uint n = M->rn, *Lp = M->adj_off, nnz = n > 0 ? Lp[n] : 0;
+  uint i, j, je;
   for (i = 0; i < nnz; i++)
     buf[i] = 0.0; // Is this really necessary?
-  for (i = 0; i < M->rn; i++)
+  for (i = 0; i < n; i++)
     y[i] = buf[nnz + i] = x[i];
+
   gs(buf, gs_double, gs_add, 0, gsh, bfr);
 
-  uint j, je;
+  scalar *D = M->diag_val, *L = M->adj_val;
   for (i = 0; i < n; i++) {
-    for (y[i] *= M->diag_val[i], j = M->adj_off[i], je = M->adj_off[i + 1];
-         j != je; j++)
-      y[i] += M->adj_val[j] * buf[j];
+    for (y[i] *= D[i], j = Lp[i], je = Lp[i + 1]; j != je; j++)
+      y[i] += L[j] * buf[j];
   }
 }
 
@@ -249,7 +261,7 @@ void mg_vcycle(scalar *u1, scalar *rhs, struct mg_data *d, struct comm *c,
       u[off + j] = sigma * r[off + j] / M->diag_val[j];
 
     // G*u
-    mat_vec(Gs + off, M, u + off, l->Q, buf, bfr);
+    mat_vec_csr(Gs + off, u + off, M, l->Q, buf, bfr);
 
     // r = rhs - Gu
     for (j = 0; j < n; j++)
@@ -265,9 +277,9 @@ void mg_vcycle(scalar *u1, scalar *rhs, struct mg_data *d, struct comm *c,
       }
 
       // G*s
-      mat_vec(Gs + off, M, s + off, l->Q, buf, bfr);
+      mat_vec_csr(Gs + off, s + off, M, l->Q, buf, bfr);
 
-      // r=r-Gs
+      // r = r - Gs
       for (j = 0; j < n; j++)
         r[off + j] = r[off + j] - Gs[off + j];
     }

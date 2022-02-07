@@ -241,8 +241,9 @@ int inv_power_serial(double *y, int N, double *A, int verbose) {
   return j;
 }
 
-int project(genmap_vector x, struct laplacian *gl, struct mg_data *d,
-            genmap_vector ri, int max_iter, struct comm *gsc, buffer *buf) {
+static int project(genmap_vector x, struct laplacian *gl, struct mg_data *d,
+                   genmap_vector ri, int max_iter, struct comm *gsc,
+                   buffer *buf) {
   assert(x->size == ri->size);
   uint lelt = x->size;
 
@@ -275,7 +276,6 @@ int project(genmap_vector x, struct laplacian *gl, struct mg_data *d,
 
   vec_copy(z, r);
   vec_ortho(gsc, z, nelg);
-
   GenmapScalar rz1 = vec_dot(r, z);
   comm_allreduce(gsc, gs_double, gs_add, &rz1, 1, bfr);
 

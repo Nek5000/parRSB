@@ -2,20 +2,11 @@
 #include "multigrid.h"
 #include <math.h>
 
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
-
 #define FREE(ptr, x)                                                           \
   {                                                                            \
     if (ptr->x != NULL)                                                        \
       free(ptr->x);                                                            \
   }
-
-#define CSC 0
-#define CSR 1
-
-#define IS_CSC(A) ((A)->type == CSC)
-#define IS_CSR(A) ((A)->type == CSR)
-#define NO_DIAG(A) ((A)->diag_val == NULL)
 
 //#define DUMPB
 //#define DUMPE
@@ -33,21 +24,29 @@ static void comm_split(const struct comm *old, const int bin, const int key,
   comm_init(new_, new_comm);
   MPI_Comm_free(&new_comm);
 }
+//------------------------------------------------------------------------------
+// Coarse system
+//
+struct coarse {
+  ulong ls, is;
+  uint ln, in, *idx;
+  void *solver;
+};
 
 //------------------------------------------------------------------------------
 // Number rows, local first then interface. Returns global number of local
 // elements.
-static int number_rows(ulong *elem, ulong ng[2], const slong *vtx,
-                       const uint nelt, const int nv, const struct comm *ci,
-                       buffer *bfr) {
+static ulong number_rows(ulong *elem, ulong *ls_, uint *ln_, ulong *is_,
+                         uint *in_, uint **idx_, const slong *vtx,
+                         const uint nelt, const int nv, const struct comm *ci,
+                         buffer *bfr) {
   uint npts = nelt * nv;
   int nnz = npts > 0;
+  if (nnz == 0)
+    return 1;
 
   struct comm c;
   comm_split(ci, nnz, ci->id, &c);
-
-  if (nnz == 0)
-    return 1;
 
   int *dof = tcalloc(int, npts), level = 1;
   uint i, j;
@@ -88,26 +87,31 @@ static int number_rows(ulong *elem, ulong ng[2], const slong *vtx,
   }
   comm_free(&c);
 
-  uint ni = 0;
+  uint in = 0, ln = 0;
   for (i = 0; i < nelt; i++)
     if (elem[i] > 0)
-      ni++;
-  uint nl = nelt - ni;
-
-  slong in[2] = {nl, ni}, out[2][2], buf[2][2];
-  comm_scan(out, ci, gs_long, gs_add, in, 2, buf);
-  slong sl = out[0][0] + 1, si = out[0][1];
-  slong gl = out[1][0] + 1;
-
-  for (i = 0; i < nelt; i++)
-    if (elem[i] > 0)
-      elem[i] = gl + si++;
+      in++;
     else
-      elem[i] = sl++;
+      ln++;
+  *in_ = in, *ln_ = ln;
 
-  ng[0] = out[1][0], ng[1] = out[1][1];
+  slong inp[2] = {ln, in}, out[2][2], buf[2][2];
+  comm_scan(out, ci, gs_long, gs_add, inp, 2, buf);
+  slong ls = *ls_ = out[0][0] + 1, is = *is_ = out[0][1] + 1;
+  slong lg = out[1][0];
+
+  uint *idx = *idx_ = tcalloc(uint, nelt);
+  for (i = ln = in = 0; i < nelt; i++)
+    if (elem[i] > 0)
+      elem[i] = lg + is++, idx[ln + in++] = i;
+    else
+      elem[i] = ls++, idx[ln++] = i;
+  assert(*ln_ == ln);      // Sanity check
+  assert(*in_ == in);      // Sanity check
+  assert(ln + in == nelt); // Sanity check
 
   free(dof);
+  return lg;
 }
 
 //------------------------------------------------------------------------------
@@ -277,7 +281,7 @@ static int csr_setup(struct mat *mat, struct array *entries, int sep,
   sarray_sort_2(struct mat_ij, entries->ptr, entries->n, r, 1, c, 1, buf);
   ptr = (struct mat_ij *)entries->ptr;
 
-  sep = sep > 0 ? 1 : 0;
+  sep = sep != 0;
   Lp[0] = 0, unique[0] = ptr[0];
   uint j;
   for (nr = 1, i = 1, j = 0; i < nnz; i++) {
@@ -351,7 +355,6 @@ struct par_mat {
   scalar *adj_val;
 
   // Diagonal
-  uint *diag_idx;
   scalar *diag_val;
 };
 
@@ -360,7 +363,7 @@ static int par_csr_setup(struct par_mat *mat, struct array *entries, int sd,
   mat->type = CSR;
   if (entries == NULL || entries->n == 0) {
     mat->cn = mat->rn = 0;
-    mat->diag_idx = mat->adj_off = mat->adj_idx = NULL;
+    mat->adj_off = mat->adj_idx = NULL;
     mat->adj_val = mat->diag_val = NULL;
     mat->rows = mat->cols = NULL;
     return 0;
@@ -375,7 +378,8 @@ static int par_csr_setup(struct par_mat *mat, struct array *entries, int sd,
 
   ulong *cols = (ulong *)buf->ptr;
   cols[0] = ptr[0].c, ptr[0].idx = 0, mat->cn = 1;
-  for (uint i = 1; i < nnz; i++) {
+  uint i;
+  for (i = 1; i < nnz; i++) {
     if (ptr[i - 1].c != ptr[i].c)
       cols[mat->cn] = ptr[i].c, ptr[i].idx = mat->cn++;
     else
@@ -396,7 +400,7 @@ static int par_csr_setup(struct par_mat *mat, struct array *entries, int sd,
 
   adj_off[0] = 0, unique[0] = ptr[0], rows[0] = ptr[0].r;
   uint j = 0;
-  for (uint i = mat->rn = 1; i < nnz; i++) {
+  for (i = mat->rn = 1; i < nnz; i++) {
     if ((unique[j].r != ptr[i].r) || (unique[j].c != ptr[i].c)) {
       if (unique[j].r != ptr[i].r) {
         adj_off[mat->rn] = j + 1 - sd * mat->rn;
@@ -416,28 +420,52 @@ static int par_csr_setup(struct par_mat *mat, struct array *entries, int sd,
   mat->adj_idx = (uint *)tcalloc(uint, j - sd * mat->rn);
   mat->adj_val = (scalar *)tcalloc(scalar, j - sd * mat->rn);
 
+  uint nadj = 0, ndiag = 0;
+  i = 0;
   if (sd) {
-    mat->diag_idx = (uint *)tcalloc(uint, mat->rn);
     mat->diag_val = (scalar *)tcalloc(scalar, mat->rn);
-  } else {
-    mat->diag_idx = NULL;
-    mat->diag_val = NULL;
-  }
-
-  uint ndiag, nadj, i;
-  for (i = ndiag = nadj = 0; i < j; i++) {
-    if (unique[i].r == unique[i].c && sd) {
-      mat->diag_idx[ndiag] = unique[i].idx;
-      mat->diag_val[ndiag++] = unique[i].v;
-    } else {
-      mat->adj_idx[nadj] = unique[i].idx;
-      mat->adj_val[nadj++] = unique[i].v;
+    for (; i < j; i++) {
+      if (unique[i].r == unique[i].c) {
+        mat->diag_val[ndiag++] = unique[i].v;
+      } else {
+        mat->adj_idx[nadj] = unique[i].idx;
+        mat->adj_val[nadj++] = unique[i].v;
+      }
     }
+  } else {
+    mat->diag_val = NULL;
+    for (; i < j; i++)
+      mat->adj_idx[nadj] = unique[i].idx, mat->adj_val[nadj++] = unique[i].v;
   }
 
-  // Sanity check
-  assert(ndiag == sd * mat->rn);
-  assert(nadj == j - sd * mat->rn);
+  return 0;
+}
+
+static int distribute_by_columns(struct array *aij, ulong s, uint n,
+                                 struct comm *c, struct crystal *cr,
+                                 buffer *bfr) {
+  buffer_reserve(bfr, sizeof(slong) * aij->n);
+  slong *cols = (slong *)bfr->ptr;
+  sint *owner = (sint *)tcalloc(sint, aij->n);
+
+  uint i;
+  struct mat_ij *ptr = aij->ptr;
+  for (i = 0; i < aij->n; i++) {
+    cols[i] = ptr[i].c;
+    if (ptr[i].c >= s && ptr[i].c < s + n)
+      owner[i] = c->id;
+    else
+      owner[i] = -1;
+  }
+
+  struct gs_data *gsh = gs_setup(cols, aij->n, c, 0, gs_pairwise, 0);
+  gs(owner, gs_int, gs_max, 0, gsh, bfr);
+
+  for (i = 0; i < aij->n; i++)
+    ptr[i].p = owner[i];
+  free(owner);
+
+  sarray_transfer(struct mat_ij, aij, p, 1, cr);
 
   return 0;
 }
@@ -447,7 +475,7 @@ static int par_csc_setup(struct par_mat *mat, struct array *entries, int sd,
   mat->type = CSC;
   if (entries == NULL || entries->n == 0) {
     mat->cn = mat->rn = 0;
-    mat->diag_idx = mat->adj_off = mat->adj_idx = NULL;
+    mat->adj_off = mat->adj_idx = NULL;
     mat->adj_val = mat->diag_val = NULL;
     mat->rows = mat->cols = NULL;
     return 0;
@@ -462,7 +490,8 @@ static int par_csc_setup(struct par_mat *mat, struct array *entries, int sd,
 
   ulong *rows = (ulong *)buf->ptr;
   rows[0] = ptr[0].r, ptr[0].idx = 0, mat->rn = 1;
-  for (uint i = 1; i < nnz; i++) {
+  uint i;
+  for (i = 1; i < nnz; i++) {
     if (ptr[i - 1].r != ptr[i].r)
       rows[mat->rn] = ptr[i].r, ptr[i].idx = mat->rn++;
     else
@@ -483,7 +512,7 @@ static int par_csc_setup(struct par_mat *mat, struct array *entries, int sd,
 
   adj_off[0] = 0, unique[0] = ptr[0], cols[0] = ptr[0].c;
   uint j = 0;
-  for (uint i = mat->cn = 1; i < nnz; i++) {
+  for (i = mat->cn = 1; i < nnz; i++) {
     if ((unique[j].r != ptr[i].r) || (unique[j].c != ptr[i].c)) {
       if (unique[j].c != ptr[i].c) {
         adj_off[mat->cn] = j + 1 - sd * mat->cn;
@@ -503,28 +532,23 @@ static int par_csc_setup(struct par_mat *mat, struct array *entries, int sd,
   mat->adj_idx = (uint *)tcalloc(uint, j - sd * mat->cn);
   mat->adj_val = (scalar *)tcalloc(scalar, j - sd * mat->cn);
 
+  uint nadj = 0, ndiag = 0;
+  i = 0;
   if (sd) {
-    mat->diag_idx = (uint *)tcalloc(uint, mat->cn);
     mat->diag_val = (scalar *)tcalloc(scalar, mat->cn);
-  } else {
-    mat->diag_idx = NULL;
-    mat->diag_val = NULL;
-  }
-
-  uint ndiag, nadj, i;
-  for (i = ndiag = nadj = 0; i < j; i++) {
-    if (unique[i].r == unique[i].c && sd) {
-      mat->diag_idx[ndiag] = unique[i].idx;
-      mat->diag_val[ndiag++] = unique[i].v;
-    } else {
-      mat->adj_idx[nadj] = unique[i].idx;
-      mat->adj_val[nadj++] = unique[i].v;
+    for (; i < j; i++) {
+      if (unique[i].r == unique[i].c) {
+        mat->diag_val[ndiag++] = unique[i].v;
+      } else {
+        mat->adj_idx[nadj] = unique[i].idx;
+        mat->adj_val[nadj++] = unique[i].v;
+      }
     }
+  } else {
+    mat->diag_val = NULL;
+    for (; i < j; i++)
+      mat->adj_idx[nadj] = unique[i].idx, mat->adj_val[nadj++] = unique[i].v;
   }
-
-  // Sanity check
-  assert(ndiag == sd * mat->cn);
-  assert(nadj == j - sd * mat->cn);
 
   return 0;
 }
@@ -536,7 +560,7 @@ static void par_mat_print(struct par_mat *A) {
       for (j = A->adj_off[i]; j < A->adj_off[i + 1]; j++)
         printf("%ld %ld %lf\n", A->rows[i], A->cols[A->adj_idx[j]],
                A->adj_val[j]);
-      if (A->diag_val != NULL)
+      if (IS_DIAG(A))
         printf("%ld %ld %lf\n", A->rows[i], A->rows[i], A->diag_val[i]);
     }
   } else if (IS_CSC(A)) {
@@ -544,7 +568,7 @@ static void par_mat_print(struct par_mat *A) {
       for (j = A->adj_off[i]; j < A->adj_off[i + 1]; j++)
         printf("%ld %ld %lf\n", A->rows[A->adj_idx[j]], A->cols[i],
                A->adj_val[j]);
-      if (A->diag_val != NULL)
+      if (IS_DIAG(A))
         printf("%ld %ld %lf\n", A->cols[i], A->cols[i], A->diag_val[i]);
     }
   }
@@ -556,7 +580,6 @@ int par_mat_free(struct par_mat *A) {
   FREE(A, adj_off);
   FREE(A, adj_idx);
   FREE(A, adj_val);
-  FREE(A, diag_idx);
   FREE(A, diag_val);
 
   return 0;
@@ -793,6 +816,22 @@ static void cholesky_solve(scalar *x, const struct mat *A, scalar *b) {
   }
 }
 
+static void cholesky_lower_solve(scalar *x, const struct mat *A, scalar *b) {
+  const uint *Lp = A->Lp, *Li = A->Li, n = A->n;
+  const scalar *L = A->L, *D = A->D;
+
+  uint i, p, pe;
+  for (i = 0; i < n; i++) {
+    scalar xi = b[i];
+    for (p = Lp[i], pe = Lp[i + 1]; p != pe; p++)
+      xi += x[Li[p]] * L[p];
+    x[i] = xi;
+  }
+
+  for (i = 0; i < n; i++)
+    x[i] *= sqrt(D[i]);
+}
+
 static void cholesky_upper_solve(scalar *x, const struct mat *A, scalar *b) {
   const uint *Lp = A->Lp, *Li = A->Li, n = A->n;
   const scalar *L = A->L, *D = A->D;
@@ -811,25 +850,24 @@ static void cholesky_upper_solve(scalar *x, const struct mat *A, scalar *b) {
   }
 }
 
-static void cholesky_lower_solve(scalar *x, const struct mat *A, scalar *b) {
-  const uint *Lp = A->Lp, *Li = A->Li, n = A->n;
-  const scalar *L = A->L, *D = A->D;
-
-  uint i, p, pe;
-  for (i = 0; i < n; i++) {
-    scalar xi = b[i];
-    for (p = Lp[i], pe = Lp[i + 1]; p != pe; p++)
-      xi += x[Li[p]] * L[p];
-    x[i] = xi;
-  }
-
-  for (i = 0; i < n; i++)
-    x[i] *= sqrt(D[i]);
-}
-
 //-----------------------------------------------------------------------------
 // Schur setup
 //
+// A_ll: local dof of a processor (block diagonal across processors)
+// A_sl: shared - local matrix
+// A_ss: shared dof freedom (matrix is split row wise)
+//
+//     |A_ll (B)  A_ls (F)|
+//  A= |                  |
+//     |A_sl (E)  A_ss (S)|
+//
+struct schur {
+  struct mat A_ll;
+  struct par_mat A_ls, A_sl, A_ss;
+  struct gs_data *Q_ls, *Q_sl, *Q_ss;
+  struct mg_data *M;
+};
+
 static int S_owns_row(const ulong r, const ulong *rows, const uint n) {
   // We can do a binary search instead of linear search
   uint i = 0;
@@ -846,17 +884,16 @@ static int schur_setup_G(struct par_mat *G, const struct mat *L,
                          const uint srn, const struct comm *c,
                          struct crystal *const cr, buffer *bfr) {
   assert(IS_CSR(F));
-  assert(NO_DIAG(F));
+  assert(!IS_DIAG(F));
 
   uint n = L->n;
-  scalar *b = tcalloc(scalar, 2 * n);
-  scalar *x = b + n;
+  scalar *b = tcalloc(scalar, 2 * n), *x = b + n;
 
   struct array gij;
   array_init(struct mat_ij, &gij, 100);
 
   struct mat_ij m;
-  uint i, j, k, ke;
+  uint i, j, k;
   for (i = 0; i < F->rn; i++) {
     b[F->rows[i] - L->start] = 1;
     cholesky_lower_solve(x, L, b);
@@ -870,7 +907,7 @@ static int schur_setup_G(struct par_mat *G, const struct mat *L,
 
     // Calculate F: i^th row of F is multiplied by each element of i^th
     // column of L_B^-1
-    for (k = F->adj_off[i], ke = F->adj_off[i + 1]; k < ke; k++) {
+    for (uint k = F->adj_off[i], ke = F->adj_off[i + 1]; k < ke; k++) {
       m.c = F->cols[F->adj_idx[k]];
       for (j = 0; j < n; j++) {
         m.r = L->start + j;
@@ -887,9 +924,9 @@ static int schur_setup_G(struct par_mat *G, const struct mat *L,
   sarray_sort_2(struct mat_ij, gij.ptr, gij.n, r, 1, c, 1, bfr);
   struct mat_ij *ptr = (struct mat_ij *)gij.ptr;
 
-  buffer_reserve(bfr, (sizeof(slong) + sizeof(sint)) * (gij.n + 1));
+  buffer_reserve(bfr, sizeof(slong) * gij.n);
   slong *cols = (slong *)bfr->ptr;
-  sint *owners = (sint *)(cols + gij.n + 1);
+  sint *owners = (sint *)trealloc(sint, b, gij.n);
 
   struct array unique;
   array_init(struct mat_ij, &unique, 100);
@@ -916,6 +953,7 @@ static int schur_setup_G(struct par_mat *G, const struct mat *L,
   ptr = unique.ptr;
   for (i = 0; i < unique.n; i++)
     ptr[i].p = owners[i];
+  free(owners);
 
   sarray_transfer(struct mat_ij, &unique, p, 0, cr);
 
@@ -923,9 +961,7 @@ static int schur_setup_G(struct par_mat *G, const struct mat *L,
 #ifdef DUMPG
   par_mat_print(G);
 #endif
-
   array_free(&unique);
-  free(b);
 
   return 0;
 }
@@ -933,67 +969,21 @@ static int schur_setup_G(struct par_mat *G, const struct mat *L,
 // Calculate W = E x U_{B}^{-1} where B = L_{B} U_{B}. E is in CSC format.
 // W will be in CSR format and distributed by rows similar to distribution of S.
 static int schur_setup_W(struct par_mat *W, const struct mat *L,
-                         const struct par_mat *Er, const ulong *srows,
+                         const struct par_mat *E, const ulong *srows,
                          const uint srn, const struct comm *c,
                          struct crystal *const cr, buffer *bfr) {
-  assert(IS_CSR(Er));
-  assert(NO_DIAG(Er));
-
-  uint nnz = 0;
-  if (Er->rn > 0)
-    nnz = Er->adj_off[Er->rn];
-
-  // Setup E as a CSC matrix. First, find the owner processor of each column
-  // with gslib. Then send the matrix entries to relevant processor and setup
-  // E as a CSC matrix.
-  buffer_reserve(bfr, (sizeof(sint) + sizeof(slong)) * nnz);
-  slong *cols = (slong *)bfr->ptr;
-  sint *owners = (sint *)(cols + nnz);
-
-  uint i, k, ke;
-  for (i = 0; i < Er->rn; i++) {
-    for (k = Er->adj_off[i], ke = Er->adj_off[i + 1]; k != ke; k++) {
-      cols[k] = Er->cols[Er->adj_idx[k]];
-      if (cols[k] >= L->start && cols[k] < L->start + L->n)
-        owners[k] = c->id;
-      else
-        owners[k] = -1;
-    }
-  }
-
-  struct gs_data *gsh = gs_setup(cols, nnz, c, 0, gs_pairwise, 0);
-  gs(owners, gs_int, gs_max, 0, gsh, bfr);
-  gs_free(gsh);
-
-  struct array eij;
-  array_init(struct mat_ij, &eij, 100);
-  struct mat_ij *ptr = (struct mat_ij *)eij.ptr;
-
-  struct mat_ij m;
-  for (i = 0; i < Er->rn; i++) {
-    m.r = Er->rows[i];
-    for (k = Er->adj_off[i], ke = Er->adj_off[i + 1]; k != ke; k++) {
-      m.c = cols[k], m.p = owners[k], m.v = Er->adj_val[k];
-      array_cat(struct mat_ij, &eij, &m, 1);
-    }
-  }
-
-  sarray_transfer(struct mat_ij, &eij, p, 1, cr);
-
-  struct par_mat E;
-  par_csc_setup(&E, &eij, 0, bfr);
-  array_free(&eij);
+  assert(!IS_DIAG(E));
 
   // Multiply E by U_B^{-1} now. Columns of U_B^{-1} are found one by one and
   // then E is multiplied by each column.
   uint n = L->n;
-  scalar *b = tcalloc(scalar, 2 * n);
-  scalar *x = b + n;
+  scalar *b = tcalloc(scalar, 2 * n), *x = b + n;
 
   struct array wij;
   array_init(struct mat_ij, &wij, 100);
 
-  uint j;
+  struct mat_ij m;
+  uint i, j, k;
   for (i = 0; i < n; i++) {
     b[i] = 1;
     cholesky_upper_solve(x, L, b);
@@ -1006,11 +996,11 @@ static int schur_setup_W(struct par_mat *W, const struct mat *L,
 #endif
 
     // Multiply E by x: i^th col of E is multiplied by element x[i]
-    for (j = 0; j < E.cn; j++) {
+    for (j = 0; j < E->cn; j++) {
       m.c = L->start + i;
-      for (k = E.adj_off[j], ke = E.adj_off[j + 1]; k < ke; k++) {
-        m.r = E.rows[E.adj_idx[k]];
-        m.v = E.adj_val[k] * x[E.cols[j] - L->start];
+      for (uint k = E->adj_off[j], ke = E->adj_off[j + 1]; k < ke; k++) {
+        m.r = E->rows[E->adj_idx[k]];
+        m.v = E->adj_val[k] * x[E->cols[j] - L->start];
         array_cat(struct mat_ij, &wij, &m, 1);
       }
     }
@@ -1019,14 +1009,13 @@ static int schur_setup_W(struct par_mat *W, const struct mat *L,
     for (j = 0; j < n; j++)
       x[j] = 0;
   }
-  par_mat_free(&E);
 
   sarray_sort_2(struct mat_ij, wij.ptr, wij.n, r, 1, c, 1, bfr);
-  ptr = (struct mat_ij *)wij.ptr;
+  struct mat_ij *ptr = (struct mat_ij *)wij.ptr;
 
-  buffer_reserve(bfr, (sizeof(sint) + sizeof(slong)) * (wij.n + 1));
+  buffer_reserve(bfr, sizeof(slong) * wij.n);
   slong *rows = (slong *)bfr->ptr;
-  owners = (sint *)(rows + wij.n + 1);
+  sint *owners = (sint *)trealloc(sint, b, wij.n);
 
   struct array unique;
   array_init(struct mat_ij, &unique, 100);
@@ -1046,13 +1035,14 @@ static int schur_setup_W(struct par_mat *W, const struct mat *L,
   // Set the destination processor for elements in unique. Since W will be in
   // CSR and share the same row distribution as S, we use gslib and row
   // distribution of S to find the destination processor.
-  gsh = gs_setup(rows, k, c, 0, gs_pairwise, 0);
+  struct gs_data *gsh = gs_setup(rows, k, c, 0, gs_pairwise, 0);
   gs(owners, gs_int, gs_max, 0, gsh, bfr);
   free(gsh);
 
   ptr = unique.ptr;
   for (i = 0; i < unique.n; i++)
     ptr[i].p = owners[i];
+  free(owners);
 
   sarray_transfer(struct mat_ij, &unique, p, 0, cr);
 
@@ -1060,9 +1050,7 @@ static int schur_setup_W(struct par_mat *W, const struct mat *L,
 #ifdef DUMPW
   par_mat_print(W);
 #endif
-
   array_free(&unique);
-  free(b);
 
   return 0;
 }
@@ -1087,11 +1075,23 @@ static int sparse_sub(struct par_mat *C, const struct par_mat *A,
       array_cat(struct mat_ij, &cij, &m, 1);
     }
   }
+  if (IS_DIAG(A)) {
+    for (r = 0; r < A->rn; r++) {
+      m.r = A->rows[r], m.c = A->rows[r], m.v = A->diag_val[r];
+      array_cat(struct mat_ij, &cij, &m, 1);
+    }
+  }
 
   for (r = 0; r < B->rn; r++) {
     m.r = B->rows[r];
     for (j = B->adj_off[r], je = B->adj_off[r + 1]; j != je; j++) {
       m.c = B->cols[B->adj_idx[j]], m.v = -B->adj_val[j];
+      array_cat(struct mat_ij, &cij, &m, 1);
+    }
+  }
+  if (IS_DIAG(B)) {
+    for (r = 0; r < B->rn; r++) {
+      m.r = B->rows[r], m.c = B->rows[r], m.v = -B->diag_val[r];
       array_cat(struct mat_ij, &cij, &m, 1);
     }
   }
@@ -1122,7 +1122,7 @@ static int sparse_sub(struct par_mat *C, const struct par_mat *A,
   return 0;
 }
 
-static int sparse_gemm(struct par_mat *S, const struct par_mat *W,
+static int sparse_gemm(struct par_mat *WG, const struct par_mat *W,
                        const struct par_mat *G, struct crystal *cr,
                        const struct comm *c, buffer *bfr) {
   // W is in CSR, G is in CSC; we multiply rows of W by shifting
@@ -1177,12 +1177,92 @@ static int sparse_gemm(struct par_mat *S, const struct par_mat *W,
     ptr = gij.ptr;
   }
 
-  par_csr_setup(S, &sij, 0, bfr);
+  par_csr_setup(WG, &sij, 0, bfr);
 
   array_free(&gij);
   array_free(&sij);
 
   return 0;
+}
+
+static struct gs_data *setup_Ezl_Q(struct par_mat *E, ulong s, uint n,
+                                   struct comm *c, buffer *bfr) {
+  assert(IS_CSC(E));
+  assert(!IS_DIAG(E));
+
+  buffer_reserve(bfr, sizeof(slong) * (E->rn + n));
+  slong *ids = (slong *)bfr->ptr;
+  uint i, j;
+  for (i = 0; i < n; i++)
+    ids[i] = s + i;
+  for (j = 0; j < E->rn; j++, i++)
+    ids[i] = -E->rows[j];
+
+  return gs_setup(ids, i, c, 0, gs_pairwise, 0);
+}
+
+static int Ezl(scalar *y, struct par_mat *E, struct gs_data *gsh, scalar *zl,
+               ulong s, uint n, buffer *bfr) {
+  assert(E->cn == 0 || IS_CSC(E));
+  assert(!IS_DIAG(E));
+
+  uint nn = n + E->rn;
+  scalar *wrk = (scalar *)tcalloc(scalar, nn);
+  scalar *ye = wrk + n;
+  for (uint i = 0; i < E->rn; i++) {
+    scalar zlk = zl[E->cols[i] - s];
+    for (uint j = E->adj_off[i], je = E->adj_off[i + 1]; j < je; j++)
+      ye[E->adj_idx[j]] += zlk * E->adj_val[j];
+  }
+
+  gs(wrk, gs_double, gs_add, 0, gsh, bfr);
+
+  for (uint i = 0; i < n; i++)
+    y[i] = wrk[i];
+
+  free(wrk);
+
+  return 0;
+}
+
+static struct gs_data *setup_Fzi_Q(struct par_mat *F, ulong s, uint n,
+                                   struct comm *c, buffer *bfr) {
+  assert(IS_CSR(F));
+  assert(!IS_DIAG(F));
+
+  uint nnz = F->rn > 0 ? F->adj_off[F->rn] : 0;
+  buffer_reserve(bfr, sizeof(slong) * (n + nnz));
+  slong *ids = (slong *)bfr->ptr;
+  uint i, j;
+  for (i = 0; i < nnz; i++)
+    ids[i] = F->cols[F->adj_idx[i]];
+  for (j = 0; j < n; j++, i++)
+    ids[i] = -(s + j);
+
+  return gs_setup(ids, i, c, 0, gs_pairwise, 0);
+}
+
+static int Fzi(scalar *y, struct par_mat *F, struct gs_data *gsh, scalar *zi,
+               ulong s, uint n, buffer *bfr) {
+  assert(IS_CSR(F));
+  assert(!IS_DIAG(F));
+
+  uint nnz = F->rn > 0 ? F->adj_off[F->rn] : 0;
+  scalar *wrk = (scalar *)tcalloc(scalar, nnz + n);
+  uint i, j;
+  for (i = 0; i < nnz; i++)
+    wrk[i] = 0;
+  for (j = 0; j < n; j++, i++)
+    wrk[i] = zi[j], y[i] = 0;
+
+  gs(wrk, gs_double, gs_add, 0, gsh, bfr);
+
+  for (i = 0; i < F->rn; i++) {
+    scalar si = 0;
+    for (uint j = F->adj_off[i], je = F->adj_off[i + 1]; j < je; j++)
+      si += F->adj_val[j] * wrk[j];
+    y[F->rows[i] - s] = si;
+  }
 }
 
 static struct mg_data *
@@ -1212,11 +1292,10 @@ schur_precond_setup(const struct mat *L, const struct par_mat *F,
   return mg_setup(P, 2, c, cr, bfr);
 }
 
-static struct mg_data *schur_setup(struct mat *A_ll, struct par_mat *A_ls,
-                                   struct par_mat *A_sl, struct par_mat *A_ss,
-                                   struct array *eij, const ulong ng[2],
-                                   struct comm *c, struct crystal *cr,
-                                   buffer *bfr) {
+static uint schur_setup(struct coarse *crs, struct array *eij, const ulong ng,
+                        struct comm *c, struct crystal *cr, buffer *bfr) {
+  struct schur *schur = crs->solver = (struct schur *)tcalloc(struct schur, 1);
+
   // Setup A_ll
   struct array ll, ls, sl, ss;
   array_init(struct mat_ij, &ll, eij->n / 4 + 1);
@@ -1226,119 +1305,281 @@ static struct mg_data *schur_setup(struct mat *A_ll, struct par_mat *A_ls,
 
   struct mat_ij *ptr = (struct mat_ij *)eij->ptr;
   for (uint i = 0; i < eij->n; i++) {
-    if (ptr[i].r < ng[0])
-      if (ptr[i].c < ng[0])
+    if (ptr[i].r <= ng) {
+      if (ptr[i].c <= ng)
         array_cat(struct mat_ij, &ll, &ptr[i], 1);
       else
-        array_cat(struct mat_ij, &sl, &ptr[i], 1);
-    else if (ptr[i].c < ng[0])
-      array_cat(struct mat_ij, &ls, &ptr[i], 1);
+        array_cat(struct mat_ij, &ls, &ptr[i], 1);
+    } else if (ptr[i].c <= ng)
+      array_cat(struct mat_ij, &sl, &ptr[i], 1);
     else
       array_cat(struct mat_ij, &ss, &ptr[i], 1);
   }
+  assert(ls.n == sl.n); // For symmetric matrices
 
   // Setup local block diagonal (B)
-  struct mat All;
-  csr_setup(&All, &ll, 0, bfr);
-  cholesky_factor(A_ll, &All, bfr);
+  struct mat A;
+  csr_setup(&A, &ll, 0, bfr);
+  cholesky_factor(&schur->A_ll, &A, bfr);
 #ifdef DUMPB
-  mat_print(&A_ll);
+  mat_print(&A);
 #endif
-  mat_free(&All);
+  mat_free(&A);
+  array_free(&ll);
+  schur->A_ll.start = crs->ls;
 
   // Setup E
-  par_csr_setup(A_ls, &ls, 0, bfr);
+  assert(schur->A_ll.n == crs->ln);
+  distribute_by_columns(&sl, crs->ls, crs->ln, c, cr, bfr);
+  par_csc_setup(&schur->A_sl, &sl, 0, bfr);
 #ifdef DUMPE
-  par_mat_print(A_ls);
+  par_mat_print(&schur->A_sl);
 #endif
-
-  // Setup F
-  par_csr_setup(A_sl, &sl, 0, bfr);
-#ifdef DUMPF
-  par_mat_print(A_sl);
-#endif
+  array_free(&sl);
+  schur->Q_sl = setup_Ezl_Q(&schur->A_sl, crs->ls, crs->ln, c, bfr);
 
   // Setup S
-  par_csr_setup(A_ss, &ss, 0, bfr);
+  par_csr_setup(&schur->A_ss, &ss, 1, bfr);
 #ifdef DUMPS
-  par_mat_print(A_ss);
+  par_mat_print(&schur->A_ss);
 #endif
-
-  array_free(&ll);
-  array_free(&ls);
-  array_free(&sl);
   array_free(&ss);
+  schur->Q_ss = setup_Q(&schur->A_ss, c, bfr);
+
+  // Setup F
+  par_csr_setup(&schur->A_ls, &ls, 0, bfr);
+#ifdef DUMPF
+  par_mat_print(&schur->A_ls);
+#endif
+  array_free(&ls);
+  schur->Q_ls = setup_Fzi_Q(&schur->A_ls, crs->is, crs->in, c, bfr);
 
   // Setup the preconditioner for the Schur complement matrix
-  return schur_precond_setup(A_ll, A_sl, A_ss, A_ls, c, cr, bfr);
+  schur->M = schur_precond_setup(&schur->A_ll, &schur->A_ls, &schur->A_ss,
+                                 &schur->A_sl, c, cr, bfr);
+
+  return 0;
+}
+
+static inline scalar dot(scalar *r, scalar *s, uint n) {
+  scalar t = 0;
+  for (uint i = 0; i < n; i++)
+    t += r[i] * s[i];
+  return t;
+}
+
+static inline void ortho(scalar *q, uint n, ulong ng, struct comm *c) {
+  scalar s = 0, buf;
+  for (uint i = 0; i < n; i++)
+    s += q[i];
+
+  comm_allreduce(c, gs_double, gs_add, &s, 1, &buf);
+  s /= ng;
+
+  for (uint i = 0; i < n; i++)
+    q[i] -= s;
+}
+
+static int project(scalar *x, scalar *b, struct par_mat *S, struct gs_data *gsh,
+                   struct mg_data *d, struct comm *c, int miter, buffer *bfr) {
+  assert(IS_CSR(S));
+
+  uint n = S->rn, nnz = n > 0 ? S->adj_off[n] + n : 0;
+  scalar *z = (scalar *)tcalloc(scalar, (6 + 2 * (miter + 1)) * n + nnz);
+  scalar *w = z + n, *r = w + n, *p = r + n, *z0 = p + n, *dz = z0 + n;
+  scalar *P = dz + n, *W = P + n * (miter + 1), *wrk = W + n * (miter + 1);
+
+  uint i;
+  for (i = 0; i < n; i++)
+    x[i] = 0, r[i] = b[i];
+
+  slong out[2][1], buf[2][1], in = n;
+  comm_scan(out, c, gs_long, gs_add, &in, 1, buf);
+  ulong ng = out[1][0];
+
+  scalar rr = dot(r, r, n);
+  comm_allreduce(c, gs_double, gs_add, &rr, 1, buf);
+  scalar tol = 1e-3, rtol = rr * tol * tol;
+
+  for (i = 0; i < n; i++)
+    z[i] = r[i];
+  ortho(z, n, ng, c);
+  scalar rz1 = dot(z, z, n);
+  comm_allreduce(c, gs_double, gs_add, &rz1, 1, buf);
+
+  for (i = 0; i < n; i++)
+    p[i] = z[i];
+
+  scalar alpha, beta, rzt, rz2;
+
+  uint j, k;
+  for (i = 0; i < miter; i++) {
+    mat_vec_csr(w, p, S, gsh, wrk, bfr);
+
+    scalar pw = dot(p, w, n);
+    comm_allreduce(c, gs_double, gs_add, &pw, 1, buf);
+    alpha = rz1 / pw;
+
+    pw = 1 / sqrt(pw);
+    for (j = 0; j < n; j++)
+      W[i * n + j] = pw * w[i], P[i * n + j] = pw * p[i];
+
+    for (j = 0; j < n; j++)
+      x[i] += alpha * p[i], r[i] -= alpha * w[i];
+
+    rr = dot(r, r, n);
+    comm_allreduce(c, gs_double, gs_add, &rr, 1, buf);
+
+    if (rr < rtol || sqrt(rr) < tol)
+      break;
+
+    for (j = 0; j < n; j++)
+      z0[i] = z[i];
+    mg_vcycle(z, r, d, c, bfr);
+
+    rzt = rz1;
+    ortho(z, n, ng, c);
+    rz1 = dot(r, z, n);
+    comm_allreduce(c, gs_double, gs_add, &rz1, 1, buf);
+
+    for (j = 0; j < n; j++)
+      dz[i] = z[i] - z0[i];
+    rz2 = dot(r, dz, n);
+    comm_allreduce(c, gs_double, gs_add, &rz2, 1, buf);
+
+    beta = rz2 / rzt;
+    for (j = 0; j < n; j++)
+      p[i] = z[i] + beta * p[i];
+
+    for (k = 0; k < n; k++)
+      P[miter * n + k] = 0;
+
+    for (j = 0; j < i; j++) {
+      pw = 0;
+      for (k = 0; k < n; k++)
+        pw += W[j * n + k] * p[k];
+      comm_allreduce(c, gs_double, gs_add, &pw, 1, buf);
+      for (k = 0; k < n; k++)
+        P[miter * n + k] += pw * P[j * n + k];
+    }
+
+    for (k = 0; k < n; k++)
+      p[k] -= P[miter * n + k];
+  }
+
+  return i == miter ? i : i + 1;
+}
+
+static int schur_solve(scalar *x, scalar *b, struct coarse *crs, struct comm *c,
+                       buffer *bfr) {
+  struct schur *schur = crs->solver;
+
+  uint ln = crs->ln, in = crs->in, *idx = crs->idx;
+  scalar *rhs = (scalar *)tcalloc(scalar, ln > in ? ln : in);
+  scalar *zl = (scalar *)tcalloc(scalar, ln);
+  scalar *xl = (scalar *)tcalloc(scalar, in + ln), *xi = xl + ln;
+
+  // Solve: A_ll z_l = r_l
+  for (uint i = 0; i < ln; i++)
+    rhs[i] = b[idx[i]];
+  cholesky_solve(zl, &schur->A_ll, rhs);
+
+  // Solve: A_ss x_i = fi where fi = r_i - E zl
+  Ezl(rhs, &schur->A_sl, schur->Q_sl, zl, crs->ls, ln, bfr);
+  for (uint i = 0; i < in; i++)
+    rhs[i] = b[idx[ln + i]] - rhs[i];
+  project(xi, rhs, &schur->A_ss, schur->Q_ss, schur->M, c, 100, bfr);
+
+  // Solve A_ll xl = fl where fl = r_l - F xi
+  Fzi(rhs, &schur->A_ls, schur->Q_ls, xi, crs->is, in, bfr);
+  for (uint i = 0; i < ln; i++)
+    rhs[i] = b[idx[i]] - rhs[i];
+  cholesky_solve(xl, &schur->A_ll, rhs);
+
+  for (uint i = 0; i < ln + in; i++)
+    x[idx[i]] = xl[i];
+
+  free(rhs);
+  free(zl);
+  free(xl);
+
+  return 0;
+}
+
+static int schur_free(struct schur *schur) {
+  if (schur != NULL) {
+    mat_free(&schur->A_ll);
+
+    par_mat_free(&schur->A_ls);
+    if (schur->Q_ls != NULL)
+      gs_free(schur->Q_ls), schur->Q_ls = NULL;
+
+    par_mat_free(&schur->A_sl);
+    if (schur->Q_sl != NULL)
+      gs_free(schur->Q_sl), schur->Q_sl = NULL;
+
+    par_mat_free(&schur->A_ss);
+    if (schur->Q_ss != NULL)
+      gs_free(schur->Q_ss), schur->Q_ss = NULL;
+
+    if (schur->M != NULL)
+      mg_free(schur->M), schur->M = NULL;
+
+    free(schur), schur = NULL;
+  }
+
+  return 0;
 }
 
 //------------------------------------------------------------------------------
 // Setup coarse grid system
-// A_ll: Local dof of a processor (block diagonal across processors)
-// A_sl (= A_ls^T): shared - local matrix
-// A_ss: Shared dof freedom (matrix is split row wise)
-//     |A_ll (B)  A_ls (F)|
-//  A= |                  |
-//     |A_sl (E)  A_ss (S)|
-struct coarse {
-  struct par_mat A_ls, A_ss, A_sl;
-  struct mat A_ll;
-  struct mg_data *M;
-};
-
+//
 struct coarse *coarse_setup(uint nelt, int nv, slong const *vtx, struct comm *c,
                             buffer *bfr) {
-  struct coarse *crs = tcalloc(struct coarse, 1);
-
-  ulong *eid = tcalloc(ulong, nelt), ng[2];
-  number_rows(eid, ng, vtx, nelt, nv, c, bfr);
-
   struct crystal cr;
   crystal_init(&cr, c);
 
-  struct array nbrs;
+  struct coarse *crs = tcalloc(struct coarse, 1);
+
+  struct array nbrs, eij;
   array_init(struct nbr, &nbrs, nelt);
+  array_init(struct mat_ij, &eij, nelt);
+
+  ulong *eid = tcalloc(ulong, nelt);
+  ulong ng = number_rows(eid, &crs->ls, &crs->ln, &crs->is, &crs->in, &crs->idx,
+                         vtx, nelt, nv, c, bfr);
   find_nbrs(&nbrs, eid, vtx, nelt, nv, c, &cr, bfr);
   free(eid);
 
   // convert `struct nbr` -> `struct mat_ij` and compress
   // entries which share the same (r, c) values. Set the
   // diagonal element to have zero row sum
-
-  // Be a bit smarter than just using 100?
-  struct array eij;
-  array_init(struct mat_ij, &eij, 100);
   compress_nbrs(&eij, &nbrs, bfr);
   array_free(&nbrs);
 
-  crs->M = schur_setup(&crs->A_ll, &crs->A_ls, &crs->A_sl, &crs->A_ss, &eij, ng,
-                       c, &cr, bfr);
+  schur_setup(crs, &eij, ng, c, &cr, bfr);
+
   array_free(&eij);
   crystal_free(&cr);
 
   return crs;
 }
 
-int coarse_solve(scalar *x, struct coarse *crs, scalar *b) {
-  cholesky_solve(x, &crs->A_ll, b);
+int coarse_solve(scalar *x, scalar *b, struct coarse *crs, struct comm *c,
+                 buffer *bfr) {
+  schur_solve(x, b, crs, c, bfr);
   return 0;
 }
 
 int coarse_free(struct coarse *crs) {
-  mat_free(&crs->A_ll);
-  par_mat_free(&crs->A_ls);
-  par_mat_free(&crs->A_sl);
-  par_mat_free(&crs->A_ss);
-  mg_free(crs->M);
-  free(crs);
+  if (crs != NULL) {
+    if (crs->solver != NULL)
+      schur_free((struct schur *)crs->solver);
+    if (crs->idx != NULL)
+      free(crs->idx), crs->idx = NULL;
+    free(crs), crs = NULL;
+  }
   return 0;
 }
 
-#undef NO_DIAG
-#undef IS_CSC
-#undef IS_CSR
-#undef CSC
-#undef CSR
-#undef MIN
 #undef FREE
