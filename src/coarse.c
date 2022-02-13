@@ -8,14 +8,13 @@
       free(ptr->x);                                                            \
   }
 
-//#define DUMPB
-//#define DUMPE
-//#define DUMPF
-//#define DUMPS
+//#define DUMPA
 //#define DUMPG
 //#define DUMPW
 //#define DUMPWG
 //#define DUMPP
+//#define DUMPI
+//#define DUMPS
 
 static void comm_split(const struct comm *old, const int bin, const int key,
                        struct comm *new_) {
@@ -28,7 +27,7 @@ static void comm_split(const struct comm *old, const int bin, const int key,
 // Coarse system
 //
 struct coarse {
-  ulong ls, is;
+  ulong ls, lg, is, ig;
   uint ln, in, *idx;
   void *solver;
 };
@@ -36,10 +35,10 @@ struct coarse {
 //------------------------------------------------------------------------------
 // Number rows, local first then interface. Returns global number of local
 // elements.
-static ulong number_rows(ulong *elem, ulong *ls_, uint *ln_, ulong *is_,
-                         uint *in_, uint **idx_, const slong *vtx,
-                         const uint nelt, const int nv, const struct comm *ci,
-                         buffer *bfr) {
+static ulong number_rows(ulong *elem, ulong *ls_, ulong *lg_, uint *ln_,
+                         ulong *is_, ulong *ig_, uint *in_, uint **idx_,
+                         const slong *vtx, const uint nelt, const int nv,
+                         const struct comm *ci, buffer *bfr) {
   uint npts = nelt * nv;
   int nnz = npts > 0;
   if (nnz == 0)
@@ -97,13 +96,13 @@ static ulong number_rows(ulong *elem, ulong *ls_, uint *ln_, ulong *is_,
 
   slong inp[2] = {ln, in}, out[2][2], buf[2][2];
   comm_scan(out, ci, gs_long, gs_add, inp, 2, buf);
-  slong ls = *ls_ = out[0][0] + 1, is = *is_ = out[0][1] + 1;
-  slong lg = out[1][0];
+  ulong ls = *ls_ = out[0][0] + 1, is = *is_ = out[0][1] + 1;
+  ulong lg = *lg_ = out[1][0], ig = *ig_ = out[1][1];
 
   uint *idx = *idx_ = tcalloc(uint, nelt);
   for (i = ln = in = 0; i < nelt; i++)
     if (elem[i] > 0)
-      elem[i] = lg + is++, idx[ln + in++] = i;
+      elem[i] = lg + is++, idx[*ln_ + in++] = i;
     else
       elem[i] = ls++, idx[ln++] = i;
   assert(*ln_ == ln);      // Sanity check
@@ -553,7 +552,7 @@ static int par_csc_setup(struct par_mat *mat, struct array *entries, int sd,
   return 0;
 }
 
-static void par_mat_print(struct par_mat *A) {
+void par_mat_print(struct par_mat *A) {
   uint i, j;
   if (IS_CSR(A)) {
     for (i = 0; i < A->rn; i++) {
@@ -631,21 +630,15 @@ static int compress_mat_ij(struct array *eij, struct array *entries,
   struct mat_ij *pe = (struct mat_ij *)eij->ptr;
   i = 0;
   while (i < eij->n) {
-    sint j = i, k = -1, s = 0;
+    sint j = i, k = -1;
+    scalar s = 0;
     while (j < eij->n && pe[j].r == pe[i].r) {
-#if 0
-      if (eij->n < 5)
-        printf("r = %lld c = %lld\n", pe[j].r, pe[j].c);
-#endif
       if (pe[j].r == pe[j].c)
         k = j;
       else
         s += pe[j].v;
       j++;
     }
-#if 0
-    printf("ii = %d n = %d\n", i, eij->n);
-#endif
     assert(k >= 0);
     pe[k].v = -s;
     i = j;
@@ -897,13 +890,6 @@ static int schur_setup_G(struct par_mat *G, const struct mat *L,
   for (i = 0; i < F->rn; i++) {
     b[F->rows[i] - L->start] = 1;
     cholesky_lower_solve(x, L, b);
-#if 0
-    printf("L = ");
-    for (j = 0; j < n; j++)
-      printf("%lf ", x[j]);
-    printf("\n");
-    fflush(stdout);
-#endif
 
     // Calculate F: i^th row of F is multiplied by each element of i^th
     // column of L_B^-1
@@ -972,6 +958,7 @@ static int schur_setup_W(struct par_mat *W, const struct mat *L,
                          const struct par_mat *E, const ulong *srows,
                          const uint srn, const struct comm *c,
                          struct crystal *const cr, buffer *bfr) {
+  assert(IS_CSC(E));
   assert(!IS_DIAG(E));
 
   // Multiply E by U_B^{-1} now. Columns of U_B^{-1} are found one by one and
@@ -987,13 +974,6 @@ static int schur_setup_W(struct par_mat *W, const struct mat *L,
   for (i = 0; i < n; i++) {
     b[i] = 1;
     cholesky_upper_solve(x, L, b);
-#if 0
-    printf("U = ");
-    for (j = 0; j < n; j++)
-      printf("%lf ", x[j]);
-    printf("\n");
-    fflush(stdout);
-#endif
 
     // Multiply E by x: i^th col of E is multiplied by element x[i]
     for (j = 0; j < E->cn; j++) {
@@ -1056,7 +1036,7 @@ static int schur_setup_W(struct par_mat *W, const struct mat *L,
 }
 
 // C = A - B; A and B should be in CSR format with the same row
-// distribution
+// distribution across processors
 static int sparse_sub(struct par_mat *C, const struct par_mat *A,
                       const struct par_mat *B, const struct comm *c,
                       struct crystal *const cr, buffer *bfr) {
@@ -1105,9 +1085,9 @@ static int sparse_sub(struct par_mat *C, const struct par_mat *A,
   if (cij.n > 0) {
     uint i = 0;
     while (i < cij.n) {
-      j = i;
       scalar s = 0;
-      for (; j < cij.n && ptr[j].r == ptr[i].r && ptr[j].c == ptr[i].c; j++)
+      for (j = i; j < cij.n && ptr[j].r == ptr[i].r && ptr[j].c == ptr[i].c;
+           j++)
         s += ptr[j].v;
       m = ptr[i], m.v = s;
       array_cat(struct mat_ij, &unique, &m, 1);
@@ -1185,86 +1165,6 @@ static int sparse_gemm(struct par_mat *WG, const struct par_mat *W,
   return 0;
 }
 
-static struct gs_data *setup_Ezl_Q(struct par_mat *E, ulong s, uint n,
-                                   struct comm *c, buffer *bfr) {
-  assert(IS_CSC(E));
-  assert(!IS_DIAG(E));
-
-  buffer_reserve(bfr, sizeof(slong) * (E->rn + n));
-  slong *ids = (slong *)bfr->ptr;
-  uint i, j;
-  for (i = 0; i < n; i++)
-    ids[i] = s + i;
-  for (j = 0; j < E->rn; j++, i++)
-    ids[i] = -E->rows[j];
-
-  return gs_setup(ids, i, c, 0, gs_pairwise, 0);
-}
-
-static int Ezl(scalar *y, struct par_mat *E, struct gs_data *gsh, scalar *zl,
-               ulong s, uint n, buffer *bfr) {
-  assert(E->cn == 0 || IS_CSC(E));
-  assert(!IS_DIAG(E));
-
-  uint nn = n + E->rn;
-  scalar *wrk = (scalar *)tcalloc(scalar, nn);
-  scalar *ye = wrk + n;
-  for (uint i = 0; i < E->rn; i++) {
-    scalar zlk = zl[E->cols[i] - s];
-    for (uint j = E->adj_off[i], je = E->adj_off[i + 1]; j < je; j++)
-      ye[E->adj_idx[j]] += zlk * E->adj_val[j];
-  }
-
-  gs(wrk, gs_double, gs_add, 0, gsh, bfr);
-
-  for (uint i = 0; i < n; i++)
-    y[i] = wrk[i];
-
-  free(wrk);
-
-  return 0;
-}
-
-static struct gs_data *setup_Fzi_Q(struct par_mat *F, ulong s, uint n,
-                                   struct comm *c, buffer *bfr) {
-  assert(IS_CSR(F));
-  assert(!IS_DIAG(F));
-
-  uint nnz = F->rn > 0 ? F->adj_off[F->rn] : 0;
-  buffer_reserve(bfr, sizeof(slong) * (n + nnz));
-  slong *ids = (slong *)bfr->ptr;
-  uint i, j;
-  for (i = 0; i < nnz; i++)
-    ids[i] = F->cols[F->adj_idx[i]];
-  for (j = 0; j < n; j++, i++)
-    ids[i] = -(s + j);
-
-  return gs_setup(ids, i, c, 0, gs_pairwise, 0);
-}
-
-static int Fzi(scalar *y, struct par_mat *F, struct gs_data *gsh, scalar *zi,
-               ulong s, uint n, buffer *bfr) {
-  assert(IS_CSR(F));
-  assert(!IS_DIAG(F));
-
-  uint nnz = F->rn > 0 ? F->adj_off[F->rn] : 0;
-  scalar *wrk = (scalar *)tcalloc(scalar, nnz + n);
-  uint i, j;
-  for (i = 0; i < nnz; i++)
-    wrk[i] = 0;
-  for (j = 0; j < n; j++, i++)
-    wrk[i] = zi[j], y[i] = 0;
-
-  gs(wrk, gs_double, gs_add, 0, gsh, bfr);
-
-  for (i = 0; i < F->rn; i++) {
-    scalar si = 0;
-    for (uint j = F->adj_off[i], je = F->adj_off[i + 1]; j < je; j++)
-      si += F->adj_val[j] * wrk[j];
-    y[F->rows[i] - s] = si;
-  }
-}
-
 static struct mg_data *
 schur_precond_setup(const struct mat *L, const struct par_mat *F,
                     const struct par_mat *S, const struct par_mat *E,
@@ -1282,7 +1182,7 @@ schur_precond_setup(const struct mat *L, const struct par_mat *F,
   struct par_mat *P = tcalloc(struct par_mat, 1);
   sparse_sub(P, S, &WG, c, cr, bfr);
 #ifdef DUMPP
-  par_mat_print(&P);
+  par_mat_print(P);
 #endif
 
   par_mat_free(&W);
@@ -1290,6 +1190,86 @@ schur_precond_setup(const struct mat *L, const struct par_mat *F,
   par_mat_free(&WG);
 
   return mg_setup(P, 2, c, cr, bfr);
+}
+
+static struct gs_data *setup_Ezl_Q(struct par_mat *E, ulong s, uint n,
+                                   struct comm *c, buffer *bfr) {
+  assert(IS_CSC(E));
+  assert(!IS_DIAG(E));
+
+  buffer_reserve(bfr, sizeof(slong) * (n + E->rn));
+  slong *ids = (slong *)bfr->ptr;
+  uint i, j;
+  for (i = 0; i < n; i++)
+    ids[i] = s + i;
+  for (j = 0; j < E->rn; j++, i++)
+    ids[i] = -E->rows[j];
+
+  return gs_setup(ids, i, c, 0, gs_pairwise, 0);
+}
+
+static int Ezl(scalar *y, struct par_mat *E, struct gs_data *gsh, scalar *zl,
+               ulong s, uint n, buffer *bfr) {
+  assert(IS_CSC(E));
+  assert(!IS_DIAG(E));
+
+  uint nn = n + E->rn;
+  scalar *wrk = (scalar *)tcalloc(scalar, nn);
+  scalar *ye = wrk + n;
+  for (uint i = 0; i < E->cn; i++) {
+    scalar zlk = zl[E->cols[i] - s];
+    for (uint j = E->adj_off[i], je = E->adj_off[i + 1]; j < je; j++)
+      ye[E->adj_idx[j]] += zlk * E->adj_val[j];
+  }
+
+  gs(wrk, gs_double, gs_add, 1, gsh, bfr);
+
+  for (uint i = 0; i < n; i++)
+    y[i] = wrk[i];
+
+  free(wrk);
+
+  return 0;
+}
+
+static struct gs_data *setup_Fxi_Q(struct par_mat *F, ulong s, uint n,
+                                   struct comm *c, buffer *bfr) {
+  assert(IS_CSR(F));
+  assert(!IS_DIAG(F));
+
+  uint nnz = F->rn > 0 ? F->adj_off[F->rn] : 0;
+  buffer_reserve(bfr, sizeof(slong) * (n + nnz));
+  slong *ids = (slong *)bfr->ptr;
+  uint i, j;
+  for (i = 0; i < nnz; i++)
+    ids[i] = F->cols[F->adj_idx[i]];
+  for (j = 0; j < n; j++, i++)
+    ids[i] = -(s + j);
+
+  return gs_setup(ids, i, c, 0, gs_pairwise, 0);
+}
+
+static int Fxi(scalar *y, struct par_mat *F, struct gs_data *gsh, scalar *zi,
+               ulong s, uint n, buffer *bfr) {
+  assert(IS_CSR(F));
+  assert(!IS_DIAG(F));
+
+  uint nnz = F->rn > 0 ? F->adj_off[F->rn] : 0;
+  scalar *wrk = (scalar *)tcalloc(scalar, nnz + n);
+  uint i, j;
+  for (i = 0; i < nnz; i++)
+    wrk[i] = 0;
+  for (j = 0; j < n; j++, i++)
+    wrk[i] = zi[j];
+
+  gs(wrk, gs_double, gs_add, 1, gsh, bfr);
+
+  for (i = 0; i < F->rn; i++) {
+    scalar si = 0;
+    for (uint j = F->adj_off[i], je = F->adj_off[i + 1]; j < je; j++)
+      si += F->adj_val[j] * wrk[j];
+    y[F->rows[i] - s] = si;
+  }
 }
 
 static uint schur_setup(struct coarse *crs, struct array *eij, const ulong ng,
@@ -1318,13 +1298,13 @@ static uint schur_setup(struct coarse *crs, struct array *eij, const ulong ng,
   assert(ls.n == sl.n); // For symmetric matrices
 
   // Setup local block diagonal (B)
-  struct mat A;
-  csr_setup(&A, &ll, 0, bfr);
-  cholesky_factor(&schur->A_ll, &A, bfr);
-#ifdef DUMPB
-  mat_print(&A);
+  struct mat B;
+  csr_setup(&B, &ll, 0, bfr);
+  cholesky_factor(&schur->A_ll, &B, bfr);
+#ifdef DUMPA
+  mat_print(&B);
 #endif
-  mat_free(&A);
+  mat_free(&B);
   array_free(&ll);
   schur->A_ll.start = crs->ls;
 
@@ -1332,15 +1312,15 @@ static uint schur_setup(struct coarse *crs, struct array *eij, const ulong ng,
   assert(schur->A_ll.n == crs->ln);
   distribute_by_columns(&sl, crs->ls, crs->ln, c, cr, bfr);
   par_csc_setup(&schur->A_sl, &sl, 0, bfr);
-#ifdef DUMPE
+#ifdef DUMPA
   par_mat_print(&schur->A_sl);
 #endif
   array_free(&sl);
-  schur->Q_sl = setup_Ezl_Q(&schur->A_sl, crs->ls, crs->ln, c, bfr);
+  schur->Q_sl = setup_Ezl_Q(&schur->A_sl, crs->lg + crs->is, crs->in, c, bfr);
 
   // Setup S
   par_csr_setup(&schur->A_ss, &ss, 1, bfr);
-#ifdef DUMPS
+#ifdef DUMPA
   par_mat_print(&schur->A_ss);
 #endif
   array_free(&ss);
@@ -1348,11 +1328,11 @@ static uint schur_setup(struct coarse *crs, struct array *eij, const ulong ng,
 
   // Setup F
   par_csr_setup(&schur->A_ls, &ls, 0, bfr);
-#ifdef DUMPF
+#ifdef DUMPA
   par_mat_print(&schur->A_ls);
 #endif
   array_free(&ls);
-  schur->Q_ls = setup_Fzi_Q(&schur->A_ls, crs->is, crs->in, c, bfr);
+  schur->Q_ls = setup_Fxi_Q(&schur->A_ls, crs->lg + crs->is, crs->in, c, bfr);
 
   // Setup the preconditioner for the Schur complement matrix
   schur->M = schur_precond_setup(&schur->A_ll, &schur->A_ls, &schur->A_ss,
@@ -1381,8 +1361,17 @@ static inline void ortho(scalar *q, uint n, ulong ng, struct comm *c) {
 }
 
 static int project(scalar *x, scalar *b, struct par_mat *S, struct gs_data *gsh,
-                   struct mg_data *d, struct comm *c, int miter, buffer *bfr) {
+                   struct mg_data *d, struct comm *c, int miter, int verbose,
+                   buffer *bfr) {
   assert(IS_CSR(S));
+  assert(S->rn == 0 || IS_DIAG(S));
+
+  slong out[2][1], buf[2][1], in = S->rn;
+  comm_scan(out, c, gs_long, gs_add, &in, 1, buf);
+  ulong ng = out[1][0];
+
+  if (ng == 0)
+    return 0;
 
   uint n = S->rn, nnz = n > 0 ? S->adj_off[n] + n : 0;
   scalar *z = (scalar *)tcalloc(scalar, (6 + 2 * (miter + 1)) * n + nnz);
@@ -1392,10 +1381,6 @@ static int project(scalar *x, scalar *b, struct par_mat *S, struct gs_data *gsh,
   uint i;
   for (i = 0; i < n; i++)
     x[i] = 0, r[i] = b[i];
-
-  slong out[2][1], buf[2][1], in = n;
-  comm_scan(out, c, gs_long, gs_add, &in, 1, buf);
-  ulong ng = out[1][0];
 
   scalar rr = dot(r, r, n);
   comm_allreduce(c, gs_double, gs_add, &rr, 1, buf);
@@ -1422,10 +1407,10 @@ static int project(scalar *x, scalar *b, struct par_mat *S, struct gs_data *gsh,
 
     pw = 1 / sqrt(pw);
     for (j = 0; j < n; j++)
-      W[i * n + j] = pw * w[i], P[i * n + j] = pw * p[i];
+      W[i * n + j] = pw * w[j], P[i * n + j] = pw * p[j];
 
     for (j = 0; j < n; j++)
-      x[i] += alpha * p[i], r[i] -= alpha * w[i];
+      x[j] += alpha * p[j], r[j] -= alpha * w[j];
 
     rr = dot(r, r, n);
     comm_allreduce(c, gs_double, gs_add, &rr, 1, buf);
@@ -1434,8 +1419,14 @@ static int project(scalar *x, scalar *b, struct par_mat *S, struct gs_data *gsh,
       break;
 
     for (j = 0; j < n; j++)
-      z0[i] = z[i];
+      z0[j] = z[j];
+
+#if 1
     mg_vcycle(z, r, d, c, bfr);
+#else
+    for (j = 0; j < n; j++)
+      z[j] = r[j];
+#endif
 
     rzt = rz1;
     ortho(z, n, ng, c);
@@ -1443,18 +1434,21 @@ static int project(scalar *x, scalar *b, struct par_mat *S, struct gs_data *gsh,
     comm_allreduce(c, gs_double, gs_add, &rz1, 1, buf);
 
     for (j = 0; j < n; j++)
-      dz[i] = z[i] - z0[i];
+      dz[j] = z[j] - z0[j];
     rz2 = dot(r, dz, n);
     comm_allreduce(c, gs_double, gs_add, &rz2, 1, buf);
 
+    if (c->id == 0 && verbose > 0)
+      printf("rz0 = %lf rz1 = %lf rz2 = %lf\n", rzt, rz1, rz2);
+
     beta = rz2 / rzt;
     for (j = 0; j < n; j++)
-      p[i] = z[i] + beta * p[i];
+      p[j] = z[j] + beta * p[j];
 
     for (k = 0; k < n; k++)
       P[miter * n + k] = 0;
 
-    for (j = 0; j < i; j++) {
+    for (j = 0; j <= i; j++) {
       pw = 0;
       for (k = 0; k < n; k++)
         pw += W[j * n + k] * p[k];
@@ -1466,6 +1460,8 @@ static int project(scalar *x, scalar *b, struct par_mat *S, struct gs_data *gsh,
     for (k = 0; k < n; k++)
       p[k] -= P[miter * n + k];
   }
+
+  free(z);
 
   return i == miter ? i : i + 1;
 }
@@ -1482,19 +1478,80 @@ static int schur_solve(scalar *x, scalar *b, struct coarse *crs, struct comm *c,
   // Solve: A_ll z_l = r_l
   for (uint i = 0; i < ln; i++)
     rhs[i] = b[idx[i]];
+#ifdef DUMPI
+  printf("%d bl = ", c->id);
+  for (uint i = 0; i < ln; i++)
+    printf("%lf ", rhs[i]);
+  printf("\n");
+  fflush(stdout);
+  printf("%d bi = ", c->id);
+  for (uint i = 0; i < in; i++)
+    printf("%lf ", b[idx[ln + i]]);
+  printf("\n");
+  fflush(stdout);
+#endif
+
   cholesky_solve(zl, &schur->A_ll, rhs);
+#ifdef DUMPI
+  printf("%d zl = ", c->id);
+  for (uint i = 0; i < ln; i++)
+    printf("%lf ", zl[i]);
+  printf("\n");
+  fflush(stdout);
+#endif
 
   // Solve: A_ss x_i = fi where fi = r_i - E zl
-  Ezl(rhs, &schur->A_sl, schur->Q_sl, zl, crs->ls, ln, bfr);
+  Ezl(rhs, &schur->A_sl, schur->Q_sl, zl, crs->ls, in, bfr);
+#ifdef DUMPI
+  printf("%d Ezl = ", c->id);
+  for (uint i = 0; i < in; i++)
+    printf("%lf ", rhs[i]);
+  printf("\n");
+  fflush(stdout);
+#endif
+
   for (uint i = 0; i < in; i++)
     rhs[i] = b[idx[ln + i]] - rhs[i];
-  project(xi, rhs, &schur->A_ss, schur->Q_ss, schur->M, c, 100, bfr);
+#ifdef DUMPI
+  printf("%d fi = ", c->id);
+  for (uint i = 0; i < in; i++)
+    printf("%lf ", rhs[i]);
+  printf("\n");
+  fflush(stdout);
+#endif
+
+  assert(in == schur->A_ss.rn);
+  project(xi, rhs, &schur->A_ss, schur->Q_ss, schur->M, c, 100, 1, bfr);
+#ifdef DUMPI
+  printf("%d xi = ", c->id);
+  for (uint i = 0; i < in; i++)
+    printf("%lf ", xi[i]);
+  printf("\n");
+  fflush(stdout);
+#endif
 
   // Solve A_ll xl = fl where fl = r_l - F xi
-  Fzi(rhs, &schur->A_ls, schur->Q_ls, xi, crs->is, in, bfr);
+  for (uint i = 0; i < ln; i++)
+    rhs[i] = 0;
+  Fxi(rhs, &schur->A_ls, schur->Q_ls, xi, crs->ls, in, bfr);
+#ifdef DUMPI
+  printf("%d Fxi = ", c->id);
+  for (uint i = 0; i < ln; i++)
+    printf("%lf ", rhs[i]);
+  printf("\n");
+  fflush(stdout);
+#endif
+
   for (uint i = 0; i < ln; i++)
     rhs[i] = b[idx[i]] - rhs[i];
   cholesky_solve(xl, &schur->A_ll, rhs);
+#ifdef DUMPI
+  printf("%d xl = ", c->id);
+  for (uint i = 0; i < ln; i++)
+    printf("%lf ", xl[i]);
+  printf("\n");
+  fflush(stdout);
+#endif
 
   for (uint i = 0; i < ln + in; i++)
     x[idx[i]] = xl[i];
@@ -1546,8 +1603,8 @@ struct coarse *coarse_setup(uint nelt, int nv, slong const *vtx, struct comm *c,
   array_init(struct mat_ij, &eij, nelt);
 
   ulong *eid = tcalloc(ulong, nelt);
-  ulong ng = number_rows(eid, &crs->ls, &crs->ln, &crs->is, &crs->in, &crs->idx,
-                         vtx, nelt, nv, c, bfr);
+  ulong ng = number_rows(eid, &crs->ls, &crs->lg, &crs->ln, &crs->is, &crs->ig,
+                         &crs->in, &crs->idx, vtx, nelt, nv, c, bfr);
   find_nbrs(&nbrs, eid, vtx, nelt, nv, c, &cr, bfr);
   free(eid);
 

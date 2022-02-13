@@ -19,6 +19,7 @@ struct par_mat *par_csr_setup_con(const uint nelt, const ulong *eid,
                                   const slong *vtx, int nv, int sep,
                                   struct comm *c, struct crystal *cr,
                                   buffer *bfr);
+void par_mat_print(struct par_mat *A);
 int par_mat_free(struct par_mat *A);
 
 struct coarse;

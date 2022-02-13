@@ -141,8 +141,7 @@ static sint converged(struct array *fdlr, GenmapScalar *fiedler, struct comm *c,
 
   parallel_sort(struct fiedler, fdlr, fiedler, gs_double, 0, 1, c, buf);
 
-  slong out[2][1], bfr[2][1];
-  slong in = fdlr->n;
+  slong out[2][1], bfr[2][1], in = fdlr->n;
   comm_scan(out, c, gs_long, gs_add, &in, 1, bfr);
   slong start = out[0][0];
 

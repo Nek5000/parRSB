@@ -21,6 +21,33 @@ static void coarse_system(struct rsb_element *elems, uint nelt, int nv,
       ids[i * nv + j] = elems[i].vertices[j];
 
   struct coarse *crs = coarse_setup(nelt, nv, ids, cin, bfr);
+
+  slong out[2][1], buf[2][1], in = nelt;
+  comm_scan(out, cin, gs_long, gs_add, &in, 1, buf);
+  slong start = out[0][0], ng = out[1][0];
+
+  scalar *b = (scalar *)tcalloc(scalar, 2 * nelt), *x = b + nelt;
+
+  scalar sum = 0;
+  for (i = 0; i < nelt; i++)
+    b[i] = start + i + 1, sum += b[i];
+
+  comm_allreduce(cin, gs_double, gs_add, &sum, 1, buf);
+  sum /= ng;
+
+  scalar norm = 0;
+  for (i = 0; i < nelt; i++)
+    b[i] -= sum, norm += b[i] * b[i];
+
+  comm_allreduce(cin, gs_double, gs_add, &norm, 1, buf);
+  norm = sqrt(norm);
+
+  for (i = 0; i < nelt; i++)
+    b[i] /= sum;
+
+  coarse_solve(x, b, crs, cin, bfr);
+
+  free(b);
   coarse_free(crs);
   free(ids);
 }
