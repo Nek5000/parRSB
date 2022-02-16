@@ -45,8 +45,8 @@ static void get_axis_len(double *length, size_t unit_size, char *elems,
     length[i] = max[i] - min[i];
 }
 
-static void rcb_local(struct array *a, size_t unit_size, uint start, uint end,
-                      int ndim, buffer *buf) {
+void rcb_local(struct array *a, size_t unit_size, uint start, uint end,
+               int ndim, buffer *buf) {
   sint size = end - start;
   if (size <= 1)
     return;

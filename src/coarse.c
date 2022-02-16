@@ -8,14 +8,6 @@
       free(ptr->x);                                                            \
   }
 
-//#define DUMPA
-//#define DUMPG
-//#define DUMPW
-//#define DUMPWG
-//#define DUMPP
-//#define DUMPI
-//#define DUMPS
-
 static void comm_split(const struct comm *old, const int bin, const int key,
                        struct comm *new_) {
   MPI_Comm new_comm;
@@ -1361,8 +1353,8 @@ static inline void ortho(scalar *q, uint n, ulong ng, struct comm *c) {
 }
 
 static int project(scalar *x, scalar *b, struct par_mat *S, struct gs_data *gsh,
-                   struct mg_data *d, struct comm *c, int miter, int verbose,
-                   buffer *bfr) {
+                   struct mg_data *d, struct comm *c, int miter, int null_space,
+                   int verbose, buffer *bfr) {
   assert(IS_CSR(S));
   assert(S->rn == 0 || IS_DIAG(S));
 
@@ -1388,7 +1380,8 @@ static int project(scalar *x, scalar *b, struct par_mat *S, struct gs_data *gsh,
 
   for (i = 0; i < n; i++)
     z[i] = r[i];
-  ortho(z, n, ng, c);
+  if (null_space)
+    ortho(z, n, ng, c);
   scalar rz1 = dot(z, z, n);
   comm_allreduce(c, gs_double, gs_add, &rz1, 1, buf);
 
@@ -1429,7 +1422,8 @@ static int project(scalar *x, scalar *b, struct par_mat *S, struct gs_data *gsh,
 #endif
 
     rzt = rz1;
-    ortho(z, n, ng, c);
+    if (null_space)
+      ortho(z, n, ng, c);
     rz1 = dot(r, z, n);
     comm_allreduce(c, gs_double, gs_add, &rz1, 1, buf);
 
@@ -1439,7 +1433,8 @@ static int project(scalar *x, scalar *b, struct par_mat *S, struct gs_data *gsh,
     comm_allreduce(c, gs_double, gs_add, &rz2, 1, buf);
 
     if (c->id == 0 && verbose > 0)
-      printf("rz0 = %lf rz1 = %lf rz2 = %lf\n", rzt, rz1, rz2);
+      printf("rr = %lf rtol = %lf rz0 = %lf rz1 = %lf rz2 = %lf\n", rr, rtol,
+        rzt, rz1, rz2);
 
     beta = rz2 / rzt;
     for (j = 0; j < n; j++)
@@ -1521,7 +1516,7 @@ static int schur_solve(scalar *x, scalar *b, struct coarse *crs, struct comm *c,
 #endif
 
   assert(in == schur->A_ss.rn);
-  project(xi, rhs, &schur->A_ss, schur->Q_ss, schur->M, c, 100, 1, bfr);
+  project(xi, rhs, &schur->A_ss, schur->Q_ss, schur->M, c, 100, 0, 1, bfr);
 #ifdef DUMPI
   printf("%d xi = ", c->id);
   for (uint i = 0; i < in; i++)

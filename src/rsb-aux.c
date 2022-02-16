@@ -336,6 +336,8 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
   }
 #if 0
   rsb_local(elements->ptr, 0, elements->n, nv, max_iter, max_pass, &lc, bfr);
+#else
+  rcb_local(elements, sizeof(struct rsb_element), 0, elements->n, 3, bfr);
 #endif
   comm_free(&lc);
 
