@@ -13,7 +13,7 @@ OCCADIR ?=
 
 ########################## Don't touch what follows ###########################
 ifeq ($(GSLIBPATH),)
-  $(error Specify GSLIBPATH=<path to gslib>/build)
+  $(error Specify GSLIBPATH=<path to gslib build>)
 endif
 
 ifneq ($(OCCA), 0)
@@ -30,11 +30,10 @@ SRCDIR = $(SRCROOT)/src
 BUILDDIR = $(SRCROOT)/build
 EXAMPLEDIR = $(SRCROOT)/examples
 
-INCFLAGS = -I$(SRCDIR) -I$(SRCDIR)/precond -I$(SRCDIR)/gencon -I$(GSLIBPATH)/include
+INCFLAGS = -I$(SRCDIR) -I$(GSLIBPATH)/include
 LDFLAGS = -L$(BUILDDIR)/lib -lparRSB -L$(GSLIBPATH)/lib -lgs -lm
 
 SRCS  = $(wildcard $(SRCDIR)/*.c)
-SRCS += $(wildcard $(SRCDIR)/gencon/*.c)
 EXAMPLES = $(wildcard $(EXAMPLEDIR)/*.c)
 LIB = $(BUILDDIR)/lib/libparRSB.a
 

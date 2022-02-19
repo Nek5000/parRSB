@@ -1,24 +1,34 @@
-#ifndef _GENMAP_GENCON_IMPL_H_
-#define _GENMAP_GENCON_IMPL_H_
+#ifndef _GENMAP_GENCON_H_
+#define _GENMAP_GENCON_H_
 
-#include <gencon.h>
+#include "genmap-impl.h"
 
-double diff_sqr(double x, double y);
-double distance_2d(struct Point_private *a, struct Point_private *b);
-double distance_3d(struct Point_private *a, struct Point_private *b);
+// Upper bound for number of dimensions
+#define GC_MAX_DIM 3
 
-#define distance2D(a, b) (diff_sqr(a.x[0], b.x[0]) + diff_sqr(a.x[1], b.x[1]))
-#define distance3D(a, b) (distance2D(a, b) + diff_sqr(a.x[2], b.x[2]))
+// Boundary condition types
+#define GC_PERIODIC "P  "
+
+// Upper bounds for elements
+#define GC_MAX_FACES 6
+#define GC_MAX_VERTICES 8
+#define GC_MAX_NEIGHBORS 3
+
+// Upper bounds for faces
+#define GC_MAX_FACE_VERTICES 4
+
+typedef struct Point_private *Point;
+typedef struct Element_private *Element;
+typedef struct Boundary_private *BoundaryFace;
+typedef struct Mesh_private *Mesh;
 
 #define min(a, b) ((a) < (b) ? (a) : (b))
 #define max(a, b) ((a) > (b) ? (a) : (b))
 
 #define READ_T(coords, buf, T, nVertex)                                        \
-  do {                                                                         \
-    memcpy((coords), buf, sizeof(T) * nVertex);                                \
-  } while (0)
+  memcpy((coords), buf, sizeof(T) * nVertex)
 
-/* TODO: Use rsb_element here */
+// TODO: Use rsb_element here
 struct Point_private {
   GenmapScalar dx;
   GenmapScalar x[GC_MAX_DIM];

@@ -1434,7 +1434,7 @@ static int project(scalar *x, scalar *b, struct par_mat *S, struct gs_data *gsh,
 
     if (c->id == 0 && verbose > 0)
       printf("rr = %lf rtol = %lf rz0 = %lf rz1 = %lf rz2 = %lf\n", rr, rtol,
-        rzt, rz1, rz2);
+             rzt, rz1, rz2);
 
     beta = rz2 / rzt;
     for (j = 0; j < n; j++)

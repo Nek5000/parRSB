@@ -341,7 +341,7 @@ static int project(genmap_vector x, struct laplacian *gl, struct mg_data *d,
     for (k = 0; k < lelt; k++)
       P[(MM - 1) * lelt + k] = 0.0;
 
-    for (j = 0; j < i; j++) {
+    for (j = 0; j <= i; j++) {
       double a = 0.0;
       for (k = 0; k < lelt; k++)
         a += W[j * lelt + k] * p->data[k];

@@ -1,7 +1,6 @@
 #include <getopt.h>
 #include <stdio.h>
 
-#include <gencon-impl.h>
 #include <genmap-impl.h>
 #include <parRSB.h>
 

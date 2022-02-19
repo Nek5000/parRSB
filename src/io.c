@@ -1,7 +1,7 @@
 #include <math.h>
 #include <stdio.h>
 
-#include <gencon-impl.h>
+#include "con.h"
 #include <genmap-impl.h>
 #include <parRSB.h>
 
@@ -515,10 +515,10 @@ int parrsb_dump_map(char *name, unsigned int nelt, int nv, long long *vtx,
 #undef GC_CO2_HEADER_LEN
 
 #define WRITE_T(dest, val, T, nunits)                                          \
-  do {                                                                         \
+  {                                                                            \
     memcpy(dest, val, sizeof(T) * nunits);                                     \
     dest += sizeof(T) * nunits;                                                \
-  } while (0)
+  }
 
 int parrsb_dump_part(char *name, unsigned int nel, int nv, double *coord,
                      int gid, MPI_Comm comm) {
