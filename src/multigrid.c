@@ -1,5 +1,4 @@
 #include "multigrid.h"
-#include "coarse.h"
 #include <math.h>
 
 struct mg_lvl {
@@ -15,30 +14,6 @@ struct mg_data {
   struct mg_lvl **levels;
   uint *level_off;
   scalar *buf;
-};
-
-// Following struct definitions should match what is defined in coarse.c
-struct mat_ij {
-  ulong r, c;
-  uint idx, p;
-  scalar v;
-};
-
-struct par_mat {
-  // CSC or CSR or whatever
-  int type;
-
-  // Unique global column ids and row ids of the matrix
-  uint cn, rn;
-  ulong *cols, *rows;
-
-  // Adjacency matrix
-  uint *adj_off;
-  uint *adj_idx;
-  scalar *adj_val;
-
-  // Diagonal
-  scalar *diag_val;
 };
 
 static int logbll(slong n, int a) {

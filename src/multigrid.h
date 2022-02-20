@@ -1,15 +1,10 @@
-#ifndef _GENMAP_PRECON_H_
-#define _GENMAP_PRECON_H_
+#ifndef _MULTIGRID_H_
+#define _MULTIGRID_H_
 
-#include <gslib.h>
-
-#ifndef scalar
-#define scalar double
-#endif
+#include "mat.h"
 
 #define TOL 1e-12
 
-struct par_mat;
 struct gs_data *setup_Q(const struct par_mat *M, const struct comm *c,
                         buffer *bfr);
 void mat_vec_csr(scalar *y, scalar *x, struct par_mat *M, struct gs_data *gsh,

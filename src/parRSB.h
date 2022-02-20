@@ -15,9 +15,9 @@
 extern "C" {
 #endif
 
-/*
- * Partitioning
- */
+//==============================================================================
+// Partitioning
+//
 typedef struct {
   /* General options */
   int partitioner;   // 0 - RSB, 1 - RCB, 2 - RIB (Default: 0)
@@ -42,9 +42,9 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
 void fparrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
                        int *nel, int *nve, int *options, int *comm, int *err);
 
-/*
- * Connectivity
- */
+//==============================================================================
+// Connectivity
+//
 int parrsb_find_conn(long long *vtx, double *coord, int nel, int nDim,
                      long long *periodicInfo, int nPeriodicFaces, double tol,
                      MPI_Comm comm, int verbose);
@@ -54,9 +54,10 @@ int parrsb_find_conn(long long *vtx, double *coord, int nel, int nDim,
 void fparrsb_find_conn(long long *vtx, double *coord, int *nel, int *nDim,
                        long long *periodicInfo, int *nPeriodicFaces,
                        double *tol, MPI_Fint *fcomm, int *verbose, int *err);
-/*
- * I/O routines
- */
+
+//==============================================================================
+// I/O routines
+//
 int parrsb_read_mesh(unsigned int *nel, int *nv, long long **vl, double **coord,
                      unsigned int *nbcs, long long **bcs, char *name,
                      MPI_Comm comm, int read);
@@ -70,9 +71,9 @@ int parrsb_dump_map(char *name, unsigned int nelt, int nv, long long *vtx,
 int parrsb_dump_part(char *name, unsigned int nelt, int nv, double *coord,
                      int gid, MPI_Comm comm);
 
-/*
- * Auxiliary functions
- */
+//==============================================================================
+// Auxiliary functions
+//
 typedef struct {
   char *mesh;  // Mesh name, required.
   double tol;  // gencon tolerance, default: 0.2
