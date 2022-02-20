@@ -51,32 +51,9 @@ struct rsb_element {
 #define WEIGHTED 128
 #define UNWEIGHTED 256
 
-struct laplacian {
-  int type, nv;
-  uint nel;
-  void *data;
-};
-
-struct csr_laplacian {
-  uint rn, *roff;
-  ulong rstart, *col;
-  GenmapScalar *v, *diag, *buf;
-  struct gs_data *gsh;
-};
-
-void csr_mat_gather(GenmapScalar *buf, struct csr_laplacian *M, GenmapScalar *x,
-                    buffer *bfr);
-void csr_mat_apply(GenmapScalar *y, struct csr_laplacian *M, GenmapScalar *x,
-                   buffer *buf);
-int csr_mat_free(struct csr_laplacian *M);
-
-struct gs_laplacian {
-  GenmapScalar *diag, *u;
-  struct gs_data *gsh;
-};
-
-int laplacian_init(struct laplacian *l, struct rsb_element *elems, uint nel,
-                   int nv, int type, struct comm *c, buffer *buf);
+struct laplacian;
+struct laplacian *laplacian_init(struct rsb_element *elems, uint nel, int nv,
+                                 int type, struct comm *c, buffer *buf);
 int laplacian(GenmapScalar *v, struct laplacian *l, GenmapScalar *u,
               buffer *buf);
 void laplacian_free(struct laplacian *l);

@@ -45,19 +45,26 @@ int IS_CSC(const struct par_mat *A);
 int IS_CSR(const struct par_mat *A);
 int IS_DIAG(const struct par_mat *A);
 
+// Output array `arr` is an array of type `struct nbr`
 void find_nbrs(struct array *arr, const ulong *eid, const slong *vtx,
                const uint nelt, const int nv, const struct comm *c,
                struct crystal *cr, buffer *buf);
+// Output array `eij` is an array of type `struct mat_ij`, input array `nbr` is
+// an array of type `struct nbr`
 int compress_nbrs(struct array *eij, struct array *nbr, buffer *bfr);
 
+// Input array `entries` is of type `struct mat_ij`
 int csr_setup(struct mat *mat, struct array *entries, int sep, buffer *buf);
+int mat_print(struct mat *mat);
 int mat_free(struct mat *mat);
 
+// Input array `entries` is of type `struct mat_ij`
 int par_csc_setup(struct par_mat *mat, struct array *entries, int sd,
                   buffer *buf);
 int par_csr_setup(struct par_mat *mat, struct array *entries, int sd,
                   buffer *buf);
-struct par_mat *par_csr_setup_ext(struct array *entries, int sep, buffer *bfr);
+struct par_mat *par_csr_setup_ext(struct array *entries, int sd, buffer *bfr);
+// Create a par_mat from connectivity
 struct par_mat *par_csr_setup_con(const uint nelt, const ulong *eid,
                                   const slong *vtx, int nv, int sep,
                                   struct comm *c, struct crystal *cr,
