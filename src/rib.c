@@ -56,8 +56,8 @@ static void get_rib_axis(char *elems, uint nel, size_t unit_size, int ndim,
   }
 }
 
-static void rib_local(struct array *a, size_t unit_size, uint start, uint end,
-                      int ndim, buffer *buf) {
+void rib_local(struct array *a, size_t unit_size, uint start, uint end,
+               int ndim, buffer *buf) {
   sint size = end - start;
   if (size <= 1)
     return;

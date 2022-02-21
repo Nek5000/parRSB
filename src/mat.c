@@ -222,7 +222,7 @@ int par_csr_setup(struct par_mat *mat, struct array *entries, int sd,
   mat->type = CSR;
   if (entries == NULL || entries->n == 0) {
     mat->cn = mat->rn = 0;
-    mat->adj_off = mat->adj_idx = NULL;
+    mat->adj_off = mat->adj_idx = mat->diag_idx = NULL;
     mat->adj_val = mat->diag_val = NULL;
     mat->rows = mat->cols = NULL;
     return 0;
@@ -283,8 +283,10 @@ int par_csr_setup(struct par_mat *mat, struct array *entries, int sd,
   i = 0;
   if (sd) {
     mat->diag_val = (scalar *)tcalloc(scalar, mat->rn);
+    mat->diag_idx = (uint *)tcalloc(uint, mat->rn);
     for (; i < j; i++) {
       if (unique[i].r == unique[i].c) {
+        mat->diag_idx[ndiag] = unique[i].idx;
         mat->diag_val[ndiag++] = unique[i].v;
       } else {
         mat->adj_idx[nadj] = unique[i].idx;
@@ -292,7 +294,7 @@ int par_csr_setup(struct par_mat *mat, struct array *entries, int sd,
       }
     }
   } else {
-    mat->diag_val = NULL;
+    mat->diag_val = NULL, mat->diag_idx = NULL;
     for (; i < j; i++)
       mat->adj_idx[nadj] = unique[i].idx, mat->adj_val[nadj++] = unique[i].v;
   }
@@ -305,7 +307,7 @@ int par_csc_setup(struct par_mat *mat, struct array *entries, int sd,
   mat->type = CSC;
   if (entries == NULL || entries->n == 0) {
     mat->cn = mat->rn = 0;
-    mat->adj_off = mat->adj_idx = NULL;
+    mat->adj_off = mat->adj_idx = mat->diag_idx = NULL;
     mat->adj_val = mat->diag_val = NULL;
     mat->rows = mat->cols = NULL;
     return 0;
@@ -365,9 +367,11 @@ int par_csc_setup(struct par_mat *mat, struct array *entries, int sd,
   uint nadj = 0, ndiag = 0;
   i = 0;
   if (sd) {
+    mat->diag_idx = (uint *)tcalloc(uint, mat->cn);
     mat->diag_val = (scalar *)tcalloc(scalar, mat->cn);
     for (; i < j; i++) {
       if (unique[i].r == unique[i].c) {
+        mat->diag_idx[ndiag] = unique[i].idx;
         mat->diag_val[ndiag++] = unique[i].v;
       } else {
         mat->adj_idx[nadj] = unique[i].idx;
@@ -375,7 +379,7 @@ int par_csc_setup(struct par_mat *mat, struct array *entries, int sd,
       }
     }
   } else {
-    mat->diag_val = NULL;
+    mat->diag_idx = NULL, mat->diag_val = NULL;
     for (; i < j; i++)
       mat->adj_idx[nadj] = unique[i].idx, mat->adj_val[nadj++] = unique[i].v;
   }
@@ -410,6 +414,7 @@ int par_mat_free(struct par_mat *A) {
   FREE(A, adj_off);
   FREE(A, adj_idx);
   FREE(A, adj_val);
+  FREE(A, diag_idx);
   FREE(A, diag_val);
 
   return 0;

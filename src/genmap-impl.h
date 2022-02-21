@@ -26,8 +26,12 @@ struct rcb_element {
   GenmapScalar coord[MAXDIM], fiedler;
 };
 
+void rcb_local(struct array *a, size_t unit_size, uint start, uint end,
+               int ndim, buffer *buf);
 int rcb(struct array *elements, size_t unit_size, int ndim, struct comm *c,
         buffer *bfr);
+void rib_local(struct array *a, size_t unit_size, uint start, uint end,
+               int ndim, buffer *buf);
 int rib(struct array *elements, size_t unit_size, int ndim, struct comm *c,
         buffer *bfr);
 

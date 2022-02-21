@@ -88,7 +88,7 @@ ifneq ($(INSTALLDIR),)
 	@cp -v $(LIB) $(INSTALLDIR)/lib 2>/dev/null
 	@mkdir -p $(INSTALLDIR)/include 2>/dev/null
 	@cp $(SRCDIR)/*.h $(INSTALLDIR)/include 2>/dev/null
-	@cp -r okl $(INSTALLDIR)/ 2>/dev/null
+	@cp -r $(SRCDIR)/occa/*.okl $(INSTALLDIR)/ 2>/dev/null
 endif
 
 .PHONY: lib

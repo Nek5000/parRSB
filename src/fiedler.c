@@ -752,9 +752,9 @@ static int lanczos(genmap_vector fiedler, struct rsb_element *elems, int nv,
   struct laplacian *wl;
 #if defined(GENMAP_OCCA)
   wl = laplacian_init(elems, lelt, nv, CSR | WEIGHTED, gsc, bfr);
-  occa_lanczos_init(gsc, &wl, max_iter);
+  occa_lanczos_init(gsc, wl, max_iter);
 #else
-  wl = laplacian_init(elems, lelt, nv, GS | WEIGHTED, gsc, bfr);
+  wl = laplacian_init(elems, lelt, nv, CSR | WEIGHTED, gsc, bfr);
 #endif
 
   genmap_vector alpha, beta;

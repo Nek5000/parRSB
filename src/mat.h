@@ -25,20 +25,10 @@ struct mat {
 };
 
 struct par_mat {
-  // CSC or CSR or whatever
-  int type;
-
-  // Unique global column ids and row ids of the matrix
-  uint cn, rn;
-  ulong *cols, *rows;
-
-  // Adjacency matrix
-  uint *adj_off;
-  uint *adj_idx;
-  scalar *adj_val;
-
-  // Diagonal
-  scalar *diag_val;
+  int type; // CSC or CSR
+  uint cn, rn, *adj_off, *adj_idx, *diag_idx;
+  scalar *adj_val, *diag_val;
+  ulong *cols, *rows; // Unique global column ids and row ids of the matrix
 };
 
 int IS_CSC(const struct par_mat *A);
