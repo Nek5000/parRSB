@@ -5,14 +5,18 @@
 #include <occa.h>
 
 #define BLK_SIZE 512
+#define OPT_SHRT_FOR_SCALAR 1
+#define OPT_SINT_FOR_SCALAR 1
+#define OPT_CALC_DIAG 1
 
 static occaDevice device;
 static occaJson props;
 static occaKernel zero, copy, sum, scale, dot, norm, add2s1, add2s2, addc;
-static occaKernel lplcn00, lplcn01;
+static occaKernel lplcn00, lplcn01, lplcn02, lplcn03;
 
 // Laplacian and CG work arrays
-struct par_mat *M = NULL;
+struct par_mat *M = NULL;                          // host matrix
+struct gs_data *gsh = NULL;                        // gs for host communication
 static occaMemory o_adj_off, o_adj_idx, o_adj_val; // Adjacency matrix
 static occaMemory o_diag_idx, o_diag_val;          // Diagonal
 static occaMemory o_p, o_w, o_r, o_rr, o_x, o_y;   // CG
@@ -21,8 +25,6 @@ static occaMemory o_p, o_w, o_r, o_rr, o_x, o_y;   // CG
 size_t wrk_size, nblocks;
 static scalar *wrk = NULL;
 static occaMemory o_wrk;
-
-struct gs_data *gsh = NULL; // gs for host communication
 
 // Following definitions should match the ones in laplacian.c
 struct laplacian {
@@ -36,6 +38,34 @@ struct csr_laplacian {
   struct gs_data *gsh;
   scalar *buf;
 };
+
+static int analyse_adj(struct par_mat *M, struct comm *c, buffer *bfr) {
+  uint nnz = M->rn > 0 ? M->adj_off[M->rn] : 0;
+  sint *val = (sint *)tcalloc(sint, nnz);
+  for (uint i = 0; i < nnz; i++)
+    val[i] = M->adj_val[i];
+
+  struct sv {
+    sint v;
+  };
+  sarray_sort(struct sv, val, nnz, v, 0, bfr);
+
+  uint cnt = nnz > 0;
+  for (uint i = 1; i < nnz; i++)
+    if (val[i] != val[i - 1])
+      cnt++;
+
+  sint tmp[2];
+  comm_allreduce(c, gs_int, gs_max, &cnt, 1, tmp);
+
+  if (c->id == 0)
+    printf("# of different values: %d\n", cnt);
+
+  if (val != NULL)
+    free(val), val = NULL;
+
+  return 0;
+}
 
 int occa_init(const char *backend_, int device_id, int platform_id,
               struct comm *c) {
@@ -74,6 +104,7 @@ int occa_init(const char *backend_, int device_id, int platform_id,
   props = occaCreateJson();
   occaJsonObjectSet(props, "defines/BLK_SIZE", occaInt(512));
   occaJsonObjectSet(props, "defines/uint", occaString("unsigned int"));
+  occaJsonObjectSet(props, "defines/sint", occaString("int"));
   occaJsonObjectSet(props, "defines/ulong", occaString("unsigned long"));
   occaJsonObjectSet(props, "defines/scalar", occaString("double"));
 
@@ -89,6 +120,8 @@ int occa_init(const char *backend_, int device_id, int platform_id,
     addc = occaDeviceBuildKernel(device, okl, "addc", props);
     lplcn00 = occaDeviceBuildKernel(device, okl, "laplacian_v00", props);
     lplcn01 = occaDeviceBuildKernel(device, okl, "laplacian_v01", props);
+    lplcn02 = occaDeviceBuildKernel(device, okl, "laplacian_v02", props);
+    lplcn03 = occaDeviceBuildKernel(device, okl, "laplacian_v03", props);
   }
 
   comm_barrier(c);
@@ -104,6 +137,8 @@ int occa_init(const char *backend_, int device_id, int platform_id,
   addc = occaDeviceBuildKernel(device, okl, "addc", props);
   lplcn00 = occaDeviceBuildKernel(device, okl, "laplacian_v00", props);
   lplcn01 = occaDeviceBuildKernel(device, okl, "laplacian_v01", props);
+  lplcn02 = occaDeviceBuildKernel(device, okl, "laplacian_v02", props);
+  lplcn03 = occaDeviceBuildKernel(device, okl, "laplacian_v03", props);
 
   return 0;
 }
@@ -137,19 +172,50 @@ int occa_lanczos_init(struct comm *c, struct laplacian *l, int niter) {
         occaDeviceMalloc(device, sizeof(uint) * nadj, NULL, occaDefault);
     occaCopyPtrToMem(o_adj_idx, M->adj_idx, occaAllBytes, 0, occaDefault);
 
-    o_adj_val =
-        occaDeviceMalloc(device, sizeof(scalar) * nadj, NULL, occaDefault);
-    occaCopyPtrToMem(o_adj_val, M->adj_val, occaAllBytes, 0, occaDefault);
-
-    o_diag_val =
-        occaDeviceMalloc(device, sizeof(scalar) * M->rn, NULL, occaDefault);
-    occaCopyPtrToMem(o_diag_val, M->diag_val, occaAllBytes, 0, occaDefault);
-
     o_diag_idx =
         occaDeviceMalloc(device, sizeof(uint) * M->rn, NULL, occaDefault);
     occaCopyPtrToMem(o_diag_idx, M->diag_idx, occaAllBytes, 0, occaDefault);
 
     o_x = occaDeviceMalloc(device, sizeof(scalar) * M->cn, NULL, occaDefault);
+
+#define SETUP_ARRAYS(T)                                                        \
+  {                                                                            \
+    av = (void *)tcalloc(T, nadj);                                             \
+    T *avp = (T *)av;                                                          \
+    for (uint i = 0; i < nadj; i++)                                            \
+      avp[i] = (T)M->adj_val[i];                                               \
+    dv = (void *)tcalloc(T, M->rn);                                            \
+    T *dvp = (T *)dv;                                                          \
+    for (uint i = 0; i < M->rn; i++)                                           \
+      dvp[i] = (T)M->diag_val[i];                                              \
+    usize = sizeof(T);                                                         \
+  }
+
+    void *av, *dv;
+    size_t usize;
+#if OPT_SHRT_FOR_SCALAR == 1
+    SETUP_ARRAYS(short);
+#elif OPT_SINT_FOR_SCALAR == 1
+    SETUP_ARRAYS(int);
+#else
+    av = (void *)M->adj_val;
+    dv = (void *)M->diag_val;
+    usize = sizeof(scalar);
+#endif
+
+    o_adj_val = occaDeviceMalloc(device, usize * nadj, NULL, occaDefault);
+    occaCopyPtrToMem(o_adj_val, av, occaAllBytes, 0, occaDefault);
+
+    o_diag_val = occaDeviceMalloc(device, usize * M->rn, NULL, occaDefault);
+    occaCopyPtrToMem(o_diag_val, dv, occaAllBytes, 0, occaDefault);
+
+#if OPT_SINT_FOR_SCALAR == 1
+    if (av != NULL)
+      free(av);
+    if (dv != NULL)
+      free(dv);
+#endif
+
     if (wrk_size < M->cn + M->rn)
       wrk_size = M->cn + M->rn;
   }
@@ -243,14 +309,24 @@ static void laplacian_op(occaMemory o_w, occaMemory o_p, uint lelt,
   // Fix this: occaAllbytes --> M->cn * sizeof(scalar)
   occaCopyPtrToMem(o_wrk, wrk, sizeof(scalar) * M->cn, 0, occaDefault);
 
+#if OPT_SHRT_FOR_SCALAR == 1
+  occaKernelRun(lplcn03, o_w, occaUInt(lelt), o_adj_off, o_adj_idx, o_adj_val,
+                o_diag_idx, o_diag_val, o_wrk);
+#elif OPT_SINT_FOR_SCALAR == 1
+  occaKernelRun(lplcn02, o_w, occaUInt(lelt), o_adj_off, o_adj_idx, o_adj_val,
+                o_diag_idx, o_diag_val, o_wrk);
+#else
   occaKernelRun(lplcn01, o_w, occaUInt(lelt), o_adj_off, o_adj_idx, o_adj_val,
                 o_diag_idx, o_diag_val, o_wrk);
+#endif
 }
 
 int occa_lanczos_aux(genmap_vector diag, genmap_vector upper, genmap_vector *rr,
                      uint lelt, ulong nelg, int niter, genmap_vector f,
                      struct laplacian *gl, struct comm *gsc, buffer *bfr) {
   assert(f->size == lelt);
+
+  analyse_adj(M, gsc, bfr);
 
   // vec_create_zeros(p, ...)
   occaKernelRun(zero, o_p, occaUInt(lelt));
@@ -377,3 +453,7 @@ int occa_free() {
 
   return 0;
 }
+
+#undef BLK_SIZE
+#undef OPT_SINT_FOR_SCALAR
+#undef OPT_SHRT_FOR_SCALAR

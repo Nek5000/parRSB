@@ -159,3 +159,29 @@
     y[i] = s;
   }
 }
+
+@kernel void laplacian_v02(scalar *y, const uint nr, const uint *adj_off,
+                           const uint *adj_ind, const sint *adj_val,
+                           const uint *diag_ind, const sint *diag_val,
+                           const scalar *x) {
+  for (int i = 0; i < nr; i++; @tile(BLK_SIZE, @outer, @inner)) {
+    scalar s = diag_val[i] * x[diag_ind[i]];
+    for (int j = adj_off[i]; j < adj_off[i + 1]; j++) {
+      s = s + adj_val[j] * x[adj_ind[j]];
+    }
+    y[i] = s;
+  }
+}
+
+@kernel void laplacian_v03(scalar *y, const uint nr, const uint *adj_off,
+                           const uint *adj_ind, const short *adj_val,
+                           const uint *diag_ind, const short *diag_val,
+                           const scalar *x) {
+  for (int i = 0; i < nr; i++; @tile(BLK_SIZE, @outer, @inner)) {
+    scalar s = diag_val[i] * x[diag_ind[i]];
+    for (int j = adj_off[i]; j < adj_off[i + 1]; j++) {
+      s = s + adj_val[j] * x[adj_ind[j]];
+    }
+    y[i] = s;
+  }
+}
