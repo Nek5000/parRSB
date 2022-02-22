@@ -117,8 +117,8 @@
   }
 }
 
-@kernel void scale(scalar *v, const uint start, scalar *u, const scalar alpha,
-                   const uint n) {
+@kernel void scale(scalar *v, const uint start, const scalar *u,
+                   const scalar alpha, const uint n) {
   for (int i = 0; i < n; i++; @tile(BLK_SIZE, @outer, @inner)) {
     v[start + i] = alpha * u[i];
   }

@@ -7,7 +7,6 @@
 #define BLK_SIZE 512
 #define OPT_SHRT_FOR_SCALAR 1
 #define OPT_SINT_FOR_SCALAR 1
-#define OPT_CALC_DIAG 1
 
 static occaDevice device;
 static occaJson props;
@@ -50,7 +49,7 @@ static int analyse_adj(struct par_mat *M, struct comm *c, buffer *bfr) {
   };
   sarray_sort(struct sv, val, nnz, v, 0, bfr);
 
-  uint cnt = nnz > 0;
+  sint cnt = nnz > 0;
   for (uint i = 1; i < nnz; i++)
     if (val[i] != val[i - 1])
       cnt++;
@@ -72,8 +71,7 @@ int occa_init(const char *backend_, int device_id, int platform_id,
   // Initialize backend
   char backend[BUFSIZ] = {'\0'};
   size_t len = strnlen(backend_, BUFSIZ);
-  int i;
-  for (i = 0; i < len; i++)
+  for (int i = 0; i < len; i++)
     backend[i] = tolower(backend_[i]);
 
   char *fmt_ocl = "{mode: 'OpenCL', device_id: %d, platform_id: %d}";
@@ -238,7 +236,7 @@ int occa_lanczos_init(struct comm *c, struct laplacian *l, int niter) {
 
 static int vec_ortho(occaMemory o_in, ulong nelg, uint lelt, struct comm *c) {
   occaKernelRun(sum, occaUInt(lelt), o_in, o_wrk);
-  occaCopyMemToPtr(wrk, o_wrk, occaAllBytes, 0, occaDefault);
+  occaCopyMemToPtr(wrk, o_wrk, nblocks * sizeof(scalar), 0, occaDefault);
 
   scalar tmp = 0.0, rtr;
   uint i;
@@ -254,7 +252,7 @@ static int vec_ortho(occaMemory o_in, ulong nelg, uint lelt, struct comm *c) {
 
 static scalar vec_norm(occaMemory o_a, uint lelt, struct comm *c) {
   occaKernelRun(norm, o_wrk, occaInt(lelt), o_a);
-  occaCopyMemToPtr(wrk, o_wrk, occaAllBytes, 0, occaDefault);
+  occaCopyMemToPtr(wrk, o_wrk, nblocks * sizeof(scalar), 0, occaDefault);
 
   scalar pp = 0.0, tmp;
   uint i;
@@ -268,7 +266,7 @@ static scalar vec_norm(occaMemory o_a, uint lelt, struct comm *c) {
 static scalar vec_dot(occaMemory o_a, occaMemory o_b, uint lelt,
                       struct comm *c) {
   occaKernelRun(dot, o_wrk, occaInt(lelt), o_a, o_b);
-  occaCopyMemToPtr(wrk, o_wrk, occaAllBytes, 0, occaDefault);
+  occaCopyMemToPtr(wrk, o_wrk, nblocks * sizeof(scalar), 0, occaDefault);
 
   scalar pap = 0.0, tmp;
   uint i;
@@ -282,7 +280,7 @@ static scalar vec_dot(occaMemory o_a, occaMemory o_b, uint lelt,
 static scalar vec_normalize(occaMemory o_scaled, uint indx, occaMemory o_a,
                             uint lelt, struct comm *c) {
   occaKernelRun(norm, o_wrk, occaInt(lelt), o_a);
-  occaCopyMemToPtr(wrk, o_wrk, occaAllBytes, 0, occaDefault);
+  occaCopyMemToPtr(wrk, o_wrk, nblocks * sizeof(scalar), 0, occaDefault);
 
   scalar rtr = 0, tmp;
   uint i;
@@ -340,7 +338,7 @@ int occa_lanczos_aux(genmap_vector diag, genmap_vector upper, genmap_vector *rr,
   // vec_scale(rr[0], r, rni);
   scalar rtr = vec_norm(o_r, lelt, gsc);
   scalar rnorm = sqrt(rtr);
-  scalar rni = 1.0 / rni;
+  scalar rni = 1.0 / rnorm;
   occaKernelRun(scale, o_rr, occaUInt(0), o_r, occaDouble(rni), occaUInt(lelt));
 
   scalar eps = 1.e-5;
@@ -399,16 +397,15 @@ int occa_lanczos_aux(genmap_vector diag, genmap_vector upper, genmap_vector *rr,
     }
 
     if (rnorm < rtol) {
-      diag->size = iter + 1;
-      upper->size = iter;
-      iter = iter + 1;
+      upper->size = iter++;
+      diag->size = iter;
       break;
     }
   }
 
-  occaCopyMemToPtr(wrk, o_rr, occaAllBytes, 0, occaDefault);
-  uint i;
-  for (i = 0; i < iter + 1; i++)
+  occaCopyMemToPtr(wrk, o_rr, lelt * (iter + 1) * sizeof(scalar), 0,
+                   occaDefault);
+  for (uint i = 0; i < iter + 1; i++)
     memcpy(rr[i]->data, &wrk[i * lelt], sizeof(scalar) * lelt);
 
   metric_acc(TOL_FINAL, rnorm);
@@ -422,14 +419,15 @@ int occa_lanczos_free() {
   occaFree(&o_w);
   occaFree(&o_r);
   occaFree(&o_y);
-  occaFree(&o_x);
   occaFree(&o_rr);
-  occaFree(&o_wrk);
+
   occaFree(&o_adj_off);
   occaFree(&o_adj_idx);
-  occaFree(&o_adj_val);
   occaFree(&o_diag_idx);
+  occaFree(&o_x);
+  occaFree(&o_adj_val);
   occaFree(&o_diag_val);
+  occaFree(&o_wrk);
 
   if (wrk != NULL)
     free(wrk);

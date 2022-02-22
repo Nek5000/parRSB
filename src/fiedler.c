@@ -724,9 +724,8 @@ static int lanczos_aux(genmap_vector diag, genmap_vector upper,
     }
 
     if (rnorm < rtol) {
-      diag->size = iter + 1;
-      upper->size = iter;
-      iter = iter + 1;
+      upper->size = iter++;
+      diag->size = iter;
       break;
     }
   }
