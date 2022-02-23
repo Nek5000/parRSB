@@ -25,9 +25,10 @@ typedef struct {
   int profile_level; // 0, 1, 2, .. etc (Default: 0)
 
   /* RSB specific */
-  int rsb_algo;     // 0 - Lanczos, 1 - RQI (Default: 0)
-  int rsb_pre;      // 0 - None, 1 - RCB , 2 - RIB (Default: 1)
-  int rsb_grammian; // 0 or 1 (Default: 1)
+  int rsb_algo;      // 0 - Lanczos, 1 - RQI (Default: 0)
+  int rsb_pre;       // 0 - None, 1 - RCB , 2 - RIB (Default: 1)
+  int rsb_grammian;  // 0 or 1 (Default: 1)
+  int rsb_mg_factor; // 2 or 4 (Default: 4)
 
   /* Other */
   int repair; // 0 - No, 1 - Yes (Default: 1)

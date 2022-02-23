@@ -322,7 +322,7 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
     comm_split(&lc, bin, lc.id, &tc);
 
     metric_tic(&lc, REPAIR_BALANCE);
-    if (options->repair == 1) {
+    if (options->repair > 0) {
       repair_partitions(elements, nv, &tc, &lc, bin, gc, bfr);
       balance_partitions(elements, nv, &tc, &lc, bin, bfr);
     }
@@ -336,13 +336,12 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
   }
 #if 0
   rsb_local(elements->ptr, 0, elements->n, nv, max_iter, max_pass, &lc, bfr);
-#else
   rcb_local(elements, sizeof(struct rsb_element), 0, elements->n, 3, bfr);
 #endif
   comm_free(&lc);
 
   check_rsb_partition(gc, max_pass, max_iter);
-  coarse_system(elements->ptr, elements->n, nv, gc, bfr);
+  // coarse_system(elements->ptr, elements->n, nv, gc, bfr);
   // count_interface_dofs(elements->ptr, elements->n, nv, gc, bfr);
 
   return 0;

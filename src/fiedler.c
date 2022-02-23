@@ -398,7 +398,12 @@ static int inverse(genmap_vector y, struct rsb_element *elems, int nv,
   struct crystal cr;
   crystal_init(&cr, gsc);
   struct par_mat *L = par_csr_setup_con(lelt, eid, vtx, nv, 1, gsc, &cr, buf);
-  struct mg_data *d = mg_setup(L, 4, gsc, &cr, buf);
+
+  int factor = 4;
+  char *fc = getenv("PARRSB_RSB_MG_FACTOR");
+  if (fc != NULL)
+    factor = atoi(fc);
+  struct mg_data *d = mg_setup(L, factor, gsc, &cr, buf);
   crystal_free(&cr);
 
   wrk = sizeof(GenmapScalar) *
@@ -700,7 +705,7 @@ static int lanczos_aux(genmap_vector diag, genmap_vector upper,
     pap_old = pap;
     pap = vec_dot(w, p);
     comm_allreduce(gsc, gs_double, gs_add, &pap, 1, buf);
-#if 1
+#if 0
     if (gsc->id == 0)
       printf("host iter = %d beta = %lf pp = %lf pap = %lf\n", iter, beta, pp,
              pap);
@@ -729,6 +734,15 @@ static int lanczos_aux(genmap_vector diag, genmap_vector upper,
       break;
     }
   }
+
+#if 0
+  for (uint i = 0; i < iter + 1; i++) {
+    GenmapScalar norm = vec_dot(rr[i], rr[i]);
+    comm_allreduce(gsc, gs_double, gs_add, &norm, 1, buf);
+    if (gsc->id == 0)
+      printf("norm rr[%d] = %lf\n", i, sqrt(norm));
+  }
+#endif
 
   metric_acc(TOL_FINAL, rnorm);
   metric_acc(TOL_TARGET, rtol);
@@ -800,6 +814,11 @@ static int lanczos(genmap_vector fiedler, struct rsb_element *elems, int nv,
       }
     }
     vec_copy(evTriDiag, eVectors[eValMinI]);
+#if 0
+    if (gsc->id == 0)
+      printf("ipass = %d eValMinI = %d eValue = %lf\n", ipass, eValMinI,
+             eValues->data[eValMinI]);
+#endif
 
     GenmapInt j;
     for (i = 0; i < lelt; i++) {
@@ -869,6 +888,11 @@ int fiedler(struct rsb_element *elems, uint lelt, int nv, int max_iter,
   GenmapScalar norm = 0;
   for (i = 0; i < lelt; i++)
     norm += fiedler->data[i] * fiedler->data[i];
+#if 0
+  if (gsc->id == 0)
+    printf("fiedler norm = %lf\n", norm);
+#endif
+
   GenmapScalar normi;
   comm_allreduce(gsc, gs_double, gs_add, &norm, 1, &normi);
   normi = 1.0 / sqrt(norm);

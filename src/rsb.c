@@ -7,7 +7,7 @@
 #include <genmap-impl.h>
 #include <parRSB.h>
 
-parrsb_options parrsb_default_options = {0, 2, 1, 0, 1, 0, 1};
+parrsb_options parrsb_default_options = {0, 2, 1, 0, 1, 0, 4, 1};
 
 static int if_number(const char *c) {
   int i;
@@ -31,6 +31,7 @@ static void update_options(parrsb_options *options) {
   UPDATE_OPTION(rsb_pre, "PARRSB_RSB_PRE");
   UPDATE_OPTION(rsb_grammian, "PARRSB_RSB_GRAMMIAN");
   UPDATE_OPTION(repair, "PARRSB_REPAIR");
+  UPDATE_OPTION(rsb_mg_factor, "PARRSB_RSB_MG_FACTOR");
 }
 
 #undef UPDATE_OPTION
@@ -44,6 +45,7 @@ static void print_options(parrsb_options *options) {
   PRINT_OPTION(rsb_pre, "PARRSB_RSB_PRE");
   PRINT_OPTION(rsb_grammian, "PARRSB_RSB_GRAMMIAN");
   PRINT_OPTION(repair, "PARRSB_REPAIR");
+  PRINT_OPTION(rsb_mg_factor, "PARRSB_RSB_MG_FACTOR");
 }
 
 #undef PRINT_OPTION
@@ -219,7 +221,9 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
       break;
     }
 
+#if 0
     metric_print(&ca, options.profile_level);
+#endif
 
     comm_free(&ca);
     metric_finalize();
