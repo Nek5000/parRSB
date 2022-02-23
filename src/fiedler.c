@@ -375,8 +375,7 @@ static int inverse(genmap_vector y, struct rsb_element *elems, int nv,
   assert(z->size == y->size);
   uint lelt = z->size;
 
-  struct laplacian *wl =
-      laplacian_init(elems, lelt, nv, GS | WEIGHTED, gsc, buf);
+  struct laplacian *wl = laplacian_init(elems, lelt, nv, GS, gsc, buf);
 
   // Reserve enough memory in buffer
   size_t wrk = sizeof(ulong) * lelt + sizeof(slong) * nv * lelt;
@@ -705,7 +704,7 @@ static int lanczos_aux(genmap_vector diag, genmap_vector upper,
     pap_old = pap;
     pap = vec_dot(w, p);
     comm_allreduce(gsc, gs_double, gs_add, &pap, 1, buf);
-#if 0
+#if 1
     if (gsc->id == 0)
       printf("host iter = %d beta = %lf pp = %lf pap = %lf\n", iter, beta, pp,
              pap);
@@ -764,10 +763,10 @@ static int lanczos(genmap_vector fiedler, struct rsb_element *elems, int nv,
 
   struct laplacian *wl;
 #if defined(GENMAP_OCCA)
-  wl = laplacian_init(elems, lelt, nv, CSR | WEIGHTED, gsc, bfr);
+  wl = laplacian_init(elems, lelt, nv, CSR, gsc, bfr);
   occa_lanczos_init(gsc, wl, max_iter);
 #else
-  wl = laplacian_init(elems, lelt, nv, CSR | WEIGHTED, gsc, bfr);
+  wl = laplacian_init(elems, lelt, nv, CSR, gsc, bfr);
 #endif
 
   genmap_vector alpha, beta;

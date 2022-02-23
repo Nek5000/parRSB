@@ -51,9 +51,7 @@ struct rsb_element {
 //
 #define GS 1
 #define CSR 2
-#define GPU 4
-#define WEIGHTED 128
-#define UNWEIGHTED 256
+#define CSC 4
 
 struct laplacian;
 struct laplacian *laplacian_init(struct rsb_element *elems, uint nel, int nv,

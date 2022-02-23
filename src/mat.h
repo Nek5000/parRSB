@@ -54,6 +54,7 @@ int par_csc_setup(struct par_mat *mat, struct array *entries, int sd,
 int par_csr_setup(struct par_mat *mat, struct array *entries, int sd,
                   buffer *buf);
 struct par_mat *par_csr_setup_ext(struct array *entries, int sd, buffer *bfr);
+struct par_mat *par_csc_setup_ext(struct array *entries, int sd, buffer *bfr);
 // Create a par_mat from connectivity
 struct par_mat *par_csr_setup_con(const uint nelt, const ulong *eid,
                                   const slong *vtx, int nv, int sep,
