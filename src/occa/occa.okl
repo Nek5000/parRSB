@@ -219,3 +219,15 @@
     y[i] = s - d * x[diag_ind[i]];
   }
 }
+
+@kernel void laplacian_csc_v00(scalar *y, const uint nc, const uint *adj_off,
+                           const uint *adj_ind, const scalar *adj_val,
+                           const uint *diag_ind, const scalar *diag_val,
+                           const scalar *x) {
+  for (int i = 0; i < nc; i++; @tile(BLK_SIZE, @outer, @inner)) {
+    scalar xi = x[i];
+    for (int j = adj_off[i]; j < adj_off[i + 1]; j++) {
+      y[adj_ind[j]] += adj_val[j] * xi;
+    }
+  }
+}

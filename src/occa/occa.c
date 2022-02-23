@@ -35,7 +35,7 @@ struct par_mat *M = NULL;                          // host matrix
 struct gs_data *gsh = NULL;                        // gs for host communication
 static occaMemory o_adj_off, o_adj_idx, o_adj_val; // Adjacency matrix
 static occaMemory o_diag_idx, o_diag_val;          // Diagonal
-static occaMemory o_p, o_w, o_r, o_rr, o_x, o_y;   // CG
+static occaMemory o_p, o_w, o_r, o_rr;             // CG
 
 // Work arrays
 size_t wrk_size, nblocks;
@@ -166,7 +166,6 @@ int occa_lanczos_init(struct comm *c, struct laplacian *l, int niter) {
   o_p = occaDeviceMalloc(device, sizeof(scalar) * lelt, NULL, occaDefault);
   o_w = occaDeviceMalloc(device, sizeof(scalar) * lelt, NULL, occaDefault);
   o_r = occaDeviceMalloc(device, sizeof(scalar) * lelt, NULL, occaDefault);
-  o_y = occaDeviceMalloc(device, sizeof(scalar) * lelt, NULL, occaDefault);
   o_rr = occaDeviceMalloc(device, sizeof(scalar) * lelt * (niter + 1), NULL,
                           occaDefault);
 
@@ -177,23 +176,25 @@ int occa_lanczos_init(struct comm *c, struct laplacian *l, int niter) {
   // Laplacian
   struct csr_laplacian *L = (struct csr_laplacian *)l->data;
   M = L->M;
-  assert(IS_CSR(M));
   assert(IS_DIAG(M));
-  if (M->rn > 0) {
+
+  int csr = IS_CSR(M);
+  int nn = csr ? M->rn : M->cn;
+  int mn = csr ? M->cn : M->rn;
+
+  if (nn > 0) {
     o_adj_off =
-        occaDeviceMalloc(device, sizeof(uint) * (M->rn + 1), NULL, occaDefault);
+        occaDeviceMalloc(device, sizeof(uint) * (nn + 1), NULL, occaDefault);
     occaCopyPtrToMem(o_adj_off, M->adj_off, occaAllBytes, 0, occaDefault);
 
-    uint nadj = M->adj_off[M->rn];
+    uint nadj = M->adj_off[nn];
     o_adj_idx =
         occaDeviceMalloc(device, sizeof(uint) * nadj, NULL, occaDefault);
     occaCopyPtrToMem(o_adj_idx, M->adj_idx, occaAllBytes, 0, occaDefault);
 
     o_diag_idx =
-        occaDeviceMalloc(device, sizeof(uint) * M->rn, NULL, occaDefault);
+        occaDeviceMalloc(device, sizeof(uint) * nn, NULL, occaDefault);
     occaCopyPtrToMem(o_diag_idx, M->diag_idx, occaAllBytes, 0, occaDefault);
-
-    o_x = occaDeviceMalloc(device, sizeof(scalar) * M->cn, NULL, occaDefault);
 
 #define SETUP_ARRAYS(usize, T, ip, n, A)                                       \
   {                                                                            \
@@ -208,19 +209,19 @@ int occa_lanczos_init(struct comm *c, struct laplacian *l, int niter) {
     size_t sza, szd;
 #if OPT_01 == 1
     SETUP_ARRAYS(sza, int, av, nadj, M->adj_val);
-    SETUP_ARRAYS(szd, int, dv, M->rn, M->diag_val);
+    SETUP_ARRAYS(szd, int, dv, nn, M->diag_val);
     if (c->id == 0)
       printf("OPT_01\n");
 #elif OPT_02 == 1
     if (c->id == 0)
       printf("OPT_02\n");
     SETUP_ARRAYS(sza, short, av, nadj, M->adj_val);
-    SETUP_ARRAYS(szd, short, dv, M->rn, M->diag_val);
+    SETUP_ARRAYS(szd, short, dv, nn, M->diag_val);
 #elif OPT_03 == 1
     if (c->id == 0)
       printf("OPT_03\n");
     SETUP_ARRAYS(sza, short, av, nadj, M->adj_val);
-    SETUP_ARRAYS(szd, short, dv, M->rn, M->diag_val); // Allocated but not used
+    SETUP_ARRAYS(szd, short, dv, nn, M->diag_val); // Allocated but not used
 #elif OPT_04 == 1
     if (c->id == 0)
       printf("OPT_04\n");
@@ -260,13 +261,15 @@ int occa_lanczos_init(struct comm *c, struct laplacian *l, int niter) {
   o_wrk =
       occaDeviceMalloc(device, sizeof(scalar) * wrk_size, NULL, occaDefault);
 
-  slong *ids = (slong *)tcalloc(slong, M->cn);
-  for (uint i = 0; i < M->cn; i++)
-    ids[i] = -M->cols[i];
-  for (uint i = 0; i < M->rn; i++)
+  // TODO
+  slong *ids = (slong *)tcalloc(slong, mn);
+  ulong *idd = csr ? M->cols : M->rows;
+  for (uint i = 0; i < mn; i++)
+    ids[i] = -idd[i];
+  for (uint i = 0; i < nn; i++)
     ids[M->diag_idx[i]] *= -1;
 
-  gsh = gs_setup(ids, M->cn, c, 0, gs_crystal_router, 0);
+  gsh = gs_setup(ids, mn, c, 0, gs_crystal_router, 0);
   free(ids);
 
   return 0;
@@ -342,7 +345,6 @@ static void laplacian_op(occaMemory o_w, occaMemory o_p, uint lelt,
     wrk[M->diag_idx[i]] = wrk[M->cn + i];
   gs(wrk, gs_double, gs_add, 0, gsh, bfr);
 
-  // Fix this: occaAllbytes --> M->cn * sizeof(scalar)
   occaCopyPtrToMem(o_wrk, wrk, sizeof(scalar) * M->cn, 0, occaDefault);
 
 #if OPT_01 == 1
@@ -470,13 +472,11 @@ int occa_lanczos_free() {
   occaFree(&o_p);
   occaFree(&o_w);
   occaFree(&o_r);
-  occaFree(&o_y);
   occaFree(&o_rr);
 
   occaFree(&o_adj_off);
   occaFree(&o_adj_idx);
   occaFree(&o_diag_idx);
-  occaFree(&o_x);
   occaFree(&o_adj_val);
   occaFree(&o_diag_val);
   occaFree(&o_wrk);
