@@ -236,10 +236,10 @@ static void check_rsb_partition(struct comm *gc, int max_pass, int max_iter) {
 
     if (converged == 0) {
       double dbfr;
-      double final = (double)metric_get_value(i, TOL_FINAL);
+      double final = (double)metric_get_value(i, TOL_FNL);
       comm_allreduce(gc, gs_double, gs_min, &final, 1, &dbfr);
 
-      double target = (double)metric_get_value(i, TOL_TARGET);
+      double target = (double)metric_get_value(i, TOL_TGT);
       comm_allreduce(gc, gs_double, gs_min, &target, 1, &dbfr);
 
       if (gc->id == 0) {

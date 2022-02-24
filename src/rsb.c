@@ -221,9 +221,7 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
       break;
     }
 
-#if 0
     metric_print(&ca, options.profile_level);
-#endif
 
     comm_free(&ca);
     metric_finalize();

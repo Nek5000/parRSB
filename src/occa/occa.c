@@ -7,28 +7,14 @@
 #define BLK_SIZE 512
 #define OPT_01 0
 #define OPT_02 0
-#define OPT_03 0
-
-static scalar host_vec_dot(genmap_vector y, genmap_vector x, struct comm *gsc) {
-  /* asserts:
-       - size x = size y
-  */
-  assert(x->size == y->size);
-
-  scalar result = 0.0;
-  for (uint i = 0; i < x->size; i++)
-    result += x->data[i] * y->data[i];
-
-  scalar buf[2];
-  comm_allreduce(gsc, gs_double, gs_add, &result, 1, buf);
-
-  return result;
-}
+#define OPT_03 1
+#define OPT_04 0
+#define OPT_05 0
 
 static occaDevice device;
 static occaJson props;
 static occaKernel zero, copy, sum, scale, dot, norm, add2s1, add2s2, addc;
-static occaKernel lplcn00, lplcn01, lplcn02, lplcn03, lplcn04;
+static occaKernel lplcn00, lplcn01, lplcn02, lplcn03, lplcn04, lplcn05;
 static occaKernel csc00;
 
 // Laplacian and CG work arrays
@@ -38,8 +24,12 @@ static occaMemory o_adj_off, o_adj_idx, o_adj_val; // Adjacency matrix
 static occaMemory o_diag_idx, o_diag_val;          // Diagonal
 static occaMemory o_p, o_w, o_r, o_rr;             // CG
 
+// Timing
+static double t_ax = 0.0;
+static int n_ax = 0;
+
 // Work arrays
-size_t wrk_size, nblocks;
+size_t wsize, nblocks;
 static scalar *wrk = NULL;
 static occaMemory o_wrk;
 
@@ -139,6 +129,7 @@ int occa_init(const char *backend_, int device_id, int platform_id,
     lplcn02 = occaDeviceBuildKernel(device, okl, "laplacian_v02", props);
     lplcn03 = occaDeviceBuildKernel(device, okl, "laplacian_v03", props);
     lplcn04 = occaDeviceBuildKernel(device, okl, "laplacian_v04", props);
+    lplcn05 = occaDeviceBuildKernel(device, okl, "laplacian_v05", props);
     csc00 = occaDeviceBuildKernel(device, okl, "laplacian_csc_v00", props);
   }
 
@@ -158,6 +149,7 @@ int occa_init(const char *backend_, int device_id, int platform_id,
   lplcn02 = occaDeviceBuildKernel(device, okl, "laplacian_v02", props);
   lplcn03 = occaDeviceBuildKernel(device, okl, "laplacian_v03", props);
   lplcn04 = occaDeviceBuildKernel(device, okl, "laplacian_v04", props);
+  lplcn05 = occaDeviceBuildKernel(device, okl, "laplacian_v05", props);
   csc00 = occaDeviceBuildKernel(device, okl, "laplacian_csc_v00", props);
 
   return 0;
@@ -174,7 +166,7 @@ int occa_lanczos_init(struct comm *c, struct laplacian *l, int niter) {
 
   // Work array size
   nblocks = (lelt + BLK_SIZE - 1) / BLK_SIZE;
-  wrk_size = lelt * (niter + 1) > nblocks ? lelt * (niter + 1) : nblocks;
+  wsize = lelt * (niter + 1) > nblocks ? lelt * (niter + 1) : nblocks;
 
   // Laplacian
   struct csr_laplacian *L = (struct csr_laplacian *)l->data;
@@ -213,31 +205,19 @@ int occa_lanczos_init(struct comm *c, struct laplacian *l, int niter) {
 #if OPT_01 == 1
     SETUP_ARRAYS(sza, int, av, nadj, M->adj_val);
     SETUP_ARRAYS(szd, int, dv, nn, M->diag_val);
-    if (c->id == 0)
-      printf("OPT_01\n");
 #elif OPT_02 == 1
-    if (c->id == 0)
-      printf("OPT_02\n");
     SETUP_ARRAYS(sza, short, av, nadj, M->adj_val);
     SETUP_ARRAYS(szd, short, dv, nn, M->diag_val);
 #elif OPT_03 == 1
-    if (c->id == 0)
-      printf("OPT_03\n");
     SETUP_ARRAYS(sza, short, av, nadj, M->adj_val);
     SETUP_ARRAYS(szd, short, dv, nn, M->diag_val); // Allocated but not used
 #elif OPT_04 == 1
-    if (c->id == 0)
-      printf("OPT_04\n");
-    SETUP_ARRAYS(sza, signed char, av, nadj, M->adj_val);
-
-    signed char *avc = (signed char *)av;
-    for (uint i = 0; i < nadj; i++)
-      printf("i = %d v = %d\n", i, avc[i]);
-
-    SETUP_ARRAYS(szd, short, dv, nadj, M->adj_val);
+    SETUP_ARRAYS(sza, float, av, nadj, M->adj_val);
+    SETUP_ARRAYS(szd, float, dv, nadj, M->adj_val);
+#elif OPT_05 == 1
+    SETUP_ARRAYS(sza, float, av, nadj, M->adj_val);
+    SETUP_ARRAYS(szd, float, dv, nadj, M->adj_val); // not used
 #else
-    if (c->id == 0)
-      printf("OPT_00\n");
     av = (void *)M->adj_val;
     dv = (void *)M->diag_val;
     sza = szd = sizeof(scalar);
@@ -256,15 +236,13 @@ int occa_lanczos_init(struct comm *c, struct laplacian *l, int niter) {
       free(dv);
 #endif
 
-    if (wrk_size < M->cn + M->rn)
-      wrk_size = M->cn + M->rn;
+    if (wsize < M->cn + M->rn)
+      wsize = M->cn + M->rn;
   }
 
-  wrk = tcalloc(scalar, wrk_size);
-  o_wrk =
-      occaDeviceMalloc(device, sizeof(scalar) * wrk_size, NULL, occaDefault);
+  wrk = tcalloc(scalar, wsize);
+  o_wrk = occaDeviceMalloc(device, sizeof(scalar) * wsize, NULL, occaDefault);
 
-  // TODO
   slong *ids = (slong *)tcalloc(slong, mn);
   ulong *idd = csr ? M->cols : M->rows;
   for (uint i = 0; i < mn; i++)
@@ -372,6 +350,7 @@ static void laplacian_op(occaMemory o_w, occaMemory o_p, uint lelt,
 
     occaCopyPtrToMem(o_wrk, wrk, sizeof(scalar) * mn, 0, occaDefault);
 
+    occaStreamTag start = occaDeviceTagStream(device);
 #if OPT_01 == 1
     occaKernelRun(lplcn01, o_w, occaUInt(lelt), o_adj_off, o_adj_idx, o_adj_val,
                   o_diag_idx, o_diag_val, o_wrk);
@@ -383,11 +362,17 @@ static void laplacian_op(occaMemory o_w, occaMemory o_p, uint lelt,
                   o_diag_idx, o_wrk);
 #elif OPT_04 == 1
     occaKernelRun(lplcn04, o_w, occaUInt(lelt), o_adj_off, o_adj_idx, o_adj_val,
+                  o_diag_idx, o_diag_val, o_wrk);
+#elif OPT_05 == 1
+    occaKernelRun(lplcn05, o_w, occaUInt(lelt), o_adj_off, o_adj_idx, o_adj_val,
                   o_diag_idx, o_wrk);
 #else
     occaKernelRun(lplcn00, o_w, occaUInt(lelt), o_adj_off, o_adj_idx, o_adj_val,
                   o_diag_idx, o_diag_val, o_wrk);
 #endif
+    occaStreamTag end = occaDeviceTagStream(device);
+    t_ax += occaDeviceTimeBetweenTags(device, start, end);
+    n_ax += 1;
   }
 }
 
@@ -443,7 +428,7 @@ int occa_lanczos_aux(genmap_vector diag, genmap_vector upper, genmap_vector *rr,
     pap_old = pap;
     pap = vec_dot(o_w, o_p, lelt, gsc);
 
-#if 1
+#if 0
     if (gsc->id == 0)
       printf("occa iter = %d beta = %lf pp = %lf pap = %lf\n", iter, beta, pp,
              pap);
@@ -475,21 +460,14 @@ int occa_lanczos_aux(genmap_vector diag, genmap_vector upper, genmap_vector *rr,
     }
   }
 
+  // TODO: Do the following in the device as well
   occaCopyMemToPtr(wrk, o_rr, lelt * (iter + 1) * sizeof(scalar), 0,
                    occaDefault);
   for (uint i = 0; i < iter + 1; i++)
     memcpy(rr[i]->data, &wrk[i * lelt], sizeof(scalar) * lelt);
 
-#if 0
-  for (uint i = 0; i < iter + 1; i++) {
-    GenmapScalar norm = host_vec_dot(rr[i], rr[i], gsc);
-    if (gsc->id == 0)
-      printf("norm rr[%d] = %lf\n", i, sqrt(norm));
-  }
-#endif
-
-  metric_acc(TOL_FINAL, rnorm);
-  metric_acc(TOL_TARGET, rtol);
+  metric_acc(TOL_FNL, rnorm);
+  metric_acc(TOL_TGT, rtol);
 
   return iter;
 }
@@ -537,8 +515,9 @@ int occa_free() {
   return 0;
 }
 
-#undef BLK_SIZE
+#undef OPT_05
 #undef OPT_04
 #undef OPT_03
 #undef OPT_02
 #undef OPT_01
+#undef BLK_SIZE

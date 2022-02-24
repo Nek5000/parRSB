@@ -192,29 +192,27 @@
 }
 
 @kernel void laplacian_v04(scalar *y, const uint nr, const uint *adj_off,
-                           const uint *adj_ind, const signed char *adj_val,
-                           const uint *diag_ind, const short *diag_val,
+                           const uint *adj_ind, const float *adj_val,
+                           const uint *diag_ind, const float *diag_val,
                            const scalar *x) {
   for (int i = 0; i < nr; i++; @tile(BLK_SIZE, @outer, @inner)) {
     scalar s = diag_val[i] * x[diag_ind[i]];
     for (int j = adj_off[i]; j < adj_off[i + 1]; j++) {
-      int t = adj_val[j];
-      s = s + t * x[adj_ind[j]];
+      s = s + adj_val[j] * x[adj_ind[j]];
     }
     y[i] = s;
   }
 }
 
 @kernel void laplacian_v05(scalar *y, const uint nr, const uint *adj_off,
-                           const uint *adj_ind, const signed char *adj_val,
+                           const uint *adj_ind, const float *adj_val,
                            const uint *diag_ind, const scalar *x) {
   for (int i = 0; i < nr; i++; @tile(BLK_SIZE, @outer, @inner)) {
-    scalar s = 0;
-    char d = 0;
+    scalar s = 0.0, d = 0.0;
     for (int j = adj_off[i]; j < adj_off[i + 1]; j++) {
-      int t = adj_val[j];
-      d = d + t;
+      scalar t = adj_val[j];
       s = s + t * x[adj_ind[j]];
+      d = d + t;
     }
     y[i] = s - d * x[diag_ind[i]];
   }

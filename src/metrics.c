@@ -88,12 +88,12 @@ void metric_print(struct comm *c, int profile_level) {
       printf("level=%02d\n", i);
       printf("  PRE                    : %g/%g/%g\n", SUMMARY(i, PRE));
       printf("  FIEDLER                : %g/%g/%g\n", SUMMARY(i, FIEDLER));
+      printf("  LANCZOS                : %g/%g/%g\n", SUMMARY(i, LANCZOS));
       printf("  FIEDLER_NITER          : %g/%g/%g\n",
              SUMMARY(i, FIEDLER_NITER));
       printf("  PROJECT_NITER          : %g/%g/%g\n",
              SUMMARY(i, PROJECT_NITER));
-      printf("    LAPLACIAN_INIT       : %g/%g/%g\n",
-             SUMMARY(i, LAPLACIAN_INIT));
+      printf("    LAPLACIAN       : %g/%g/%g\n", SUMMARY(i, LAPLACIAN));
       printf("  FIEDLER_SORT           : %g/%g/%g\n", SUMMARY(i, FIEDLER_SORT));
       printf("  REPAIR_BALANCE         : %g/%g/%g\n",
              SUMMARY(i, REPAIR_BALANCE));

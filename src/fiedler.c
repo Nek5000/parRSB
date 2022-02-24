@@ -684,27 +684,26 @@ static int lanczos_aux(genmap_vector diag, genmap_vector upper,
     if (iter == 0)
       beta = 0.0;
 
-    /* add2s1(p,r,beta,n) */
+    // add2s1(p,r,beta,n)
     uint i;
     for (i = 0; i < lelt; i++)
       p->data[i] = beta * p->data[i] + r->data[i];
 
-#if 1
     GenmapScalar pp = vec_dot(p, p);
     comm_allreduce(gsc, gs_double, gs_add, &pp, 1, buf);
-#endif
 
     vec_ortho(gsc, p, nelg);
 
+    metric_tic(gsc, LAPLACIAN);
     laplacian(w->data, gl, p->data, bfr);
+    metric_toc(gsc, LAPLACIAN);
 
     GenmapScalar ww = vec_dot(w, w);
     comm_allreduce(gsc, gs_double, gs_add, &ww, 1, buf);
 
-    pap_old = pap;
-    pap = vec_dot(w, p);
+    pap_old = pap, pap = vec_dot(w, p);
     comm_allreduce(gsc, gs_double, gs_add, &pap, 1, buf);
-#if 1
+#if 0
     if (gsc->id == 0)
       printf("host iter = %d beta = %lf pp = %lf pap = %lf\n", iter, beta, pp,
              pap);
@@ -734,17 +733,8 @@ static int lanczos_aux(genmap_vector diag, genmap_vector upper,
     }
   }
 
-#if 0
-  for (uint i = 0; i < iter + 1; i++) {
-    GenmapScalar norm = vec_dot(rr[i], rr[i]);
-    comm_allreduce(gsc, gs_double, gs_add, &norm, 1, buf);
-    if (gsc->id == 0)
-      printf("norm rr[%d] = %lf\n", i, sqrt(norm));
-  }
-#endif
-
-  metric_acc(TOL_FINAL, rnorm);
-  metric_acc(TOL_TARGET, rtol);
+  metric_acc(TOL_FNL, rnorm);
+  metric_acc(TOL_TGT, rtol);
 
   vec_destroy(p);
   vec_destroy(w);
@@ -756,8 +746,6 @@ static int lanczos_aux(genmap_vector diag, genmap_vector upper,
 static int lanczos(genmap_vector fiedler, struct rsb_element *elems, int nv,
                    genmap_vector initv, struct comm *gsc, int max_iter,
                    slong nelg, buffer *bfr) {
-  metric_tic(gsc, LANCZOS);
-
   assert(fiedler->size == initv->size);
   uint lelt = fiedler->size;
 
@@ -768,6 +756,8 @@ static int lanczos(genmap_vector fiedler, struct rsb_element *elems, int nv,
 #else
   wl = laplacian_init(elems, lelt, nv, CSR, gsc, bfr);
 #endif
+
+  metric_tic(gsc, LANCZOS);
 
   genmap_vector alpha, beta;
   vec_create(&alpha, max_iter);
