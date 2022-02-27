@@ -321,7 +321,6 @@ static int schur_setup_G(struct par_mat *G, scalar tol, const struct mat *L,
 
   buffer_reserve(bfr, sizeof(scalar) * L->n * F->cn);
   scalar *v = (scalar *)bfr->ptr;
-
   for (uint i = 0; i < L->n * F->cn; i++)
     v[i] = 0;
 
@@ -348,21 +347,20 @@ static int schur_setup_G(struct par_mat *G, scalar tol, const struct mat *L,
 
   struct array unique;
   array_init(struct mat_ij, &unique, size);
+
   slong *cols = tcalloc(slong, size);
   sint *owners = tcalloc(sint, size);
-
   for (uint i = k = 0; i < L->n; i++) {
     for (uint j = 0; j < F->cn; j++) {
       if (fabs(v[i * F->cn + j]) >= tol) {
-        m.r = L->start + i, m.c = F->cols[F->adj_idx[j]];
-        m.v = v[i * F->cn + j];
+        m.r = L->start + i, m.c = F->cols[j], m.v = v[i * F->cn + j];
         if (k == size) {
           size += size / 2 + 1;
           cols = (slong *)trealloc(slong, cols, size);
           owners = (sint *)trealloc(sint, owners, size);
         }
-        cols[k] = m.c;
-        owners[k++] = S_owns_row(cols[k], srows, srn) < srn ? c->id : -1;
+        owners[k] = S_owns_row(m.c, srows, srn) < srn ? c->id : -1;
+        cols[k++] = m.c;
         array_cat(struct mat_ij, &unique, &m, 1);
       }
     }
@@ -393,63 +391,60 @@ static int schur_setup_G(struct par_mat *G, scalar tol, const struct mat *L,
 
 // Calculate W = E x U_{B}^{-1} where B = L_{B} U_{B}. E is in CSC format.
 // W will be in CSR format and distributed by rows similar to distribution of S.
-static int schur_setup_W(struct par_mat *W, const struct mat *L,
+static int schur_setup_W(struct par_mat *W, scalar tol, const struct mat *L,
                          const struct par_mat *E, const ulong *srows,
                          const uint srn, const struct comm *c,
                          struct crystal *const cr, buffer *bfr) {
   assert(IS_CSC(E));
   assert(!IS_DIAG(E));
 
+  buffer_reserve(bfr, sizeof(scalar) * L->n * E->rn);
+  scalar *v = (scalar *)bfr->ptr;
+  for (uint i = 0; i < L->n * E->rn; i++)
+    v[i] = 0;
+
   // Multiply E by U_B^{-1} now. Columns of U_B^{-1} are found one by one and
   // then E is multiplied by each column.
-  uint n = L->n;
-  scalar *b = tcalloc(scalar, 2 * n), *x = b + n;
-
-  struct array wij;
-  array_init(struct mat_ij, &wij, 100);
-
-  struct mat_ij m;
-  uint i, j, k;
-  for (i = 0; i < n; i++) {
+  scalar *b = tcalloc(scalar, 2 * L->n);
+  scalar *x = b + L->n;
+  for (uint i = 0; i < L->n; i++) {
     b[i] = 1;
     cholesky_upper_solve(x, L, b);
 
     // Multiply E by x: i^th col of E is multiplied by element x[i]
-    for (j = 0; j < E->cn; j++) {
-      m.c = L->start + i;
-      for (uint k = E->adj_off[j], ke = E->adj_off[j + 1]; k < ke; k++) {
-        m.r = E->rows[E->adj_idx[k]];
-        m.v = E->adj_val[k] * x[E->cols[j] - L->start];
-        array_cat(struct mat_ij, &wij, &m, 1);
-      }
-    }
+    for (uint j = 0; j < E->cn; j++)
+      for (uint k = E->adj_off[j], ke = E->adj_off[j + 1]; k < ke; k++)
+        // m.c = L->start + i, m.r = E->rows[E->adj_idx[k]];
+        v[E->adj_idx[k] * L->n + i] += E->adj_val[k] * x[E->cols[j] - L->start];
 
     b[i] = 0;
-    for (j = 0; j < n; j++)
+    for (uint j = 0; j < L->n; j++)
       x[j] = 0;
   }
 
-  sarray_sort_2(struct mat_ij, wij.ptr, wij.n, r, 1, c, 1, bfr);
-  struct mat_ij *ptr = (struct mat_ij *)wij.ptr;
-
-  buffer_reserve(bfr, sizeof(slong) * wij.n);
-  slong *rows = (slong *)bfr->ptr;
-  sint *owners = (sint *)trealloc(sint, b, wij.n);
+  uint size = E->rn * 20 + 1, k;
+  struct mat_ij m;
 
   struct array unique;
-  array_init(struct mat_ij, &unique, 100);
-  for (i = k = 0; i < wij.n; k++) {
-    for (j = i + 1; j < wij.n && ptr[j].r == ptr[i].r && ptr[j].c == ptr[i].c;
-         j++)
-      ptr[i].v += ptr[j].v;
+  array_init(struct mat_ij, &unique, size);
 
-    array_cat(struct mat_ij, &unique, &ptr[i], 1);
-    rows[k] = ptr[i].r;
-    owners[k] = S_owns_row(rows[k], srows, srn) < srn ? c->id : -1;
-    i = j;
+  slong *rows = (slong *)tcalloc(slong, size);
+  sint *owners = (sint *)tcalloc(sint, size);
+  for (uint i = k = 0; i < E->rn; i++) {
+    for (uint j = 0; j < L->n; j++) {
+      if (fabs(v[i * L->n + j]) > tol) {
+        m.r = E->rows[i], m.c = L->start + j, m.v = v[i * L->n + j];
+        if (k == size) {
+          size += size / 2 + 1;
+          rows = (slong *)trealloc(slong, rows, size);
+          owners = (sint *)trealloc(sint, owners, size);
+        }
+        owners[k] = S_owns_row(m.r, srows, srn) < srn ? c->id : -1;
+        rows[k++] = m.r;
+        array_cat(struct mat_ij, &unique, &m, 1);
+      }
+    }
   }
-  array_free(&wij);
-  assert(k == unique.n); // Sanity check
 
   // Set the destination processor for elements in unique. Since W will be in
   // CSR and share the same row distribution as S, we use gslib and row
@@ -458,10 +453,10 @@ static int schur_setup_W(struct par_mat *W, const struct mat *L,
   gs(owners, gs_int, gs_max, 0, gsh, bfr);
   free(gsh);
 
-  ptr = unique.ptr;
-  for (i = 0; i < unique.n; i++)
+  struct mat_ij *ptr = unique.ptr;
+  for (uint i = 0; i < unique.n; i++)
     ptr[i].p = owners[i];
-  free(owners);
+  free(owners), free(rows);
 
   sarray_transfer(struct mat_ij, &unique, p, 0, cr);
 
@@ -611,7 +606,7 @@ schur_precond_setup(const struct mat *L, const struct par_mat *F,
   // TODO: Sparsify W and G when they are built
   struct par_mat W, G, WG;
   schur_setup_G(&G, 0.0, L, F, S->rows, S->rn, c, cr, bfr);
-  schur_setup_W(&W, L, E, S->rows, S->rn, c, cr, bfr);
+  schur_setup_W(&W, 0.0, L, E, S->rows, S->rn, c, cr, bfr);
   sparse_gemm(&WG, &W, &G, cr, c, bfr);
 #ifdef DUMPWG
   par_mat_print(&WG);
@@ -909,8 +904,8 @@ static int project(scalar *x, scalar *b, struct par_mat *S, struct gs_data *gsh,
     comm_allreduce(c, gs_double, gs_add, &rz2, 1, buf);
 
     if (c->id == 0 && verbose > 0)
-      printf("rr = %lf rtol = %lf rz0 = %lf rz1 = %lf rz2 = %lf\n", rr, rtol,
-             rzt, rz1, rz2);
+      printf("rr = %e rtol = %e rz0 = %e rz1 = %e rz2 = %e\n", rr, rtol, rzt,
+             rz1, rz2);
 
     beta = rz2 / rzt;
     for (j = 0; j < n; j++)
