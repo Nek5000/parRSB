@@ -370,12 +370,9 @@ static int project(scalar *x, uint n, scalar *b, struct laplacian *L,
 
 // Input z should be orthogonal to 1-vector, have unit norm.
 // inverse iteration should not change z.
-static int inverse(genmap_vector y, struct rsb_element *elems, int nv,
-                   genmap_vector z, struct comm *gsc, int max_iter, slong nelg,
+static int inverse(scalar *y, uint lelt, struct rsb_element *elems, int nv,
+                   scalar *z, struct comm *gsc, int miter, slong nelg,
                    buffer *buf) {
-  assert(z->size == y->size);
-  uint lelt = z->size;
-
   struct laplacian *wl = laplacian_init(elems, lelt, nv, GS, gsc, buf);
 
   // Reserve enough memory in buffer
@@ -388,7 +385,7 @@ static int inverse(genmap_vector y, struct rsb_element *elems, int nv,
 
   ulong *eid = (ulong *)buf->ptr;
   slong *vtx = (slong *)(eid + lelt);
-  uint i, j, k;
+  uint i, j, k, l;
   for (i = k = 0; i < lelt; i++) {
     eid[i] = start + i + 1;
     for (j = 0; j < nv; j++)
@@ -399,54 +396,44 @@ static int inverse(genmap_vector y, struct rsb_element *elems, int nv,
   crystal_init(&cr, gsc);
   struct par_mat *L = par_csr_setup_con(lelt, eid, vtx, nv, 1, gsc, &cr, buf);
 
-  int factor = 4;
+  int factor = 2;
   char *fc = getenv("PARRSB_RSB_MG_FACTOR");
   if (fc != NULL)
     factor = atoi(fc);
   struct mg_data *d = mg_setup(L, factor, gsc, &cr, buf);
   crystal_free(&cr);
 
-  wrk = sizeof(GenmapScalar) *
-        (max_iter * lelt + lelt + max_iter * max_iter + 2 * max_iter);
-  buffer_reserve(buf, wrk);
-
-  GenmapScalar *Z = (GenmapScalar *)buf->ptr;
-  GenmapScalar *GZ = Z + max_iter * lelt;
-  GenmapScalar *M = GZ + lelt;
-  GenmapScalar *rhs = M + max_iter * max_iter;
-  GenmapScalar *v = rhs + max_iter;
+  scalar *err = tcalloc(scalar, 2 * lelt + miter * (lelt + miter + 1));
+  scalar *Z = err + lelt, *M = Z + lelt, *GZ = M + miter * lelt;
+  scalar *rhs = GZ + miter * miter, *v = rhs + miter;
 
   int grammian = 0;
 
-  genmap_vector err;
-  vec_create(&err, lelt);
-
-  uint l;
-  for (i = 0; i < max_iter; i++) {
+  for (i = 0; i < miter; i++) {
     metric_tic(gsc, PROJECT);
-    int ppfi = project(y->data, y->size, z->data, wl, d, gsc, 100, 1, 0, buf);
+    int ppfi = project(y, lelt, z, wl, d, gsc, 100, 1, 0, buf);
     metric_toc(gsc, PROJECT);
+    metric_acc(END, ppfi);
 
-    vec_ortho(gsc, y, nelg);
+    ortho(y, lelt, nelg, gsc);
 
-    GenmapScalar lambda = vec_dot(y, z);
+    scalar lambda = dot(y, z, lelt);
     comm_allreduce(gsc, gs_double, gs_add, &lambda, 1, bfr);
 
-    vec_axpby(err, y, 1.0, z, -lambda);
-    GenmapScalar norme = vec_dot(err, err);
+    for (uint j = 0; j < lelt; j++)
+      err[i] = y[i] - lambda * z[i];
+    scalar norme = dot(err, err, lelt);
     comm_allreduce(gsc, gs_double, gs_add, &norme, 1, bfr);
     norme = sqrt(norme);
 
-    metric_acc(END, ppfi);
-
-    GenmapScalar norm = vec_dot(y, y);
+    scalar norm = dot(y, y, lelt);
     comm_allreduce(gsc, gs_double, gs_add, &norm, 1, bfr);
-    GenmapScalar normi = 1.0 / sqrt(norm);
+    scalar normi = 1.0 / sqrt(norm);
 
     for (j = 0; j < lelt; j++)
-      z->data[j] = y->data[j] * normi;
+      z[j] = y[j] * normi;
 
-    vec_ortho(gsc, z, nelg);
+    ortho(z, lelt, nelg, gsc);
 
     int N = i + 1;
     if (grammian == 1) {
@@ -459,14 +446,14 @@ static int inverse(genmap_vector y, struct rsb_element *elems, int nv,
         for (j = 0; j < i; j++) {
           rhs[j] = 0.0;
           for (l = 0; l < lelt; l++)
-            rhs[j] += Z[j * lelt + l] * z->data[l];
+            rhs[j] += Z[j * lelt + l] * z[l];
         }
         // Global reduction rhs[j]
         comm_allreduce(gsc, gs_double, gs_add, rhs, i, bfr);
 
         // Z[k,:] = z[:] - Z[:,1:lelt]*rhs[:]
         for (l = 0; l < lelt; l++)
-          Z[i * lelt + l] = z->data[l];
+          Z[i * lelt + l] = z[l];
 
         for (j = 0; j < i; j++) {
           for (l = 0; l < lelt; l++)
@@ -501,17 +488,17 @@ static int inverse(genmap_vector y, struct rsb_element *elems, int nv,
         inv_power_serial(v, N, M, 0);
 
         for (j = 0; j < lelt; j++)
-          z->data[j] = 0.0;
+          z[j] = 0.0;
 
         for (j = 0; j < N; j++) {
           for (k = 0; k < lelt; k++)
-            z->data[k] += Z[j * lelt + k] * v[j];
+            z[k] += Z[j * lelt + k] * v[j];
         }
         vec_ortho(gsc, z, nelg);
       } else {
         // Z(k,:) = z;
         for (l = 0; l < lelt; l++)
-          Z[i * lelt + l] = z->data[l];
+          Z[i * lelt + l] = z[l];
       }
     }
 
@@ -519,11 +506,11 @@ static int inverse(genmap_vector y, struct rsb_element *elems, int nv,
       break;
   }
 
-  vec_destroy(err);
   laplacian_free(wl);
   mg_free(d);
+  free(err);
 
-  return i == max_iter ? i : i + 1;
+  return i == miter ? i : i + 1;
 }
 
 static double sign(GenmapScalar a, GenmapScalar b) {
@@ -872,7 +859,8 @@ int fiedler(struct rsb_element *elems, uint lelt, int nv, int max_iter,
   if (algo == 0)
     iter = lanczos(fiedler, elems, nv, initv, gsc, max_iter, nelg, buf);
   else if (algo == 1)
-    iter = inverse(fiedler, elems, nv, initv, gsc, max_iter, nelg, buf);
+    iter = inverse(fiedler->data, fiedler->size, elems, nv, initv->data, gsc,
+                   max_iter, nelg, buf);
   metric_acc(FIEDLER_NITER, iter);
 
   GenmapScalar norm = 0;
