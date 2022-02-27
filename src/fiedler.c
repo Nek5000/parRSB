@@ -494,7 +494,7 @@ static int inverse(scalar *y, uint lelt, struct rsb_element *elems, int nv,
           for (k = 0; k < lelt; k++)
             z[k] += Z[j * lelt + k] * v[j];
         }
-        vec_ortho(gsc, z, nelg);
+        ortho(z, lelt, nelg, gsc);
       } else {
         // Z(k,:) = z;
         for (l = 0; l < lelt; l++)

@@ -312,62 +312,61 @@ static int S_owns_row(const ulong r, const ulong *rows, const uint n) {
 // Calculate G = L_{B}^{-1} x F where B = L_{B} U_{B}. F is in CSR format,
 // distributed by rows similar to B. G will be in CSC format and distributed
 // by columns similar to row distribution of S.
-static int schur_setup_G(struct par_mat *G, const struct mat *L,
+static int schur_setup_G(struct par_mat *G, scalar tol, const struct mat *L,
                          const struct par_mat *F, const ulong *srows,
                          const uint srn, const struct comm *c,
                          struct crystal *const cr, buffer *bfr) {
   assert(IS_CSR(F));
   assert(!IS_DIAG(F));
 
-  uint n = L->n;
-  scalar *b = tcalloc(scalar, 2 * n), *x = b + n;
+  buffer_reserve(bfr, sizeof(scalar) * L->n * F->cn);
+  scalar *v = (scalar *)bfr->ptr;
 
-  struct array gij;
-  array_init(struct mat_ij, &gij, 100);
+  for (uint i = 0; i < L->n * F->cn; i++)
+    v[i] = 0;
 
-  struct mat_ij m;
-  uint i, j, k;
-  for (i = 0; i < F->rn; i++) {
+  scalar *b = tcalloc(scalar, 2 * L->n);
+  scalar *x = b + L->n;
+  for (uint i = 0; i < F->rn; i++) {
     b[F->rows[i] - L->start] = 1;
     cholesky_lower_solve(x, L, b);
 
     // Calculate F: i^th row of F is multiplied by each element of i^th
     // column of L_B^-1
-    for (uint k = F->adj_off[i], ke = F->adj_off[i + 1]; k < ke; k++) {
-      m.c = F->cols[F->adj_idx[k]];
-      for (j = 0; j < n; j++) {
-        m.r = L->start + j;
-        m.v = F->adj_val[k] * x[j];
-        array_cat(struct mat_ij, &gij, &m, 1);
-      }
-    }
+    for (uint k = F->adj_off[i], ke = F->adj_off[i + 1]; k < ke; k++)
+      for (uint j = 0; j < L->n; j++)
+        // m.c = F->cols[F->adj_idx[k]], m.r = L->start + j;
+        v[j * F->cn + F->adj_idx[k]] += F->adj_val[k] * x[j];
 
     b[F->rows[i] - L->start] = 0;
-    for (j = 0; j < n; j++)
+    for (uint j = 0; j < L->n; j++)
       x[j] = 0;
   }
 
-  sarray_sort_2(struct mat_ij, gij.ptr, gij.n, r, 1, c, 1, bfr);
-  struct mat_ij *ptr = (struct mat_ij *)gij.ptr;
-
-  buffer_reserve(bfr, sizeof(slong) * gij.n);
-  slong *cols = (slong *)bfr->ptr;
-  sint *owners = (sint *)trealloc(sint, b, gij.n);
+  uint size = L->n * 20 + 1, k;
+  struct mat_ij m;
 
   struct array unique;
-  array_init(struct mat_ij, &unique, 100);
-  for (i = k = 0; i < gij.n; k++) {
-    for (j = i + 1; j < gij.n && ptr[j].r == ptr[i].r && ptr[j].c == ptr[i].c;
-         j++)
-      ptr[i].v += ptr[j].v;
+  array_init(struct mat_ij, &unique, size);
+  slong *cols = tcalloc(slong, size);
+  sint *owners = tcalloc(sint, size);
 
-    array_cat(struct mat_ij, &unique, &ptr[i], 1);
-    cols[k] = ptr[i].c;
-    owners[k] = S_owns_row(cols[k], srows, srn) < srn ? c->id : -1;
-    i = j;
+  for (uint i = k = 0; i < L->n; i++) {
+    for (uint j = 0; j < F->cn; j++) {
+      if (fabs(v[i * F->cn + j]) >= tol) {
+        m.r = L->start + i, m.c = F->cols[F->adj_idx[j]];
+        m.v = v[i * F->cn + j];
+        if (k == size) {
+          size += size / 2 + 1;
+          cols = (slong *)trealloc(slong, cols, size);
+          owners = (sint *)trealloc(sint, owners, size);
+        }
+        cols[k] = m.c;
+        owners[k++] = S_owns_row(cols[k], srows, srn) < srn ? c->id : -1;
+        array_cat(struct mat_ij, &unique, &m, 1);
+      }
+    }
   }
-  array_free(&gij);
-  assert(k == unique.n); // Sanity check
 
   // Set the destination processor for elements in unique. Since W will be in
   // CSR and share the same row distribution as S, we use gslib and row
@@ -376,10 +375,10 @@ static int schur_setup_G(struct par_mat *G, const struct mat *L,
   gs(owners, gs_int, gs_max, 0, gsh, bfr);
   free(gsh);
 
-  ptr = unique.ptr;
-  for (i = 0; i < unique.n; i++)
+  struct mat_ij *ptr = unique.ptr;
+  for (uint i = 0; i < unique.n; i++)
     ptr[i].p = owners[i];
-  free(owners);
+  free(owners), free(cols);
 
   sarray_transfer(struct mat_ij, &unique, p, 0, cr);
 
@@ -611,7 +610,7 @@ schur_precond_setup(const struct mat *L, const struct par_mat *F,
                     const struct comm *c, struct crystal *cr, buffer *bfr) {
   // TODO: Sparsify W and G when they are built
   struct par_mat W, G, WG;
-  schur_setup_G(&G, L, F, S->rows, S->rn, c, cr, bfr);
+  schur_setup_G(&G, 0.0, L, F, S->rows, S->rn, c, cr, bfr);
   schur_setup_W(&W, L, E, S->rows, S->rn, c, cr, bfr);
   sparse_gemm(&WG, &W, &G, cr, c, bfr);
 #ifdef DUMPWG
