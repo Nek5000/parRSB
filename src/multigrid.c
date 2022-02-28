@@ -26,36 +26,6 @@ static int logbll(slong n, int a) {
   return k;
 }
 
-struct gs_data *setup_Q(const struct par_mat *M, const struct comm *c,
-                        buffer *bfr) {
-  uint n;
-  ulong *ids, *diag;
-  if (IS_CSR(M))
-    n = M->rn, ids = M->cols, diag = M->rows;
-  else if (IS_CSC(M))
-    n = M->cn, ids = M->rows, diag = M->cols;
-  else {
-    fprintf(stderr, "%s:%d Wrong matrix type !\n", __FILE__, __LINE__);
-    exit(1);
-  }
-
-  assert(n == 0 || IS_DIAG(M));
-
-  // Setup gs handle for the mat-vec
-  uint nnz = n > 0 ? M->adj_off[n] + n : 0;
-  buffer_reserve(bfr, nnz * sizeof(slong));
-  slong *sids = (slong *)bfr->ptr;
-
-  uint i, j;
-  for (i = 0; i < n; i++)
-    for (j = M->adj_off[i]; j < M->adj_off[i + 1]; j++)
-      sids[j] = -ids[M->adj_idx[j]];
-  for (i = 0; i < n; i++)
-    sids[j++] = diag[i];
-
-  return gs_setup(sids, nnz, c, 0, gs_crystal_router, 0);
-}
-
 static void mg_lvl_setup(struct mg_data *d, const uint lvl, const int factor,
                          const struct comm *c, struct crystal *cr,
                          struct array *entries, buffer *bfr) {
@@ -193,27 +163,6 @@ struct mg_data *mg_setup(const struct par_mat *M, const int factor,
   return d;
 }
 
-void mat_vec_csr(scalar *y, scalar *x, struct par_mat *M, struct gs_data *gsh,
-                 scalar *buf, buffer *bfr) {
-  assert(IS_CSR(M));
-  assert(M->rn == 0 || IS_DIAG(M));
-
-  uint n = M->rn, *Lp = M->adj_off, nnz = n > 0 ? Lp[n] : 0;
-  uint i, j, je;
-  for (i = 0; i < nnz; i++)
-    buf[i] = 0.0; // Is this really necessary?
-  for (i = 0, j = nnz; i < n; i++, j++)
-    y[i] = buf[j] = x[i];
-
-  gs(buf, gs_double, gs_add, 0, gsh, bfr);
-
-  scalar *D = M->diag_val, *L = M->adj_val;
-  for (i = 0; i < n; i++) {
-    for (y[i] *= D[i], j = Lp[i], je = Lp[i + 1]; j != je; j++)
-      y[i] += L[j] * buf[j];
-  }
-}
-
 void mg_vcycle(scalar *u1, scalar *rhs, struct mg_data *d, struct comm *c,
                buffer *bfr) {
   if (d == NULL)
@@ -278,7 +227,7 @@ void mg_vcycle(scalar *u1, scalar *rhs, struct mg_data *d, struct comm *c,
     struct mg_lvl *l = lvls[nlevels - 1];
     struct par_mat *M = l->M;
     assert(M->rn == 1);
-    if (fabs(M->diag_val[0]) > sqrt(TOL))
+    if (fabs(M->diag_val[0]) > 1e-6)
       u[off] = r[off] / M->diag_val[0];
     else
       u[off] = 0.0;

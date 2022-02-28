@@ -19,7 +19,7 @@ struct mat_ij {
 };
 
 struct mat {
-  ulong start, *col;
+  ulong start;
   uint n, *Lp, *Li;
   scalar *L, *D;
 };
@@ -63,4 +63,9 @@ struct par_mat *par_csr_setup_con(const uint nelt, const ulong *eid,
 void par_mat_print(struct par_mat *A);
 int par_mat_free(struct par_mat *A);
 
+// Mat vec routines
+struct gs_data *setup_Q(const struct par_mat *M, const struct comm *c,
+                        buffer *bfr);
+void mat_vec_csr(scalar *y, scalar *x, struct par_mat *M, struct gs_data *gsh,
+                 scalar *buf, buffer *bfr);
 #endif // _MAT_H_

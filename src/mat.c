@@ -63,7 +63,6 @@ int csr_setup(struct mat *mat, struct array *entries, int sep, buffer *buf) {
     mat->start = mat->n = 0;
     mat->Lp = mat->Li = NULL;
     mat->L = mat->D = NULL;
-    mat->col = NULL;
     return 0;
   }
 
@@ -71,30 +70,20 @@ int csr_setup(struct mat *mat, struct array *entries, int sep, buffer *buf) {
   sarray_sort(struct mat_ij, entries->ptr, entries->n, c, 1, buf);
   struct mat_ij *ptr = (struct mat_ij *)entries->ptr;
 
-  // Reserve enough memory for work arrays
-  buffer_reserve(buf, sizeof(ulong) * nnz);
-  ulong *cols = (ulong *)buf->ptr;
-
-  ulong n = cols[0] = ptr[0].c;
-  uint i;
-  for (ptr[0].c = 0, i = 1; i < nnz; i++) {
+  ulong n = ptr[0].c;
+  ptr[0].c = 0;
+  for (uint i = 1; i < nnz; i++) {
     if (ptr[i].c == n)
       ptr[i].c = ptr[i - 1].c;
-    else {
+    else
       n = ptr[i].c, ptr[i].c = ptr[i - 1].c + 1;
-      cols[ptr[i].c] = n;
-    }
   }
-  uint nc = ptr[nnz - 1].c + 1;
-
-  mat->col = tcalloc(ulong, nc);
-  memcpy(mat->col, cols, sizeof(ulong) * nc);
 
   sarray_sort(struct mat_ij, entries->ptr, entries->n, r, 1, buf);
   ptr = (struct mat_ij *)entries->ptr;
-  mat->start = ptr[0].r;
+  n = mat->start = ptr[0].r, ptr[0].r = 0;
 
-  for (n = ptr[0].r, ptr[0].r = 0, i = 1; i < nnz; i++)
+  for (uint i = 1; i < nnz; i++)
     if (ptr[i].r == n)
       ptr[i].r = ptr[i - 1].r;
     else
@@ -114,7 +103,7 @@ int csr_setup(struct mat *mat, struct array *entries, int sep, buffer *buf) {
 
   sep = sep != 0;
   Lp[0] = 0, unique[0] = ptr[0];
-  uint j;
+  uint i, j;
   for (nr = 1, i = 1, j = 0; i < nnz; i++) {
     if ((unique[j].r != ptr[i].r) || (unique[j].c != ptr[i].c)) {
       if (unique[j].r != ptr[i].r)
@@ -133,7 +122,7 @@ int csr_setup(struct mat *mat, struct array *entries, int sep, buffer *buf) {
     mat->D = (scalar *)tcalloc(scalar, mat->n);
     uint ndiag;
     for (i = ndiag = nadj = 0; i < j; i++) {
-      if (mat->start + unique[i].r == mat->col[unique[i].c])
+      if (mat->start + unique[i].r == mat->start + unique[i].c)
         mat->D[ndiag++] = unique[i].v;
       else
         mat->L[nadj] = unique[i].v, mat->Li[nadj++] = unique[i].c;
@@ -151,7 +140,8 @@ int mat_print(struct mat *mat) {
   uint i, j;
   for (i = 0; i < mat->n; i++) {
     for (j = mat->Lp[i]; j < mat->Lp[i + 1]; j++)
-      printf("%ld %ld %lf\n", mat->start + i, mat->col[mat->Li[j]], mat->L[j]);
+      printf("%ld %ld %lf\n", mat->start + i, mat->start + mat->Li[j],
+             mat->L[j]);
     if (mat->D != NULL)
       printf("%ld %ld %lf\n", mat->start + i, mat->start + i, mat->D[i]);
   }
@@ -164,7 +154,6 @@ int mat_free(struct mat *mat) {
   FREE(mat, Li);
   FREE(mat, L);
   FREE(mat, D);
-  FREE(mat, col);
   return 0;
 }
 
@@ -514,6 +503,57 @@ int IS_CSC(const struct par_mat *A) { return (A->type == CSC); }
 int IS_CSR(const struct par_mat *A) { return (A->type == CSR); }
 
 int IS_DIAG(const struct par_mat *A) { return (A->diag_val != NULL); }
+
+struct gs_data *setup_Q(const struct par_mat *M, const struct comm *c,
+                        buffer *bfr) {
+  uint n;
+  ulong *ids, *diag;
+  if (IS_CSR(M))
+    n = M->rn, ids = M->cols, diag = M->rows;
+  else if (IS_CSC(M))
+    n = M->cn, ids = M->rows, diag = M->cols;
+  else {
+    fprintf(stderr, "%s:%d Wrong matrix type !\n", __FILE__, __LINE__);
+    exit(1);
+  }
+
+  assert(n == 0 || IS_DIAG(M));
+
+  // Setup gs handle for the mat-vec
+  uint nnz = n > 0 ? M->adj_off[n] + n : 0;
+  buffer_reserve(bfr, nnz * sizeof(slong));
+  slong *sids = (slong *)bfr->ptr;
+
+  uint i, j;
+  for (i = 0; i < n; i++)
+    for (j = M->adj_off[i]; j < M->adj_off[i + 1]; j++)
+      sids[j] = -ids[M->adj_idx[j]];
+  for (i = 0; i < n; i++)
+    sids[j++] = diag[i];
+
+  return gs_setup(sids, nnz, c, 0, gs_crystal_router, 0);
+}
+
+void mat_vec_csr(scalar *y, scalar *x, struct par_mat *M, struct gs_data *gsh,
+                 scalar *buf, buffer *bfr) {
+  assert(IS_CSR(M));
+  assert(M->rn == 0 || IS_DIAG(M));
+
+  uint n = M->rn, *Lp = M->adj_off, nnz = n > 0 ? Lp[n] : 0;
+  uint i, j, je;
+  for (i = 0; i < nnz; i++)
+    buf[i] = 0.0; // Is this really necessary?
+  for (i = 0, j = nnz; i < n; i++, j++)
+    y[i] = buf[j] = x[i];
+
+  gs(buf, gs_double, gs_add, 0, gsh, bfr);
+
+  scalar *D = M->diag_val, *L = M->adj_val;
+  for (i = 0; i < n; i++) {
+    for (y[i] *= D[i], j = Lp[i], je = Lp[i + 1]; j != je; j++)
+      y[i] += L[j] * buf[j];
+  }
+}
 
 #undef CSC
 #undef CSR
