@@ -13,7 +13,7 @@ void genmap_barrier(struct comm *c) {
 #endif
 }
 
-void comm_split(struct comm *old, int bin, int key, struct comm *new_) {
+void comm_split(const struct comm *old, int bin, int key, struct comm *new_) {
   MPI_Comm new_comm;
   MPI_Comm_split(old->c, bin, key, &new_comm);
   comm_init(new_, new_comm);

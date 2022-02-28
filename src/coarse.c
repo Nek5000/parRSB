@@ -6,17 +6,12 @@ extern int schur_solve(scalar *x, scalar *b, struct coarse *crs, struct comm *c,
                        buffer *bfr);
 extern int schur_free(struct coarse *crs);
 
+extern void comm_split(const struct comm *old, int bin, int key,
+                       struct comm *new_);
+
 //------------------------------------------------------------------------------
 // Number rows, local first then interface. Returns global number of local
 // elements.
-static void comm_split(const struct comm *old, const int bin, const int key,
-                       struct comm *new_) {
-  MPI_Comm new_comm;
-  MPI_Comm_split(old->c, bin, key, &new_comm);
-  comm_init(new_, new_comm);
-  MPI_Comm_free(&new_comm);
-}
-
 static ulong number_rows(ulong *elem, ulong *ls_, ulong *lg_, uint *ln_,
                          ulong *is_, ulong *ig_, uint *in_, uint **idx_,
                          const slong *vtx, const uint nelt, const int nv,

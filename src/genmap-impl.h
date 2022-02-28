@@ -26,12 +26,8 @@ struct rcb_element {
   GenmapScalar coord[MAXDIM], fiedler;
 };
 
-void rcb_local(struct array *a, size_t unit_size, uint start, uint end,
-               int ndim, buffer *buf);
 int rcb(struct array *elements, size_t unit_size, int ndim, struct comm *c,
         buffer *bfr);
-void rib_local(struct array *a, size_t unit_size, uint start, uint end,
-               int ndim, buffer *buf);
 int rib(struct array *elements, size_t unit_size, int ndim, struct comm *c,
         buffer *bfr);
 
@@ -46,6 +42,9 @@ struct rsb_element {
   GenmapInt part;
 };
 
+int rsb(struct array *elements, parrsb_options *options, int nv,
+        struct comm *gc, buffer *bfr);
+
 //------------------------------------------------------------------------------
 // Laplacian
 //
@@ -59,21 +58,6 @@ struct laplacian *laplacian_init(struct rsb_element *elems, uint nel, int nv,
 int laplacian(GenmapScalar *v, struct laplacian *l, GenmapScalar *u,
               buffer *buf);
 void laplacian_free(struct laplacian *l);
-
-//------------------------------------------------------------------------------
-// Repair and balance
-int repair_partitions(struct array *elements, int nv, struct comm *tc,
-                      struct comm *lc, int bin, struct comm *gc, buffer *bfr);
-int balance_partitions(struct array *elements, int nv, struct comm *lc,
-                       struct comm *gc, int bin, buffer *bfr);
-
-//------------------------------------------------------------------------------
-// RSB
-int fiedler(struct rsb_element *elements, uint nel, int nv, int max_iter,
-            int global, struct comm *gsc, buffer *buf);
-
-int rsb(struct array *elements, parrsb_options *options, int nv,
-        struct comm *gc, buffer *bfr);
 
 //------------------------------------------------------------------------------
 // OCCA
@@ -133,35 +117,8 @@ void metric_finalize();
 //------------------------------------------------------------------------------
 // Misc
 //
-struct vector {
-  GenmapInt size;
-  GenmapScalar *data;
-};
-
-typedef struct {
-  GenmapULong sequenceId;
-  int nNeighbors;
-  GenmapULong elementId;
-  GenmapULong vertexId;
-  uint workProc;
-} vertex;
-
-void matrix_inverse(int N, double *A);
-int power_serial(double *y, int N, double *A, int verbose);
-
-int GenmapFiedlerDump(const char *fname, struct rsb_element *elm, uint nelt,
-                      int nv, struct comm *c);
-int GenmapVectorDump(const char *fname, GenmapScalar *y,
-                     struct rsb_element *elm, uint nelt, int nv,
-                     struct comm *c);
-int GenmapElementDump(const char *fname, struct rsb_element *elm, uint nelt,
-                      int nv, struct comm *c, int dump);
 int log2ll(long long n);
-
 void genmap_barrier(struct comm *c);
-void comm_split(struct comm *old, int bin, int key, struct comm *new_);
-
-double GenmapGetMaxRss();
-void GenmapPrintStack();
+void comm_split(const struct comm *old, int bin, int key, struct comm *new_);
 
 #endif

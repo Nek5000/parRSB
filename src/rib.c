@@ -2,6 +2,8 @@
 #include <genmap-impl.h>
 #include <sort.h>
 
+extern int power_serial(double *y, int N, double *A, int verbose);
+
 static void get_rib_axis(char *elems, uint nel, size_t unit_size, int ndim,
                          struct comm *c) {
   double avg[3];

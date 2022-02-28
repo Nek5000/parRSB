@@ -70,6 +70,14 @@ struct Mesh_private {
   struct array boundary;
 };
 
+typedef struct {
+  GenmapULong sequenceId;
+  int nNeighbors;
+  GenmapULong elementId;
+  GenmapULong vertexId;
+  uint workProc;
+} vertex;
+
 /*
  Preprocessor Corner notation:      Symmetric Corner notation:
 

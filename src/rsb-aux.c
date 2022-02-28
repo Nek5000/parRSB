@@ -5,6 +5,18 @@
 #include <genmap-impl.h>
 #include <sort.h>
 
+extern void rcb_local(struct array *a, size_t unit_size, uint start, uint end,
+                      int ndim, buffer *buf);
+extern void rib_local(struct array *a, size_t unit_size, uint start, uint end,
+                      int ndim, buffer *buf);
+extern int repair_partitions(struct array *elements, int nv, struct comm *tc,
+                             struct comm *lc, int bin, struct comm *gc,
+                             buffer *bfr);
+extern int balance_partitions(struct array *elements, int nv, struct comm *lc,
+                              struct comm *gc, int bin, buffer *bfr);
+extern int fiedler(struct rsb_element *elems, uint lelt, int nv, int max_iter,
+                   int algo, struct comm *gsc, buffer *buf);
+
 struct gid {
   ulong gid;
   uint proc;

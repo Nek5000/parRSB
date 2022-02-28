@@ -7,6 +7,8 @@
 
 #define MM 500
 
+extern void matrix_inverse(int N, double *A);
+
 inline static scalar dot(scalar *y, scalar *x, uint n) {
   scalar result = 0.0;
   for (uint i = 0; i < n; i++)
