@@ -77,12 +77,11 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
 
 //------------------------------------------------------------------------------
 // OCCA
-typedef struct vector *genmap_vector;
 int occa_init(const char *backend, int device_id, int platform_id,
               struct comm *c);
 int occa_lanczos_init(struct comm *c, struct laplacian *l, int niter);
-int occa_lanczos_aux(genmap_vector diag, genmap_vector upper, genmap_vector *rr,
-                     uint lelt, ulong nelg, int niter, genmap_vector f,
+int occa_lanczos_aux(GenmapScalar *diag, GenmapScalar *upper, GenmapScalar *rr,
+                     uint lelt, ulong nelg, int niter, GenmapScalar *f,
                      struct laplacian *gl, struct comm *gsc, buffer *bfr);
 int occa_lanczos_free();
 int occa_free();

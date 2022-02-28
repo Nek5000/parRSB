@@ -7,130 +7,12 @@
 
 #define MM 500
 
-static int vec_create(genmap_vector *x, GenmapInt size) {
-  assert(size > 0);
-
-  GenmapMalloc(1, x);
-  if (*x == NULL) {
-    return 1;
-  }
-
-  (*x)->size = size;
-  (*x)->data = NULL;
-
-  GenmapMalloc((size_t)size, &(*x)->data);
-  if ((*x)->data == NULL) {
-    return 1;
-  }
-
-  return 0;
-}
-
-static int vec_destroy(genmap_vector x) {
-  if (x->data) {
-    GenmapFree(x->data);
-  }
-
-  if (x) {
-    GenmapFree(x);
-  }
-
-  return 0;
-}
-
-static int vec_create_zeros(genmap_vector *x, GenmapInt size) {
-  vec_create(x, size);
-
-  GenmapInt i;
-  for (i = 0; i < size; i++) {
-    (*x)->data[i] = 0.;
-  }
-
-  return 0;
-}
-
-static int vec_copy(genmap_vector y, genmap_vector x) {
-  /* Asserts:
-       - size y = size x
-  */
-  assert(y->size >= x->size);
-
-  GenmapInt n = x->size;
-  GenmapInt i;
-  for (i = 0; i < n; i++) {
-    y->data[i] = x->data[i];
-  }
-
-  return 0;
-}
-
-static int vec_scale(genmap_vector y, genmap_vector x, GenmapScalar alpha) {
-  /* asserts:
-       - size x = size y
-  */
-  assert(x->size == y->size);
-
-  GenmapInt n = x->size;
-  GenmapInt i;
-  for (i = 0; i < n; i++) {
-    y->data[i] = alpha * x->data[i];
-  }
-
-  return 0;
-}
-
-static GenmapScalar vec_dot(genmap_vector y, genmap_vector x) {
-  /* asserts:
-       - size x = size y
-  */
-  assert(x->size == y->size);
-
-  GenmapScalar result = 0.0;
-  GenmapInt i;
-  for (i = 0; i < x->size; i++) {
-    result += x->data[i] * y->data[i];
-  }
-
-  return result;
-}
-
 inline static scalar dot(scalar *y, scalar *x, uint n) {
   scalar result = 0.0;
   for (uint i = 0; i < n; i++)
     result += x[i] * y[i];
 
   return result;
-}
-
-static int vec_axpby(genmap_vector z, genmap_vector x, GenmapScalar alpha,
-                     genmap_vector y, GenmapScalar beta) {
-  assert(z->size == x->size);
-  assert(z->size == y->size);
-
-  GenmapInt n = z->size;
-  GenmapInt i;
-  for (i = 0; i < n; i++) {
-    z->data[i] = alpha * x->data[i] + beta * y->data[i];
-  }
-
-  return 0;
-}
-
-/* Orthogonalize by 1-vector (vector of all 1's) */
-static int vec_ortho(struct comm *c, genmap_vector q1, GenmapULong n) {
-  GenmapInt i;
-  GenmapScalar sum = 0.0;
-  for (i = 0; i < q1->size; i++)
-    sum += q1->data[i];
-
-  GenmapScalar buf;
-  comm_allreduce(c, gs_double, gs_add, &sum, 1, &buf);
-  sum /= n;
-
-  for (i = 0; i < q1->size; i++)
-    q1->data[i] -= sum;
-
-  return 0;
 }
 
 inline static void ortho(scalar *q, uint lelt, ulong n, struct comm *c) {
@@ -638,61 +520,50 @@ static int tqli(scalar *eVectors, scalar *eValues, sint n, scalar *diagonal,
 static int lanczos_aux(scalar *diag, scalar *upper, scalar *rr, uint lelt,
                        ulong nelg, int niter, scalar *f, struct laplacian *gl,
                        struct comm *gsc, buffer *bfr) {
-  genmap_vector r, p, w;
-  vec_create_zeros(&p, lelt);
-  vec_create(&w, lelt);
-  vec_create(&r, lelt);
-
+  scalar *r = tcalloc(scalar, 3 * lelt), *p = r + lelt, *w = p + lelt;
   // vec_copy(r, f);
-  for (uint i = 0; i < lelt; i++)
-    r->data[i] = f[i];
+  uint i;
+  for (i = 0; i < lelt; i++)
+    r[i] = f[i];
 
-  vec_ortho(gsc, r, nelg);
+  // vec_ortho(gsc, r, nelg);
+  ortho(r, lelt, nelg, gsc);
 
-  GenmapScalar buf[2];
-  GenmapScalar rtr = vec_dot(r, r);
+  scalar eps = 1e-5, rtz1 = 1, pap = 0, alpha, beta, rtz2, pap_old;
+
+  scalar rtr = dot(r, r, lelt), buf[2];
   comm_allreduce(gsc, gs_double, gs_add, &rtr, 1, buf);
-  GenmapScalar rnorm = sqrt(rtr);
-  GenmapScalar rni = 1.0 / rnorm;
+  scalar rnorm = sqrt(rtr), rni = 1.0 / rnorm, rtol = rnorm * eps;
 
   // vec_scale(rr[0], r, rni);
-  for (uint i = 0; i < lelt; i++)
-    rr[0 * lelt + i] = r->data[i] * rni;
-
-  GenmapScalar eps = 1.e-5;
-  GenmapScalar rtol = rnorm * eps;
-
-  GenmapScalar rtz1 = 1.0;
-  GenmapScalar pap = 0.0;
-  GenmapScalar alpha, beta;
-  GenmapScalar rtz2, pap_old;
+  for (i = 0; i < lelt; i++)
+    rr[0 * lelt + i] = r[i] * rni;
 
   int iter;
   for (iter = 0; iter < niter; iter++) {
-    rtz2 = rtz1;
-    rtz1 = rtr;
+    rtz2 = rtz1, rtz1 = rtr;
     beta = rtz1 / rtz2;
     if (iter == 0)
       beta = 0.0;
 
     // add2s1(p,r,beta,n)
-    uint i;
     for (i = 0; i < lelt; i++)
-      p->data[i] = beta * p->data[i] + r->data[i];
+      p[i] = beta * p[i] + r[i];
 
-    GenmapScalar pp = vec_dot(p, p);
+    scalar pp = dot(p, p, lelt);
     comm_allreduce(gsc, gs_double, gs_add, &pp, 1, buf);
 
-    vec_ortho(gsc, p, nelg);
+    // vec_ortho(gsc, p, nelg);
+    ortho(p, lelt, nelg, gsc);
 
     metric_tic(gsc, LAPLACIAN);
-    laplacian(w->data, gl, p->data, bfr);
+    laplacian(w, gl, p, bfr);
     metric_toc(gsc, LAPLACIAN);
 
-    GenmapScalar ww = vec_dot(w, w);
+    scalar ww = dot(w, w, lelt);
     comm_allreduce(gsc, gs_double, gs_add, &ww, 1, buf);
 
-    pap_old = pap, pap = vec_dot(w, p);
+    pap_old = pap, pap = dot(w, p, lelt);
     comm_allreduce(gsc, gs_double, gs_add, &pap, 1, buf);
 #if 0
     if (gsc->id == 0)
@@ -701,16 +572,17 @@ static int lanczos_aux(scalar *diag, scalar *upper, scalar *rr, uint lelt,
 #endif
 
     alpha = rtz1 / pap;
-    vec_axpby(r, r, 1.0, w, -1.0 * alpha);
+    // vec_axpby(r, r, 1.0, w, -1.0 * alpha);
+    for (i = 0; i < lelt; i++)
+      r[i] = r[i] - alpha * w[i];
 
-    rtr = vec_dot(r, r);
+    rtr = dot(r, r, lelt);
     comm_allreduce(gsc, gs_double, gs_add, &rtr, 1, buf);
-    rnorm = sqrt(rtr);
-    rni = 1.0 / rnorm;
+    rnorm = sqrt(rtr), rni = 1.0 / rnorm;
 
     // vec_scale(rr[iter + 1], r, rni);
-    for (uint i = 0; i < lelt; i++)
-      rr[(iter + 1) * lelt + i] = r->data[i] * rni;
+    for (i = 0; i < lelt; i++)
+      rr[(iter + 1) * lelt + i] = r[i] * rni;
 
     if (iter == 0) {
       diag[iter] = pap / rtz1;
@@ -728,9 +600,7 @@ static int lanczos_aux(scalar *diag, scalar *upper, scalar *rr, uint lelt,
   metric_acc(TOL_FNL, rnorm);
   metric_acc(TOL_TGT, rtol);
 
-  vec_destroy(p);
-  vec_destroy(w);
-  vec_destroy(r);
+  free(r);
 
   return iter;
 }

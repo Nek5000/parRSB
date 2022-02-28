@@ -376,18 +376,16 @@ static void laplacian_op(occaMemory o_w, occaMemory o_p, uint lelt,
   }
 }
 
-int occa_lanczos_aux(genmap_vector diag, genmap_vector upper, genmap_vector *rr,
-                     uint lelt, ulong nelg, int niter, genmap_vector f,
-                     struct laplacian *gl, struct comm *gsc, buffer *bfr) {
-  assert(f->size == lelt);
-
+int occa_lanczos_aux(scalar *diag, scalar *upper, scalar *rr, uint lelt,
+                     ulong nelg, int niter, scalar *f, struct laplacian *gl,
+                     struct comm *gsc, buffer *bfr) {
   // analyse_adj(M, gsc, bfr);
 
   // vec_create_zeros(p, ...)
   occaKernelRun(zero, o_p, occaUInt(lelt));
 
   // vec_copy(r, f)
-  occaCopyPtrToMem(o_r, f->data, occaAllBytes, 0, occaDefault);
+  occaCopyPtrToMem(o_r, f, occaAllBytes, 0, occaDefault);
 
   // vec_ortho(gsc, r, nelg);
   vec_ortho(o_r, nelg, lelt, gsc);
@@ -447,10 +445,10 @@ int occa_lanczos_aux(genmap_vector diag, genmap_vector upper, genmap_vector *rr,
                   occaDouble(rni), occaUInt(lelt));
 
     if (iter == 0) {
-      diag->data[iter] = pap / rtz1;
+      diag[iter] = pap / rtz1;
     } else {
-      diag->data[iter] = (beta * beta * pap_old + pap) / rtz1;
-      upper->data[iter - 1] = -beta * pap_old / sqrt(rtz2 * rtz1);
+      diag[iter] = (beta * beta * pap_old + pap) / rtz1;
+      upper[iter - 1] = -beta * pap_old / sqrt(rtz2 * rtz1);
     }
 
     if (rnorm < rtol) {
@@ -463,8 +461,7 @@ int occa_lanczos_aux(genmap_vector diag, genmap_vector upper, genmap_vector *rr,
   // TODO: Do the following in the device as well
   occaCopyMemToPtr(wrk, o_rr, lelt * (iter + 1) * sizeof(scalar), 0,
                    occaDefault);
-  for (uint i = 0; i < iter + 1; i++)
-    memcpy(rr[i]->data, &wrk[i * lelt], sizeof(scalar) * lelt);
+  memcpy(rr, wrk, (iter + 1) * sizeof(scalar) * lelt);
 
   metric_acc(TOL_FNL, rnorm);
   metric_acc(TOL_TGT, rtol);
