@@ -263,7 +263,7 @@ int inv_power_serial(double *y, int N, double *A, int verbose) {
 }
 
 static int project(scalar *x, uint n, scalar *b, struct laplacian *L,
-                   struct mg_data *d, struct comm *c, int miter, int null_space,
+                   struct mg *d, struct comm *c, int miter, int null_space,
                    int verbose, buffer *bfr) {
   slong out[2][1], buf[2][1], in = n;
   comm_scan(out, c, gs_long, gs_add, &in, 1, buf);
@@ -400,7 +400,7 @@ static int inverse(scalar *y, uint lelt, struct rsb_element *elems, int nv,
   char *fc = getenv("PARRSB_RSB_MG_FACTOR");
   if (fc != NULL)
     factor = atoi(fc);
-  struct mg_data *d = mg_setup(L, factor, gsc, &cr, buf);
+  struct mg *d = mg_setup(L, factor, gsc, &cr, buf);
   crystal_free(&cr);
 
   scalar *err = tcalloc(scalar, 2 * lelt + miter * (lelt + miter + 1));
@@ -518,28 +518,23 @@ static double sign(GenmapScalar a, GenmapScalar b) {
   return fabs(a) * m;
 }
 
-static int tqli(genmap_vector **eVectors, genmap_vector *eValues,
-                genmap_vector diagonal, genmap_vector upper, int id) {
-  assert(diagonal->size == upper->size + 1);
+static int tqli(scalar *eVectors, scalar *eValues, sint n, scalar *diagonal,
+                scalar *upper, int id) {
+  if (n == 0)
+    return 0;
 
-  GenmapInt n = diagonal->size;
+  scalar *d = tcalloc(scalar, 2 * n), *e = d + n;
+  sint i;
+  for (i = 0; i < n; i++)
+    d[i] = diagonal[i];
+  for (i = 0; i < n - 1; i++)
+    e[i] = upper[i];
+  e[n - 1] = 0.0;
 
-  genmap_vector d, e;
-  vec_create(&d, n);
-  vec_create(&e, n);
-
-  vec_copy(d, diagonal);
-  vec_copy(e, upper);
-  e->data[n - 1] = 0.0;
-
-  /* Create the vector to store eigenvalues */
-  vec_create(eValues, n);
-  /* Init to identity */
-  GenmapMalloc(n, eVectors);
-  GenmapInt i;
   for (i = 0; i < n; i++) {
-    vec_create_zeros(&(*eVectors)[i], n);
-    (*eVectors)[i]->data[i] = 1.0;
+    for (uint j = 0; j < n; j++)
+      eVectors[i * n + j] = 0;
+    eVectors[i * n + i] = 1;
   }
 
   GenmapInt j, k, l, iter, m;
@@ -547,9 +542,9 @@ static int tqli(genmap_vector **eVectors, genmap_vector *eValues,
     iter = 0;
     do {
       for (m = l; m < n - 1; m++) {
-        GenmapScalar dd = fabs(d->data[m]) + fabs(d->data[m + 1]);
+        scalar dd = fabs(d[m]) + fabs(d[m + 1]);
         /* Should use a tolerance for this check */
-        if (fabs(e->data[m]) / dd < GENMAP_TOL)
+        if (fabs(e[m]) / dd < GENMAP_TOL)
           break;
       }
 
@@ -557,44 +552,46 @@ static int tqli(genmap_vector **eVectors, genmap_vector *eValues,
         if (iter++ == 30) {
           if (id == 0)
             printf("Too many iterations.\n");
-          vec_copy(*eValues, d);
+          // vec_copy(*eValues, d);
+          for (i = 0; i < n; i++)
+            eValues[i] = d[i];
           return 1;
         }
 
-        GenmapScalar g = (d->data[l + 1] - d->data[l]) / (2.0 * e->data[l]);
+        GenmapScalar g = (d[l + 1] - d[l]) / (2.0 * e[l]);
         GenmapScalar r = sqrt(g * g + 1.0);
 
-        g = d->data[m] - d->data[l] + e->data[l] / (g + sign(r, g));
+        g = d[m] - d[l] + e[l] / (g + sign(r, g));
         GenmapScalar s = 1.0, c = 1.0, p = 0.0;
 
         for (i = m - 1; i >= l; i--) {
-          GenmapScalar f = s * e->data[i];
-          GenmapScalar b = c * e->data[i];
+          GenmapScalar f = s * e[i];
+          GenmapScalar b = c * e[i];
 
           if (fabs(f) >= fabs(g)) {
             c = g / f;
             r = sqrt(c * c + 1.0);
-            e->data[i + 1] = f * r;
+            e[i + 1] = f * r;
             s = 1.0 / r;
             c = c * s;
           } else {
             s = f / g;
             r = sqrt(s * s + 1.0);
-            e->data[i + 1] = g * r;
+            e[i + 1] = g * r;
             c = 1.0 / r;
             s = s * c;
           }
 
-          g = d->data[i + 1] - p;
-          r = (d->data[i] - g) * s + 2.0 * c * b;
+          g = d[i + 1] - p;
+          r = (d[i] - g) * s + 2.0 * c * b;
           p = s * r;
-          d->data[i + 1] = g + p;
+          d[i + 1] = g + p;
           g = c * r - b;
           /* Find eigenvectors */
           for (k = 0; k < n; k++) {
-            f = (*eVectors)[k]->data[i + 1];
-            (*eVectors)[k]->data[i + 1] = s * (*eVectors)[k]->data[i] + c * f;
-            (*eVectors)[k]->data[i] = c * (*eVectors)[k]->data[i] - s * f;
+            f = eVectors[k * n + i + 1];
+            eVectors[k * n + i + 1] = s * eVectors[k * n + i] + c * f;
+            eVectors[k * n + i] = c * eVectors[k * n + i] - s * f;
           }
           /* Done with eigenvectors */
         }
@@ -602,9 +599,9 @@ static int tqli(genmap_vector **eVectors, genmap_vector *eValues,
         if (r < GENMAP_TOL && i >= l)
           continue;
 
-        d->data[l] -= p;
-        e->data[l] = g;
-        e->data[m] = 0.0;
+        d[l] -= p;
+        e[l] = g;
+        e[m] = 0.0;
       }
     } while (m != l);
   }
@@ -612,40 +609,43 @@ static int tqli(genmap_vector **eVectors, genmap_vector *eValues,
   /* Orthnormalize eigenvectors -- Just normalize? */
   for (i = 0; i < n; i++) {
     for (j = 0; j < i; j++) {
-      GenmapScalar tmp = (*eVectors)[i]->data[j];
-      (*eVectors)[i]->data[j] = (*eVectors)[j]->data[i];
-      (*eVectors)[j]->data[i] = tmp;
+      GenmapScalar tmp = eVectors[i * n + j];
+      eVectors[i * n + j] = eVectors[j * n + i];
+      eVectors[j * n + i] = tmp;
     }
   }
 
   for (k = 0; k < n; k++) {
-    e->data[k] = vec_dot((*eVectors)[k], (*eVectors)[k]);
-    if (e->data[k] > 0.0)
-      e->data[k] = sqrt(fabs(e->data[k]));
-    GenmapScalar scale = 1.0 / e->data[k];
-    vec_scale((*eVectors)[k], (*eVectors)[k], scale);
+    e[k] = 0;
+    for (uint i = 0; i < n; i++)
+      e[k] += eVectors[k * n + i] * eVectors[k * n + i];
+    if (e[k] > 0.0)
+      e[k] = sqrt(fabs(e[k]));
+    GenmapScalar scale = 1.0 / e[k];
+    for (uint i = 0; i < n; i++)
+      eVectors[k * n + i] *= scale;
   }
 
-  vec_copy(*eValues, d);
+  // vec_copy(*eValues, d);
+  for (i = 0; i < n; i++)
+    eValues[i] = d[i];
 
-  vec_destroy(d);
-  vec_destroy(e);
+  free(d);
 
   return 0;
 }
 
-static int lanczos_aux(genmap_vector diag, genmap_vector upper,
-                       genmap_vector *rr, uint lelt, ulong nelg, int niter,
-                       genmap_vector f, struct laplacian *gl, struct comm *gsc,
-                       buffer *bfr) {
-  assert(f->size == lelt);
-
+static int lanczos_aux(scalar *diag, scalar *upper, scalar *rr, uint lelt,
+                       ulong nelg, int niter, scalar *f, struct laplacian *gl,
+                       struct comm *gsc, buffer *bfr) {
   genmap_vector r, p, w;
   vec_create_zeros(&p, lelt);
   vec_create(&w, lelt);
   vec_create(&r, lelt);
 
-  vec_copy(r, f);
+  // vec_copy(r, f);
+  for (uint i = 0; i < lelt; i++)
+    r->data[i] = f[i];
 
   vec_ortho(gsc, r, nelg);
 
@@ -654,7 +654,10 @@ static int lanczos_aux(genmap_vector diag, genmap_vector upper,
   comm_allreduce(gsc, gs_double, gs_add, &rtr, 1, buf);
   GenmapScalar rnorm = sqrt(rtr);
   GenmapScalar rni = 1.0 / rnorm;
-  vec_scale(rr[0], r, rni);
+
+  // vec_scale(rr[0], r, rni);
+  for (uint i = 0; i < lelt; i++)
+    rr[0 * lelt + i] = r->data[i] * rni;
 
   GenmapScalar eps = 1.e-5;
   GenmapScalar rtol = rnorm * eps;
@@ -705,18 +708,19 @@ static int lanczos_aux(genmap_vector diag, genmap_vector upper,
     rnorm = sqrt(rtr);
     rni = 1.0 / rnorm;
 
-    vec_scale(rr[iter + 1], r, rni);
+    // vec_scale(rr[iter + 1], r, rni);
+    for (uint i = 0; i < lelt; i++)
+      rr[(iter + 1) * lelt + i] = r->data[i] * rni;
 
     if (iter == 0) {
-      diag->data[iter] = pap / rtz1;
+      diag[iter] = pap / rtz1;
     } else {
-      diag->data[iter] = (beta * beta * pap_old + pap) / rtz1;
-      upper->data[iter - 1] = -beta * pap_old / sqrt(rtz2 * rtz1);
+      diag[iter] = (beta * beta * pap_old + pap) / rtz1;
+      upper[iter - 1] = -beta * pap_old / sqrt(rtz2 * rtz1);
     }
 
     if (rnorm < rtol) {
-      upper->size = iter++;
-      diag->size = iter;
+      iter++;
       break;
     }
   }
@@ -731,100 +735,66 @@ static int lanczos_aux(genmap_vector diag, genmap_vector upper,
   return iter;
 }
 
-static int lanczos(genmap_vector fiedler, struct rsb_element *elems, int nv,
-                   genmap_vector initv, struct comm *gsc, int max_iter,
+static int lanczos(scalar *fiedler, uint lelt, struct rsb_element *elems,
+                   int nv, scalar *initv, struct comm *gsc, int miter,
                    slong nelg, buffer *bfr) {
-  assert(fiedler->size == initv->size);
-  uint lelt = fiedler->size;
+  metric_tic(gsc, LANCZOS);
 
   struct laplacian *wl;
 #if defined(GENMAP_OCCA)
   wl = laplacian_init(elems, lelt, nv, CSR, gsc, bfr);
-  occa_lanczos_init(gsc, wl, max_iter);
+  occa_lanczos_init(gsc, wl, miter);
 #else
-  wl = laplacian_init(elems, lelt, nv, CSR, gsc, bfr);
+  wl = laplacian_init(elems, lelt, nv, GS, gsc, bfr);
 #endif
 
-  metric_tic(gsc, LANCZOS);
+  if (nelg < miter)
+    miter = nelg;
 
-  genmap_vector alpha, beta;
-  vec_create(&alpha, max_iter);
-  vec_create(&beta, max_iter - 1);
-
-  if (nelg < max_iter) {
-    max_iter = nelg;
-    alpha->size = max_iter;
-    beta->size = max_iter - 1;
-  }
-
-  genmap_vector *rr;
-  GenmapMalloc(max_iter + 1, &rr);
-
-  uint i;
-  for (i = 0; i < max_iter + 1; ++i)
-    vec_create(&rr[i], lelt);
-
+  scalar *alpha = tcalloc(scalar, 2 * miter - 1), *beta = alpha + miter;
+  scalar *rr = tcalloc(scalar, (miter + 1) * lelt);
+  scalar *eVectors = tcalloc(scalar, miter * miter);
+  scalar *eValues = tcalloc(scalar, miter);
   int iter, ipass = 0;
   do {
 #if defined(GENMAP_OCCA)
-    iter = occa_lanczos_aux(alpha, beta, rr, lelt, nelg, max_iter, initv, wl,
-                            gsc, bfr);
+    iter = occa_lanczos_aux(alpha, beta, rr, lelt, nelg, miter, initv, wl, gsc,
+                            bfr);
 #else
-    iter =
-        lanczos_aux(alpha, beta, rr, lelt, nelg, max_iter, initv, wl, gsc, bfr);
+    iter = lanczos_aux(alpha, beta, rr, lelt, nelg, miter, initv, wl, gsc, bfr);
 #endif
 
-    genmap_vector evTriDiag;
-    vec_create(&evTriDiag, iter);
-
     // Use TQLI and find the minimum eigenvalue and associated vector
-    genmap_vector *eVectors, eValues;
-    tqli(&eVectors, &eValues, alpha, beta, gsc->id);
+    tqli(eVectors, eValues, iter, alpha, beta, gsc->id);
 
-    GenmapScalar eValMin = fabs(eValues->data[0]);
+    GenmapScalar eValMin = fabs(eValues[0]);
     GenmapInt eValMinI = 0;
     uint i;
     for (i = 1; i < iter; i++) {
-      if (fabs(eValues->data[i]) < eValMin) {
-        eValMin = fabs(eValues->data[i]);
+      if (fabs(eValues[i]) < eValMin) {
+        eValMin = fabs(eValues[i]);
         eValMinI = i;
       }
     }
-    vec_copy(evTriDiag, eVectors[eValMinI]);
-#if 0
-    if (gsc->id == 0)
-      printf("ipass = %d eValMinI = %d eValue = %lf\n", ipass, eValMinI,
-             eValues->data[eValMinI]);
-#endif
 
     GenmapInt j;
     for (i = 0; i < lelt; i++) {
-      fiedler->data[i] = 0.0;
+      fiedler[i] = 0.0;
       for (j = 0; j < iter; j++)
-        fiedler->data[i] += rr[j]->data[i] * evTriDiag->data[j];
+        fiedler[i] += rr[j * lelt + i] * eVectors[eValMinI * iter + j];
     }
 
-    vec_ortho(gsc, fiedler, nelg);
+    // vec_ortho(gsc, fiedler, nelg);
+    ortho(fiedler, lelt, nelg, gsc);
+  } while (iter == miter && ipass++ < miter);
 
-    vec_destroy(evTriDiag);
-    vec_destroy(eValues);
-    for (i = 0; i < iter; i++)
-      vec_destroy(eVectors[i]);
-    GenmapFree(eVectors);
-  } while (iter == max_iter && ipass++ < max_iter);
-
-  metric_toc(gsc, LANCZOS);
-
-  for (i = 0; i < max_iter + 1; ++i)
-    vec_destroy(rr[i]);
-  vec_destroy(alpha);
-  vec_destroy(beta);
-
+  free(alpha), free(rr), free(eVectors), free(eValues);
 #if defined(GENMAP_OCCA)
   occa_lanczos_free();
 #endif
-
   laplacian_free(wl);
+
+  metric_toc(gsc, LANCZOS);
 
   return ipass;
 }
@@ -835,37 +805,36 @@ int fiedler(struct rsb_element *elems, uint lelt, int nv, int max_iter,
   comm_scan(out, gsc, gs_long, gs_add, &in, 1, bfr);
   slong start = out[0][0], nelg = out[1][0];
 
-  genmap_vector initv, fiedler;
-  vec_create(&initv, lelt);
-  vec_create(&fiedler, lelt);
-
+  scalar *initv = tcalloc(scalar, 2 * lelt), *fiedler = initv + lelt;
   uint i;
   for (i = 0; i < lelt; i++) {
-    initv->data[i] = start + i + 1.0;
+    initv[i] = start + i + 1.0;
     // if (start + i < nelg / 2)
     //  initv->data[i] += 1000 * nelg;
   }
 
-  vec_ortho(gsc, initv, nelg);
+  // vec_ortho(gsc, initv, nelg);
+  ortho(initv, lelt, nelg, gsc);
 
-  double rtr = vec_dot(initv, initv);
-  double rni;
+  // double rtr = vec_dot(initv, initv);
+  scalar rtr = dot(initv, initv, lelt), rni;
   comm_allreduce(gsc, gs_double, gs_add, &rtr, 1, &rni);
 
   rni = 1.0 / sqrt(rtr);
-  vec_scale(initv, initv, rni);
+  // vec_scale(initv, initv, rni);
+  for (uint i = 0; i < lelt; i++)
+    initv[i] *= rni;
 
   int iter = 0;
   if (algo == 0)
-    iter = lanczos(fiedler, elems, nv, initv, gsc, max_iter, nelg, buf);
+    iter = lanczos(fiedler, lelt, elems, nv, initv, gsc, max_iter, nelg, buf);
   else if (algo == 1)
-    iter = inverse(fiedler->data, fiedler->size, elems, nv, initv->data, gsc,
-                   max_iter, nelg, buf);
+    iter = inverse(fiedler, lelt, elems, nv, initv, gsc, max_iter, nelg, buf);
   metric_acc(FIEDLER_NITER, iter);
 
   GenmapScalar norm = 0;
   for (i = 0; i < lelt; i++)
-    norm += fiedler->data[i] * fiedler->data[i];
+    norm += fiedler[i] * fiedler[i];
 #if 0
   if (gsc->id == 0)
     printf("fiedler norm = %lf\n", norm);
@@ -875,13 +844,13 @@ int fiedler(struct rsb_element *elems, uint lelt, int nv, int max_iter,
   comm_allreduce(gsc, gs_double, gs_add, &norm, 1, &normi);
   normi = 1.0 / sqrt(norm);
 
-  vec_scale(fiedler, fiedler, normi);
+  // vec_scale(fiedler, fiedler, normi);
+  for (i = 0; i < lelt; i++)
+    fiedler[i] *= normi;
 
   for (i = 0; i < lelt; i++)
-    elems[i].fiedler = fiedler->data[i];
+    elems[i].fiedler = fiedler[i];
 
-  vec_destroy(initv);
-  vec_destroy(fiedler);
-
+  free(initv);
   return 0;
 }

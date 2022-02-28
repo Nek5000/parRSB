@@ -201,7 +201,7 @@ struct schur {
   struct mat A_ll;
   struct par_mat A_ls, A_sl, A_ss;
   struct gs_data *Q_ls, *Q_sl, *Q_ss;
-  struct mg_data *M;
+  struct mg *M;
 };
 
 static int S_owns_row(const ulong r, const ulong *rows, const uint n) {
@@ -502,7 +502,7 @@ static int sparse_gemm(struct par_mat *WG, const struct par_mat *W,
   return 0;
 }
 
-static struct mg_data *
+static struct mg *
 schur_precond_setup(const struct mat *L, const struct par_mat *F,
                     const struct par_mat *S, const struct par_mat *E,
                     const struct comm *c, struct crystal *cr, buffer *bfr) {
@@ -658,7 +658,7 @@ static inline void ortho(scalar *q, uint n, ulong ng, struct comm *c) {
 }
 
 static int project(scalar *x, scalar *b, struct par_mat *S, struct gs_data *gsh,
-                   struct mg_data *d, struct comm *c, int miter, int null_space,
+                   struct mg *d, struct comm *c, int miter, int null_space,
                    int verbose, buffer *bfr) {
   assert(IS_CSR(S));
   assert(S->rn == 0 || IS_DIAG(S));

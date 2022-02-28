@@ -9,7 +9,7 @@ struct mg_lvl {
   struct par_mat *M;
 };
 
-struct mg_data {
+struct mg {
   int nlevels;
   struct mg_lvl **levels;
   uint *level_off;
@@ -26,7 +26,7 @@ static int logbll(slong n, int a) {
   return k;
 }
 
-static void mg_lvl_setup(struct mg_data *d, const uint lvl, const int factor,
+static void mg_lvl_setup(struct mg *d, const uint lvl, const int factor,
                          const struct comm *c, struct crystal *cr,
                          struct array *entries, buffer *bfr) {
   assert(lvl > 0);
@@ -113,9 +113,8 @@ static void mg_lvl_setup(struct mg_data *d, const uint lvl, const int factor,
   d->levels[lvl]->Q = setup_Q(M, c, bfr);
 }
 
-struct mg_data *mg_setup(const struct par_mat *M, const int factor,
-                         const struct comm *c, struct crystal *cr,
-                         buffer *bfr) {
+struct mg *mg_setup(const struct par_mat *M, const int factor,
+                    const struct comm *c, struct crystal *cr, buffer *bfr) {
   assert(IS_CSR(M));
   assert(M->rn == 0 || IS_DIAG(M));
 
@@ -126,7 +125,7 @@ struct mg_data *mg_setup(const struct par_mat *M, const int factor,
   if (rg == 0)
     return NULL;
 
-  struct mg_data *d = (struct mg_data *)tcalloc(struct mg_data, 1);
+  struct mg *d = (struct mg *)tcalloc(struct mg, 1);
   d->nlevels = logbll(rg, factor);
   d->levels = (struct mg_lvl **)tcalloc(struct mg_lvl *, d->nlevels);
 
@@ -163,7 +162,7 @@ struct mg_data *mg_setup(const struct par_mat *M, const int factor,
   return d;
 }
 
-void mg_vcycle(scalar *u1, scalar *rhs, struct mg_data *d, struct comm *c,
+void mg_vcycle(scalar *u1, scalar *rhs, struct mg *d, struct comm *c,
                buffer *bfr) {
   if (d == NULL)
     return;
@@ -252,7 +251,7 @@ void mg_vcycle(scalar *u1, scalar *rhs, struct mg_data *d, struct comm *c,
     u1[i] = r[i];
 }
 
-void mg_free(struct mg_data *d) {
+void mg_free(struct mg *d) {
   if (d != NULL) {
     struct mg_lvl **l = d->levels;
     for (uint i = 0; i < d->nlevels; i++) {

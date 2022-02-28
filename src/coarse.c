@@ -1,10 +1,14 @@
 #include "coarse.h"
 
-extern int schur_free(struct coarse *crs);
+extern int schur_setup(struct coarse *crs, struct array *eij, const ulong ng,
+                       struct comm *c, struct crystal *cr, buffer *bfr);
 extern int schur_solve(scalar *x, scalar *b, struct coarse *crs, struct comm *c,
                        buffer *bfr);
 extern int schur_free(struct coarse *crs);
 
+//------------------------------------------------------------------------------
+// Number rows, local first then interface. Returns global number of local
+// elements.
 static void comm_split(const struct comm *old, const int bin, const int key,
                        struct comm *new_) {
   MPI_Comm new_comm;
@@ -13,9 +17,6 @@ static void comm_split(const struct comm *old, const int bin, const int key,
   MPI_Comm_free(&new_comm);
 }
 
-//------------------------------------------------------------------------------
-// Number rows, local first then interface. Returns global number of local
-// elements.
 static ulong number_rows(ulong *elem, ulong *ls_, ulong *lg_, uint *ln_,
                          ulong *is_, ulong *ig_, uint *in_, uint **idx_,
                          const slong *vtx, const uint nelt, const int nv,
