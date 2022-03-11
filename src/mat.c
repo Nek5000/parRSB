@@ -534,8 +534,8 @@ struct gs_data *setup_Q(const struct par_mat *M, const struct comm *c,
   return gs_setup(sids, nnz, c, 0, gs_crystal_router, 0);
 }
 
-void mat_vec_csr(scalar *y, scalar *x, struct par_mat *M, struct gs_data *gsh,
-                 scalar *buf, buffer *bfr) {
+void mat_vec_csr(scalar *y, const scalar *x, const struct par_mat *M,
+                 struct gs_data *gsh, scalar *buf, buffer *bfr) {
   assert(IS_CSR(M));
   assert(M->rn == 0 || IS_DIAG(M));
 

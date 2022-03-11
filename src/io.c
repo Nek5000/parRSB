@@ -438,6 +438,10 @@ int parrsb_dump_map(char *name, unsigned int nelt, int nv, long long *vtx,
   char version[6] = "#v001";
   float test = 6.54321;
 
+  char ma2_name[BUFSIZ];
+  strncpy(ma2_name, name, BUFSIZ);
+  strncat(ma2_name, ".ma2", 5);
+
   int nelgt = nelt;
   MPI_Allreduce(&nelt, &nelgt, 1, MPI_INT, MPI_SUM, comm);
 
@@ -461,8 +465,8 @@ int parrsb_dump_map(char *name, unsigned int nelt, int nv, long long *vtx,
 
   int errs = 0;
   MPI_File file;
-  int err = MPI_File_open(comm, name, MPI_MODE_WRONLY | MPI_MODE_CREATE, infoIn,
-                          &file);
+  int err = MPI_File_open(comm, ma2_name, MPI_MODE_WRONLY | MPI_MODE_CREATE,
+                          infoIn, &file);
   if (err) {
     errs++;
     MPI_Abort(comm, 911);

@@ -356,6 +356,7 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
 
   check_rsb_partition(gc, max_pass, max_iter);
   coarse_system(elements->ptr, elements->n, nv, gc, bfr);
+  get_key_sizes(elements->ptr, elements->n, nv, gc, bfr);
   // count_interface_dofs(elements->ptr, elements->n, nv, gc, bfr);
 
   return 0;

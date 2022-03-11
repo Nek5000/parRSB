@@ -545,8 +545,8 @@ static struct gs_data *setup_Ezl_Q(struct par_mat *E, ulong s, uint n,
   return gs_setup(ids, i, c, 0, gs_pairwise, 0);
 }
 
-static int Ezl(scalar *y, struct par_mat *E, struct gs_data *gsh, scalar *zl,
-               ulong s, uint n, buffer *bfr) {
+static int Ezl(scalar *y, const struct par_mat *E, struct gs_data *gsh,
+               scalar *zl, const ulong s, const uint n, buffer *bfr) {
   assert(IS_CSC(E));
   assert(!IS_DIAG(E));
 
@@ -586,8 +586,8 @@ static struct gs_data *setup_Fxi_Q(struct par_mat *F, ulong s, uint n,
   return gs_setup(ids, i, c, 0, gs_pairwise, 0);
 }
 
-static int Fxi(scalar *y, struct par_mat *F, struct gs_data *gsh, scalar *zi,
-               ulong s, uint n, buffer *bfr) {
+static int Fxi(scalar *y, const struct par_mat *F, struct gs_data *gsh,
+               scalar *xi, const ulong s, const uint n, buffer *bfr) {
   assert(IS_CSR(F));
   assert(!IS_DIAG(F));
 
@@ -597,7 +597,7 @@ static int Fxi(scalar *y, struct par_mat *F, struct gs_data *gsh, scalar *zi,
   for (i = 0; i < nnz; i++)
     wrk[i] = 0;
   for (j = 0; j < n; j++, i++)
-    wrk[i] = zi[j];
+    wrk[i] = xi[j];
 
   gs(wrk, gs_double, gs_add, 1, gsh, bfr);
 
@@ -657,11 +657,43 @@ static inline void ortho(scalar *q, uint n, ulong ng, struct comm *c) {
     q[i] -= s;
 }
 
-static int project(scalar *x, scalar *b, struct par_mat *S, struct gs_data *gsh,
-                   struct mg *d, struct comm *c, int miter, int null_space,
-                   int verbose, buffer *bfr) {
+static int schur_action(scalar *y, const struct schur *schur, scalar *x,
+                        ulong ls, scalar *wrk, buffer *bfr) {
+  const struct par_mat *S = &schur->A_ss;
   assert(IS_CSR(S));
   assert(S->rn == 0 || IS_DIAG(S));
+
+  uint ln = schur->A_ll.n, in = S->rn;
+  uint mn = ln > in ? ln : in;
+  scalar *xl = (scalar *)tcalloc(scalar, 2 * mn), *exl = xl + mn;
+
+  // Calculate (E (B^-1) F) x
+  // Fx: x has size in, Fx has size ln. So wrk has to be at least ln
+  Fxi(exl, &schur->A_ls, schur->Q_ls, x, ls, in, bfr);
+  // Multiply Fx by B^-1 or (LU)^-1
+  cholesky_solve(xl, &schur->A_ll, exl);
+  // Multuply (B^-1)Fx by E
+  Ezl(exl, &schur->A_sl, schur->Q_sl, xl, ls, in, bfr);
+
+  // Separately calculate Sx
+  mat_vec_csr(y, x, S, schur->Q_ss, wrk, bfr);
+
+  for (uint i = 0; i < in; i++)
+    y[i] -= exl[i];
+
+  free(xl);
+
+  return 0;
+}
+
+static int project(scalar *x, scalar *b, const struct schur *schur, ulong ls,
+                   struct comm *c, int miter, int null_space, int verbose,
+                   buffer *bfr) {
+  const struct par_mat *S = &schur->A_ss;
+  assert(IS_CSR(S));
+  assert(S->rn == 0 || IS_DIAG(S));
+
+  struct mg *d = schur->M;
 
   slong out[2][1], buf[2][1], in = S->rn;
   comm_scan(out, c, gs_long, gs_add, &in, 1, buf);
@@ -671,9 +703,11 @@ static int project(scalar *x, scalar *b, struct par_mat *S, struct gs_data *gsh,
     return 0;
 
   uint n = S->rn, nnz = n > 0 ? S->adj_off[n] + n : 0;
-  scalar *z = (scalar *)tcalloc(scalar, (6 + 2 * (miter + 1)) * n + nnz);
+  scalar *z = (scalar *)tcalloc(scalar, 6 * n + nnz);
   scalar *w = z + n, *r = w + n, *p = r + n, *z0 = p + n, *dz = z0 + n;
-  scalar *P = dz + n, *W = P + n * (miter + 1), *wrk = W + n * (miter + 1);
+  scalar *wrk = dz + n;
+  scalar *P = (scalar *)tcalloc(scalar, 2 * (miter + 1) * n);
+  scalar *W = P + n * (miter + 1);
 
   uint i;
   for (i = 0; i < n; i++)
@@ -697,7 +731,8 @@ static int project(scalar *x, scalar *b, struct par_mat *S, struct gs_data *gsh,
 
   uint j, k;
   for (i = 0; i < miter; i++) {
-    mat_vec_csr(w, p, S, gsh, wrk, bfr);
+    // Action of S - E (LU)^-1 F
+    schur_action(w, schur, p, ls, wrk, bfr);
 
     scalar pw = dot(p, w, n);
     comm_allreduce(c, gs_double, gs_add, &pw, 1, buf);
@@ -762,6 +797,7 @@ static int project(scalar *x, scalar *b, struct par_mat *S, struct gs_data *gsh,
   }
 
   free(z);
+  free(P);
 
   return i == miter ? i : i + 1;
 }
@@ -890,7 +926,7 @@ int schur_solve(scalar *x, scalar *b, struct coarse *crs, struct comm *c,
 #endif
 
   assert(in == schur->A_ss.rn);
-  project(xi, rhs, &schur->A_ss, schur->Q_ss, schur->M, c, 100, 0, 1, bfr);
+  project(xi, rhs, schur, crs->ls, c, 100, 1, 1, bfr);
 #ifdef DUMPI
   printf("%d xi = ", c->id);
   for (uint i = 0; i < in; i++)

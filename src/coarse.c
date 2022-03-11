@@ -18,49 +18,51 @@ static ulong number_rows(ulong *elem, ulong *ls_, ulong *lg_, uint *ln_,
                          const struct comm *ci, buffer *bfr) {
   uint npts = nelt * nv;
   int nnz = npts > 0;
-  if (nnz == 0)
-    return 1;
 
   struct comm c;
   comm_split(ci, nnz, ci->id, &c);
 
-  int *dof = tcalloc(int, npts), level = 1;
   uint i, j;
-  while (c.np > 1) {
-    struct gs_data *gsh = gs_setup(vtx, npts, &c, 0, gs_pairwise, 0);
+  if (nnz > 0) {
+    int *dof = tcalloc(int, npts), level = 1;
+    while (c.np > 1) {
+      struct gs_data *gsh = gs_setup(vtx, npts, &c, 0, gs_pairwise, 0);
 
-    int bin = c.id >= (c.np + 1) / 2;
-    assert(bin == 0 || bin == 1);
-    for (i = 0; i < npts; i++)
-      dof[i] = bin;
-
-    gs(dof, gs_int, gs_add, 0, gsh, bfr);
-
-    if (bin == 1)
+      int bin = c.id >= (c.np + 1) / 2;
+      assert(bin == 0 || bin == 1);
       for (i = 0; i < npts; i++)
-        dof[i] = 0;
+        dof[i] = bin;
 
-    gs(dof, gs_int, gs_add, 0, gsh, bfr);
+      gs(dof, gs_int, gs_add, 0, gsh, bfr);
 
-    for (i = 0; i < nelt; i++) {
-      for (j = 0; j < nv; j++) {
-        if (dof[i * nv + j] > 0 && !elem[i]) {
-          elem[i] = level;
-          break;
+      if (bin == 1)
+        for (i = 0; i < npts; i++)
+          dof[i] = 0;
+
+      gs(dof, gs_int, gs_add, 0, gsh, bfr);
+
+      for (i = 0; i < nelt; i++) {
+        for (j = 0; j < nv; j++) {
+          if (dof[i * nv + j] > 0 && !elem[i]) {
+            elem[i] = level;
+            break;
+          }
         }
       }
+
+      gs_free(gsh);
+
+      struct comm t;
+      comm_split(&c, bin, c.id, &t);
+      comm_free(&c);
+      comm_dup(&c, &t);
+      comm_free(&t);
+
+      level++;
     }
-
-    gs_free(gsh);
-
-    struct comm t;
-    comm_split(&c, bin, c.id, &t);
-    comm_free(&c);
-    comm_dup(&c, &t);
-    comm_free(&t);
-
-    level++;
+    free(dof);
   }
+
   comm_free(&c);
 
   uint in = 0, ln = 0;
@@ -86,7 +88,6 @@ static ulong number_rows(ulong *elem, ulong *ls_, ulong *lg_, uint *ln_,
   assert(*in_ == in);      // Sanity check
   assert(ln + in == nelt); // Sanity check
 
-  free(dof);
   return lg;
 }
 
