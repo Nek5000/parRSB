@@ -16,14 +16,16 @@ extern int balance_partitions(struct array *elements, int nv, struct comm *lc,
                               struct comm *gc, int bin, buffer *bfr);
 extern int fiedler(struct rsb_element *elems, uint lelt, int nv, int max_iter,
                    int algo, struct comm *gsc, buffer *buf);
+extern int vtx_dist(uint nelt, int nv, const slong *vtx, struct comm *c,
+                    struct crystal *cr, buffer *bfr);
 
 struct gid {
   ulong gid;
   uint proc;
 };
 
-static void coarse_system(struct rsb_element *elems, uint nelt, int nv,
-                          struct comm *cin, buffer *bfr) {
+static void schur_test(struct rsb_element *elems, uint nelt, int nv,
+                       struct comm *cin, buffer *bfr) {
   uint npts = nelt * nv;
   slong *ids = (slong *)tcalloc(slong, npts);
 
@@ -32,7 +34,12 @@ static void coarse_system(struct rsb_element *elems, uint nelt, int nv,
     for (j = 0; j < nv; j++)
       ids[i * nv + j] = elems[i].vertices[j];
 
+  genmap_barrier(cin);
+  double t = comm_time();
   struct coarse *crs = coarse_setup(nelt, nv, ids, cin, bfr);
+  t = comm_time() - t;
+  if (cin->id == 0)
+    printf("coarse_setup: %lf\n", t);
 
   slong out[2][1], buf[2][1], in = nelt;
   comm_scan(out, cin, gs_long, gs_add, &in, 1, buf);
@@ -57,11 +64,50 @@ static void coarse_system(struct rsb_element *elems, uint nelt, int nv,
   for (i = 0; i < nelt; i++)
     b[i] /= sum;
 
+  genmap_barrier(cin);
+  t = comm_time();
   coarse_solve(x, b, crs, cin, bfr);
+  t = comm_time() - t;
+  if (cin->id == 0)
+    printf("coarse_solve: %lf\n", t);
 
   free(b);
   coarse_free(crs);
   free(ids);
+}
+
+static void get_key_sizes(struct rsb_element *elems, uint nelt, int nv,
+                          struct comm *c, buffer *bfr) {
+  uint npts = nelt * nv;
+  assert(npts > 0);
+
+  slong *vtx = tcalloc(slong, npts);
+  uint e, n;
+  for (e = 0; e < nelt; e++)
+    for (n = 0; n < nv; n++)
+      vtx[e * nv + n] = elems[e].vertices[n];
+
+  struct crystal cr;
+  crystal_init(&cr, c);
+  vtx_dist(nelt, nv, vtx, c, &cr, bfr);
+  elm_dist(nelt, nv, vtx, c, &cr, bfr);
+  crystal_free(&cr);
+
+  free(vtx);
+}
+
+static void ilu_test(struct rsb_element *elems, uint nelt, int nv,
+                     struct comm *cin, buffer *bfr) {
+  uint npts = nelt * nv;
+  slong *ids = (slong *)tcalloc(slong, npts);
+
+  uint i, j;
+  for (i = 0; i < nelt; i++)
+    for (j = 0; j < nv; j++)
+      ids[i * nv + j] = elems[i].vertices[j];
+
+  struct ilu *ilu = ilu_setup(nelt, nv, ids, cin, 0, bfr);
+  ilu_free(ilu);
 }
 
 static void count_interface_dofs(struct rsb_element *elems, uint nelt, int nv,
@@ -355,9 +401,9 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
   comm_free(&lc);
 
   check_rsb_partition(gc, max_pass, max_iter);
-  coarse_system(elements->ptr, elements->n, nv, gc, bfr);
+  schur_test(elements->ptr, elements->n, nv, gc, bfr);
   get_key_sizes(elements->ptr, elements->n, nv, gc, bfr);
-  // count_interface_dofs(elements->ptr, elements->n, nv, gc, bfr);
+  ilu_test(elements->ptr, elements->n, nv, gc, bfr);
 
   return 0;
 }

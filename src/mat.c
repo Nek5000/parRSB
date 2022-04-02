@@ -170,6 +170,7 @@ void find_nbrs(struct array *arr, const ulong *eid, const slong *vtx,
   uint i, j;
   for (i = 0; i < nelt; i++) {
     v.r = eid[i];
+    assert(v.r > 0);
     for (j = 0; j < nv; j++) {
       v.c = vtx[i * nv + j], v.proc = v.c % c->np;
       array_cat(struct nbr, &vertices, &v, 1);
@@ -180,19 +181,19 @@ void find_nbrs(struct array *arr, const ulong *eid, const slong *vtx,
 
   sarray_sort(struct nbr, vertices.ptr, vertices.n, c, 1, buf);
   struct nbr *vptr = (struct nbr *)vertices.ptr;
-  uint vn = vertices.n;
 
   // FIXME: Assumes quads or hexes
   struct nbr t;
   uint s = 0, e;
-  while (s < vn) {
+  while (s < vertices.n) {
     e = s + 1;
-    while (e < vn && vptr[s].c == vptr[e].c)
+    while (e < vertices.n && vptr[s].c == vptr[e].c)
       e++;
     for (i = s; i < e; i++) {
       t = vptr[i];
       for (j = s; j < e; j++) {
         t.c = vptr[j].r;
+        assert(t.r > 0 && t.c > 0);
         array_cat(struct nbr, arr, &t, 1);
       }
     }
@@ -226,6 +227,7 @@ int par_csr_setup(struct par_mat *mat, struct array *entries, int sd,
 
   ulong *cols = (ulong *)buf->ptr;
   cols[0] = ptr[0].c, ptr[0].idx = 0, mat->cn = 1;
+  assert(cols[0] > 0);
   uint i;
   for (i = 1; i < nnz; i++) {
     if (ptr[i - 1].c != ptr[i].c)
@@ -395,6 +397,44 @@ void par_mat_print(struct par_mat *A) {
         printf("%ld %ld %lf\n", A->cols[i], A->cols[i], A->diag_val[i]);
     }
   }
+}
+
+int par_csr_merge(struct par_mat *C, struct par_mat *A, struct par_mat *B,
+                  buffer *bfr) {
+  assert(IS_CSR(A) && IS_CSR(B));
+  assert(!IS_DIAG(A) && !IS_DIAG(B));
+
+  struct array cijs;
+  array_init(struct mat_ij, &cijs, (A->rn + B->rn) * 30);
+
+  struct mat_ij ij;
+
+  uint *off = A->adj_off, *idx = A->adj_idx, rn = A->rn;
+  ulong *rows = A->rows, *cols = A->cols;
+  scalar *val = A->adj_val;
+  for (uint i = 0; i < rn; i++) {
+    ij.r = rows[i];
+    for (uint j = off[i]; j < off[i + 1]; j++) {
+      ij.c = cols[idx[j]], ij.v = val[j];
+      array_cat(struct mat_ij, &cijs, &ij, 1);
+    }
+  }
+
+  off = B->adj_off, idx = B->adj_idx, rn = B->rn;
+  rows = B->rows, cols = B->cols;
+  val = B->adj_val;
+  for (uint i = 0; i < rn; i++) {
+    ij.r = rows[i];
+    for (uint j = off[i]; j < off[i + 1]; j++) {
+      ij.c = cols[idx[j]], ij.v = val[j];
+      array_cat(struct mat_ij, &cijs, &ij, 1);
+    }
+  }
+
+  par_csr_setup(C, &cijs, 0, bfr);
+
+  array_free(&cijs);
+  return 0;
 }
 
 int par_mat_free(struct par_mat *A) {

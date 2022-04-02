@@ -25,10 +25,12 @@ struct mat {
 };
 
 struct par_mat {
-  int type; // CSC or CSR
+  // CSC or CSR
+  int type;
   uint cn, rn, *adj_off, *adj_idx, *diag_idx;
   scalar *adj_val, *diag_val;
-  ulong *cols, *rows; // Unique global column ids and row ids of the matrix
+  // Unique global column ids and row ids of the matrix
+  ulong *cols, *rows;
 };
 
 int IS_CSC(const struct par_mat *A);
@@ -44,15 +46,19 @@ void find_nbrs(struct array *arr, const ulong *eid, const slong *vtx,
 int compress_nbrs(struct array *eij, struct array *nbr, buffer *bfr);
 
 // Input array `entries` is of type `struct mat_ij`
+// TODO: Rename to mat_setup
 int csr_setup(struct mat *mat, struct array *entries, int sep, buffer *buf);
 int mat_print(struct mat *mat);
 int mat_free(struct mat *mat);
 
 // Input array `entries` is of type `struct mat_ij`
+// TODO: Unify _csr_ and _csc_ functions
 int par_csc_setup(struct par_mat *mat, struct array *entries, int sd,
                   buffer *buf);
 int par_csr_setup(struct par_mat *mat, struct array *entries, int sd,
                   buffer *buf);
+int par_csr_merge(struct par_mat *C, struct par_mat *A, struct par_mat *B,
+                  buffer *bfr);
 struct par_mat *par_csr_setup_ext(struct array *entries, int sd, buffer *bfr);
 struct par_mat *par_csc_setup_ext(struct array *entries, int sd, buffer *bfr);
 // Create a par_mat from connectivity
