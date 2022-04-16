@@ -326,6 +326,9 @@ static void rsb_local(struct rsb_element *elems, uint s, uint e, int nv,
                       int max_iter, int max_pass, struct comm *lc,
                       buffer *buf) {
   // lc should contain only a single rank
+  if (e <= s)
+    return;
+
   uint mid;
   uint size = e - s;
   if (size > 1) {

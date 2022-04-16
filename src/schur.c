@@ -896,7 +896,13 @@ int schur_solve(scalar *x, scalar *b, struct coarse *crs, struct comm *c,
   fflush(stdout);
 #endif
 
+  comm_barrier(c);
+  double t = comm_time();
   cholesky_solve(zl, &schur->A_ll, rhs);
+  t = comm_time() - t;
+  if (c->id == 0)
+    printf("\t cholesky_solve: %lf\n", t);
+
 #ifdef DUMPI
   printf("%d zl = ", c->id);
   for (uint i = 0; i < ln; i++)
@@ -926,7 +932,14 @@ int schur_solve(scalar *x, scalar *b, struct coarse *crs, struct comm *c,
 #endif
 
   assert(in == schur->A_ss.rn);
+
+  comm_barrier(c);
+  t = comm_time();
   project(xi, rhs, schur, crs->ls, c, 100, 1, 1, bfr);
+  t = comm_time() - t;
+  if (c->id == 0)
+    printf("\tproject: %lf\n", t);
+
 #ifdef DUMPI
   printf("%d xi = ", c->id);
   for (uint i = 0; i < in; i++)
@@ -949,7 +962,14 @@ int schur_solve(scalar *x, scalar *b, struct coarse *crs, struct comm *c,
 
   for (uint i = 0; i < ln; i++)
     rhs[i] = b[idx[i]] - rhs[i];
+
+  comm_barrier(c);
+  t = comm_time();
   cholesky_solve(xl, &schur->A_ll, rhs);
+  t = comm_time() - t;
+  if (c->id == 0)
+    printf("\tcholesky_solve 2: %lf\n", t);
+
 #ifdef DUMPI
   printf("%d xl = ", c->id);
   for (uint i = 0; i < ln; i++)
