@@ -383,10 +383,9 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
     comm_split(&lc, bin, lc.id, &tc);
 
     metric_tic(&lc, REPAIR_BALANCE);
-    if (options->repair > 0) {
+    if (options->repair > 0)
       repair_partitions(elements, nv, &tc, &lc, bin, gc, bfr);
-      balance_partitions(elements, nv, &tc, &lc, bin, bfr);
-    }
+    balance_partitions(elements, nv, &tc, &lc, bin, bfr);
     metric_toc(&lc, REPAIR_BALANCE);
 
     comm_free(&lc);

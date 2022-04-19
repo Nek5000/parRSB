@@ -10,14 +10,13 @@ struct unmarked {
   uint index;
 };
 
-struct interface_element {
-  uint index;
-  uint orig;
+struct ielem_t {
+  uint index, orig;
   sint dest;
   GenmapScalar fiedler;
 };
 
-/* Check the bin value */
+// Check the bin value
 static int check_bin_val(int bin, struct comm *gc) {
   if (bin < 0 || bin > 1) {
     if (gc->id == 0) {
@@ -29,7 +28,7 @@ static int check_bin_val(int bin, struct comm *gc) {
   return 0;
 }
 
-/* Find the number of disconnected components */
+// Find the number of disconnected components
 static sint get_components(sint *component, struct rsb_element *elements,
                            struct comm *c, buffer *buf, uint nelt, uint nv) {
   slong out[2][1], buff[2][1];
@@ -67,7 +66,7 @@ static sint get_components(sint *component, struct rsb_element *elements,
   sint count = 0;
 
   do {
-    /* Count unmarked elements */
+    // Count unmarked elements
     arr.n = 0;
     for (e = 0; e < nelt; e++) {
       if (component[e] == -1) {
@@ -83,12 +82,12 @@ static sint get_components(sint *component, struct rsb_element *elements,
 
     nnz1 = nnzg = nnzg0 = 0;
     if (bin == 1) {
-      /* Initialize p */
+      // Initialize p
       for (e = 0; e < arr.n; e++)
         for (d = 0; d < nv; d++)
           p[e * nv + d] = 0;
 
-      /* Mark the first non-marked element as seed */
+      // Mark the first non-marked element as seed
       struct unmarked *ptr = (struct unmarked *)arr.ptr;
       slong first = start + ptr[0].index;
       slong first_ = first;
@@ -99,7 +98,7 @@ static sint get_components(sint *component, struct rsb_element *elements,
           p[0 * nv + d] = 1;
       }
 
-      /* Setup gs */
+      // Setup gs
       for (e = 0; e < arr.n; e++)
         for (d = 0; d < nv; d++)
           ids[e * nv + d] = elements[ptr[e].index].vertices[d];
@@ -118,8 +117,8 @@ static sint get_components(sint *component, struct rsb_element *elements,
               break;
             }
           }
-
-          if (d < nv) { // There was one non-zero vertex in the element
+          // There was one non-zero vertex in the element
+          if (d < nv) {
             for (d = 0; d < nv; d++)
               p[e * nv + d] = 1;
           }
@@ -152,37 +151,26 @@ int balance_partitions(struct array *elements, int nv, struct comm *lc,
                        struct comm *gc, int bin, buffer *bfr) {
   assert(check_bin_val(bin, gc) == 0);
 
+  // Calculate expected # of elements per processor
   uint nelt = elements->n;
-
-  /* Calculate expected # of elements per processor */
-  slong buf;
-  slong nelgt = nelt;
+  slong nelgt = nelt, nglob = nelt, buf;
   comm_allreduce(lc, gs_long, gs_add, &nelgt, 1, &buf);
-
-  slong nglob = nelt;
   comm_allreduce(gc, gs_long, gs_add, &nglob, 1, &buf);
 
-  slong nelt_ = nglob / gc->np;
-  slong nelgt_exp = nelt_ * lc->np;
-  sint nrem = nglob - nelt_ * gc->np;
-  nelgt_exp += nrem / 2 + (nrem % 2) * (1 - bin);
+  sint nelt_ = nglob / gc->np, nrem = nglob - nelt_ * gc->np;
+  slong nelgt_exp = nelt_ * lc->np + nrem / 2 + (nrem % 2) * (1 - bin);
+  slong send_cnt = nelgt - nelgt_exp > 0 ? nelgt - nelgt_exp : 0;
 
-  slong send_cnt = 0;
-  if (nelgt - nelgt_exp > 0)
-    send_cnt = nelgt - nelgt_exp;
-
-  /* Setup gather-scatter */
-  uint size = nelt * nv;
+  // Setup gather-scatter
+  uint size = nelt * nv, e, v;
   slong *ids = tcalloc(slong, size);
   struct rsb_element *elems = elements->ptr;
-  uint e, v;
   for (e = 0; e < nelt; e++)
     for (v = 0; v < nv; v++)
       ids[e * nv + v] = elems[e].vertices[v];
-
   struct gs_data *gsh = gs_setup(ids, size, gc, 0, gs_pairwise, 0);
 
-  sint *input = tcalloc(sint, size);
+  sint *input = (sint *)ids;
   if (send_cnt > 0)
     for (e = 0; e < size; e++)
       input[e] = 0;
@@ -195,54 +183,46 @@ int balance_partitions(struct array *elements, int nv, struct comm *lc,
   for (e = 0; e < nelt; e++)
     elems[e].proc = gc->id;
 
-  sint start_id = (send_cnt == 0) ? gc->id : INT_MAX;
-  comm_allreduce(gc, gs_int, gs_min, &start_id, 1, &buf);
+  sint sid = (send_cnt == 0) ? gc->id : INT_MAX, balanced = 0;
+  comm_allreduce(gc, gs_int, gs_min, &sid, 1, &buf);
 
   struct crystal cr;
-  sint balanced = 0;
 
   if (send_cnt > 0) {
-    int mul = -1;
-    if (start_id == 0) /* we are sending to lower fiedler values */
-      mul = 1;
-
     struct array ielems;
-    array_init(struct interface_element, &ielems, 10);
+    array_init(struct ielem_t, &ielems, 10);
 
-    struct interface_element ielem;
-    ielem.dest = -1;
-
+    struct ielem_t ielem = {
+        .index = 0, .orig = lc->id, .dest = -1, .fiedler = 0};
+    int mul = sid == 0 ? 1 : -1;
     for (e = 0; e < nelt; e++) {
-      for (v = 0; v < nv; v++)
+      for (v = 0; v < nv; v++) {
         if (input[e * nv + v] > 0) {
-          ielem.index = e;
-          ielem.orig = lc->id;
-          ielem.fiedler = mul * elems[e].fiedler;
-          array_cat(struct interface_element, &ielems, &ielem, 1);
+          ielem.index = e, ielem.fiedler = mul * elems[e].fiedler;
+          array_cat(struct ielem_t, &ielems, &ielem, 1);
           break;
         }
+      }
     }
 
-    parallel_sort(struct interface_element, &ielems, fiedler, gs_double, 0, 1,
-                  lc, bfr);
+    // Sort based on fiedler value and sets `orig` field
+    parallel_sort(struct ielem_t, &ielems, fiedler, gs_double, 0, 1, lc, bfr);
 
-    slong ielems_n = ielems.n;
-    slong out[2][1], bfr[2][1];
-    comm_scan(out, lc, gs_long, gs_add, &ielems_n, 1, bfr);
+    slong out[2][1], bfr[2][1], nielems = ielems.n;
+    comm_scan(out, lc, gs_long, gs_add, &nielems, 1, bfr);
     slong start = out[0][0];
 
     sint P = gc->np - lc->np;
-    slong part_size = (send_cnt + P - 1) / P;
+    sint part_size = (send_cnt + P - 1) / P;
 
-    if (out[1][0] < send_cnt)
-      balanced = 0;
-    else {
-      struct interface_element *ptr = ielems.ptr;
+    if (out[1][0] >= send_cnt) {
+      balanced = 1;
+      struct ielem_t *ptr = ielems.ptr;
       for (e = 0; start + e < send_cnt && e < ielems.n; e++)
-        ptr[e].dest = start_id + (start + e) / part_size;
+        ptr[e].dest = sid + (start + e) / part_size;
 
       crystal_init(&cr, lc);
-      sarray_transfer(struct interface_element, &ielems, orig, 0, &cr);
+      sarray_transfer(struct ielem_t, &ielems, orig, 0, &cr);
       crystal_free(&cr);
 
       ptr = ielems.ptr;
@@ -254,17 +234,18 @@ int balance_partitions(struct array *elements, int nv, struct comm *lc,
     array_free(&ielems);
   }
 
-  comm_allreduce(gc, gs_int, gs_min, &balanced, 1, &buf);
+  comm_allreduce(gc, gs_int, gs_max, &balanced, 1, &buf);
   if (balanced == 1) {
     crystal_init(&cr, gc);
     sarray_transfer(struct rsb_element, elements, proc, 0, &cr);
     crystal_free(&cr);
 
-    /* Do a load balanced sort in each partition */
+    // Do a load balanced sort in each partition
     parallel_sort(struct rsb_element, elements, fiedler, gs_double, 0, 1, lc,
                   bfr);
   } else {
-    /* Forget repair, just do a load balanced partition */
+    // Forget repair, just do a load balanced partition
+    // TODO: Need to change how parallel_sort load balance
     parallel_sort(struct rsb_element, elements, fiedler, gs_double, 0, 1, gc,
                   bfr);
   }
@@ -273,9 +254,8 @@ int balance_partitions(struct array *elements, int nv, struct comm *lc,
   sint ncomp = get_components(NULL, elements->ptr, lc, bfr, nelt, nv);
   metric_acc(COMPONENTS, ncomp);
 
-  free(input);
-  gs_free(gsh);
   free(ids);
+  gs_free(gsh);
 }
 
 int repair_partitions(struct array *elements, int nv, struct comm *tc,
