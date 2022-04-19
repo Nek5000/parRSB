@@ -6,17 +6,15 @@ struct dof {
   uint d;
 };
 
-int vtx_dist(uint nelt, int nv, const slong *vtx, struct comm *c,
-             struct crystal *cr, buffer *bfr) {
+int vtx_dist(uint nelt, int nv, const slong *vtx, struct crystal *cr,
+             buffer *bfr) {
   uint ndofs = nelt * nv;
-  int active = 0;
-  if (ndofs > 0)
-    active = 1;
-
+  int active = ndofs > 0 ? 1 : 0;
   struct array dofs;
   array_init(struct dof, &dofs, ndofs);
 
-  struct dof t = {0, 0};
+  struct comm *c = &cr->comm;
+  struct dof t = {.v = 0, .d = 0};
   for (uint i = 0; i < nelt; i++) {
     for (uint j = 0; j < nv; j++) {
       t.v = vtx[i * nv + j], t.d = t.v % c->np;
@@ -56,49 +54,49 @@ int vtx_dist(uint nelt, int nv, const slong *vtx, struct comm *c,
   return 0;
 }
 
-struct ev {
+struct ev_t {
   ulong v;
   uint d, p;
 };
 
-struct proc {
+struct p_t {
   uint p;
 };
 
-static int elm_procs_aux(uint *p, const slong *vtx, int nv,
-                         const struct array *pdst, struct array *procs,
-                         buffer *bfr) {
-  procs->n = 0;
+static int elm_procs(uint *p, const slong *vtx, int nv, const struct array *v2p,
+                     struct array *ps, buffer *bfr) {
+  ps->n = 0;
   uint i, j;
   for (i = 0; i < nv; i++) {
-    struct ev *ptr = (struct ev *)pdst->ptr;
-    for (j = 0; j < pdst->n && ptr[j].v < vtx[i]; j++)
+    struct ev_t *ptr = (struct ev_t *)v2p->ptr;
+    for (j = 0; j < v2p->n && ptr[j].v < vtx[i]; j++)
       ;
-    for (; j < pdst->n && ptr[j].v == vtx[i]; j++)
-      array_cat(struct proc, procs, &ptr[j].p, 1);
+    for (; j < v2p->n && ptr[j].v == vtx[i]; j++)
+      array_cat(struct p_t, ps, &ptr[j].p, 1);
   }
 
-  sarray_sort(struct proc, procs->ptr, procs->n, p, 0, bfr);
+  assert(ps->n > 0);
+  sarray_sort(struct p_t, ps->ptr, ps->n, p, 0, bfr);
 
-  struct proc *ptr = (struct proc *)procs->ptr;
-  assert(procs->n > 0);
-  *p = ptr[procs->n - 1].p, j = 1;
-  for (i = 1; i < procs->n; i++)
+  struct p_t *ptr = (struct p_t *)ps->ptr;
+  *p = ptr[ps->n - 1].p, j = 1;
+  for (i = 1; i < ps->n; i++)
     if (ptr[i - 1].p != ptr[i].p)
       j++;
 
   return j;
 }
 
-static int elm_procs(struct array *pdst, uint n, int nv, const slong *vtx,
-                     const struct comm *c, struct crystal *cr, buffer *bfr) {
+static int vtx_procs(struct array *v2p, uint n, int nv, const slong *vtx,
+                     struct crystal *cr, buffer *bfr) {
   uint ndofs = n * nv;
-  int active = ndofs > 0;
+  int active = ndofs > 0 ? 1 : 0;
 
   struct array dofs;
   array_init(struct dof, &dofs, ndofs);
 
-  struct dof t = {0, 0};
+  struct comm *c = &cr->comm;
+  struct dof t = {.v = 0, .d = 0};
   for (uint i = 0; i < n; i++) {
     for (uint j = 0; j < nv; j++) {
       t.v = vtx[i * nv + j], t.d = t.v % c->np;
@@ -132,10 +130,10 @@ static int elm_procs(struct array *pdst, uint n, int nv, const slong *vtx,
       for (e = s + 1; e < uniq.n && p[s].v == p[e].v; e++)
         ;
       for (uint i = s; i < e; i++) {
-        struct ev ev = {p[i].v, p[i].d, 0};
+        struct ev_t ev = {.v = p[i].v, .d = p[i].d, .p = 0};
         for (uint j = s; j < e; j++) {
           ev.p = p[j].d;
-          array_cat(struct ev, pdst, &ev, 1);
+          array_cat(struct ev_t, v2p, &ev, 1);
         }
       }
       s = e;
@@ -143,24 +141,25 @@ static int elm_procs(struct array *pdst, uint n, int nv, const slong *vtx,
   }
   array_free(&uniq);
 
-  sarray_transfer(struct ev, pdst, d, 0, cr);
-  sarray_sort_2(struct ev, pdst->ptr, pdst->n, v, 1, p, 0, bfr);
+  sarray_transfer(struct ev_t, v2p, d, 0, cr);
+  sarray_sort_2(struct ev_t, v2p->ptr, v2p->n, v, 1, p, 0, bfr);
 }
 
-int elm_dist(uint n, int nv, const slong *vtx, const struct comm *c,
-             struct crystal *cr, buffer *bfr) {
-  struct array pdst, procs;
-  array_init(struct ev, &pdst, 100);
-  array_init(struct proc, &procs, 100);
+int elm_dist(uint n, int nv, const slong *vtx, struct crystal *cr,
+             buffer *bfr) {
+  struct array v2p, ps;
+  array_init(struct ev_t, &v2p, 100);
+  array_init(struct p_t, &ps, 100);
 
-  elm_procs(&pdst, n, nv, vtx, c, cr, bfr);
+  vtx_procs(&v2p, n, nv, vtx, cr, bfr);
 
   slong count[100] = {0};
   uint owner;
   for (uint i = 0; i < n; i++)
-    count[elm_procs_aux(&owner, &vtx[i * nv], nv, &pdst, &procs, bfr)]++;
+    count[elm_procs(&owner, &vtx[i * nv], nv, &v2p, &ps, bfr)]++;
 
   slong buf[100];
+  struct comm *c = &cr->comm;
   comm_allreduce(c, gs_long, gs_add, count, 100, buf);
 
   if (c->id == 0) {
@@ -170,21 +169,336 @@ int elm_dist(uint n, int nv, const slong *vtx, const struct comm *c,
     fflush(stdout);
   }
 
-  array_free(&procs);
-  array_free(&pdst);
+  array_free(&ps);
+  array_free(&v2p);
 
   return 0;
 }
 
 //=============================================================================
-// ILU
+// ILU levels
 //
-static int local_row(const ulong *rows, const ulong row, const uint n) {
+struct key_t {
+  ulong e;
+  uint p;
+};
+
+struct e2n_t {
+  ulong e, n;
+};
+
+static int find_unique_nbrs(struct array *e2nm, uint n, int nv,
+                            const ulong *ids, const slong *vtx,
+                            struct crystal *cr, buffer *bfr) {
+  struct array nbrs;
+  find_nbrs(&nbrs, ids, vtx, n, nv, cr, bfr);
+
+  array_init(struct e2n_t, e2nm, n * 10);
+  if (nbrs.n > 0) {
+    sarray_sort_2(struct nbr, nbrs.ptr, nbrs.n, r, 1, c, 1, bfr);
+    struct nbr *pn = (struct nbr *)nbrs.ptr;
+
+    struct e2n_t en;
+    uint i, j;
+    for (i = 1, j = 0; i < nbrs.n; i++) {
+      if ((pn[i].r != pn[j].r) || (pn[i].c != pn[j].c)) {
+        en.e = pn[j].r, en.n = pn[j].c;
+        array_cat(struct e2n_t, e2nm, &en, 1);
+        j = i;
+      }
+    }
+    en.e = pn[j].r, en.n = pn[j].c;
+    array_cat(struct e2n_t, e2nm, &en, 1);
+    array_free(&nbrs);
+
+    sarray_sort_2(struct e2n_t, e2nm->ptr, e2nm->n, e, 1, n, 1, bfr);
+  }
+
+  return 0;
+}
+
+static int local_dof(const ulong *rows, const ulong row, const uint n) {
   for (uint i = 0; i < n; i++)
     if (rows[i] == row)
       return i;
   return n;
 }
+
+struct request_t {
+  ulong r;
+  uint p, o;
+};
+
+// Fill dofs array with unique dofs found in this processr
+static int update_keys(struct array *keys, struct array *nbrs, const uint ln,
+                       const ulong *lids, struct crystal *cr, buffer *bfr) {
+  uint i, j;
+  struct array temp, rqst;
+  array_init(struct request_t, &temp, nbrs->n);
+  array_init(struct request_t, &rqst, nbrs->n);
+
+  struct comm *c = &cr->comm;
+  struct e2n_t *pn = (struct e2n_t *)nbrs->ptr;
+  struct request_t t;
+  for (i = 0; i < nbrs->n; i++) {
+    t.r = pn[i].n, t.p = t.r % c->np;
+    t.o = (local_dof(lids, t.r, ln) < ln);
+    array_cat(struct request_t, &temp, &t, 1);
+  }
+
+  struct request_t *pt = (struct request_t *)temp.ptr;
+  if (temp.n > 0) {
+    sarray_sort(struct request_t, temp.ptr, temp.n, r, 1, bfr);
+    for (i = 1, j = 0; i < temp.n; i++) {
+      if (pt[i].r != pt[j].r) {
+        array_cat(struct request_t, &rqst, &pt[j], 1);
+        j = i;
+      }
+    }
+    array_cat(struct request_t, &rqst, &pt[j], 1);
+  }
+
+  sarray_transfer(struct request_t, &rqst, p, 1, cr);
+  sarray_sort_2(struct request_t, rqst.ptr, rqst.n, r, 1, o, 0, bfr);
+
+  struct request_t *pr = (struct request_t *)rqst.ptr;
+  if (rqst.n > 0) {
+    for (i = 1, j = 0; i < rqst.n; i++) {
+      if (pr[i].r != pr[j].r) {
+        // owner for dof j, j + 1, ... i - 1 is pr[i - 1].p
+        assert(pr[i - 1].o == 1);
+        for (; j < i; j++)
+          pr[j].o = pr[i - 1].p;
+        // j = i at the end
+      }
+    }
+    assert(pr[i - 1].o == 1);
+    for (; j < i; j++)
+      pr[j].o = pr[i - 1].p;
+  }
+
+  sarray_transfer(struct request_t, &rqst, o, 0, cr);
+  sarray_sort_2(struct request_t, rqst.ptr, rqst.n, r, 1, p, 0, bfr);
+
+  // All the requests are forwarded correctly. Send the data back
+  // to the requesting processors. Note that the requests are unique.
+  struct key_t *pk = (struct key_t *)keys->ptr;
+  pr = (struct request_t *)rqst.ptr;
+  temp.n = 0;
+  for (i = j = 0; i < rqst.n; i++) {
+    while (pk[j].e < pr[i].r)
+      j++;
+    // Sanity check
+    assert(pk[j].e == pr[i].r);
+    t.o = pr[i].p;
+    for (uint k = j; k < keys->n && pk[k].e == pk[j].e; k++) {
+      t.r = pk[k].e, t.p = pk[k].p;
+      array_cat(struct request_t, &temp, &t, 1);
+    }
+  }
+  array_free(&rqst);
+
+  sarray_transfer(struct request_t, &temp, o, 0, cr);
+  sarray_sort_2(struct request_t, temp.ptr, temp.n, r, 1, p, 0, bfr);
+
+  // Update the keys array. Update here is a complete rewrite.
+  struct array keyt;
+  array_init(struct key_t, &keyt, temp.n);
+
+  struct key_t s;
+  pt = (struct request_t *)temp.ptr;
+  for (i = 0; i < ln; i++) {
+    ulong e = lids[i];
+    // Find `e` in the nbrs array
+    for (j = 0; j < nbrs->n && pn[j].e < e; j++)
+      ;
+    assert(j < nbrs->n && pn[j].e == e);
+    // Now go through all the neighbors and update the keys
+    for (; j < nbrs->n && pn[j].e == e; j++) {
+      ulong n = pn[j].n;
+      // find the key of `n` in temp
+      uint k = 0;
+      for (; k < temp.n && pt[k].r < n; k++)
+        ;
+      assert(k < temp.n && pt[k].r == n);
+      for (; k < temp.n && pt[k].r == n; k++) {
+        s.e = e, s.p = pt[k].p;
+        array_cat(struct key_t, &keyt, &s, 1);
+      }
+    }
+  }
+  array_free(&temp);
+
+  keys->n = 0;
+  if (keyt.n > 0) {
+    sarray_sort_2(struct key_t, keyt.ptr, keyt.n, e, 1, p, 0, bfr);
+    pk = (struct key_t *)keyt.ptr;
+    for (i = 1, j = 0; i < keyt.n; i++) {
+      if ((pk[i].e != pk[j].e) || (pk[i].p != pk[j].p)) {
+        array_cat(struct key_t, keys, &pk[j], 1);
+        j = i;
+      }
+    }
+    array_cat(struct key_t, keys, &pk[j], 1);
+  }
+
+  array_free(&keyt);
+
+  return 0;
+}
+
+// This routine will update `lvl_n`, `lvl_off` and `lvl_ids` with the DOF
+// belongig to current level. In the process, it will remove the DOFs and their
+// connectivity from ids, and vtx arrays. `n` will be adjusted to reflect
+// changes.
+static int find_level_01_aux(int *lvl_n, uint *lvl_off, uint *lvl_owner,
+                             ulong *lvl_ids, uint *n, ulong *ids, slong *vtx,
+                             int nv, struct array *keys, struct comm *c,
+                             int verbose) {
+  // Find the min key size locally.
+  uint i, j, k;
+  sint min = INT_MAX;
+  struct key_t *pk = (struct key_t *)keys->ptr;
+  if (keys->n > 0) {
+    for (i = 1, j = 0; i < keys->n; i++) {
+      if (pk[i].e != pk[j].e) {
+        // Different element, update min key size if required
+        min = min > i - j ? i - j : min;
+        j = i;
+      }
+    }
+  }
+
+  sint buf[2];
+  comm_allreduce(c, gs_int, gs_min, &min, 1, buf);
+  if (min == INT_MAX)
+    return 0;
+
+  int lvl = *lvl_n;
+  uint off = lvl_off[lvl];
+  if (keys->n > 0) {
+    for (i = 1, j = 0; i < keys->n; i++) {
+      if (pk[i].e != pk[j].e) {
+        if (i - j == min)
+          lvl_ids[off] = pk[j].e, lvl_owner[off] = pk[i - 1].p, off++;
+        j = i;
+      }
+    }
+    if (i - j == min)
+      lvl_ids[off] = pk[j].e, lvl_owner[off] = pk[i - 1].p, off++;
+  }
+
+  assert(lvl < 50);
+  lvl++, lvl_off[lvl] = off;
+  if (verbose > 1) {
+    printf("id: %d |key| = %d lvl = %d size = %u\n", c->id, min, lvl,
+           lvl_off[lvl] - lvl_off[lvl - 1]);
+    fflush(stdout);
+  }
+
+  // Now we have to update ids and vtx. This can be done in place.
+  for (i = lvl_off[lvl - 1], j = 0, k = 0; i < lvl_off[lvl]; i++, j++) {
+    for (; j < *n && ids[j] < lvl_ids[i]; j++, k++) {
+      ids[k] = ids[j];
+      for (int v = 0; v < nv; v++)
+        vtx[k * nv + v] = vtx[j * nv + v];
+    }
+    assert(j < *n && ids[j] == lvl_ids[i]);
+  }
+  for (; j < *n; j++, k++) {
+    ids[k] = ids[j];
+    for (int v = 0; v < nv; v++)
+      vtx[k * nv + v] = vtx[j * nv + v];
+  }
+
+  *n -= lvl_off[lvl] - lvl_off[lvl - 1], *lvl_n = lvl;
+
+  return 0;
+}
+
+static int find_levels_01(uint *lvl_off, uint *lvl_owner, ulong *lvl_ids,
+                          const uint n_, const int nv, const ulong *ids_,
+                          const slong *vtx_, struct crystal *cr, int verbose,
+                          buffer *bfr) {
+  // Copy ids and vtx since we are going to modify them
+  uint n = n_;
+  ulong *ids = tcalloc(ulong, n);
+  slong *vtx = tcalloc(slong, n * nv);
+  for (uint i = 0, j = 0; i < n; i++) {
+    ids[i] = ids_[i];
+    for (int v = 0; v < nv; v++, j++)
+      vtx[j] = vtx_[j];
+  }
+
+  struct comm *c = &cr->comm;
+
+  // Initialize keys: set key of each dof to the current MPI rank
+  // keys array should has unique entries and should be sorted first
+  // by .e and then by .p.
+  struct array keys;
+  array_init(struct key_t, &keys, n);
+  struct key_t e2p = {.e = 0, .p = c->id};
+  for (uint i = 0; i < n; i++) {
+    e2p.e = ids[i];
+    array_cat(struct key_t, &keys, &e2p, 1);
+  }
+  sarray_sort_2(struct key_t, keys.ptr, keys.n, e, 1, p, 0, bfr);
+  if (verbose > 1) {
+    printf("id = %d nkeys = %d\n", c->id, keys.n);
+    fflush(stdout);
+  }
+
+  slong ng = n, buf[2];
+  comm_allreduce(c, gs_long, gs_add, &ng, 1, buf);
+
+  int nlvls = 0;
+  struct array nbrs;
+  while (ng > 0) {
+    // Find unique neighbors of a DOF. DOF is a neighbor of itself.
+    find_unique_nbrs(&nbrs, n, nv, ids, vtx, cr, bfr);
+
+    // Send and receive key to/from neighbors. We forward all the requests
+    // for the key of a DOF to the processor that owns the DOF and then that
+    // processor takes care of the request. To do that, we first find all the
+    // unique requests.
+    update_keys(&keys, &nbrs, n, ids, cr, bfr);
+
+    // Find the min key size
+    // Add all the dofs with key size equal to min key size to current level
+    // Update ids and vtx by removing the dofs with min key size
+    find_level_01_aux(&nlvls, lvl_off, lvl_owner, lvl_ids, &n, ids, vtx, nv,
+                      &keys, c, verbose);
+
+    ng = n;
+    comm_allreduce(c, gs_long, gs_add, &ng, 1, buf);
+    if (verbose > 1) {
+      if (c->id == 0)
+        printf("lvl = %d ng = %lld\n", nlvls, ng);
+      fflush(stdout);
+    }
+    array_free(&nbrs);
+  }
+
+  free(ids), free(vtx);
+
+  return nlvls;
+}
+
+//=============================================================================
+// ILU(0) and ILUt
+//
+
+struct ilu {
+  int nlvls, type;
+  uint *lvl_off;
+  struct par_mat A;
+  struct crystal cr;
+};
+
+struct owner {
+  ulong ri;
+  uint rp, p;
+};
 
 static int copy_row(struct array *arr, const uint i, const uint p,
                     struct par_mat *A) {
@@ -200,37 +514,6 @@ static int copy_row(struct array *arr, const uint i, const uint p,
 
   return 0;
 }
-
-static int find_owner_level(uint *owner, int *lvl, const uint n, const int nv,
-                            const slong *vtx, const struct comm *c,
-                            struct crystal *cr, buffer *bfr) {
-  // (i, j, v)
-  struct array pdst, procs;
-  array_init(struct ev, &pdst, 100);
-  array_init(struct proc, &procs, 100);
-
-  elm_procs(&pdst, n, nv, vtx, c, cr, bfr);
-
-  for (uint i = 0; i < n; i++)
-    lvl[i] = elm_procs_aux(&owner[i], &vtx[i * nv], nv, &pdst, &procs, bfr);
-
-  array_free(&procs);
-  array_free(&pdst);
-
-  return 0;
-}
-
-struct ilu {
-  int nlvls, type;
-  uint *lvl_off;
-  struct par_mat A;
-  struct crystal cr;
-};
-
-struct owner {
-  ulong ri;
-  uint rp, p;
-};
 
 static int ilu0_aux_rows(struct par_mat *ext, int lvl, struct ilu *ilu,
                          buffer *bfr) {
@@ -298,7 +581,7 @@ static int ilu0_aux_rows(struct par_mat *ext, int lvl, struct ilu *ilu,
 
   for (i = 0; i < requests.n; i = j) {
     ulong ri = ptr[i].ri;
-    uint ro = local_row(rows, ri, rn);
+    uint ro = local_dof(rows, ri, rn);
     assert(ro < A->rn);
     for (j = i; j < requests.n && ptr[j].ri == ri; j++)
       if (ptr[j].p != c->id) // No need to send to owner
@@ -460,22 +743,35 @@ struct elm {
 };
 
 struct ilu *ilu_setup(uint n, int nv, const slong *vtx, const struct comm *c,
-                      int type, buffer *bfr) {
-  assert(nv <= 8);
-
+                      int type, int verbose, buffer *bfr) {
   struct ilu *ilu = tcalloc(struct ilu, 1);
   crystal_init(&ilu->cr, c);
 
-  // Find owner and level for an element
-  uint *owner = tcalloc(uint, n);
-  int *level = tcalloc(int, n);
-  find_owner_level(owner, level, n, nv, vtx, c, &ilu->cr, bfr);
-
-  // Send the elements to owner: First do a scan to come up with the numbering
-  // implied by the input and then send elements to their owner.
+  // Establish a numbering based on input
   slong out[2][1], buf[2][1], in = n;
   comm_scan(out, c, gs_long, gs_add, &in, 1, buf);
 
+  ulong *eid = tcalloc(ulong, n);
+  for (uint i = 0; i < n; i++)
+    eid[i] = out[0][0] + i + 1;
+
+  uint *lvl_off = tcalloc(uint, 100);
+  uint *lvl_owner = tcalloc(uint, n);
+  ulong *lvl_ids = tcalloc(ulong, n);
+  int nlvls = find_levels_01(lvl_off, lvl_owner, lvl_ids, n, nv, eid, vtx,
+                             &ilu->cr, 1, bfr);
+
+  if (verbose > 0) {
+    for (int l = 0; l < nlvls; l++) {
+      for (uint i = lvl_off[l]; i < lvl_off[l + 1]; i++)
+        printf("id = %d e = %llu lvl = %d owner = %u\n", c->id, lvl_ids[i],
+               l + 1, lvl_owner[i]);
+      fflush(stdout);
+    }
+  }
+
+#if 0
+  // Send the elements in each level to the owner
   struct array elms;
   array_init(struct elm, &elms, n);
 
@@ -483,7 +779,7 @@ struct ilu *ilu_setup(uint n, int nv, const slong *vtx, const struct comm *c,
   for (uint i = 0; i < n; i++) {
     for (int j = 0; j < nv; j++)
       elm.vtx[j] = vtx[i * nv + j];
-    elm.e = out[0][0] + i + 1;
+    elm.e = eid[i];
     elm.p = owner[i];
     elm.lvl = level[i];
     array_cat(struct elm, &elms, &elm, 1);
@@ -505,7 +801,7 @@ struct ilu *ilu_setup(uint n, int nv, const slong *vtx, const struct comm *c,
   ilu->nlvls = nlvls;
   ilu->lvl_off = (uint *)tcalloc(uint, ilu->nlvls + 1);
 
-  ulong *eid = tcalloc(ulong, elms.n);
+  eid = trealloc(ulong, eid, elms.n);
   uint s = 0, e = 0;
   ilu->lvl_off[0] = s;
   for (int l = 1; l <= ilu->nlvls; l++) {
@@ -530,6 +826,14 @@ struct ilu *ilu_setup(uint n, int nv, const slong *vtx, const struct comm *c,
     ng += out[1][0];
   }
 
+  if (verbose > 0) {
+    for (int l = 0; l < ilu->nlvls; l++) {
+      printf("id = %d, lvl = %d s = %u, e = %u\n", c->id, l, ilu->lvl_off[l],
+             ilu->lvl_off[l + 1]);
+      fflush(stdout);
+    }
+  }
+
   slong *vrt = tcalloc(slong, elms.n * nv);
   for (uint i = 0; i < elms.n; i++) {
     for (int j = 0; j < nv; j++) {
@@ -541,13 +845,9 @@ struct ilu *ilu_setup(uint n, int nv, const slong *vtx, const struct comm *c,
 
   // Find and compress neighbors in order to form the Laplacian
   struct array nbrs, eij;
-  array_init(struct nbr, &nbrs, n);
-  array_init(struct mat_ij, &eij, n);
-
-  find_nbrs(&nbrs, eid, vrt, elms.n, nv, c, &ilu->cr, bfr);
+  find_nbrs(&nbrs, eid, vrt, elms.n, nv, &ilu->cr, bfr);
+  free(eid), free(vrt);
   compress_nbrs(&eij, &nbrs, bfr);
-  free(eid);
-  free(vrt);
   array_free(&nbrs);
 
   // Setup the parallel CSR matrix
@@ -563,6 +863,7 @@ struct ilu *ilu_setup(uint n, int nv, const slong *vtx, const struct comm *c,
     break;
   }
 
+#endif
   return ilu;
 }
 

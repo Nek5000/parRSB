@@ -2,6 +2,7 @@
 #include <time.h>
 
 #include "coarse.h"
+#include "ilu.h"
 #include <genmap-impl.h>
 #include <sort.h>
 
@@ -16,8 +17,8 @@ extern int balance_partitions(struct array *elements, int nv, struct comm *lc,
                               struct comm *gc, int bin, buffer *bfr);
 extern int fiedler(struct rsb_element *elems, uint lelt, int nv, int max_iter,
                    int algo, struct comm *gsc, buffer *buf);
-extern int vtx_dist(uint nelt, int nv, const slong *vtx, struct comm *c,
-                    struct crystal *cr, buffer *bfr);
+extern int vtx_dist(uint nelt, int nv, const slong *vtx, struct crystal *cr,
+                    buffer *bfr);
 
 struct gid {
   ulong gid;
@@ -89,8 +90,8 @@ static void get_key_sizes(struct rsb_element *elems, uint nelt, int nv,
 
   struct crystal cr;
   crystal_init(&cr, c);
-  vtx_dist(nelt, nv, vtx, c, &cr, bfr);
-  elm_dist(nelt, nv, vtx, c, &cr, bfr);
+  vtx_dist(nelt, nv, vtx, &cr, bfr);
+  elm_dist(nelt, nv, vtx, &cr, bfr);
   crystal_free(&cr);
 
   free(vtx);
@@ -106,7 +107,7 @@ static void ilu_test(struct rsb_element *elems, uint nelt, int nv,
     for (j = 0; j < nv; j++)
       ids[i * nv + j] = elems[i].vertices[j];
 
-  struct ilu *ilu = ilu_setup(nelt, nv, ids, cin, 0, bfr);
+  struct ilu *ilu = ilu_setup(nelt, nv, ids, cin, 0, 1, bfr);
   ilu_free(ilu);
 }
 

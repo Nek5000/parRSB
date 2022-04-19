@@ -16,7 +16,7 @@
 // and the array is modified in place. Also, the diagonal entries are modified
 // to ensure all the
 int compress_nbrs(struct array *eij, struct array *nbr, buffer *bfr) {
-  eij->n = 0;
+  array_init(struct mat_ij, eij, nbr->n);
   if (nbr->n == 0)
     return 1;
 
@@ -161,11 +161,11 @@ int mat_free(struct mat *mat) {
 // Find neighbors in the graph
 //
 void find_nbrs(struct array *arr, const ulong *eid, const slong *vtx,
-               const uint nelt, const int nv, const struct comm *c,
-               struct crystal *cr, buffer *buf) {
+               const uint nelt, const int nv, struct crystal *cr, buffer *buf) {
   struct array vertices;
   array_init(struct nbr, &vertices, nelt * nv);
 
+  struct comm *c = &cr->comm;
   struct nbr v;
   uint i, j;
   for (i = 0; i < nelt; i++) {
@@ -178,21 +178,20 @@ void find_nbrs(struct array *arr, const ulong *eid, const slong *vtx,
   }
 
   sarray_transfer(struct nbr, &vertices, proc, 1, cr);
-
   sarray_sort(struct nbr, vertices.ptr, vertices.n, c, 1, buf);
-  struct nbr *vptr = (struct nbr *)vertices.ptr;
 
   // FIXME: Assumes quads or hexes
-  struct nbr t;
+  struct nbr *pv = (struct nbr *)vertices.ptr, t;
+  array_init(struct nbr, arr, vertices.n * 10);
   uint s = 0, e;
   while (s < vertices.n) {
     e = s + 1;
-    while (e < vertices.n && vptr[s].c == vptr[e].c)
+    while (e < vertices.n && pv[s].c == pv[e].c)
       e++;
     for (i = s; i < e; i++) {
-      t = vptr[i];
+      t = pv[i];
       for (j = s; j < e; j++) {
-        t.c = vptr[j].r;
+        t.c = pv[j].r;
         assert(t.r > 0 && t.c > 0);
         array_cat(struct nbr, arr, &t, 1);
       }
@@ -457,7 +456,7 @@ struct par_mat *par_csr_setup_con(const uint nelt, const ulong *eid,
   array_init(struct nbr, &nbrs, 100);
   array_init(struct mat_ij, &eij, 100);
 
-  find_nbrs(&nbrs, eid, vtx, nelt, nv, c, cr, bfr);
+  find_nbrs(&nbrs, eid, vtx, nelt, nv, cr, bfr);
   compress_nbrs(&eij, &nbrs, bfr);
   array_free(&nbrs);
 

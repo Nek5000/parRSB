@@ -101,19 +101,17 @@ struct coarse *coarse_setup(uint nelt, int nv, slong const *vtx, struct comm *c,
 
   struct coarse *crs = tcalloc(struct coarse, 1);
 
-  struct array nbrs, eij;
-  array_init(struct nbr, &nbrs, nelt);
-  array_init(struct mat_ij, &eij, nelt);
-
   ulong *eid = tcalloc(ulong, nelt);
   ulong ng = number_rows(eid, &crs->ls, &crs->lg, &crs->ln, &crs->is, &crs->ig,
                          &crs->in, &crs->idx, vtx, nelt, nv, c, bfr);
-  find_nbrs(&nbrs, eid, vtx, nelt, nv, c, &cr, bfr);
+  struct array nbrs;
+  find_nbrs(&nbrs, eid, vtx, nelt, nv, &cr, bfr);
   free(eid);
 
   // Convert `struct nbr` -> `struct mat_ij` and compress
   // entries which share the same (r, c) values. Set the
   // diagonal element to have zero row sum
+  struct array eij;
   compress_nbrs(&eij, &nbrs, bfr);
   array_free(&nbrs);
 

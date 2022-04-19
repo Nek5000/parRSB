@@ -46,6 +46,7 @@ static void find_nbrs_rsb(struct array *arr, const struct rsb_element *elems,
   // FIXME: Assumes quads or hexes
   struct nbr t;
   uint s = 0, e;
+  array_init(struct nbr, arr, vertices.n * 10);
   while (s < vn) {
     e = s + 1;
     while (e < vn && vptr[s].c == vptr[e].c)
@@ -67,13 +68,10 @@ static void find_nbrs_rsb(struct array *arr, const struct rsb_element *elems,
 static int par_csr_init(struct laplacian *l, const struct rsb_element *elems,
                         const uint nelt, const int nv, const struct comm *c,
                         buffer *bfr) {
-  struct array nbrs, eij;
-  array_init(struct nbr, &nbrs, nelt * nv);
-  array_init(struct mat_ij, &eij, nelt * nv);
-
   struct crystal cr;
   crystal_init(&cr, c);
 
+  struct array nbrs, eij;
   find_nbrs_rsb(&nbrs, elems, nelt, nv, c, &cr, bfr);
   compress_nbrs(&eij, &nbrs, bfr);
 
@@ -95,13 +93,10 @@ static int par_csr_init(struct laplacian *l, const struct rsb_element *elems,
 static int par_csc_init(struct laplacian *l, const struct rsb_element *elems,
                         const uint nelt, const int nv, const struct comm *c,
                         buffer *bfr) {
-  struct array nbrs, eij;
-  array_init(struct nbr, &nbrs, nelt * nv);
-  array_init(struct mat_ij, &eij, nelt * nv);
-
   struct crystal cr;
   crystal_init(&cr, c);
 
+  struct array nbrs, eij;
   find_nbrs_rsb(&nbrs, elems, nelt, nv, c, &cr, bfr);
   compress_nbrs(&eij, &nbrs, bfr);
 
