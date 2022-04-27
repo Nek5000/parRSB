@@ -1,10 +1,9 @@
+#include "coarse.h"
+#include "genmap-impl.h"
+#include "ilu.h"
+#include "sort.h"
 #include <limits.h>
 #include <time.h>
-
-#include "coarse.h"
-#include "ilu.h"
-#include <genmap-impl.h>
-#include <sort.h>
 
 extern void rcb_local(struct array *a, size_t unit_size, uint start, uint end,
                       int ndim, buffer *buf);
@@ -18,6 +17,8 @@ extern int balance_partitions(struct array *elements, int nv, struct comm *lc,
 extern int fiedler(struct rsb_element *elems, uint lelt, int nv, int max_iter,
                    int algo, struct comm *gsc, buffer *buf);
 extern int vtx_dist(uint nelt, int nv, const slong *vtx, struct crystal *cr,
+                    buffer *bfr);
+extern int elm_dist(uint n, int nv, const slong *vtx, struct crystal *cr,
                     buffer *bfr);
 
 struct gid {
