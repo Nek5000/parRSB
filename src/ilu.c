@@ -495,11 +495,6 @@ struct ilu {
   struct crystal cr;
 };
 
-struct owner {
-  ulong ri;
-  uint rp, p;
-};
-
 static int copy_row(struct array *arr, const uint i, const uint p,
                     struct par_mat *A) {
   uint *off = A->adj_off, *idx = A->adj_idx;
@@ -517,6 +512,11 @@ static int copy_row(struct array *arr, const uint i, const uint p,
 
 static int ilu0_aux_rows(struct par_mat *ext, int lvl, struct ilu *ilu,
                          buffer *bfr) {
+  struct owner {
+    ulong ri;
+    uint rp, p;
+  };
+
   assert(lvl > 1);
   struct par_mat *A = &ilu->A;
   assert(IS_CSR(A) && !IS_DIAG(A));
@@ -736,14 +736,105 @@ static void ilu0(struct ilu *ilu, const struct comm *c, buffer *bfr) {
   par_mat_print(&ilu->A);
 }
 
-struct elm {
-  slong vtx[8];
-  uint p, lvl;
-  ulong e;
-};
+// `vtx` array is in the order of sorted element ids
+static int ilu_setup_aux(struct ilu *ilu, int nlvls, uint *lvl_off,
+                         uint *lvl_owner, uint *lvl_ids, const uint n,
+                         const int nv, const slong *vtx, const int verbose,
+                         buffer *bfr) {
+  struct elm {
+    slong vtx[8];
+    uint p, lvl;
+    ulong e;
+  };
 
-struct ilu *ilu_setup(uint n, int nv, const slong *vtx, const struct comm *c,
-                      int type, int verbose, buffer *bfr) {
+  // Send the elements in each level to the owner
+  struct array elms;
+  array_init(struct elm, &elms, n);
+
+  struct elm elm;
+  for (int l = 0; l < nlvls; l++) {
+    for (uint i = lvl_off[l]; i < lvl_off[l + 1]; i++) {
+      elm.lvl = l + 1, elm.e = lvl_ids[i], elm.p = lvl_owner[i];
+      array_cat(struct elm, &elms, &elm, 1);
+    }
+  }
+  sarray_sort(struct elm, elms.ptr, elms.n, e, 1, bfr);
+
+  struct elm *pe = (struct elm *)elms.ptr;
+  if (elms.n > 0) {
+    // Sanity check
+    assert(elms.n == n);
+    for (uint i = 0; i < n; i++) {
+      for (int v = 0; v < nv; v++)
+        pe[i].vtx[v] = vtx[i * nv + v];
+    }
+  }
+
+  struct crystal *cr = &ilu->cr;
+  sarray_transfer(struct elm, &elms, p, 1, cr);
+  sarray_sort_2(struct elm, elms.ptr, elms.n, lvl, 0, e, 1, bfr);
+
+  // Setup the ILU structure: allocate ILU data structures.
+  ilu->nlvls = nlvls;
+  ilu->lvl_off = (uint *)tcalloc(uint, ilu->nlvls + 1);
+
+  ulong *ids = trealloc(ulong, ids, elms.n);
+  uint s = 0, e = 0;
+  ilu->lvl_off[0] = s;
+  pe = (struct elm *)elms.ptr;
+  for (int l = 1; l <= ilu->nlvls; l++) {
+    while (e < elms.n && pe[e].lvl == l)
+      e++;
+    ilu->lvl_off[l] = ilu->lvl_off[l - 1] + e - s;
+    s = e;
+  }
+
+  // Number rows now: All the elements in Level 0 are numbered before Level
+  // 1 and so on.
+  struct comm *c = &cr->comm;
+  ulong ng = 0;
+  for (int l = 0; l < ilu->nlvls; l++) {
+    e = ilu->lvl_off[l + 1], s = ilu->lvl_off[l];
+    slong out[2][1], buf[2][1], in = e - s;
+    comm_scan(out, c, gs_long, gs_add, &in, 1, buf);
+    ulong start = ng + out[0][0] + 1;
+    for (; s < e; s++)
+      ids[s] = start++;
+    ng += out[1][0];
+  }
+
+  if (verbose > 0) {
+    for (int l = 0; l < ilu->nlvls; l++) {
+      printf("id = %d, lvl = %d s = %u, e = %u\n", c->id, l, ilu->lvl_off[l],
+             ilu->lvl_off[l + 1]);
+      fflush(stdout);
+    }
+  }
+
+  slong *vrt = tcalloc(slong, elms.n * nv);
+  for (uint i = 0; i < elms.n; i++) {
+    for (int j = 0; j < nv; j++)
+      vrt[i * nv + j] = pe[i].vtx[j];
+  }
+  array_free(&elms);
+
+  // Find and compress neighbors in order to form the Laplacian
+  struct array nbrs, eij;
+  find_nbrs(&nbrs, ids, vrt, elms.n, nv, cr, bfr);
+  free(ids), free(vrt);
+  compress_nbrs(&eij, &nbrs, bfr);
+  array_free(&nbrs);
+
+  // Setup the parallel CSR matrix
+  par_csr_setup(&ilu->A, &eij, 0, bfr);
+  array_free(&eij);
+
+  return 0;
+}
+
+struct ilu *ilu_setup(const uint n, const int nv, const slong *vtx,
+                      const struct comm *c, const int type, const int verbose,
+                      buffer *bfr) {
   struct ilu *ilu = tcalloc(struct ilu, 1);
   crystal_init(&ilu->cr, c);
 
@@ -760,7 +851,6 @@ struct ilu *ilu_setup(uint n, int nv, const slong *vtx, const struct comm *c,
   ulong *lvl_ids = tcalloc(ulong, n);
   int nlvls = find_levels_01(lvl_off, lvl_owner, lvl_ids, n, nv, eid, vtx,
                              &ilu->cr, 1, bfr);
-
   if (verbose > 0) {
     for (int l = 0; l < nlvls; l++) {
       for (uint i = lvl_off[l]; i < lvl_off[l + 1]; i++)
@@ -770,91 +860,10 @@ struct ilu *ilu_setup(uint n, int nv, const slong *vtx, const struct comm *c,
     }
   }
 
-#if 0
-  // Send the elements in each level to the owner
-  struct array elms;
-  array_init(struct elm, &elms, n);
+  ilu_setup_aux(ilu, nlvls, lvl_off, lvl_owner, lvl_ids, n, nv, vtx, 1, bfr);
 
-  struct elm elm;
-  for (uint i = 0; i < n; i++) {
-    for (int j = 0; j < nv; j++)
-      elm.vtx[j] = vtx[i * nv + j];
-    elm.e = eid[i];
-    elm.p = owner[i];
-    elm.lvl = level[i];
-    array_cat(struct elm, &elms, &elm, 1);
-  }
-  free(owner);
-  free(level);
-
-  sarray_transfer(struct elm, &elms, p, 1, &ilu->cr);
-  sarray_sort_2(struct elm, elms.ptr, elms.n, lvl, 0, e, 1, bfr);
-
-  // Setup the ILU structure: figure out global number of levels, allocate
-  // data structures.
-  struct elm *ptr = (struct elm *)elms.ptr;
-  sint nlvls = elms.n > 0 ? ptr[elms.n - 1].lvl : 0;
-  comm_allreduce(c, gs_int, gs_max, &nlvls, 1, buf);
-  assert(nlvls > 0);
-
+  // Setup the ILU factors
   ilu->type = type;
-  ilu->nlvls = nlvls;
-  ilu->lvl_off = (uint *)tcalloc(uint, ilu->nlvls + 1);
-
-  eid = trealloc(ulong, eid, elms.n);
-  uint s = 0, e = 0;
-  ilu->lvl_off[0] = s;
-  for (int l = 1; l <= ilu->nlvls; l++) {
-    while (e < elms.n && ptr[e].lvl == l)
-      e++;
-    ilu->lvl_off[l] = ilu->lvl_off[l - 1] + e - s;
-    s = e;
-  }
-
-  // Number rows now: All the elements in Level 0 are numbered before Level
-  // 1 and so on.
-  ulong ng = 0;
-  for (int l = 0; l < ilu->nlvls; l++) {
-    e = ilu->lvl_off[l + 1], s = ilu->lvl_off[l];
-    in = e - s;
-    comm_scan(out, c, gs_long, gs_add, &in, 1, buf);
-    ulong start = ng + out[0][0] + 1;
-    for (; s < e; s++) {
-      eid[s] = start++;
-      assert(eid[s] > 0);
-    }
-    ng += out[1][0];
-  }
-
-  if (verbose > 0) {
-    for (int l = 0; l < ilu->nlvls; l++) {
-      printf("id = %d, lvl = %d s = %u, e = %u\n", c->id, l, ilu->lvl_off[l],
-             ilu->lvl_off[l + 1]);
-      fflush(stdout);
-    }
-  }
-
-  slong *vrt = tcalloc(slong, elms.n * nv);
-  for (uint i = 0; i < elms.n; i++) {
-    for (int j = 0; j < nv; j++) {
-      vrt[i * nv + j] = ptr[i].vtx[j];
-      assert(vrt[i * nv + j] > 0);
-    }
-  }
-  array_free(&elms);
-
-  // Find and compress neighbors in order to form the Laplacian
-  struct array nbrs, eij;
-  find_nbrs(&nbrs, eid, vrt, elms.n, nv, &ilu->cr, bfr);
-  free(eid), free(vrt);
-  compress_nbrs(&eij, &nbrs, bfr);
-  array_free(&nbrs);
-
-  // Setup the parallel CSR matrix
-  par_csr_setup(&ilu->A, &eij, 0, bfr);
-  array_free(&eij);
-
-  // Setup the ILU factorization
   switch (type) {
   case 0:
     ilu0(ilu, c, bfr);
@@ -863,7 +872,8 @@ struct ilu *ilu_setup(uint n, int nv, const slong *vtx, const struct comm *c,
     break;
   }
 
-#endif
+  free(lvl_off), free(lvl_owner), free(lvl_ids);
+
   return ilu;
 }
 
