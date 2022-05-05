@@ -485,9 +485,9 @@ static int find_levels_01(uint *lvl_off, uint *lvl_owner, ulong *lvl_ids,
 // Common functions for ILU(0) and ILUt
 //
 struct ilu {
-  int nlvls, type, iluk;
+  int nlvls, type, iter;
   uint *lvl_off;
-  scalar ilut_tol;
+  scalar tol;
   struct par_mat A;
   struct crystal cr;
 };
@@ -595,8 +595,6 @@ static int ilu_get_rows(struct par_mat *ext, int lvl, struct ilu *ilu,
 //
 static void ilu0_update_row(const ulong i, const ulong k, struct par_mat *A,
                             struct par_mat *E, int verbose) {
-  assert(IS_CSR(A) && !IS_DIAG(A));
-
   uint rn = A->rn, *off = A->adj_off, *idx = A->adj_idx, *koff, *kidx;
   scalar *val = A->adj_val, *kval;
   ulong *rows = A->rows, *cols = A->cols, *kcols;
@@ -728,6 +726,179 @@ static void ilu0(struct ilu *ilu, const struct comm *c, buffer *bfr) {
 }
 
 //=============================================================================
+// ILUt
+//
+static void ilut_update_row(struct array *mij, const uint io, const uint k,
+                            struct par_mat *A, struct par_mat *E, scalar tol,
+                            int verbose, buffer *bfr) {
+  uint rn = A->rn, *off = A->adj_off, *idx = A->adj_idx;
+  uint *koff = A->adj_off, *kidx = A->adj_idx;
+  ulong *cols = A->cols, *kcols = A->cols;
+  scalar *val = A->adj_val, *kval = A->adj_val;
+
+  const ulong K = cols[idx[k]];
+  const ulong I = A->rows[io];
+
+  // Find offsets of K in A
+  sint ko = -1;
+  uint j;
+  for (j = 0; j < rn; j++) {
+    if (A->rows[j] == K) {
+      ko = j;
+      break;
+    }
+  }
+
+  // Search in E if K is not found in A
+  if (ko == -1 && E != NULL) {
+    koff = E->adj_off, kidx = E->adj_idx;
+    kval = E->adj_val, kcols = E->cols;
+    for (j = 0; j < E->rn; j++) {
+      if (E->rows[j] == K) {
+        ko = j;
+        break;
+      }
+    }
+  }
+
+  // Oops, K is no where to be found
+  if (ko == -1) {
+    fprintf(stderr, "%s:%d ilut: Row not found ! k = %llu ko = %d\n", __FILE__,
+            __LINE__, k, ko);
+    exit(1);
+  }
+
+  // Calculate a_ik = a_ik / a_kk
+  scalar a_kk = 0;
+  for (j = koff[ko]; j < koff[ko + 1]; j++) {
+    if (kcols[kidx[j]] == K) {
+      a_kk = kval[j];
+      break;
+    }
+  }
+
+  if (fabs(a_kk) < 1e-10) {
+    fprintf(stderr, "%s:%d ilut: Diagonal is zero ! k = %llu\n", __FILE__,
+            __LINE__, k);
+    exit(1);
+  }
+
+  // cols[idx[k]] = K and val[k] = a_ik
+  scalar a_ik = val[k] / a_kk;
+  if (verbose) {
+    printf("a_kk = %lf a_ik = %lf a_ik = %lf\n", a_kk, val[j], a_ik);
+    fflush(stdout);
+  }
+  val[k] = a_ik;
+
+  // a_ik if now calculated, let's do the a_i* = a_i* - a_ik * a_k*
+  struct array row;
+  array_init(struct mat_ij, &row, 30);
+
+  // Add row I to row array
+  struct mat_ij t;
+  t.r = I;
+  for (j = k; j < off[io + 1]; j++) {
+    t.c = cols[idx[j]], t.v = val[j];
+    array_cat(struct mat_ij, &row, &t, 1);
+  }
+
+  // Now add row K to row array
+  for (j = koff[ko]; j < koff[ko + 1] && kcols[kidx[j]] <= K; j++)
+    ;
+  for (; j < koff[ko + 1]; j++) {
+    t.c = kcols[kidx[j]], t.v = -a_ik * kval[j];
+    array_cat(struct mat_ij, &row, &t, 1);
+  }
+
+  sarray_sort(struct mat_ij, row.ptr, row.n, c, 1, bfr);
+  if (row.n > 0) {
+    struct mat_ij *pr = (struct mat_ij *)row.ptr;
+    uint i = 1, j = 0, l = k + 1;
+    for (; i < row.n; i++) {
+      if (pr[i].c == pr[j].c)
+        pr[j].v += pr[i].v;
+      else {
+        // update row I
+        if (l < off[io + 1] && cols[idx[l]] == pr[j].c)
+          val[l] = pr[j].v, l++;
+        // array_cat to mij
+        if (fabs(pr[j].v) > tol || pr[j].r == pr[j].c)
+          array_cat(struct mat_ij, mij, &pr[j], 1);
+        j = i;
+      }
+    }
+
+    // residual
+    if (l < off[io + 1] && cols[idx[l]] == pr[j].c)
+      val[l] = pr[j].v, l++;
+    if (fabs(pr[j].v) > tol || pr[j].r == pr[j].c)
+      array_cat(struct mat_ij, mij, &pr[j], 1);
+  }
+
+  array_free(&row);
+}
+
+static void ilut_level(struct array *mij, int lvl, uint *lvl_off,
+                       struct par_mat *A, struct par_mat *E, scalar tol,
+                       int verbose, buffer *bfr) {
+  struct mat_ij t = {.r = 0, .c = 0, .idx = 0, .p = 0, .v = 0.0};
+
+  scalar *val = A->adj_val;
+  uint *off = A->adj_off, *idx = A->adj_idx, i, k, j;
+
+  // if lvl == 1, add the first row to mij
+  if (lvl == 1) {
+    i = lvl_off[0];
+    if (i < lvl_off[1]) {
+      t.r = A->rows[i];
+      for (j = off[i]; j < off[i + 1]; j++) {
+        if (fabs(val[j]) >= tol || t.r == A->cols[idx[j]]) {
+          t.c = A->cols[idx[j]], t.v = val[j];
+          array_cat(struct mat_ij, mij, &t, 1);
+        }
+      }
+    }
+  }
+
+  for (i = lvl_off[lvl - 1] + (lvl == 1); i < lvl_off[lvl]; i++) {
+    // FIXME: < or <= ? may be diagonal should be added to mij separately
+    for (k = off[i]; k < off[i + 1] && A->cols[idx[k]] <= A->rows[i]; k++)
+      ilut_update_row(mij, i, k, A, E, tol, verbose, bfr);
+  }
+}
+
+static void ilut(struct ilu *ilu, const struct comm *c, buffer *bfr) {
+  char *val = getenv("PARRSB_DUMP_ILU_PRE");
+  if (val != NULL && atoi(val) != 0)
+    par_mat_print(&ilu->A);
+
+  struct par_mat *A = &ilu->A;
+  struct array mij;
+  array_init(struct mat_ij, &mij, A->rn > 0 ? A->adj_off[A->rn] : 0);
+
+  for (int i = 0; i < ilu->iter; i++) {
+    mij.n = 0;
+    ilut_level(&mij, 1, ilu->lvl_off, A, NULL, ilu->tol, 0, bfr);
+    for (int l = 2; l <= ilu->nlvls; l++) {
+      struct par_mat E;
+      ilu_get_rows(&E, l, ilu, bfr);
+      ilut_level(&mij, l, ilu->lvl_off, A, &E, ilu->tol, 0, bfr);
+      par_mat_free(&E);
+    }
+    par_mat_free(&ilu->A);
+    par_csr_setup(&ilu->A, &mij, 0, bfr);
+    A = &ilu->A;
+  }
+
+  array_free(&mij);
+
+  val = getenv("PARRSB_DUMP_ILU_POST");
+  if (val != NULL && atoi(val) != 0)
+    par_mat_print(&ilu->A);
+}
+
+//=============================================================================
 // ILU API related functions
 //
 // `vtx` array is in the order of sorted element ids
@@ -838,8 +1009,8 @@ static int ilu_setup_aux(struct ilu *ilu, int nlvls, uint *lvl_off,
 }
 
 struct ilu *ilu_setup(const uint n, const int nv, const slong *vtx,
-                      const struct comm *c, const int type, const int verbose,
-                      buffer *bfr) {
+                      const int type, const double tol, const int iter,
+                      const struct comm *c, const int verbose, buffer *bfr) {
   struct ilu *ilu = tcalloc(struct ilu, 1);
   crystal_init(&ilu->cr, c);
 
@@ -879,10 +1050,13 @@ struct ilu *ilu_setup(const uint n, const int nv, const slong *vtx,
                 bfr);
 
   // Setup the ILU factors
-  ilu->type = type;
+  ilu->type = type, ilu->tol = tol, ilu->iter = iter;
   switch (type) {
   case 0:
     ilu0(ilu, c, bfr);
+    break;
+  case 1:
+    ilut(ilu, c, bfr);
     break;
   default:
     break;

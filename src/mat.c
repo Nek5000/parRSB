@@ -398,44 +398,6 @@ void par_mat_print(struct par_mat *A) {
   }
 }
 
-int par_csr_merge(struct par_mat *C, struct par_mat *A, struct par_mat *B,
-                  buffer *bfr) {
-  assert(IS_CSR(A) && IS_CSR(B));
-  assert(!IS_DIAG(A) && !IS_DIAG(B));
-
-  struct array cijs;
-  array_init(struct mat_ij, &cijs, (A->rn + B->rn) * 30);
-
-  struct mat_ij ij;
-
-  uint *off = A->adj_off, *idx = A->adj_idx, rn = A->rn;
-  ulong *rows = A->rows, *cols = A->cols;
-  scalar *val = A->adj_val;
-  for (uint i = 0; i < rn; i++) {
-    ij.r = rows[i];
-    for (uint j = off[i]; j < off[i + 1]; j++) {
-      ij.c = cols[idx[j]], ij.v = val[j];
-      array_cat(struct mat_ij, &cijs, &ij, 1);
-    }
-  }
-
-  off = B->adj_off, idx = B->adj_idx, rn = B->rn;
-  rows = B->rows, cols = B->cols;
-  val = B->adj_val;
-  for (uint i = 0; i < rn; i++) {
-    ij.r = rows[i];
-    for (uint j = off[i]; j < off[i + 1]; j++) {
-      ij.c = cols[idx[j]], ij.v = val[j];
-      array_cat(struct mat_ij, &cijs, &ij, 1);
-    }
-  }
-
-  par_csr_setup(C, &cijs, 0, bfr);
-
-  array_free(&cijs);
-  return 0;
-}
-
 int par_mat_free(struct par_mat *A) {
   FREE(A, rows);
   FREE(A, cols);

@@ -25,12 +25,10 @@ struct mat {
 };
 
 struct par_mat {
-  // CSC or CSR
-  int type;
+  int type; // CSC or CSR
   uint cn, rn, *adj_off, *adj_idx, *diag_idx;
   scalar *adj_val, *diag_val;
-  // Unique global column ids and row ids of the matrix
-  ulong *cols, *rows;
+  ulong *cols, *rows; // Unique global column and row ids
 };
 
 int IS_CSC(const struct par_mat *A);
@@ -56,8 +54,6 @@ int par_csc_setup(struct par_mat *mat, struct array *entries, int sd,
                   buffer *buf);
 int par_csr_setup(struct par_mat *mat, struct array *entries, int sd,
                   buffer *buf);
-int par_csr_merge(struct par_mat *C, struct par_mat *A, struct par_mat *B,
-                  buffer *bfr);
 struct par_mat *par_csr_setup_ext(struct array *entries, int sd, buffer *bfr);
 struct par_mat *par_csc_setup_ext(struct array *entries, int sd, buffer *bfr);
 // Create a par_mat from connectivity

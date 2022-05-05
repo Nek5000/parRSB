@@ -108,7 +108,7 @@ static void ilu_test(struct rsb_element *elems, uint nelt, int nv,
     for (j = 0; j < nv; j++)
       ids[i * nv + j] = elems[i].vertices[j];
 
-  struct ilu *ilu = ilu_setup(nelt, nv, ids, cin, 0, 1, bfr);
+  struct ilu *ilu = ilu_setup(nelt, nv, ids, 1, 0.1, 10, cin, 1, bfr);
   ilu_free(ilu);
 }
 
