@@ -22,6 +22,7 @@ jobs:
           sudo apt -y update
           sudo apt install -y mpich libmpich-dev python3-pytest
           sudo apt install -y libblas-dev liblapack-dev
+          sudo apt install -y octave
       - name: Build parRSB and clone tests
         shell: bash
         run: |
@@ -77,3 +78,21 @@ jobs:
 
           mpirun -np ${{ matrix.np }} --hostfile hostfile ${EXAMPLEDIR}/genmap \
             --mesh ${{ matrix.test }} --tol=${tol} --no-dump --test
+
+      - name: ilu0
+        shell: bash
+        run: |
+          export EXAMPLEDIR=`pwd`/build/examples
+          export PARRSB_DUMP_ILU_PRE=1
+          export PARRSB_DUMP_ILU_POST=1
+
+          cp examples/ilu0.m parRSB-tests/${{ matrix.test }}
+          cd parRSB-tests/${{ matrix.test }}
+          tol=(`cat test.txt | grep tol`); tol=${tol[2]}
+
+          echo "localhost:4" > hostfile
+
+          mpirun -np ${{ matrix.np }} --hostfile hostfile ${EXAMPLEDIR}/ilu \
+            --mesh ${{ matrix.test }} --tol=${tol} --no-dump
+
+          octave-cli ilu0.m

@@ -62,6 +62,8 @@ struct par_mat *par_csr_setup_con(const uint nelt, const ulong *eid,
                                   struct comm *c, struct crystal *cr,
                                   buffer *bfr);
 void par_mat_print(struct par_mat *A);
+void par_mat_dump(const char *name, struct par_mat *A, struct crystal *cr,
+                  buffer *bfr);
 int par_mat_free(struct par_mat *A);
 
 // Mat vec routines

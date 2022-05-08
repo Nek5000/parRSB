@@ -6,7 +6,7 @@
 struct ilu;
 struct ilu *ilu_setup(const uint n, const int nv, const slong *vtx,
                       const int type, const double tol, const int iter,
-                      const struct comm *c, const int verbose, buffer *bfr);
+                      const struct comm *c, const int verbose);
 void ilu_free(struct ilu *ilu);
 
 #endif

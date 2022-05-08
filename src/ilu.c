@@ -704,10 +704,6 @@ static void ilu0_level(int lvl, struct ilu *ilu, struct par_mat *E, int verbose,
 }
 
 static void ilu0(struct ilu *ilu, const struct comm *c, buffer *bfr) {
-  char *val = getenv("PARRSB_DUMP_ILU_PRE");
-  if (val != NULL && atoi(val) != 0)
-    par_mat_print(&ilu->A);
-
   // Do ILU(0) in Level 1
   ilu0_level(1, ilu, NULL, 0, bfr);
 
@@ -719,10 +715,6 @@ static void ilu0(struct ilu *ilu, const struct comm *c, buffer *bfr) {
     ilu0_level(l, ilu, &E, 0, bfr);
     par_mat_free(&E);
   }
-
-  val = getenv("PARRSB_DUMP_ILU_POST");
-  if (val != NULL && atoi(val) != 0)
-    par_mat_print(&ilu->A);
 }
 
 //=============================================================================
@@ -869,10 +861,6 @@ static void ilut_level(struct array *mij, int lvl, uint *lvl_off,
 }
 
 static void ilut(struct ilu *ilu, const struct comm *c, buffer *bfr) {
-  char *val = getenv("PARRSB_DUMP_ILU_PRE");
-  if (val != NULL && atoi(val) != 0)
-    par_mat_print(&ilu->A);
-
   struct par_mat *A = &ilu->A;
   struct array mij;
   array_init(struct mat_ij, &mij, A->rn > 0 ? A->adj_off[A->rn] : 0);
@@ -892,10 +880,6 @@ static void ilut(struct ilu *ilu, const struct comm *c, buffer *bfr) {
   }
 
   array_free(&mij);
-
-  val = getenv("PARRSB_DUMP_ILU_POST");
-  if (val != NULL && atoi(val) != 0)
-    par_mat_print(&ilu->A);
 }
 
 //=============================================================================
@@ -1010,7 +994,7 @@ static int ilu_setup_aux(struct ilu *ilu, int nlvls, uint *lvl_off,
 
 struct ilu *ilu_setup(const uint n, const int nv, const slong *vtx,
                       const int type, const double tol, const int iter,
-                      const struct comm *c, const int verbose, buffer *bfr) {
+                      const struct comm *c, const int verbose) {
   struct ilu *ilu = tcalloc(struct ilu, 1);
   crystal_init(&ilu->cr, c);
 
@@ -1032,11 +1016,14 @@ struct ilu *ilu_setup(const uint n, const int nv, const slong *vtx,
     }
   }
 
+  buffer bfr;
+  buffer_init(&bfr, 1024);
+
   uint *lvl_off = tcalloc(uint, 100);
   uint *lvl_owner = tcalloc(uint, n);
   ulong *lvl_ids = tcalloc(ulong, n);
   int nlvls = find_levels_01(lvl_off, lvl_owner, lvl_ids, n, nv, eid, vtx,
-                             &ilu->cr, 1, bfr);
+                             &ilu->cr, 1, &bfr);
   if (verbose > 1) {
     for (int l = 0; l < nlvls; l++) {
       for (uint i = lvl_off[l]; i < lvl_off[l + 1]; i++)
@@ -1047,33 +1034,43 @@ struct ilu *ilu_setup(const uint n, const int nv, const slong *vtx,
   }
 
   ilu_setup_aux(ilu, nlvls, lvl_off, lvl_owner, lvl_ids, n, nv, vtx, verbose,
-                bfr);
+                &bfr);
+
+  char *val = getenv("PARRSB_DUMP_ILU_PRE");
+  if (val != NULL && atoi(val) != 0)
+    par_mat_dump("pre.txt", &ilu->A, &ilu->cr, &bfr);
 
   // Setup the ILU factors
   ilu->type = type, ilu->tol = tol, ilu->iter = iter;
   switch (type) {
   case 0:
-    ilu0(ilu, c, bfr);
+    ilu0(ilu, c, &bfr);
     break;
   case 1:
-    ilut(ilu, c, bfr);
+    ilut(ilu, c, &bfr);
     break;
   default:
     break;
   }
 
+  val = getenv("PARRSB_DUMP_ILU_POST");
+  if (val != NULL && atoi(val) != 0)
+    par_mat_dump("post.txt", &ilu->A, &ilu->cr, &bfr);
+
   free(lvl_off), free(lvl_owner), free(lvl_ids);
+  buffer_free(&bfr);
 
   return ilu;
 }
 
 void ilu_free(struct ilu *ilu) {
-  if (ilu)
+  if (ilu) {
     crystal_free(&ilu->cr);
-  if (ilu->nlvls > 0) {
-    par_mat_free(&ilu->A);
-    if (ilu->lvl_off)
-      free(ilu->lvl_off);
+    if (ilu->nlvls > 0) {
+      par_mat_free(&ilu->A);
+      if (ilu->lvl_off)
+        free(ilu->lvl_off);
+    }
+    free(ilu), ilu = NULL;
   }
-  free(ilu), ilu = NULL;
 }

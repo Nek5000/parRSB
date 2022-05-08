@@ -99,7 +99,7 @@ static void get_key_sizes(struct rsb_element *elems, uint nelt, int nv,
 }
 
 static void ilu_test(struct rsb_element *elems, uint nelt, int nv,
-                     struct comm *cin, buffer *bfr) {
+                     struct comm *c) {
   uint npts = nelt * nv;
   slong *ids = (slong *)tcalloc(slong, npts);
 
@@ -108,7 +108,7 @@ static void ilu_test(struct rsb_element *elems, uint nelt, int nv,
     for (j = 0; j < nv; j++)
       ids[i * nv + j] = elems[i].vertices[j];
 
-  struct ilu *ilu = ilu_setup(nelt, nv, ids, 1, 0.1, 10, cin, 1, bfr);
+  struct ilu *ilu = ilu_setup(nelt, nv, ids, 1, 0.1, 10, c, 1);
   ilu_free(ilu);
 }
 
@@ -403,7 +403,7 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
   check_rsb_partition(gc, max_pass, max_iter);
   schur_test(elements->ptr, elements->n, nv, gc, bfr);
   // get_key_sizes(elements->ptr, elements->n, nv, gc, bfr);
-  // ilu_test(elements->ptr, elements->n, nv, gc, bfr);
+  // ilu_test(elements->ptr, elements->n, nv, gc);
 
   return 0;
 }

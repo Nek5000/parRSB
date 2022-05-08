@@ -398,6 +398,41 @@ void par_mat_print(struct par_mat *A) {
   }
 }
 
+void par_mat_dump(const char *name, struct par_mat *A, struct crystal *cr,
+                  buffer *bfr) {
+  assert(IS_CSR(A) && !IS_DIAG(A));
+
+  uint nnz = (A->rn > 0 ? A->adj_off[A->rn] : 0);
+
+  struct array mijs;
+  array_init(struct mat_ij, &mijs, nnz);
+
+  struct mat_ij t = {.r = 0, .c = 0, .idx = 0, .p = 0, .v = 0};
+  for (uint i = 0; i < A->rn; i++) {
+    t.r = A->rows[i];
+    for (uint j = A->adj_off[i]; j < A->adj_off[i + 1]; j++) {
+      t.c = A->cols[A->adj_idx[j]], t.v = A->adj_val[j];
+      array_cat(struct mat_ij, &mijs, &t, 1);
+    }
+  }
+
+  sarray_transfer(struct mat_ij, &mijs, p, 1, cr);
+  sarray_sort_2(struct mat_ij, mijs.ptr, mijs.n, r, 1, c, 1, bfr);
+
+  struct comm *c = &cr->comm;
+  if (c->id == 0) {
+    FILE *fp = fopen(name, "w+");
+    if (fp != NULL) {
+      struct mat_ij *pm = (struct mat_ij *)mijs.ptr;
+      for (uint i = 0; i < mijs.n; i++)
+        fprintf(fp, "%llu %llu %lf\n", pm[i].r, pm[i].c, pm[i].v);
+      fclose(fp);
+    }
+  }
+
+  array_free(&mijs);
+}
+
 int par_mat_free(struct par_mat *A) {
   FREE(A, rows);
   FREE(A, cols);
