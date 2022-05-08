@@ -1269,10 +1269,10 @@ int parrsb_find_conn(long long *vtx, double *coord, int nelt, int ndim,
                      MPI_Comm comm, int verbose) {
   struct comm c;
   comm_init(&c, comm);
-  int rank = c.id;
-  int size = c.np;
 
-  if (rank == 0) {
+  int rank = c.id, size = c.np;
+
+  if (rank == 0 && verbose) {
     printf("Running parCon ... (tol=%g)\n", tol);
     fflush(stdout);
   }
@@ -1283,11 +1283,9 @@ int parrsb_find_conn(long long *vtx, double *coord, int nelt, int ndim,
   Mesh mesh;
   mesh_init(&mesh, nelt, ndim);
 
-  slong out[2][1], buff[2][1];
-  slong in = nelt;
+  slong out[2][1], buff[2][1], in = nelt;
   comm_scan(out, &c, gs_long, gs_add, &in, 1, buff);
-  ulong start = out[0][0];
-  ulong nelgt = out[1][0];
+  ulong start = out[0][0], nelgt = out[1][0];
   mesh->nelgt = mesh->nelgv = nelgt;
 
   int nelt_ = nelgt / size;
@@ -1356,14 +1354,14 @@ int parrsb_find_conn(long long *vtx, double *coord, int nelt, int ndim,
   comm_allreduce(&c, gs_int, gs_max, &err, 1, &buf);
   check_error(rank, err, "matchPeriodicFaces");
 
-  /* Copy output */
+  // Copy output
   Point ptr = mesh->elements.ptr;
   for (i = 0; i < nelt; i++) {
     for (j = 0; j < nvertex; j++)
       vtx[i * nvertex + j] = ptr[i * nvertex + j].globalId + 1;
   }
 
-  /* Report time and finish */
+  // Report time and finish
   genmap_barrier(&c);
   tcon = comm_time() - tcon;
   if (rank == 0 && verbose > 0) {
