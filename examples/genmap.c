@@ -1,6 +1,6 @@
-/*
- * Generate partitions (.ma2) from Nek5000's mesh (.re2) file.
- */
+//=============================================================================
+// Generate partitions (.ma2) from Nek5000's mesh (.re2) file.
+//
 #include <parRSB.h>
 
 int main(int argc, char *argv[]) {
@@ -17,7 +17,7 @@ int main(int argc, char *argv[]) {
   MPI_Comm comm;
   MPI_Comm_split(MPI_COMM_WORLD, active, id, &comm);
 
-  /* Read the geometry from the .re2 file */
+  // Read the geometry from the .re2 file
   unsigned int nelt, nbcs;
   double *coord = NULL;
   long long *bcs = NULL;
@@ -77,11 +77,12 @@ int main(int argc, char *argv[]) {
 
   if (active == 1 && in->test && in->nactive > 1)
     err = nss[2] < nss[5];
+  parrsb_check_error(err, comm);
 
   // Free resources
   free(part), free(vl), free(coord), free(bcs), free(in);
   MPI_Comm_free(&comm);
   MPI_Finalize();
 
-  return err;
+  return 0;
 }
