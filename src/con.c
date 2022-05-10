@@ -218,26 +218,6 @@ static void tuple_sort_(void *ra, uint n, uint usize, uint offset) {
 #define tuple_sort(T, arr, n, index)                                           \
   tuple_sort_((void *)arr, n, sizeof(T), offsetof(T, index))
 
-void test_tuple_sort() {
-  struct vals {
-    double x, y, z;
-  };
-
-  int SIZE = 10;
-  struct vals *arrays = tcalloc(struct vals, SIZE);
-
-  int i;
-  for (i = 0; i < SIZE; i++)
-    arrays[i].x = arrays[i].y = arrays[i].z = 1.0 + SIZE - i;
-
-  tuple_sort(struct vals, arrays, SIZE, x);
-
-  for (i = 0; i < SIZE; i++)
-    printf("i = %d lf = %lf\n", i, arrays[i].x);
-
-  free(arrays);
-}
-
 static void initSegment(Mesh mesh, struct comm *c) {
   uint nPoints = mesh->elements.n;
   Point points = mesh->elements.ptr;
@@ -269,21 +249,20 @@ static int sortSegmentsLocal(Mesh mesh, int dim, buffer *bfr) {
     for (e = s + 1; e < nPoints && points[e].ifSegment == 0; e++)
       ;
 
-    switch (dim) {
-    case 0:
-      // sarray_sort(struct Point_private, &points[s], e - s, x[0], 3, bfr);
-      tuple_sort(struct Point_private, &points[s], e - s, x[0]);
-      break;
-    case 1:
-      // sarray_sort(struct Point_private, &points[s], e - s, x[1], 3, bfr);
-      tuple_sort(struct Point_private, &points[s], e - s, x[1]);
-      break;
-    case 2:
-      // sarray_sort(struct Point_private, &points[s], e - s, x[2], 3, bfr);
-      tuple_sort(struct Point_private, &points[s], e - s, x[2]);
-      break;
-    default:
-      break;
+    if (s < nPoints - 1 && e - s > 1) {
+      switch (dim) {
+      case 0:
+        tuple_sort(struct Point_private, &points[s], e - s, x[0]);
+        break;
+      case 1:
+        tuple_sort(struct Point_private, &points[s], e - s, x[1]);
+        break;
+      case 2:
+        tuple_sort(struct Point_private, &points[s], e - s, x[2]);
+        break;
+      default:
+        break;
+      }
     }
 
     sint i, sum = 0;
@@ -303,7 +282,7 @@ static int sortSegmentsLocal(Mesh mesh, int dim, buffer *bfr) {
 
 static int sortSegments(Mesh mesh, struct comm *c, int dim, buffer *bfr) {
   if (c->np > 1) {
-    /* Parallel sort -- we haven't localized the problem yet */
+    // Parallel sort -- we haven't localized the problem yet
     switch (dim) {
     case 0:
       parallel_sort(struct Point_private, &mesh->elements, x[0], gs_scalar,
@@ -323,7 +302,7 @@ static int sortSegments(Mesh mesh, struct comm *c, int dim, buffer *bfr) {
 
     initSegment(mesh, c);
   } else {
-    /* Local sort: Segments are local */
+    // Local sort: Segments are local
     sortSegmentsLocal(mesh, dim, bfr);
   }
 
@@ -959,7 +938,7 @@ static VToEMap *getVToEMap(Mesh m, struct comm *c, buffer *bfr) {
   struct array vertices;
   array_init(vertex, &vertices, size);
 
-  /* Create (globalId, elementId) pairs and send them to globalId % np */
+  // Create (globalId, elementId) pairs and send them to globalId % np
   Point ptr = m->elements.ptr;
   sint i, j;
   for (i = 0; i < nelt; i++) {

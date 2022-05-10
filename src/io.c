@@ -38,7 +38,7 @@ static int re2_header(uint *nelt_, int *nv_, ulong *nelgt_, ulong *nelgv_,
   }
 
   *nelt_ = nelt;
-  *nv_ = (ndim == 2) ? 4 : 8;
+  *nv_ = (ndim == 2 ? 4 : 8);
   *nelgt_ = nelgt;
   *nelgv_ = nelgv;
 
@@ -165,9 +165,9 @@ static int re2_boundary(unsigned int *nbcs_, long long **bcs_,
   comm_scan(out, c, gs_long, gs_add, &nbcsl, 1, bfr);
   slong start = out[0][0];
 
-  size_t read_size = nbcsl * sizeof(long) * 8;
+  size_t read_size = nbcsl * sizeof(long) * nv;
   char *buf = calloc(read_size, sizeof(char));
-  MPI_Offset offset = bndry_off + sizeof(long) + start * 8 * sizeof(long);
+  MPI_Offset offset = bndry_off + sizeof(long) + start * nv * sizeof(long);
   MPI_File_read_at_all(file, offset, buf, read_size, MPI_BYTE, &st);
 
   struct array barray;
@@ -328,8 +328,8 @@ int parrsb_read_mesh(unsigned int *nel, int *nv, long long **vl, double **coord,
   struct comm c;
   comm_init(&c, comm);
 
-  // Set nv to 0 so we know if .re2 is read before .co2
-  *nv = 0;
+  // Set nv and nelt to 0 so we know if .re2 is read before .co2
+  *nv = 0, *nel = 0;
 
   // Read geometry from .re2 file
   if (read & 1) {
@@ -353,9 +353,7 @@ int parrsb_read_mesh(unsigned int *nel, int *nv, long long **vl, double **coord,
 }
 
 #define WRITE_INT(dest, val)                                                   \
-  do {                                                                         \
-    memcpy(dest, &(val), sizeof(int));                                         \
-  } while (0)
+  { memcpy(dest, &(val), sizeof(int)); }
 
 int parrsb_dump_con(char *name, unsigned int nelt, int nv, long long *vl,
                     MPI_Comm comm) {

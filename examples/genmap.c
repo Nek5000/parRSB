@@ -33,7 +33,7 @@ int main(int argc, char *argv[]) {
     err = 1;
   parrsb_check_error(err, comm);
 
-  int ndim = nv == 8 ? 3 : 2;
+  int ndim = (nv == 8 ? 3 : 2);
   if (active == 1)
     err = parrsb_find_conn(vl, coord, nelt, ndim, bcs, nbcs, in->tol, comm, 0);
   parrsb_check_error(err, comm);

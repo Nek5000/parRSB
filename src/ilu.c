@@ -209,10 +209,9 @@ static int find_unique_nbrs(struct array *e2nm, uint n, int nv,
     }
     en.e = pn[j].r, en.n = pn[j].c;
     array_cat(struct e2n_t, e2nm, &en, 1);
-    array_free(&nbrs);
-
     sarray_sort_2(struct e2n_t, e2nm->ptr, e2nm->n, e, 1, n, 1, bfr);
   }
+  array_free(&nbrs);
 
   return 0;
 }
@@ -363,11 +362,11 @@ static int find_level_01_aux(int *lvl_n, uint *lvl_off, uint *lvl_owner,
     for (i = 1, j = 0; i < keys->n; i++) {
       if (pk[i].e != pk[j].e) {
         // Different element, update min key size if required
-        min = min > i - j ? i - j : min;
+        min = (min > i - j ? i - j : min);
         j = i;
       }
     }
-    min = min > i - j ? i - j : min;
+    min = (min > i - j ? i - j : min);
   }
 
   sint buf[2];
@@ -417,10 +416,10 @@ static int find_level_01_aux(int *lvl_n, uint *lvl_off, uint *lvl_owner,
   return 0;
 }
 
-static int find_levels_01(uint *lvl_off, uint *lvl_owner, ulong *lvl_ids,
-                          const uint n_, const int nv, const ulong *ids_,
-                          const slong *vtx_, struct crystal *cr, int verbose,
-                          buffer *bfr) {
+static int find_levels(uint *lvl_off, uint *lvl_owner, ulong *lvl_ids,
+                       const uint n_, const int nv, const ulong *ids_,
+                       const slong *vtx_, struct crystal *cr, int verbose,
+                       buffer *bfr) {
   // Copy ids and vtx since we are going to modify them
   uint n = n_;
   ulong *ids = tcalloc(ulong, n);
@@ -433,7 +432,7 @@ static int find_levels_01(uint *lvl_off, uint *lvl_owner, ulong *lvl_ids,
 
   struct comm *c = &cr->comm;
 
-  // Initialize keys: set key of each dof to the current MPI rank
+  // Initialize keys: set key of each dof to the current MPI rank.
   // keys array should has unique entries and should be sorted first
   // by .e and then by .p.
   struct array keys;
@@ -594,10 +593,11 @@ static int ilu_get_rows(struct par_mat *ext, int lvl, struct ilu *ilu,
 // ILU(0)
 //
 static void ilu0_update_row(const ulong i, const ulong k, struct par_mat *A,
-                            struct par_mat *E, int verbose) {
-  uint rn = A->rn, *off = A->adj_off, *idx = A->adj_idx, *koff, *kidx;
-  scalar *val = A->adj_val, *kval;
-  ulong *rows = A->rows, *cols = A->cols, *kcols;
+                            struct par_mat *E, int verbose, int id, int lvl) {
+  uint rn = A->rn, *off = A->adj_off, *idx = A->adj_idx;
+  uint *koff = A->adj_off, *kidx = A->adj_idx;
+  ulong *rows = A->rows, *cols = A->cols, *kcols = A->cols;
+  scalar *val = A->adj_val, *kval = A->adj_val;
 
   // Find offsets of i and k
   sint io = -1, ko = -1;
@@ -621,17 +621,12 @@ static void ilu0_update_row(const ulong i, const ulong k, struct par_mat *A,
         break;
       }
     }
-  } else {
-    koff = off, kidx = idx;
-    kval = val;
-    kcols = cols;
   }
 
   if (io == -1 || ko == -1) {
     fprintf(stderr,
-            "%s:%d ilu0_aux_update: Row not found ! i = %llu io = %d k = %llu "
-            "ko = %d\n",
-            __FILE__, __LINE__, i, io, k, ko);
+            "%s:%d rank = %d lvl = %d i = %llu io = %d k = %llu ko = %d\n",
+            __FILE__, __LINE__, id, lvl, i, io, k, ko);
     exit(1);
   }
 
@@ -684,7 +679,7 @@ static void ilu0_update_row(const ulong i, const ulong k, struct par_mat *A,
 }
 
 static void ilu0_level(int lvl, struct ilu *ilu, struct par_mat *E, int verbose,
-                       buffer *bfr) {
+                       buffer *bfr, int id) {
   struct par_mat *A = &ilu->A;
   assert(IS_CSR(A) && !IS_DIAG(A));
   if (E != NULL)
@@ -696,23 +691,21 @@ static void ilu0_level(int lvl, struct ilu *ilu, struct par_mat *E, int verbose,
     for (uint k = A->adj_off[i];
          k < A->adj_off[i + 1] && A->cols[A->adj_idx[k]] < I; k++) {
       ulong K = A->cols[A->adj_idx[k]];
-      if (verbose)
-        printf("I = %llu K = %llu\n", I, K);
-      ilu0_update_row(I, K, A, E, verbose);
+      ilu0_update_row(I, K, A, E, verbose, id, lvl);
     }
   }
 }
 
 static void ilu0(struct ilu *ilu, const struct comm *c, buffer *bfr) {
   // Do ILU(0) in Level 1
-  ilu0_level(1, ilu, NULL, 0, bfr);
+  ilu0_level(1, ilu, NULL, 0, bfr, c->id);
 
   for (int l = 2; l <= ilu->nlvls; l++) {
     // Ask for required rows from previous levels
     struct par_mat E;
     ilu_get_rows(&E, l, ilu, bfr);
     // Perform ilu(0) at level l
-    ilu0_level(l, ilu, &E, 0, bfr);
+    ilu0_level(l, ilu, &E, 0, bfr, c->id);
     par_mat_free(&E);
   }
 }
@@ -992,29 +985,26 @@ static int ilu_setup_aux(struct ilu *ilu, int nlvls, uint *lvl_off,
   return 0;
 }
 
-struct ilu *ilu_setup(const uint n, const int nv, const slong *vtx,
+struct ilu *ilu_setup(const uint n, const int nv, const long long *vtxll,
                       const int type, const double tol, const int iter,
-                      const struct comm *c, const int verbose) {
+                      const MPI_Comm comm, const int verbose) {
+  struct comm c;
+  comm_init(&c, comm);
+
   struct ilu *ilu = tcalloc(struct ilu, 1);
-  crystal_init(&ilu->cr, c);
+  crystal_init(&ilu->cr, &c);
 
   // Establish a numbering based on input
   slong out[2][1], buf[2][1], in = n;
-  comm_scan(out, c, gs_long, gs_add, &in, 1, buf);
+  comm_scan(out, &c, gs_long, gs_add, &in, 1, buf);
 
   ulong *eid = tcalloc(ulong, n);
   for (uint i = 0; i < n; i++)
     eid[i] = out[0][0] + i + 1;
 
-  if (verbose > 1) {
-    for (uint i = 0; i < n; i++) {
-      printf("eid = %llu, ", eid[i]);
-      for (int v = 0; v < nv; v++)
-        printf("%lld, ", vtx[i * nv + v]);
-      printf("\n");
-      fflush(stdout);
-    }
-  }
+  slong *vtx = tcalloc(slong, n * nv);
+  for (uint i = 0; i < n * nv; i++)
+    vtx[i] = vtxll[i];
 
   buffer bfr;
   buffer_init(&bfr, 1024);
@@ -1022,17 +1012,8 @@ struct ilu *ilu_setup(const uint n, const int nv, const slong *vtx,
   uint *lvl_off = tcalloc(uint, 100);
   uint *lvl_owner = tcalloc(uint, n);
   ulong *lvl_ids = tcalloc(ulong, n);
-  int nlvls = find_levels_01(lvl_off, lvl_owner, lvl_ids, n, nv, eid, vtx,
-                             &ilu->cr, 1, &bfr);
-  if (verbose > 1) {
-    for (int l = 0; l < nlvls; l++) {
-      for (uint i = lvl_off[l]; i < lvl_off[l + 1]; i++)
-        printf("id = %d e = %llu lvl = %d owner = %u\n", c->id, lvl_ids[i],
-               l + 1, lvl_owner[i]);
-      fflush(stdout);
-    }
-  }
-
+  int nlvls = find_levels(lvl_off, lvl_owner, lvl_ids, n, nv, eid, vtx,
+                          &ilu->cr, 1, &bfr);
   ilu_setup_aux(ilu, nlvls, lvl_off, lvl_owner, lvl_ids, n, nv, vtx, verbose,
                 &bfr);
 
@@ -1044,10 +1025,10 @@ struct ilu *ilu_setup(const uint n, const int nv, const slong *vtx,
   ilu->type = type, ilu->tol = tol, ilu->iter = iter;
   switch (type) {
   case 0:
-    ilu0(ilu, c, &bfr);
+    ilu0(ilu, &c, &bfr);
     break;
   case 1:
-    ilut(ilu, c, &bfr);
+    ilut(ilu, &c, &bfr);
     break;
   default:
     break;
@@ -1057,8 +1038,8 @@ struct ilu *ilu_setup(const uint n, const int nv, const slong *vtx,
   if (val != NULL && atoi(val) != 0)
     par_mat_dump("post.txt", &ilu->A, &ilu->cr, &bfr);
 
-  free(lvl_off), free(lvl_owner), free(lvl_ids);
-  buffer_free(&bfr);
+  free(eid), free(vtx), free(lvl_off), free(lvl_owner), free(lvl_ids);
+  buffer_free(&bfr), comm_free(&c);
 
   return ilu;
 }
@@ -1066,11 +1047,10 @@ struct ilu *ilu_setup(const uint n, const int nv, const slong *vtx,
 void ilu_free(struct ilu *ilu) {
   if (ilu) {
     crystal_free(&ilu->cr);
-    if (ilu->nlvls > 0) {
+    if (ilu->nlvls > 0)
       par_mat_free(&ilu->A);
-      if (ilu->lvl_off)
-        free(ilu->lvl_off);
-    }
-    free(ilu), ilu = NULL;
+    if (ilu->lvl_off)
+      free(ilu->lvl_off);
+    free(ilu);
   }
 }

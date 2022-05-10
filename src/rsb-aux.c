@@ -69,20 +69,6 @@ static void schur_test(struct rsb_element *elems, uint nelt, int nv,
   free(ids);
 }
 
-static void ilu_test(struct rsb_element *elems, uint nelt, int nv,
-                     struct comm *c) {
-  uint npts = nelt * nv;
-  slong *ids = (slong *)tcalloc(slong, npts);
-
-  uint i, j;
-  for (i = 0; i < nelt; i++)
-    for (j = 0; j < nv; j++)
-      ids[i * nv + j] = elems[i].vertices[j];
-
-  struct ilu *ilu = ilu_setup(nelt, nv, ids, 1, 0.1, 10, c, 1);
-  ilu_free(ilu);
-}
-
 static void count_interface_dofs(struct rsb_element *elems, uint nelt, int nv,
                                  struct comm *cin, buffer *bfr) {
   struct comm c;
@@ -378,7 +364,6 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
 
   check_rsb_partition(gc, max_pass, max_iter);
   // schur_test(elements->ptr, elements->n, nv, gc, bfr);
-  // ilu_test(elements->ptr, elements->n, nv, gc);
 
   return 0;
 }

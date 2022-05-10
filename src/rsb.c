@@ -223,17 +223,14 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
       break;
     }
 
-    metric_print(&ca, options.profile_level);
-
-    comm_free(&ca);
     metric_finalize();
+    comm_free(&ca);
   }
+  MPI_Comm_free(&comma);
 
 #if defined(GENMAP_OCCA)
   occa_free();
 #endif
-
-  MPI_Comm_free(&comma);
 
   restore_original(part, seq, &cr, &elist, elem_size, &bfr);
 
@@ -245,10 +242,7 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
     fflush(stdout);
   }
 
-  array_free(&elist);
-  buffer_free(&bfr);
-  crystal_free(&cr);
-  comm_free(&c);
+  array_free(&elist), buffer_free(&bfr), crystal_free(&cr), comm_free(&c);
 
   return 0;
 }
@@ -257,7 +251,6 @@ void fparrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
                        int *nel, int *nv, int *options, int *comm, int *err) {
   *err = 1;
   comm_ext c = MPI_Comm_f2c(*comm);
-  // TODO: Convert int options to parrsb_options instead of default options
   parrsb_options opt = parrsb_default_options;
   *err = parrsb_part_mesh(part, seq, vtx, coord, *nel, *nv, opt, c);
 }

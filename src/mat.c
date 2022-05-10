@@ -425,7 +425,7 @@ void par_mat_dump(const char *name, struct par_mat *A, struct crystal *cr,
     if (fp != NULL) {
       struct mat_ij *pm = (struct mat_ij *)mijs.ptr;
       for (uint i = 0; i < mijs.n; i++)
-        fprintf(fp, "%llu %llu %lf\n", pm[i].r, pm[i].c, pm[i].v);
+        fprintf(fp, "%llu %llu %.15lf\n", pm[i].r, pm[i].c, pm[i].v);
       fclose(fp);
     }
   }

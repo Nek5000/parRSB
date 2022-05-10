@@ -1,6 +1,7 @@
 //=============================================================================
 // Test ILU factorization
 //
+#include <ilu.h>
 #include <parRSB.h>
 
 int main(int argc, char *argv[]) {
@@ -28,7 +29,7 @@ int main(int argc, char *argv[]) {
     err = 1;
   parrsb_check_error(err, MPI_COMM_WORLD);
 
-  int ndim = nv == 8 ? 3 : 2;
+  int ndim = (nv == 8 ? 3 : 2);
   err = parrsb_find_conn(vl, coord, nelt, ndim, bcs, nbcs, in->tol,
                          MPI_COMM_WORLD, 0);
   parrsb_check_error(err, MPI_COMM_WORLD);
@@ -50,15 +51,12 @@ int main(int argc, char *argv[]) {
   parrsb_check_error(err, MPI_COMM_WORLD);
 
   // Setup ILU
-  struct comm c;
-  comm_init(&c, MPI_COMM_WORLD);
-
-#if 0
-  struct ilu *ilu = ilu_setup(nelt, nv, vl, 0, 0, 0, &c, 1);
+  struct ilu *ilu = ilu_setup(nelt, nv, vl, 0, 0.0, 0, MPI_COMM_WORLD, 1);
   ilu_free(ilu);
-#endif
 
-  comm_free(&c);
+  // Free resources
+  free(part), free(vl), free(coord), free(bcs), free(in);
+  MPI_Finalize();
 
   return 0;
 }

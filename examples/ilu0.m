@@ -7,4 +7,4 @@ B = spconvert(post);
 n = size(A, 1);
 I = speye(n);
 err = norm(L + U - B - I, Inf);
-printf('ILU err = %lf', err);
+printf('ILU err = %f', err);
