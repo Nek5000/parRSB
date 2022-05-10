@@ -63,7 +63,7 @@ static int test_parcon(unsigned int neltp, long long *vlp, char *name,
 int main(int argc, char *argv[]) {
   MPI_Init(&argc, &argv);
 
-  parrsb_input *in = parrsb_parse_input(argc, argv);
+  struct parrsb_input *in = parrsb_parse_input(argc, argv);
   int err = (in == NULL);
   parrsb_check_error(err, MPI_COMM_WORLD);
 

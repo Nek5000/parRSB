@@ -9,6 +9,8 @@
 
 parrsb_options parrsb_default_options = {0, 2, 1, 0, 1, 0, 4, 1};
 
+static char *ALGO[3] = {"RSB", "RCB", "RIB"};
+
 static int if_number(const char *c) {
   int i;
   for (i = 0; i < strnlen(c, 32) && isdigit(c[i]); i++)
@@ -239,7 +241,7 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
   genmap_barrier(&c);
   t = comm_time() - t;
   if (c.id == 0 && options.verbose_level > 0) {
-    printf("parRSB finished in %g s\n", t);
+    printf("par%s finished in %g s\n", ALGO[options.partitioner], t);
     fflush(stdout);
   }
 

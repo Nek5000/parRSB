@@ -188,8 +188,8 @@ void parrsb_print_part_stat(long long *vtx, int nelt, int nv, MPI_Comm ce) {
   }
 }
 
-parrsb_input *parrsb_parse_input(int argc, char *argv[]) {
-  parrsb_input *in = tcalloc(parrsb_input, 1);
+struct parrsb_input *parrsb_parse_input(int argc, char *argv[]) {
+  struct parrsb_input *in = tcalloc(struct parrsb_input, 1);
   in->mesh = NULL;
   in->tol = 0.2;
   in->test = 0;

@@ -8,8 +8,8 @@
 #define GC_RE2_HEADER_LEN 80
 #define GC_CO2_HEADER_LEN 132
 
-static int readRe2Header(unsigned int *nelt_, int *nv_, ulong *nelgt_,
-                         ulong *nelgv_, MPI_File file, struct comm *c) {
+static int re2_header(uint *nelt_, int *nv_, ulong *nelgt_, ulong *nelgv_,
+                      MPI_File file, struct comm *c) {
   int rank = c->id;
   int size = c->np;
   MPI_Comm comm = c->c;
@@ -19,11 +19,12 @@ static int readRe2Header(unsigned int *nelt_, int *nv_, ulong *nelgt_,
   MPI_Status st;
   err = MPI_File_read_all(file, buf, GC_RE2_HEADER_LEN, MPI_BYTE, &st);
 
-  int nelgt, nelgv, ndim;
+  long long nelgt, nelgv;
+  int ndim;
   char version[6];
-  sscanf(buf, "%5s %d %d %d", version, &nelgt, &ndim, &nelgv);
+  sscanf(buf, "%5s %lld %d %lld", version, &nelgt, &ndim, &nelgv);
 
-  /* TODO: Assert version */
+  // TODO: Assert version
   int nelt = nelgt / size;
   int nrem = nelgt - nelt * size;
   nelt += (rank > (size - 1 - nrem) ? 1 : 0);
@@ -46,8 +47,8 @@ static int readRe2Header(unsigned int *nelt_, int *nv_, ulong *nelgt_,
   return err;
 }
 
-static int readRe2Coordinates(double **coord_, unsigned int nelt, int nv,
-                              MPI_File file, struct comm *c) {
+static int re2_coord(double **coord_, unsigned int nelt, int nv, MPI_File file,
+                     struct comm *c) {
   uint rank = c->id;
   uint size = c->np;
   MPI_Comm comm = c->c;
@@ -58,11 +59,11 @@ static int readRe2Coordinates(double **coord_, unsigned int nelt, int nv,
   slong start = out[0][0];
 
   int ndim = (nv == 4) ? 2 : 3;
-  int elemDataSize = nv * ndim * sizeof(double) + sizeof(double);
-  int header_size = GC_RE2_HEADER_LEN + sizeof(float);
+  size_t elem_size = nv * ndim * sizeof(double) + sizeof(double);
+  size_t header_size = GC_RE2_HEADER_LEN + sizeof(float);
 
-  /* calculate read size for element data on each MPI rank */
-  int read_size = nelt * elemDataSize;
+  // calculate read size for element data on each MPI rank
+  size_t read_size = nelt * elem_size;
   if (rank == 0)
     read_size += header_size;
 
@@ -76,14 +77,15 @@ static int readRe2Coordinates(double **coord_, unsigned int nelt, int nv,
   if (rank == 0)
     buf0 += header_size;
 
-  /* Allocate coord array */
+  // Allocate coord array
   size_t coord_size = nelt;
   coord_size = coord_size * nv * ndim;
   double *coord = *coord_ = tcalloc(double, coord_size);
 
-  /* Read elements for each rank */
+  // Read elements for each rank
   double x[GC_MAX_VERTICES], y[GC_MAX_VERTICES], z[GC_MAX_VERTICES];
-  int i, j, k;
+  uint i;
+  int k;
   if (ndim == 3) {
     for (i = 0; i < nelt; i++) {
       // skip group id
@@ -122,62 +124,59 @@ static int readRe2Coordinates(double **coord_, unsigned int nelt, int nv,
   return 0;
 }
 
-static int readRe2Boundaries(unsigned int *nbcs_, long long **bcs_,
-                             unsigned int nelt, int nv, ulong nelgt,
-                             MPI_File file, struct comm *c) {
+static int re2_boundary(unsigned int *nbcs_, long long **bcs_,
+                        unsigned int nelt, int nv, ulong nelgt, MPI_File file,
+                        struct comm *c) {
   uint rank = c->id;
   uint size = c->np;
   MPI_Comm comm = c->c;
 
   int ndim = (nv == 4) ? 2 : 3;
-  int elemDataSize = nv * ndim * sizeof(double) + sizeof(double);
-  int header_size = GC_RE2_HEADER_LEN + sizeof(float);
+  size_t elem_size = nv * ndim * sizeof(double) + sizeof(double);
+  size_t header_size = GC_RE2_HEADER_LEN + sizeof(float);
 
-  /* Calculate offset for the curve side data */
-  MPI_Offset curveOffset = header_size + nelgt * elemDataSize;
+  // Calculate offset for the curve side data
+  MPI_Offset curve_off = header_size + nelgt * elem_size;
 
   MPI_Status st;
-  char bufL[8];
+  char bufL[16];
   if (rank == 0)
-    MPI_File_read_at(file, curveOffset, bufL, sizeof(long), MPI_BYTE, &st);
+    MPI_File_read_at(file, curve_off, bufL, sizeof(long), MPI_BYTE, &st);
   MPI_Bcast(bufL, sizeof(long), MPI_BYTE, 0, comm);
 
-  double ncurvesD;
-  READ_T(&ncurvesD, bufL, long, 1);
-  long ncurves = ncurvesD;
+  double t;
+  READ_T(&t, bufL, long, 1);
+  long ncurves = t;
 
-  /* calculate offset for boundary conditions data */
-  MPI_Offset boundaryOffset =
-      curveOffset + sizeof(long) + sizeof(long) * 8 * ncurves;
+  // Calculate offset for boundary conditions data
+  MPI_Offset bndry_off = curve_off + sizeof(long) + sizeof(long) * 8 * ncurves;
   if (rank == 0)
-    MPI_File_read_at(file, boundaryOffset, bufL, sizeof(long), MPI_BYTE, &st);
+    MPI_File_read_at(file, bndry_off, bufL, sizeof(long), MPI_BYTE, &st);
   MPI_Bcast(bufL, sizeof(long), MPI_BYTE, 0, comm);
 
-  double nbcsD;
-  READ_T(&nbcsD, bufL, long, 1);
-  long nbcs = nbcsD;
+  READ_T(&t, bufL, long, 1);
+  long nbcs = t;
 
-  int nbcsLocal = nbcs / size;
-  int nrem = nbcs - nbcsLocal * size;
-  nbcsLocal += (rank > (size - 1 - nrem) ? 1 : 0);
+  int nbcsl = nbcs / size;
+  int nrem = nbcs - nbcsl * size;
+  nbcsl += (rank > (size - 1 - nrem) ? 1 : 0);
 
-  slong out[2][1], bfr[2][1], in = nbcsLocal;
-  comm_scan(out, c, gs_long, gs_add, &in, 1, bfr);
+  slong out[2][1], bfr[2][1];
+  comm_scan(out, c, gs_long, gs_add, &nbcsl, 1, bfr);
   slong start = out[0][0];
 
-  int offset = boundaryOffset + sizeof(long) + start * 8 * sizeof(long);
-  int read_size = nbcsLocal * sizeof(long) * 8;
-  char *buf = calloc(read_size, sizeof(char)), *buf0 = buf;
+  size_t read_size = nbcsl * sizeof(long) * 8;
+  char *buf = calloc(read_size, sizeof(char));
+  MPI_Offset offset = bndry_off + sizeof(long) + start * 8 * sizeof(long);
   MPI_File_read_at_all(file, offset, buf, read_size, MPI_BYTE, &st);
 
   struct array barray;
   array_init(struct Boundary_private, &barray, 10);
 
   double tmp[5];
-  char cbc[4];
+  char cbc[4], *buf0 = buf;
   struct Boundary_private boundary;
-  sint i;
-  for (i = 0; i < nbcsLocal; i++) {
+  for (sint i = 0; i < nbcsl; i++) {
     READ_T(tmp, buf0, long, 1);
     buf0 += sizeof(long);
     boundary.elementId = (long)tmp[0];
@@ -203,7 +202,7 @@ static int readRe2Boundaries(unsigned int *nbcs_, long long **bcs_,
   struct Boundary_private *ptr = barray.ptr;
   long long *bcs = *bcs_ = tcalloc(long long, 4 * nbcs);
 
-  for (i = 0; i < nbcs; i++) {
+  for (sint i = 0; i < nbcs; i++) {
     bcs[4 * i + 0] = ptr[i].elementId;
     bcs[4 * i + 1] = ptr[i].faceId;
     bcs[4 * i + 2] = ptr[i].bc[0];
@@ -233,9 +232,9 @@ static int read_geometry(unsigned int *nelt, int *nv, double **coord,
   }
 
   ulong nelgt, nelgv;
-  readRe2Header(nelt, nv, &nelgt, &nelgv, file, c);
-  readRe2Coordinates(coord, *nelt, *nv, file, c);
-  readRe2Boundaries(nbcs, bcs, *nelt, *nv, nelgt, file, c);
+  re2_header(nelt, nv, &nelgt, &nelgv, file, c);
+  re2_coord(coord, *nelt, *nv, file, c);
+  re2_boundary(nbcs, bcs, *nelt, *nv, nelgt, file, c);
 
   err = MPI_File_close(&file);
   if (err)
@@ -247,52 +246,55 @@ static int read_geometry(unsigned int *nelt, int *nv, double **coord,
 static int read_connectivity(unsigned int *nelt_, int *nv_, long long **vl_,
                              char *fname, struct comm *c) {
   comm_ext comm = c->c;
-  int rank = c->id;
-  int size = c->np;
+  uint rank = c->id;
+  uint size = c->np;
 
   MPI_File file;
   int err = MPI_File_open(comm, fname, MPI_MODE_RDONLY, MPI_INFO_NULL, &file);
   if (err != 0) {
     if (rank == 0)
-      printf("Error opening %s for reading.\n", fname);
+      fprintf(stderr, "Error opening %s for reading.\n", fname);
+    MPI_Abort(comm, 911);
   }
 
   char *buf = (char *)calloc(GC_CO2_HEADER_LEN + 1, sizeof(char));
   MPI_Status st;
   err = MPI_File_read_all(file, buf, GC_CO2_HEADER_LEN, MPI_BYTE, &st);
 
-  int nelgt, nelgv, nv;
+  long long nelgt, nelgv;
+  int nv;
   char version[6];
-  sscanf(buf, "%5s%12d%12d%12d", version, &nelgt, &nelgv, &nv);
+  sscanf(buf, "%5s %12lld %12lld %d", version, &nelgt, &nelgv, &nv);
 
-  /* TODO: Assert version */
+  // TODO: Assert version
   int nelt = nelgt / size;
   int nrem = nelgt - nelt * size;
   nelt += (rank > (size - 1 - nrem) ? 1 : 0);
 
-  if (*nv_ != 0) {
+  if (*nv_ != 0)
     assert(*nv_ == nv);
-    assert(*nelt_ == nelt);
-  } else {
+  else
     *nv_ = nv;
+
+  if (*nelt_ != 0)
+    assert(*nelt_ == nelt);
+  else
     *nelt_ = nelt;
-  }
 
   float byte_test;
   MPI_File_read_all(file, &byte_test, 4, MPI_BYTE, &st);
   if (fabs(byte_test - 6.543210) > 1e-7) {
     if (rank == 0)
-      printf("ERROR byte_test failed! %f\n", byte_test);
-    return 1;
+      fprintf(stderr, "ERROR byte_test failed! %f\n", byte_test);
+    MPI_Abort(comm, 911);
   }
 
-  slong out[2][1], bfr[2][1], in[1];
-  in[0] = nelt;
+  slong out[2][1], bfr[2][1], in = nelt;
   comm_scan(out, c, gs_long, gs_add, &in, 1, bfr);
   slong start = out[0][0];
 
-  int read_size = nelt * (nv + 1) * sizeof(int);
-  int header_size = GC_CO2_HEADER_LEN + sizeof(float);
+  size_t read_size = nelt * (nv + 1) * sizeof(int);
+  size_t header_size = GC_CO2_HEADER_LEN + sizeof(float);
   if (rank == 0)
     read_size += header_size;
 
@@ -300,12 +302,11 @@ static int read_connectivity(unsigned int *nelt_, int *nv_, long long **vl_,
   err = MPI_File_read_ordered(file, buf, read_size, MPI_BYTE, &st);
   err = MPI_File_close(&file);
 
-  char *buf0 = buf;
-  if (rank == 0)
-    buf0 += header_size;
+  char *buf0 = buf + (rank == 0) * header_size;
 
   long long *vl = *vl_ = tcalloc(long long, nv *nelt);
-  int i, j, tmp1, tmp2;
+  uint i;
+  int j, tmp1, tmp2;
   for (i = 0; i < nelt; i++) {
     READ_T(&tmp1, buf0, int, 1);
     buf0 += sizeof(int);
@@ -327,10 +328,10 @@ int parrsb_read_mesh(unsigned int *nel, int *nv, long long **vl, double **coord,
   struct comm c;
   comm_init(&c, comm);
 
-  /* Set nv to 0 so we know if .re2 is read before .co2 */
+  // Set nv to 0 so we know if .re2 is read before .co2
   *nv = 0;
 
-  /* Read geometry from .re2 file */
+  // Read geometry from .re2 file
   if (read & 1) {
     char geom_name[BUFSIZ];
     strncpy(geom_name, name, BUFSIZ);
@@ -338,7 +339,7 @@ int parrsb_read_mesh(unsigned int *nel, int *nv, long long **vl, double **coord,
     read_geometry(nel, nv, coord, nbcs, bcs, geom_name, &c);
   }
 
-  /* Read connectivity from .co2 file */
+  // Read connectivity from .co2 file
   if (read & 2) {
     char conn_name[BUFSIZ];
     strncpy(conn_name, name, BUFSIZ);

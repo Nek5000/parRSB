@@ -16,15 +16,6 @@ extern int balance_partitions(struct array *elements, int nv, struct comm *lc,
                               struct comm *gc, int bin, buffer *bfr);
 extern int fiedler(struct rsb_element *elems, uint lelt, int nv, int max_iter,
                    int algo, struct comm *gsc, buffer *buf);
-extern int vtx_dist(uint nelt, int nv, const slong *vtx, struct crystal *cr,
-                    buffer *bfr);
-extern int elm_dist(uint n, int nv, const slong *vtx, struct crystal *cr,
-                    buffer *bfr);
-
-struct gid {
-  ulong gid;
-  uint proc;
-};
 
 static void schur_test(struct rsb_element *elems, uint nelt, int nv,
                        struct comm *cin, buffer *bfr) {
@@ -76,26 +67,6 @@ static void schur_test(struct rsb_element *elems, uint nelt, int nv,
   free(b);
   coarse_free(crs);
   free(ids);
-}
-
-static void get_key_sizes(struct rsb_element *elems, uint nelt, int nv,
-                          struct comm *c, buffer *bfr) {
-  uint npts = nelt * nv;
-  assert(npts > 0);
-
-  slong *vtx = tcalloc(slong, npts);
-  uint e, n;
-  for (e = 0; e < nelt; e++)
-    for (n = 0; n < nv; n++)
-      vtx[e * nv + n] = elems[e].vertices[n];
-
-  struct crystal cr;
-  crystal_init(&cr, c);
-  vtx_dist(nelt, nv, vtx, &cr, bfr);
-  elm_dist(nelt, nv, vtx, &cr, bfr);
-  crystal_free(&cr);
-
-  free(vtx);
 }
 
 static void ilu_test(struct rsb_element *elems, uint nelt, int nv,
@@ -157,6 +128,11 @@ static void count_interface_dofs(struct rsb_element *elems, uint nelt, int nv,
     comm_free(&t);
   }
   comm_free(&c);
+
+  struct gid {
+    ulong gid;
+    uint proc;
+  };
 
   struct array gids;
   array_init(struct gid, &gids, 100);
@@ -401,8 +377,7 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
   comm_free(&lc);
 
   check_rsb_partition(gc, max_pass, max_iter);
-  schur_test(elements->ptr, elements->n, nv, gc, bfr);
-  // get_key_sizes(elements->ptr, elements->n, nv, gc, bfr);
+  // schur_test(elements->ptr, elements->n, nv, gc, bfr);
   // ilu_test(elements->ptr, elements->n, nv, gc);
 
   return 0;
