@@ -241,7 +241,7 @@ int par_csr_setup(struct par_mat *mat, struct array *entries, int sd,
   sarray_sort_2(struct mat_ij, entries->ptr, entries->n, r, 1, c, 1, buf);
   ptr = entries->ptr;
 
-  sd = sd != 0; // sd needs to be 1 or 0
+  sd = (sd != 0); // sd needs to be 1 or 0
 
   uint *adj_off = (uint *)buf->ptr;
   ulong *rows = (ulong *)(adj_off + nnz + 1);

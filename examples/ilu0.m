@@ -8,3 +8,4 @@ n = size(A, 1);
 I = speye(n);
 err = norm(L + U - B - I, Inf);
 printf('ILU err = %f', err);
+assert(err < 1e-8);

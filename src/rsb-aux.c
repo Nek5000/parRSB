@@ -71,7 +71,7 @@ static void schur_test(struct rsb_element *elems, uint nelt, int nv,
 
 static void count_interface_dofs(struct rsb_element *elems, uint nelt, int nv,
                                  struct comm *cin, buffer *bfr) {
-  struct comm c;
+  struct comm c, t;
   comm_dup(&c, cin);
 
   uint npts = nelt * nv;
@@ -89,8 +89,7 @@ static void count_interface_dofs(struct rsb_element *elems, uint nelt, int nv,
   while (c.np > 1) {
     struct gs_data *gsh = gs_setup(ids, npts, &c, 0, gs_pairwise, 0);
 
-    int bin = c.id >= (c.np + 1) / 2;
-    assert(bin == 0 || bin == 1);
+    int bin = (c.id >= (c.np + 1) / 2);
     for (i = 0; i < npts; i++)
       dof[i] = bin;
 
@@ -107,11 +106,8 @@ static void count_interface_dofs(struct rsb_element *elems, uint nelt, int nv,
 
     gs_free(gsh);
 
-    struct comm t;
-    comm_split(&c, bin, c.id, &t);
-    comm_free(&c);
-    comm_dup(&c, &t);
-    comm_free(&t);
+    comm_split(&c, bin, c.id, &t), comm_free(&c);
+    comm_dup(&c, &t), comm_free(&t);
   }
   comm_free(&c);
 
@@ -339,10 +335,7 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
     metric_toc(&lc, FIEDLER_SORT);
 
     // Bisect, repair and balance
-    int bin = 1;
-    if (lc.id < (lc.np + 1) / 2)
-      bin = 0;
-
+    int bin = (lc.id >= (lc.np + 1) / 2);
     struct comm tc;
     comm_split(&lc, bin, lc.id, &tc);
 

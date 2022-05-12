@@ -10,7 +10,7 @@ jobs:
         test: [box_2x2x2, pyramid, tgv, e3q, solid, ethier, vortex, expansion]
         np: [1, 2, 3, 4]
       fail-fast: false
-    name: "${{ matrix.test }}, NP = ${{ matrix.np }}"
+    name: "Main: ${{ matrix.test }}, NP = ${{ matrix.np }}"
     env:
       GSVER: 1.0.7
       CC: mpicc
@@ -89,7 +89,7 @@ jobs:
         test: [box_2x2x2, pyramid, solid, ethier, vortex, expansion]
         np: [1, 2, 3, 4]
       fail-fast: false
-    name: "${{ matrix.test }}, NP = ${{ matrix.np }}"
+    name: "ILU: ${{ matrix.test }}, NP = ${{ matrix.np }}"
     env:
       GSVER: 1.0.7
       CC: mpicc
