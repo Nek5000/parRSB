@@ -108,7 +108,7 @@ struct coarse *coarse_setup(uint nelt, int nv, slong const *vtx, struct comm *c,
   find_nbrs(&nbrs, eid, vtx, nelt, nv, &cr, bfr);
   free(eid);
 
-  // Convert `struct nbr` -> `struct mat_ij` and compress
+  // Convert `struct nbr` -> `struct mij` and compress
   // entries which share the same (r, c) values. Set the
   // diagonal element to have zero row sum
   struct array eij;

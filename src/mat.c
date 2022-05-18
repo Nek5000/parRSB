@@ -16,14 +16,14 @@
 // and the array is modified in place. Also, the diagonal entries are modified
 // to ensure all the
 int compress_nbrs(struct array *eij, struct array *nbr, buffer *bfr) {
-  array_init(struct mat_ij, eij, nbr->n);
+  array_init(struct mij, eij, nbr->n);
   if (nbr->n == 0)
     return 1;
 
   sarray_sort_2(struct nbr, nbr->ptr, nbr->n, r, 1, c, 1, bfr);
   struct nbr *ptr = (struct nbr *)nbr->ptr;
 
-  struct mat_ij m;
+  struct mij m;
   m.idx = 0;
 
   sint i = 0;
@@ -35,12 +35,12 @@ int compress_nbrs(struct array *eij, struct array *nbr, buffer *bfr) {
       j++;
 
     m.v = i - j; // = - (j - i)
-    array_cat(struct mat_ij, eij, &m, 1);
+    array_cat(struct mij, eij, &m, 1);
     i = j;
   }
 
   // Now make sure the row sum is zero
-  struct mat_ij *pe = (struct mat_ij *)eij->ptr;
+  struct mij *pe = (struct mij *)eij->ptr;
   i = 0;
   while (i < eij->n) {
     sint j = i, k = -1, s = 0;
@@ -67,8 +67,8 @@ int csr_setup(struct mat *mat, struct array *entries, int sep, buffer *buf) {
   }
 
   // Renumber cols and rows
-  sarray_sort(struct mat_ij, entries->ptr, entries->n, c, 1, buf);
-  struct mat_ij *ptr = (struct mat_ij *)entries->ptr;
+  sarray_sort(struct mij, entries->ptr, entries->n, c, 1, buf);
+  struct mij *ptr = (struct mij *)entries->ptr;
 
   ulong n = ptr[0].c;
   ptr[0].c = 0;
@@ -79,8 +79,8 @@ int csr_setup(struct mat *mat, struct array *entries, int sep, buffer *buf) {
       n = ptr[i].c, ptr[i].c = ptr[i - 1].c + 1;
   }
 
-  sarray_sort(struct mat_ij, entries->ptr, entries->n, r, 1, buf);
-  ptr = (struct mat_ij *)entries->ptr;
+  sarray_sort(struct mij, entries->ptr, entries->n, r, 1, buf);
+  ptr = (struct mij *)entries->ptr;
   n = mat->start = ptr[0].r, ptr[0].r = 0;
 
   for (uint i = 1; i < nnz; i++)
@@ -91,15 +91,15 @@ int csr_setup(struct mat *mat, struct array *entries, int sep, buffer *buf) {
   uint nr = ptr[nnz - 1].r + 1;
 
   // Reserve enough memory for work arrays
-  buffer_reserve(buf, sizeof(struct mat_ij) * nnz);
-  struct mat_ij *unique = (struct mat_ij *)buf->ptr;
+  buffer_reserve(buf, sizeof(struct mij) * nnz);
+  struct mij *unique = (struct mij *)buf->ptr;
 
   // Setup the matrix, separate diagonal
   mat->n = nr;
   uint *Lp = mat->Lp = (uint *)tcalloc(uint, nr + 1);
 
-  sarray_sort_2(struct mat_ij, entries->ptr, entries->n, r, 1, c, 1, buf);
-  ptr = (struct mat_ij *)entries->ptr;
+  sarray_sort_2(struct mij, entries->ptr, entries->n, r, 1, c, 1, buf);
+  ptr = (struct mij *)entries->ptr;
 
   sep = sep != 0;
   Lp[0] = 0, unique[0] = ptr[0];
@@ -217,12 +217,12 @@ int par_csr_setup(struct par_mat *mat, struct array *entries, int sd,
     return 0;
   }
 
-  sarray_sort(struct mat_ij, entries->ptr, entries->n, c, 1, buf);
-  struct mat_ij *ptr = (struct mat_ij *)entries->ptr;
+  sarray_sort(struct mij, entries->ptr, entries->n, c, 1, buf);
+  struct mij *ptr = (struct mij *)entries->ptr;
 
   // Reserve enough memory for work arrays
   uint nnz = entries->n;
-  buffer_reserve(buf, (sizeof(struct mat_ij) + 2 * sizeof(ulong)) * (nnz + 1));
+  buffer_reserve(buf, (sizeof(struct mij) + 2 * sizeof(ulong)) * (nnz + 1));
 
   ulong *cols = (ulong *)buf->ptr;
   cols[0] = ptr[0].c, ptr[0].idx = 0, mat->cn = 1;
@@ -238,14 +238,14 @@ int par_csr_setup(struct par_mat *mat, struct array *entries, int sd,
   mat->cols = (ulong *)tcalloc(ulong, mat->cn);
   memcpy(mat->cols, cols, sizeof(ulong) * mat->cn);
 
-  sarray_sort_2(struct mat_ij, entries->ptr, entries->n, r, 1, c, 1, buf);
+  sarray_sort_2(struct mij, entries->ptr, entries->n, r, 1, c, 1, buf);
   ptr = entries->ptr;
 
   sd = (sd != 0); // sd needs to be 1 or 0
 
   uint *adj_off = (uint *)buf->ptr;
   ulong *rows = (ulong *)(adj_off + nnz + 1);
-  struct mat_ij *unique = (struct mat_ij *)(rows + (nnz + 1));
+  struct mij *unique = (struct mij *)(rows + (nnz + 1));
 
   adj_off[0] = 0, unique[0] = ptr[0], rows[0] = ptr[0].r;
   uint j = 0;
@@ -303,12 +303,12 @@ int par_csc_setup(struct par_mat *mat, struct array *entries, int sd,
     return 0;
   }
 
-  sarray_sort(struct mat_ij, entries->ptr, entries->n, r, 1, buf);
-  struct mat_ij *ptr = (struct mat_ij *)entries->ptr;
+  sarray_sort(struct mij, entries->ptr, entries->n, r, 1, buf);
+  struct mij *ptr = (struct mij *)entries->ptr;
 
   // Reserve enough memory for work arrays
   uint nnz = entries->n;
-  buffer_reserve(buf, (sizeof(struct mat_ij) + 2 * sizeof(ulong)) * (nnz + 1));
+  buffer_reserve(buf, (sizeof(struct mij) + 2 * sizeof(ulong)) * (nnz + 1));
 
   ulong *rows = (ulong *)buf->ptr;
   rows[0] = ptr[0].r, ptr[0].idx = 0, mat->rn = 1;
@@ -323,14 +323,14 @@ int par_csc_setup(struct par_mat *mat, struct array *entries, int sd,
   mat->rows = tcalloc(ulong, mat->rn);
   memcpy(mat->rows, rows, sizeof(ulong) * mat->rn);
 
-  sarray_sort_2(struct mat_ij, entries->ptr, entries->n, c, 1, r, 1, buf);
+  sarray_sort_2(struct mij, entries->ptr, entries->n, c, 1, r, 1, buf);
   ptr = entries->ptr;
 
   sd = sd != 0; // sd needs to be 1 or 0
 
   uint *adj_off = (uint *)buf->ptr;
   ulong *cols = (ulong *)(adj_off + nnz + 1);
-  struct mat_ij *unique = (struct mat_ij *)(cols + (nnz + 1));
+  struct mij *unique = (struct mij *)(cols + (nnz + 1));
 
   adj_off[0] = 0, unique[0] = ptr[0], cols[0] = ptr[0].c;
   uint j = 0;
@@ -377,6 +377,112 @@ int par_csc_setup(struct par_mat *mat, struct array *entries, int sd,
   return 0;
 }
 
+int par_mat_setup(struct par_mat *M, struct array *mijs, const int type,
+                  const int sd, buffer *bfr) {
+  assert(type == CSC || type == CSR);
+
+  M->type = type;
+  if (mijs == NULL || mijs->n == 0) {
+    M->cn = M->rn = 0;
+    M->adj_off = M->adj_idx = M->diag_idx = NULL;
+    M->adj_val = M->diag_val = NULL;
+    M->rows = M->cols = NULL;
+    return 0;
+  }
+
+#define INIT_IDX_FLD(f, fn, fld)                                               \
+  do {                                                                         \
+    sarray_sort(struct mij, mijs->ptr, mijs->n, f, 1, bfr);                    \
+    struct mij *ptr = (struct mij *)mijs->ptr;                                 \
+    tmp[0] = ptr[0].f, ptr[0].idx = 0, M->fn = 1;                              \
+    for (uint i = 1; i < nnz; i++) {                                           \
+      if (ptr[i - 1].f != ptr[i].f)                                            \
+        tmp[M->fn] = ptr[i].f, ptr[i].idx = M->fn++;                           \
+      else                                                                     \
+        ptr[i].idx = ptr[i - 1].idx;                                           \
+    }                                                                          \
+    M->fld = tcalloc(ulong, M->fn);                                            \
+    memcpy(M->fld, tmp, sizeof(ulong) * M->fn);                                \
+  } while (0)
+
+#define INIT_ADJ_OFF(f, fn, fld)                                               \
+  do {                                                                         \
+    tmp[0] = ptr[0].f;                                                         \
+    uint i, j;                                                                 \
+    for (i = M->fn = 1, j = 0; i < nnz; i++) {                                 \
+      if ((unique[j].r != ptr[i].r) || (unique[j].c != ptr[i].c)) {            \
+        if (unique[j].f != ptr[i].f) {                                         \
+          off[M->fn] = j + 1 - sd * M->fn;                                     \
+          tmp[M->fn++] = ptr[i].f;                                             \
+        }                                                                      \
+        unique[++j] = ptr[i];                                                  \
+      } else                                                                   \
+        unique[j].v += ptr[i].v;                                               \
+    }                                                                          \
+    off[M->fn] = ++j - sd * M->fn;                                             \
+                                                                               \
+    M->fld = tcalloc(ulong, M->fn);                                            \
+    memcpy(M->fld, tmp, sizeof(ulong) * M->fn);                                \
+                                                                               \
+    M->adj_off = tcalloc(uint, M->fn + 1);                                     \
+    memcpy(M->adj_off, off, (M->fn + 1) * sizeof(uint));                       \
+                                                                               \
+    M->adj_idx = tcalloc(uint, j - sd * M->fn);                                \
+    M->adj_val = tcalloc(scalar, j - sd * M->fn);                              \
+  } while (0)
+
+  uint nnz = mijs->n;
+  buffer_reserve(bfr, (sizeof(struct mij) + 2 * sizeof(ulong)) * (nnz + 1));
+  ulong *tmp = (ulong *)bfr->ptr;
+
+  if (type == CSC) {
+    INIT_IDX_FLD(r, rn, rows);
+    sarray_sort_2(struct mij, mijs->ptr, mijs->n, c, 1, r, 1, bfr);
+  } else {
+    INIT_IDX_FLD(c, cn, cols);
+    sarray_sort_2(struct mij, mijs->ptr, mijs->n, r, 1, c, 1, bfr);
+  }
+
+  uint *off = (uint *)bfr->ptr;
+  tmp = (ulong *)(off + nnz + 1);
+  struct mij *unique = (struct mij *)(tmp + nnz + 1),
+             *ptr = (struct mij *)mijs->ptr;
+
+  off[0] = 0, unique[0] = ptr[0];
+  uint nn;
+  if (type == CSC) {
+    INIT_ADJ_OFF(c, cn, cols);
+    nn = M->cn;
+  } else {
+    INIT_ADJ_OFF(r, rn, rows);
+    nn = M->rn;
+  }
+
+  uint nadj = 0, ndiag = 0, j = off[nn] + sd * nn, i = 0;
+  if (sd != 0) {
+    M->diag_idx = (uint *)tcalloc(uint, nn);
+    M->diag_val = (scalar *)tcalloc(scalar, nn);
+    for (; i < j; i++) {
+      if (unique[i].r == unique[i].c) {
+        M->diag_idx[ndiag] = unique[i].idx;
+        M->diag_val[ndiag++] = unique[i].v;
+      } else {
+        M->adj_idx[nadj] = unique[i].idx;
+        M->adj_val[nadj++] = unique[i].v;
+      }
+    }
+  } else {
+    M->diag_idx = NULL, M->diag_val = NULL;
+    for (; i < j; i++)
+      M->adj_idx[nadj] = unique[i].idx, M->adj_val[nadj++] = unique[i].v;
+  }
+
+#undef INIT_ADJ_OFF
+#undef INIT_IDX_FLD
+
+  return 0;
+}
+
 void par_mat_print(struct par_mat *A) {
   uint i, j;
   if (IS_CSR(A)) {
@@ -400,30 +506,38 @@ void par_mat_print(struct par_mat *A) {
 
 void par_mat_dump(const char *name, struct par_mat *A, struct crystal *cr,
                   buffer *bfr) {
-  assert(IS_CSR(A) && !IS_DIAG(A));
-
-  uint nnz = (A->rn > 0 ? A->adj_off[A->rn] : 0);
+  assert(!IS_DIAG(A));
 
   struct array mijs;
-  array_init(struct mat_ij, &mijs, nnz);
+  array_init(struct mij, &mijs, 1024);
 
-  struct mat_ij t = {.r = 0, .c = 0, .idx = 0, .p = 0, .v = 0};
-  for (uint i = 0; i < A->rn; i++) {
-    t.r = A->rows[i];
-    for (uint j = A->adj_off[i]; j < A->adj_off[i + 1]; j++) {
-      t.c = A->cols[A->adj_idx[j]], t.v = A->adj_val[j];
-      array_cat(struct mat_ij, &mijs, &t, 1);
+  struct mij t = {.r = 0, .c = 0, .idx = 0, .p = 0, .v = 0};
+  if (IS_CSR(A)) {
+    for (uint i = 0; i < A->rn; i++) {
+      t.r = A->rows[i];
+      for (uint j = A->adj_off[i]; j < A->adj_off[i + 1]; j++) {
+        t.c = A->cols[A->adj_idx[j]], t.v = A->adj_val[j];
+        array_cat(struct mij, &mijs, &t, 1);
+      }
+    }
+  } else if (IS_CSC(A)) {
+    for (uint i = 0; i < A->cn; i++) {
+      t.c = A->cols[i];
+      for (uint j = A->adj_off[i]; j < A->adj_off[i + 1]; j++) {
+        t.r = A->rows[A->adj_idx[j]], t.v = A->adj_val[j];
+        array_cat(struct mij, &mijs, &t, 1);
+      }
     }
   }
 
-  sarray_transfer(struct mat_ij, &mijs, p, 1, cr);
-  sarray_sort_2(struct mat_ij, mijs.ptr, mijs.n, r, 1, c, 1, bfr);
+  sarray_transfer(struct mij, &mijs, p, 1, cr);
+  sarray_sort_2(struct mij, mijs.ptr, mijs.n, r, 1, c, 1, bfr);
 
   struct comm *c = &cr->comm;
   if (c->id == 0) {
     FILE *fp = fopen(name, "w+");
     if (fp != NULL) {
-      struct mat_ij *pm = (struct mat_ij *)mijs.ptr;
+      struct mij *pm = (struct mij *)mijs.ptr;
       for (uint i = 0; i < mijs.n; i++)
         fprintf(fp, "%llu %llu %.15lf\n", pm[i].r, pm[i].c, pm[i].v);
       fclose(fp);
@@ -451,7 +565,7 @@ struct par_mat *par_csr_setup_con(const uint nelt, const ulong *eid,
                                   buffer *bfr) {
   struct array nbrs, eij;
   array_init(struct nbr, &nbrs, 100);
-  array_init(struct mat_ij, &eij, 100);
+  array_init(struct mij, &eij, 100);
 
   find_nbrs(&nbrs, eid, vtx, nelt, nv, cr, bfr);
   compress_nbrs(&eij, &nbrs, bfr);
@@ -464,16 +578,15 @@ struct par_mat *par_csr_setup_con(const uint nelt, const ulong *eid,
   return M;
 }
 
-static int compress_mat_ij(struct array *eij, struct array *entries,
-                           buffer *bfr) {
+static int compress_mij(struct array *eij, struct array *entries, buffer *bfr) {
   eij->n = 0;
   if (entries->n == 0)
     return 1;
 
-  sarray_sort_2(struct mat_ij, entries->ptr, entries->n, r, 1, c, 1, bfr);
-  struct mat_ij *ptr = (struct mat_ij *)entries->ptr;
+  sarray_sort_2(struct mij, entries->ptr, entries->n, r, 1, c, 1, bfr);
+  struct mij *ptr = (struct mij *)entries->ptr;
 
-  struct mat_ij m;
+  struct mij m;
   m.idx = 0;
 
   uint i = 0;
@@ -483,12 +596,12 @@ static int compress_mat_ij(struct array *eij, struct array *entries,
     while (j < entries->n && ptr[j].r == ptr[i].r && ptr[j].c == ptr[i].c)
       m.v += ptr[j].v, j++;
 
-    array_cat(struct mat_ij, eij, &m, 1);
+    array_cat(struct mij, eij, &m, 1);
     i = j;
   }
 
   // Now make sure the row sum is zero
-  struct mat_ij *pe = (struct mat_ij *)eij->ptr;
+  struct mij *pe = (struct mij *)eij->ptr;
   i = 0;
   while (i < eij->n) {
     sint j = i, k = -1;
@@ -508,9 +621,9 @@ static int compress_mat_ij(struct array *eij, struct array *entries,
 
 struct par_mat *par_csr_setup_ext(struct array *entries, int sep, buffer *bfr) {
   struct array eij;
-  array_init(struct mat_ij, &eij, 100);
+  array_init(struct mij, &eij, 100);
 
-  compress_mat_ij(&eij, entries, bfr);
+  compress_mij(&eij, entries, bfr);
 
   struct par_mat *M = tcalloc(struct par_mat, 1);
   par_csr_setup(M, &eij, sep, bfr);
@@ -522,9 +635,9 @@ struct par_mat *par_csr_setup_ext(struct array *entries, int sep, buffer *bfr) {
 
 struct par_mat *par_csc_setup_ext(struct array *entries, int sep, buffer *bfr) {
   struct array eij;
-  array_init(struct mat_ij, &eij, 100);
+  array_init(struct mij, &eij, 100);
 
-  compress_mat_ij(&eij, entries, bfr);
+  compress_mij(&eij, entries, bfr);
 
   struct par_mat *M = tcalloc(struct par_mat, 1);
   par_csc_setup(M, &eij, sep, bfr);

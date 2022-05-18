@@ -246,10 +246,10 @@ static int schur_setup_G(struct par_mat *G, scalar tol, const struct mat *L,
   }
 
   uint size = L->n * 20 + 1, k;
-  struct mat_ij m;
+  struct mij m;
 
   struct array unique;
-  array_init(struct mat_ij, &unique, size);
+  array_init(struct mij, &unique, size);
 
   slong *cols = tcalloc(slong, size);
   sint *owners = tcalloc(sint, size);
@@ -264,7 +264,7 @@ static int schur_setup_G(struct par_mat *G, scalar tol, const struct mat *L,
         }
         owners[k] = S_owns_row(m.c, srows, srn) < srn ? c->id : -1;
         cols[k++] = m.c;
-        array_cat(struct mat_ij, &unique, &m, 1);
+        array_cat(struct mij, &unique, &m, 1);
       }
     }
   }
@@ -276,12 +276,12 @@ static int schur_setup_G(struct par_mat *G, scalar tol, const struct mat *L,
   gs(owners, gs_int, gs_max, 0, gsh, bfr);
   free(gsh);
 
-  struct mat_ij *ptr = unique.ptr;
+  struct mij *ptr = unique.ptr;
   for (uint i = 0; i < unique.n; i++)
     ptr[i].p = owners[i];
   free(owners), free(cols);
 
-  sarray_transfer(struct mat_ij, &unique, p, 0, cr);
+  sarray_transfer(struct mij, &unique, p, 0, cr);
 
   par_csc_setup(G, &unique, 0, bfr);
 #ifdef DUMPG
@@ -326,10 +326,10 @@ static int schur_setup_W(struct par_mat *W, scalar tol, const struct mat *L,
   }
 
   uint size = E->rn * 20 + 1, k;
-  struct mat_ij m;
+  struct mij m;
 
   struct array unique;
-  array_init(struct mat_ij, &unique, size);
+  array_init(struct mij, &unique, size);
 
   slong *rows = (slong *)tcalloc(slong, size);
   sint *owners = (sint *)tcalloc(sint, size);
@@ -344,7 +344,7 @@ static int schur_setup_W(struct par_mat *W, scalar tol, const struct mat *L,
         }
         owners[k] = S_owns_row(m.r, srows, srn) < srn ? c->id : -1;
         rows[k++] = m.r;
-        array_cat(struct mat_ij, &unique, &m, 1);
+        array_cat(struct mij, &unique, &m, 1);
       }
     }
   }
@@ -356,12 +356,12 @@ static int schur_setup_W(struct par_mat *W, scalar tol, const struct mat *L,
   gs(owners, gs_int, gs_max, 0, gsh, bfr);
   free(gsh);
 
-  struct mat_ij *ptr = unique.ptr;
+  struct mij *ptr = unique.ptr;
   for (uint i = 0; i < unique.n; i++)
     ptr[i].p = owners[i];
   free(owners), free(rows);
 
-  sarray_transfer(struct mat_ij, &unique, p, 0, cr);
+  sarray_transfer(struct mij, &unique, p, 0, cr);
 
   par_csr_setup(W, &unique, 0, bfr);
 #ifdef DUMPW
@@ -381,21 +381,21 @@ static int sparse_sub(struct par_mat *C, const struct par_mat *A,
   assert(IS_CSR(B));
 
   struct array cij;
-  array_init(struct mat_ij, &cij, 100);
+  array_init(struct mij, &cij, 100);
 
-  struct mat_ij m;
+  struct mij m;
   uint r, j, je;
   for (r = 0; r < A->rn; r++) {
     m.r = A->rows[r];
     for (j = A->adj_off[r], je = A->adj_off[r + 1]; j != je; j++) {
       m.c = A->cols[A->adj_idx[j]], m.v = A->adj_val[j];
-      array_cat(struct mat_ij, &cij, &m, 1);
+      array_cat(struct mij, &cij, &m, 1);
     }
   }
   if (IS_DIAG(A)) {
     for (r = 0; r < A->rn; r++) {
       m.r = A->rows[r], m.c = A->rows[r], m.v = A->diag_val[r];
-      array_cat(struct mat_ij, &cij, &m, 1);
+      array_cat(struct mij, &cij, &m, 1);
     }
   }
 
@@ -403,21 +403,21 @@ static int sparse_sub(struct par_mat *C, const struct par_mat *A,
     m.r = B->rows[r];
     for (j = B->adj_off[r], je = B->adj_off[r + 1]; j != je; j++) {
       m.c = B->cols[B->adj_idx[j]], m.v = -B->adj_val[j];
-      array_cat(struct mat_ij, &cij, &m, 1);
+      array_cat(struct mij, &cij, &m, 1);
     }
   }
   if (IS_DIAG(B)) {
     for (r = 0; r < B->rn; r++) {
       m.r = B->rows[r], m.c = B->rows[r], m.v = -B->diag_val[r];
-      array_cat(struct mat_ij, &cij, &m, 1);
+      array_cat(struct mij, &cij, &m, 1);
     }
   }
 
-  sarray_sort_2(struct mat_ij, cij.ptr, cij.n, r, 1, c, 1, bfr);
-  struct mat_ij *ptr = (struct mat_ij *)cij.ptr;
+  sarray_sort_2(struct mij, cij.ptr, cij.n, r, 1, c, 1, bfr);
+  struct mij *ptr = (struct mij *)cij.ptr;
 
   struct array unique;
-  array_init(struct mat_ij, &unique, 100);
+  array_init(struct mij, &unique, 100);
 
   if (cij.n > 0) {
     uint i = 0;
@@ -427,7 +427,7 @@ static int sparse_sub(struct par_mat *C, const struct par_mat *A,
            j++)
         s += ptr[j].v;
       m = ptr[i], m.v = s;
-      array_cat(struct mat_ij, &unique, &m, 1);
+      array_cat(struct mij, &unique, &m, 1);
       i = j;
     }
   }
@@ -450,22 +450,22 @@ static int sparse_gemm(struct par_mat *WG, const struct par_mat *W,
 
   // Put G into an array to transfer from processor to processor
   struct array gij, sij;
-  array_init(struct mat_ij, &gij, 100);
-  array_init(struct mat_ij, &sij, 100);
+  array_init(struct mij, &gij, 100);
+  array_init(struct mij, &sij, 100);
 
-  struct mat_ij m;
+  struct mij m;
   uint i, j, je;
   for (i = 0; i < G->cn; i++) {
     m.c = G->cols[i], m.p = c->id;
     for (j = G->adj_off[i], je = G->adj_off[i + 1]; j != je; j++) {
       m.r = G->rows[G->adj_idx[j]];
       m.v = G->adj_val[j];
-      array_cat(struct mat_ij, &gij, &m, 1);
+      array_cat(struct mij, &gij, &m, 1);
     }
   }
 
-  sarray_sort_2(struct mat_ij, gij.ptr, gij.n, r, 1, c, 1, bfr);
-  struct mat_ij *ptr = (struct mat_ij *)gij.ptr;
+  sarray_sort_2(struct mij, gij.ptr, gij.n, r, 1, c, 1, bfr);
+  struct mij *ptr = (struct mij *)gij.ptr;
   for (i = 0; i < gij.n; i++)
     ptr[i].idx = i;
 
@@ -480,7 +480,7 @@ static int sparse_gemm(struct par_mat *WG, const struct par_mat *W,
         while (idx < gij.n && ptr[idx].r == k) {
           m.c = ptr[idx].c;
           m.v = W->adj_val[j] * ptr[idx].v, idx++;
-          array_cat(struct mat_ij, &sij, &m, 1);
+          array_cat(struct mij, &sij, &m, 1);
         }
       }
     }
@@ -488,9 +488,9 @@ static int sparse_gemm(struct par_mat *WG, const struct par_mat *W,
     sint next = (c->id + 1) % c->np;
     for (i = 0; i < gij.n; i++)
       ptr[i].p = next;
-    sarray_transfer(struct mat_ij, &gij, p, 0, cr);
+    sarray_transfer(struct mij, &gij, p, 0, cr);
 
-    sarray_sort(struct mat_ij, gij.ptr, gij.n, idx, 0, bfr);
+    sarray_sort(struct mij, gij.ptr, gij.n, idx, 0, bfr);
     ptr = gij.ptr;
   }
 
@@ -617,7 +617,7 @@ static int distribute_by_columns(struct array *aij, ulong s, uint n,
   sint *owner = (sint *)tcalloc(sint, aij->n);
 
   uint i;
-  struct mat_ij *ptr = aij->ptr;
+  struct mij *ptr = aij->ptr;
   for (i = 0; i < aij->n; i++) {
     cols[i] = ptr[i].c;
     if (ptr[i].c >= s && ptr[i].c < s + n)
@@ -633,7 +633,7 @@ static int distribute_by_columns(struct array *aij, ulong s, uint n,
     ptr[i].p = owner[i];
   free(owner);
 
-  sarray_transfer(struct mat_ij, aij, p, 1, cr);
+  sarray_transfer(struct mij, aij, p, 1, cr);
 
   return 0;
 }
@@ -808,22 +808,22 @@ int schur_setup(struct coarse *crs, struct array *eij, const ulong ng,
 
   // Setup A_ll
   struct array ll, ls, sl, ss;
-  array_init(struct mat_ij, &ll, eij->n / 4 + 1);
-  array_init(struct mat_ij, &ls, eij->n / 4 + 1);
-  array_init(struct mat_ij, &sl, eij->n / 4 + 1);
-  array_init(struct mat_ij, &ss, eij->n / 4 + 1);
+  array_init(struct mij, &ll, eij->n / 4 + 1);
+  array_init(struct mij, &ls, eij->n / 4 + 1);
+  array_init(struct mij, &sl, eij->n / 4 + 1);
+  array_init(struct mij, &ss, eij->n / 4 + 1);
 
-  struct mat_ij *ptr = (struct mat_ij *)eij->ptr;
+  struct mij *ptr = (struct mij *)eij->ptr;
   for (uint i = 0; i < eij->n; i++) {
     if (ptr[i].r <= ng) {
       if (ptr[i].c <= ng)
-        array_cat(struct mat_ij, &ll, &ptr[i], 1);
+        array_cat(struct mij, &ll, &ptr[i], 1);
       else
-        array_cat(struct mat_ij, &ls, &ptr[i], 1);
+        array_cat(struct mij, &ls, &ptr[i], 1);
     } else if (ptr[i].c <= ng)
-      array_cat(struct mat_ij, &sl, &ptr[i], 1);
+      array_cat(struct mij, &sl, &ptr[i], 1);
     else
-      array_cat(struct mat_ij, &ss, &ptr[i], 1);
+      array_cat(struct mij, &ss, &ptr[i], 1);
   }
   assert(ls.n == sl.n); // For symmetric matrices
 

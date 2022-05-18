@@ -12,7 +12,7 @@ struct nbr {
   uint proc;
 };
 
-struct mat_ij {
+struct mij {
   ulong r, c;
   uint idx, p;
   scalar v;
@@ -38,24 +38,27 @@ int IS_DIAG(const struct par_mat *A);
 // Output array `arr` is an array of type `struct nbr`
 void find_nbrs(struct array *arr, const ulong *eid, const slong *vtx,
                const uint nelt, const int nv, struct crystal *cr, buffer *buf);
-// Output array `eij` is an array of type `struct mat_ij`, input array `nbr` is
+// Output array `eij` is an array of type `struct mij`, input array `nbr` is
 // an array of type `struct nbr`
 int compress_nbrs(struct array *eij, struct array *nbr, buffer *bfr);
 
-// Input array `entries` is of type `struct mat_ij`
+// Input array `entries` is of type `struct mij`
 // TODO: Rename to mat_setup
 int csr_setup(struct mat *mat, struct array *entries, int sep, buffer *buf);
 int mat_print(struct mat *mat);
 int mat_free(struct mat *mat);
 
-// Input array `entries` is of type `struct mat_ij`
-// TODO: Unify _csr_ and _csc_ functions
+// Input array `entries` is of type `struct mij`
+// type = 0 (CSC) or 1 (CSR)
+int par_mat_setup(struct par_mat *M, struct array *mijs, const int type,
+                  const int sd, buffer *bfr);
 int par_csc_setup(struct par_mat *mat, struct array *entries, int sd,
                   buffer *buf);
 int par_csr_setup(struct par_mat *mat, struct array *entries, int sd,
                   buffer *buf);
 struct par_mat *par_csr_setup_ext(struct array *entries, int sd, buffer *bfr);
 struct par_mat *par_csc_setup_ext(struct array *entries, int sd, buffer *bfr);
+
 // Create a par_mat from connectivity
 struct par_mat *par_csr_setup_con(const uint nelt, const ulong *eid,
                                   const slong *vtx, int nv, int sep,

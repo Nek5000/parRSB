@@ -34,7 +34,7 @@ static void mg_lvl_setup(struct mg *d, const uint lvl, const int factor,
   uint nnz = M->rn > 0 ? M->adj_off[M->rn] + IS_DIAG(M) * M->rn : 0;
 
   // Reserve enough space in the array
-  array_reserve(struct mat_ij, entries, nnz);
+  array_reserve(struct mij, entries, nnz);
   entries->n = 0;
 
   // Reserve enough memory for gs ids for interpolation
@@ -68,7 +68,7 @@ static void mg_lvl_setup(struct mg *d, const uint lvl, const int factor,
   }
 
   uint i, j, k = 0, n = 0;
-  struct mat_ij m;
+  struct mij m;
   for (i = 0; i < M->rn; i++) {
     ulong r = M->rows[i] - rs;
     for (j = M->adj_off[i]; j < M->adj_off[i + 1]; j++) {
@@ -82,7 +82,7 @@ static void mg_lvl_setup(struct mg *d, const uint lvl, const int factor,
       assert(m.r > 0);
       assert(m.c > 0);
       SETP(m.p, m.r, npc, nelt, nrem);
-      array_cat(struct mat_ij, entries, &m, 1);
+      array_cat(struct mij, entries, &m, 1);
     }
     m.r = (r + factor - 1) / factor;
     if (m.r > ngc)
@@ -92,13 +92,13 @@ static void mg_lvl_setup(struct mg *d, const uint lvl, const int factor,
     m.v = M->diag_val[i];
     SETP(m.p, m.r, npc, nelt, nrem);
     ids[k++] = -m.c;
-    array_cat(struct mat_ij, entries, &m, 1);
+    array_cat(struct mij, entries, &m, 1);
   }
 
 #undef SETP
 
-  sarray_transfer(struct mat_ij, entries, p, 0, cr);
-  sarray_sort_2(struct mat_ij, entries->ptr, entries->n, r, 1, c, 1, bfr);
+  sarray_transfer(struct mij, entries, p, 0, cr);
+  sarray_sort_2(struct mij, entries->ptr, entries->n, r, 1, c, 1, bfr);
 
   struct mg_lvl *l = d->levels[lvl] = tcalloc(struct mg_lvl, 1);
   M = l->M = par_csr_setup_ext(entries, 1, bfr);
@@ -141,7 +141,7 @@ struct mg *mg_setup(const struct par_mat *M, const int factor,
 
   uint nnz = M->rn > 0 ? M->adj_off[M->rn] + M->rn : 0;
   struct array entries;
-  array_init(struct mat_ij, &entries, nnz);
+  array_init(struct mij, &entries, nnz);
 
   uint i;
   for (i = 1; i < d->nlevels; i++) {
