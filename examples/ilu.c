@@ -51,7 +51,7 @@ int main(int argc, char *argv[]) {
   parrsb_check_error(err, MPI_COMM_WORLD);
 
   // Setup ILU
-  struct ilu *ilu = ilu_setup(nelt, nv, vl, 0, 0, 0, MPI_COMM_WORLD, 1);
+  struct ilu *ilu = ilu_setup(nelt, nv, vl, 0, 0, MPI_COMM_WORLD, 1);
   ilu_free(ilu);
 
   // Free resources

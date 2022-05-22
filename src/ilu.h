@@ -5,8 +5,8 @@
 
 struct ilu;
 struct ilu *ilu_setup(const uint n, const int nv, const long long *vtx,
-                      const int type, const double tol, const int iter,
-                      const MPI_Comm comm, const int verbose);
+                      const int type, const double tol, const MPI_Comm comm,
+                      const int verbose);
 void ilu_free(struct ilu *ilu);
 
 #endif
