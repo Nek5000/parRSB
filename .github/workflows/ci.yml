@@ -127,7 +127,7 @@ jobs:
           export PARRSB_DUMP_ILU_PRE=1
           export PARRSB_DUMP_ILU_POST=1
 
-          cp hostfile build/examples/ilu examples/ilu0.m parRSB-tests/${{ matrix.test }}
+          cp hostfile build/examples/ilu .github/workflows/ilu0.m parRSB-tests/${{ matrix.test }}
 
           cd parRSB-tests/${{ matrix.test }}
 
@@ -182,7 +182,7 @@ jobs:
         run: |
           export PARRSB_DUMP_ILUC=1
 
-          cp hostfile build/examples/ilu examples/iluc.m parRSB-tests/${{ matrix.test }}
+          cp hostfile build/examples/ilu .github/workflows/iluc.m parRSB-tests/${{ matrix.test }}
 
           cd parRSB-tests/${{ matrix.test }}
 
