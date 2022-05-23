@@ -476,25 +476,23 @@ inline static int copy_row(struct array *arr, const uint i, const uint p,
   return 0;
 }
 
-static int ilu_get_rows(struct par_mat *E, int lvl, struct ilu *ilu,
-                        buffer *bfr) {
+//=============================================================================
+// ILU(0)
+//
+static int ilu0_get_rows(struct par_mat *E, int lvl, uint *lvl_off,
+                         struct par_mat *A, struct crystal *cr, buffer *bfr) {
   struct owner {
     ulong ri;
     uint rp, p;
   };
 
-  assert(lvl > 1);
-  struct par_mat *A = &ilu->A;
   assert(IS_CSR(A) && !IS_DIAG(A));
-
-  struct crystal *cr = &ilu->cr;
-  struct comm *c = &cr->comm;
 
   struct array owners, requests;
   array_init(struct owner, &owners, A->rn * 30);
   array_init(struct owner, &requests, A->rn * 30);
 
-  uint *lvl_off = ilu->lvl_off;
+  struct comm *c = &cr->comm;
   struct owner t;
   for (uint i = lvl_off[lvl - 1]; i < lvl_off[lvl]; i++) {
     ulong I = A->rows[i];
@@ -563,9 +561,6 @@ static int ilu_get_rows(struct par_mat *E, int lvl, struct ilu *ilu,
   return 0;
 }
 
-//=============================================================================
-// ILU(0)
-//
 static void ilu0_update_row(const uint io, const uint k, struct par_mat *A,
                             struct par_mat *E, int verbose, int lvl) {
   uint *off = A->adj_off, *idx = A->adj_idx;
@@ -659,9 +654,9 @@ static void ilu0_level(int lvl, uint *lvl_off, struct par_mat *A,
 
 static void ilu0(struct ilu *ilu, buffer *bfr) {
   ilu0_level(1, ilu->lvl_off, &ilu->A, NULL, 0);
+  struct par_mat E;
   for (int l = 2; l <= ilu->nlvls; l++) {
-    struct par_mat E;
-    ilu_get_rows(&E, l, ilu, bfr);
+    ilu0_get_rows(&E, l, ilu->lvl_off, &ilu->A, &ilu->cr, bfr);
     ilu0_level(l, ilu->lvl_off, &ilu->A, &E, 0);
     par_mat_free(&E);
   }
