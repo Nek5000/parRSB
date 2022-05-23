@@ -81,6 +81,8 @@ struct parrsb_input {
   int test;    // run tests, default: 0
   int dump;    // dump the connectivity or map file, default: 1
   int nactive; // # of active MPI ranks, default: MPI_Comm_size
+  int type;    // ILU type, default: 0
+  int verbose; // Verbosity, default: 0
 };
 
 int parrsb_distribute_elements(unsigned int *nelt, long long **vl,
@@ -92,7 +94,7 @@ void parrsb_print_part_stat(long long *vtx, int nelt, int nv, MPI_Comm comm);
 void parrsb_get_part_stat(int *nc, int *ns, int *nss, int *nel, long long *vtx,
                           int nelt, int nv, MPI_Comm comm);
 
-struct parrsb_input *parrsb_parse_input(int argc, char *argv[]);
+struct parrsb_input *parrsb_parse_input(int argc, char *argv[], MPI_Comm comm);
 
 void parrsb_check_error_(int err, char *file, int line, MPI_Comm comm);
 #define parrsb_check_error(err, comm)                                          \

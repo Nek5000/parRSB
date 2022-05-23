@@ -70,7 +70,7 @@ static void schur_test(const unsigned int nelt, const int nv,
 int main(int argc, char *argv[]) {
   MPI_Init(&argc, &argv);
 
-  struct parrsb_input *in = parrsb_parse_input(argc, argv);
+  struct parrsb_input *in = parrsb_parse_input(argc, argv, MPI_COMM_WORLD);
   int err = (in == NULL);
   parrsb_check_error(err, MPI_COMM_WORLD);
 
@@ -88,8 +88,7 @@ int main(int argc, char *argv[]) {
 
   // Find connectivity
   long long *vl = (long long *)calloc(nelt * nv, sizeof(long long));
-  if (vl == NULL)
-    err = 1;
+  err = (vl == NULL);
   parrsb_check_error(err, MPI_COMM_WORLD);
 
   int ndim = (nv == 8 ? 3 : 2);
@@ -99,8 +98,7 @@ int main(int argc, char *argv[]) {
 
   // Partition the mesh
   int *part = (int *)calloc(nelt, sizeof(int));
-  if (part == NULL)
-    err = 1;
+  err = (part == NULL);
   parrsb_check_error(err, MPI_COMM_WORLD);
 
   parrsb_options options = parrsb_default_options;

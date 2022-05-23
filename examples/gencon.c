@@ -1,7 +1,7 @@
 //=============================================================================
 // Generate connectivity (.co2) from Nek5000 mesh (.re2) file.
 //
-#include <parRSB.h>
+#include "parRSB.h"
 
 static int test_parcon(unsigned int neltp, long long *vlp, char *name,
                        MPI_Comm comm) {
@@ -14,8 +14,7 @@ static int test_parcon(unsigned int neltp, long long *vlp, char *name,
   uint size = nelt * nv;
   slong *minp = tcalloc(slong, size);
   slong *maxp = tcalloc(slong, size);
-  if (minp == NULL || maxp == NULL)
-    err = 1;
+  err = (minp == NULL || maxp == NULL);
   parrsb_check_error(err, comm);
 
   struct comm c;
@@ -63,7 +62,7 @@ static int test_parcon(unsigned int neltp, long long *vlp, char *name,
 int main(int argc, char *argv[]) {
   MPI_Init(&argc, &argv);
 
-  struct parrsb_input *in = parrsb_parse_input(argc, argv);
+  struct parrsb_input *in = parrsb_parse_input(argc, argv, MPI_COMM_WORLD);
   int err = (in == NULL);
   parrsb_check_error(err, MPI_COMM_WORLD);
 
@@ -78,8 +77,7 @@ int main(int argc, char *argv[]) {
 
   // Find connectivity
   long long *vl = (long long *)calloc(nelt * nv, sizeof(long long));
-  if (vl == NULL)
-    err = 1;
+  err = (vl == NULL);
   parrsb_check_error(err, MPI_COMM_WORLD);
 
   int ndim = nv == 8 ? 3 : 2;
