@@ -2,8 +2,7 @@
 
 extern int schur_setup(struct coarse *crs, struct array *eij, const ulong ng,
                        struct comm *c, struct crystal *cr, buffer *bfr);
-extern int schur_solve(scalar *x, scalar *b, struct coarse *crs, struct comm *c,
-                       buffer *bfr);
+extern int schur_solve(scalar *x, scalar *b, struct coarse *crs, buffer *bfr);
 extern int schur_free(struct coarse *crs);
 
 extern void comm_split(const struct comm *old, int bin, int key,
@@ -94,38 +93,54 @@ static ulong number_rows(ulong *elem, ulong *ls_, ulong *lg_, uint *ln_,
 //------------------------------------------------------------------------------
 // Setup coarse grid system
 //
-struct coarse *coarse_setup(uint nelt, int nv, slong const *vtx, struct comm *c,
-                            buffer *bfr) {
+
+struct coarse {
+  ulong ls, lg, is, ig;
+  uint ln, in, *idx;
+  struct comm c;
+  void *solver;
+};
+
+struct coarse *coarse_setup(const unsigned int nelt, const int nv,
+                            const long long *vtx_, MPI_Comm comm) {
+  buffer bfr;
+  buffer_init(&bfr, 1024);
+
+  struct comm c;
+  comm_init(&c, comm);
+
   struct crystal cr;
-  crystal_init(&cr, c);
+  crystal_init(&cr, &c);
+
+  uint size = nelt * nv;
+  slong *vtx = tcalloc(slong, size);
+  for (uint i = 0; i < size; i++)
+    vtx[i] = vtx_[i];
 
   struct coarse *crs = tcalloc(struct coarse, 1);
+  comm_dup(&crs->c, &c);
 
   ulong *eid = tcalloc(ulong, nelt);
   ulong ng = number_rows(eid, &crs->ls, &crs->lg, &crs->ln, &crs->is, &crs->ig,
-                         &crs->in, &crs->idx, vtx, nelt, nv, c, bfr);
-  struct array nbrs;
-  find_nbrs(&nbrs, eid, vtx, nelt, nv, &cr, bfr);
-  free(eid);
-
+                         &crs->in, &crs->idx, vtx, nelt, nv, &c, &bfr);
+  struct array nbrs, eij;
+  find_nbrs(&nbrs, eid, vtx, nelt, nv, &cr, &bfr);
   // Convert `struct nbr` -> `struct mij` and compress
   // entries which share the same (r, c) values. Set the
   // diagonal element to have zero row sum
-  struct array eij;
-  compress_nbrs(&eij, &nbrs, bfr);
-  array_free(&nbrs);
+  compress_nbrs(&eij, &nbrs, &bfr);
+  array_free(&nbrs), free(eid);
 
-  schur_setup(crs, &eij, ng, c, &cr, bfr);
+  schur_setup(crs, &eij, ng, &c, &cr, &bfr);
 
-  array_free(&eij);
-  crystal_free(&cr);
+  array_free(&eij), free(vtx);
+  crystal_free(&cr), comm_free(&c), buffer_free(&bfr);
 
   return crs;
 }
 
-int coarse_solve(scalar *x, scalar *b, struct coarse *crs, struct comm *c,
-                 buffer *bfr) {
-  schur_solve(x, b, crs, c, bfr);
+int coarse_solve(scalar *x, scalar *b, struct coarse *crs, buffer *bfr) {
+  schur_solve(x, b, crs, bfr);
   return 0;
 }
 
@@ -134,6 +149,7 @@ int coarse_free(struct coarse *crs) {
     schur_free(crs);
     if (crs->idx != NULL)
       free(crs->idx), crs->idx = NULL;
+    comm_free(&crs->c);
     free(crs), crs = NULL;
   }
   return 0;

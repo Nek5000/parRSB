@@ -802,6 +802,13 @@ static int project(scalar *x, scalar *b, const struct schur *schur, ulong ls,
   return i == miter ? i : i + 1;
 }
 
+struct coarse {
+  ulong ls, lg, is, ig;
+  uint ln, in, *idx;
+  struct comm c;
+  void *solver;
+};
+
 int schur_setup(struct coarse *crs, struct array *eij, const ulong ng,
                 struct comm *c, struct crystal *cr, buffer *bfr) {
   struct schur *schur = crs->solver = (struct schur *)tcalloc(struct schur, 1);
@@ -871,8 +878,8 @@ int schur_setup(struct coarse *crs, struct array *eij, const ulong ng,
   return 0;
 }
 
-int schur_solve(scalar *x, scalar *b, struct coarse *crs, struct comm *c,
-                buffer *bfr) {
+int schur_solve(scalar *x, scalar *b, struct coarse *crs, buffer *bfr) {
+  struct comm *c = &crs->c;
   struct schur *schur = crs->solver;
 
   uint ln = crs->ln, in = crs->in, *idx = crs->idx;
