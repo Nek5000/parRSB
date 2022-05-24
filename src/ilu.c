@@ -665,67 +665,116 @@ static void ilu0(struct ilu *ilu, buffer *bfr) {
 //=============================================================================
 // ILUC
 //
-// We are going to separate A matrix to L and U where L is the strictly lower
-// triangular part of A and U is the upper triangular part of A (including the
-// diagonal). Since A is in CSR format, extracting U (in CSR format) is easy.
-// L will be distributed by columns and we need to figure out the owner of a
-// given column.
-static void iluc_aux(struct ilu *ilu, buffer *bfr) {
-  // Recover the communicator
-  struct crystal *cr = &ilu->cr;
-  struct comm *c = &cr->comm;
+static void iluc_update_row(struct array *tij, scalar l_ki, const ulong K,
+                            const ulong I, struct par_mat *U, struct par_mat *E,
+                            buffer *bfr) {
+  assert(IS_CSR(U));
 
-  // Setup U
-  struct par_mat *A = &ilu->A;
-  struct array uijs, lijs;
-  array_init(struct mij, &uijs, A->rn * 30);
-  array_init(struct mij, &lijs, A->rn * 30);
-
-  struct mij m = {.r = 0, .c = 0, .idx = 0, .p = 0, .v = 0};
-  uint i, j, je;
-  for (i = 0; i < A->rn; i++) {
-    m.r = A->rows[i];
-    j = A->adj_off[i], je = A->adj_off[i + 1];
-    for (; j < je && A->cols[A->adj_idx[j]] < m.r; j++) {
-      m.c = A->cols[A->adj_idx[j]], m.v = A->adj_val[j];
-      m.p = m.c % c->np, m.idx = (local_dof(A->rows, m.c, A->rn) < A->rn);
-      array_cat(struct mij, &lijs, &m, 1);
+  // Search row I in U
+  struct par_mat *F = NULL;
+  uint i;
+  for (i = 0; i < U->rn; i++) {
+    if (U->rows[i] == I) {
+      F = U;
+      break;
     }
-    // Add the unit diagonal to L (We actually don't need to send this)
-    m.c = m.r, m.v = 1, m.p = m.c % c->np, m.idx = 1;
-    array_cat(struct mij, &lijs, &m, 1);
+  }
+
+  if (F == NULL && E) {
+    for (i = 0; i < E->rn; i++)
+      if (E->rows[i] == I) {
+        F = E;
+        break;
+      }
+  }
+
+  // Found I
+  if (F) {
+    struct mij m = {.r = K, .c = 0, .idx = 0, .p = 0, .v = 0};
+    uint j = F->adj_off[i], je = F->adj_off[i + 1];
+    for (; j < je && F->cols[F->adj_idx[j]] < K; j++)
+      ;
 
     for (; j < je; j++) {
-      m.c = A->cols[A->adj_idx[j]], m.v = A->adj_val[j];
-      array_cat(struct mij, &uijs, &m, 1);
+      m.c = F->cols[F->adj_idx[j]], m.v = -l_ki * F->adj_val[j];
+      array_cat(struct mij, tij, &m, 1);
     }
-  }
 
-  par_mat_setup(&ilu->U, &uijs, 1 /* CSR */, 0, bfr);
-  array_free(&uijs);
+    struct array tn;
+    array_init(struct mij, &tn, tij->n);
 
-  // Setup L
-  sarray_transfer(struct mij, &lijs, p, 1, cr);
-  if (lijs.n > 0) {
-    sarray_sort_2(struct mij, lijs.ptr, lijs.n, c, 1, idx, 0, bfr);
-    struct mij *pl = (struct mij *)lijs.ptr;
-    for (i = 1, j = 0; i < lijs.n; i++) {
-      if (pl[i].c != pl[j].c) {
-        assert(pl[i - 1].idx == 1);
-        for (; j < i; j++)
-          pl[j].idx = pl[i - 1].idx;
-        // j == i at the end
-      }
+    sarray_sort(struct mij, tij->ptr, tij->n, c, 1, bfr);
+    struct mij *pt = (struct mij *)tij->ptr;
+    for (i = 1, j = 0; i < tij->n; i++) {
+      if (pt[i].c == pt[j].c)
+        pt[j].v += pt[i].v;
+      else
+        array_cat(struct mij, &tn, &pt[j], 1), j = i;
     }
     // residual
-    assert(pl[i - 1].idx == 1);
-    for (; j < i; j++)
-      pl[j].idx = pl[i - 1].idx;
+    if (j < i)
+      array_cat(struct mij, &tn, &pt[j], 1);
+
+    tij->n = 0;
+    array_cat(struct mij, tij, tn.ptr, tn.n);
+    array_free(&tn);
+  }
+}
+
+static void iluc_update_col(struct array *tij, scalar u_ik, const ulong K,
+                            const ulong I, struct par_mat *L, struct par_mat *E,
+                            buffer *bfr) {
+  assert(IS_CSC(L));
+
+  // Search row I in L
+  struct par_mat *F = NULL;
+  uint i;
+  for (i = 0; i < L->cn; i++) {
+    if (L->cols[i] == I) {
+      F = L;
+      break;
+    }
   }
 
-  sarray_transfer(struct mij, &lijs, idx, 0, cr);
-  par_mat_setup(&ilu->L, &lijs, 0 /* CSC */, 0, bfr);
-  array_free(&lijs);
+  if (F == NULL && E) {
+    for (i = 0; i < E->cn; i++)
+      if (E->cols[i] == I) {
+        F = E;
+        break;
+      }
+  }
+
+  // Found I
+  if (F) {
+    struct mij m = {.r = 0, .c = K, .idx = 0, .p = 0, .v = 0};
+    uint j = F->adj_off[i], je = F->adj_off[i + 1];
+    for (; j < je && F->rows[F->adj_idx[j]] <= K; j++)
+      ;
+    for (; j < je; j++) {
+      m.r = F->rows[F->adj_idx[j]], m.v = -u_ik * F->adj_val[j];
+      array_cat(struct mij, tij, &m, 1);
+    }
+
+    struct array tn;
+    array_init(struct mij, &tn, tij->n);
+
+    if (tij->n > 0) {
+      sarray_sort(struct mij, tij->ptr, tij->n, r, 1, bfr);
+      struct mij *pt = (struct mij *)tij->ptr;
+      for (i = 1, j = 0; i < tij->n; i++) {
+        if (pt[i].r == pt[j].r)
+          pt[j].v += pt[i].v;
+        else
+          array_cat(struct mij, &tn, &pt[j], 1), j = i;
+      }
+      if (j < i)
+        array_cat(struct mij, &tn, &pt[j], 1);
+    }
+
+    tij->n = 0;
+    array_cat(struct mij, tij, tn.ptr, tn.n);
+    array_free(&tn);
+  }
 }
 
 // At each communication step, each processor will send for the rows (or cols)
@@ -995,116 +1044,9 @@ static void iluc_get_data(struct array *data, ulong K, struct array *mplrs,
   sarray_transfer(struct mij, data, p, 1, cr);
 }
 
-static void iluc_update_row(struct array *tij, scalar l_ki, const ulong K,
-                            const ulong I, struct par_mat *U, struct par_mat *E,
-                            buffer *bfr) {
-  assert(IS_CSR(U));
-
-  // Search row I in U
-  struct par_mat *F = NULL;
-  uint i;
-  for (i = 0; i < U->rn; i++) {
-    if (U->rows[i] == I) {
-      F = U;
-      break;
-    }
-  }
-
-  if (F == NULL && E) {
-    for (i = 0; i < E->rn; i++)
-      if (E->rows[i] == I) {
-        F = E;
-        break;
-      }
-  }
-
-  // Found I
-  if (F) {
-    struct mij m = {.r = K, .c = 0, .idx = 0, .p = 0, .v = 0};
-    uint j = F->adj_off[i], je = F->adj_off[i + 1];
-    for (; j < je && F->cols[F->adj_idx[j]] < K; j++)
-      ;
-
-    for (; j < je; j++) {
-      m.c = F->cols[F->adj_idx[j]], m.v = -l_ki * F->adj_val[j];
-      array_cat(struct mij, tij, &m, 1);
-    }
-
-    struct array tn;
-    array_init(struct mij, &tn, tij->n);
-
-    sarray_sort(struct mij, tij->ptr, tij->n, c, 1, bfr);
-    struct mij *pt = (struct mij *)tij->ptr;
-    for (i = 1, j = 0; i < tij->n; i++) {
-      if (pt[i].c == pt[j].c)
-        pt[j].v += pt[i].v;
-      else
-        array_cat(struct mij, &tn, &pt[j], 1), j = i;
-    }
-    // residual
-    if (j < i)
-      array_cat(struct mij, &tn, &pt[j], 1);
-
-    tij->n = 0;
-    array_cat(struct mij, tij, tn.ptr, tn.n);
-    array_free(&tn);
-  }
-}
-
-static void iluc_update_col(struct array *tij, scalar u_ik, const ulong K,
-                            const ulong I, struct par_mat *L, struct par_mat *E,
-                            buffer *bfr) {
-  assert(IS_CSC(L));
-
-  // Search row I in L
-  struct par_mat *F = NULL;
-  uint i;
-  for (i = 0; i < L->cn; i++) {
-    if (L->cols[i] == I) {
-      F = L;
-      break;
-    }
-  }
-
-  if (F == NULL && E) {
-    for (i = 0; i < E->cn; i++)
-      if (E->cols[i] == I) {
-        F = E;
-        break;
-      }
-  }
-
-  // Found I
-  if (F) {
-    struct mij m = {.r = 0, .c = K, .idx = 0, .p = 0, .v = 0};
-    uint j = F->adj_off[i], je = F->adj_off[i + 1];
-    for (; j < je && F->rows[F->adj_idx[j]] <= K; j++)
-      ;
-    for (; j < je; j++) {
-      m.r = F->rows[F->adj_idx[j]], m.v = -u_ik * F->adj_val[j];
-      array_cat(struct mij, tij, &m, 1);
-    }
-
-    struct array tn;
-    array_init(struct mij, &tn, tij->n);
-
-    if (tij->n > 0) {
-      sarray_sort(struct mij, tij->ptr, tij->n, r, 1, bfr);
-      struct mij *pt = (struct mij *)tij->ptr;
-      for (i = 1, j = 0; i < tij->n; i++) {
-        if (pt[i].r == pt[j].r)
-          pt[j].v += pt[i].v;
-        else
-          array_cat(struct mij, &tn, &pt[j], 1), j = i;
-      }
-      if (j < i)
-        array_cat(struct mij, &tn, &pt[j], 1);
-    }
-
-    tij->n = 0;
-    array_cat(struct mij, tij, tn.ptr, tn.n);
-    array_free(&tn);
-  }
+static void iluc_update(struct array *tij, struct array *mplrs,
+                        struct array *data, int row, buffer *bfr) {
+  return;
 }
 
 static void iluc_level(int lvl, uint *lvl_off, struct par_mat *L,
@@ -1198,6 +1140,69 @@ static void iluc_level(int lvl, uint *lvl_off, struct par_mat *L,
   par_mat_free(Uc), par_mat_free(Lc);
   array_free(&uij), array_free(&lij), array_free(&tij);
   array_free(&data), array_free(&mplrs);
+}
+
+// We are going to separate A matrix to L and U where L is the strictly lower
+// triangular part of A and U is the upper triangular part of A (including the
+// diagonal). Since A is in CSR format, extracting U (in CSR format) is easy.
+// L will be distributed by columns and we need to figure out the owner of a
+// given column.
+static void iluc_aux(struct ilu *ilu, buffer *bfr) {
+  // Recover the communicator
+  struct crystal *cr = &ilu->cr;
+  struct comm *c = &cr->comm;
+
+  // Setup U
+  struct par_mat *A = &ilu->A;
+  struct array uijs, lijs;
+  array_init(struct mij, &uijs, A->rn * 30);
+  array_init(struct mij, &lijs, A->rn * 30);
+
+  struct mij m = {.r = 0, .c = 0, .idx = 0, .p = 0, .v = 0};
+  uint i, j, je;
+  for (i = 0; i < A->rn; i++) {
+    m.r = A->rows[i];
+    j = A->adj_off[i], je = A->adj_off[i + 1];
+    for (; j < je && A->cols[A->adj_idx[j]] < m.r; j++) {
+      m.c = A->cols[A->adj_idx[j]], m.v = A->adj_val[j];
+      m.p = m.c % c->np, m.idx = (local_dof(A->rows, m.c, A->rn) < A->rn);
+      array_cat(struct mij, &lijs, &m, 1);
+    }
+    // Add the unit diagonal to L (We actually don't need to send this)
+    m.c = m.r, m.v = 1, m.p = m.c % c->np, m.idx = 1;
+    array_cat(struct mij, &lijs, &m, 1);
+
+    for (; j < je; j++) {
+      m.c = A->cols[A->adj_idx[j]], m.v = A->adj_val[j];
+      array_cat(struct mij, &uijs, &m, 1);
+    }
+  }
+
+  par_mat_setup(&ilu->U, &uijs, 1 /* CSR */, 0, bfr);
+  array_free(&uijs);
+
+  // Setup L
+  sarray_transfer(struct mij, &lijs, p, 1, cr);
+  if (lijs.n > 0) {
+    sarray_sort_2(struct mij, lijs.ptr, lijs.n, c, 1, idx, 0, bfr);
+    struct mij *pl = (struct mij *)lijs.ptr;
+    for (i = 1, j = 0; i < lijs.n; i++) {
+      if (pl[i].c != pl[j].c) {
+        assert(pl[i - 1].idx == 1);
+        for (; j < i; j++)
+          pl[j].idx = pl[i - 1].idx;
+        // j == i at the end
+      }
+    }
+    // residual
+    assert(pl[i - 1].idx == 1);
+    for (; j < i; j++)
+      pl[j].idx = pl[i - 1].idx;
+  }
+
+  sarray_transfer(struct mij, &lijs, idx, 0, cr);
+  par_mat_setup(&ilu->L, &lijs, 0 /* CSC */, 0, bfr);
+  array_free(&lijs);
 }
 
 static void iluc(struct ilu *ilu, buffer *bfr) {
