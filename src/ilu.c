@@ -875,16 +875,125 @@ static void iluc_get_multipliers(struct array *mplrs, int lvl, uint *lvl_off,
   }
   array_free(&rqst);
 
-  sarray_transfer(struct mij_t, mplrs, p, 1, cr);
+  sarray_transfer(struct mplr_t, mplrs, p, 1, cr);
   if (mplrs->n > 0) {
-    struct mij_t *pr = (struct mij_t *)mplrs->ptr;
+    struct mplr_t *pr = (struct mplr_t *)mplrs->ptr;
     for (uint j = 0; j < mplrs->n; j++)
-      printf("\tM = %llu, m = %llu\n", pr[j].g, pr[j].f);
+      printf("\tf = %llu g = %llu\n", pr[j].f, pr[j].g);
   }
 }
 
 static void iluc_get_data(struct array *data, ulong K, struct array *mplrs,
-                          struct par_mat *A) {}
+                          struct par_mat *A, struct crystal *cr, buffer *bfr) {
+  data->n = 0;
+  if (A == NULL)
+    return;
+
+  assert(!IS_DIAG(A));
+
+  struct request_t {
+    ulong r;
+    uint p, o;
+  };
+
+  struct comm *c = &cr->comm;
+
+  uint nn = (IS_CSC(A) ? A->cn : A->rn);
+  struct array rqsts;
+  array_init(struct request_t, &rqsts, nn);
+
+  ulong *fldf = (IS_CSC(A) ? A->cols : A->rows);
+  struct request_t t = {.r = 0, .p = 0, .o = 0};
+  for (uint i = 0; i < nn; i++) {
+    t.r = fldf[i], t.p = t.r % c->np, t.o = 1;
+    array_cat(struct request_t, &rqsts, &t, 1);
+  }
+
+  struct mplr_t *pm = (struct mplr_t *)mplrs->ptr;
+  for (uint i = 0; i < mplrs->n; i++) {
+    t.r = pm[i].g, t.p = t.r % c->np, t.o = 0;
+    array_cat(struct request_t, &rqsts, &t, 1);
+  }
+
+  sarray_transfer(struct request_t, &rqsts, p, 1, cr);
+
+  struct array fwds;
+  array_init(struct request_t, &fwds, rqsts.n);
+
+  // printf("\trqsts.n = %u\n", rqsts.n);
+  if (rqsts.n > 0) {
+    sarray_sort_2(struct request_t, rqsts.ptr, rqsts.n, r, 1, o, 0, bfr);
+    struct request_t *pr = (struct request_t *)rqsts.ptr;
+
+    uint i = 1, j = 0;
+    for (; i < rqsts.n; i++) {
+      // printf("\t\t i = %u j = %u rqsts.n = %u\n", i, j, rqsts.n);
+      if (pr[i].r != pr[j].r) {
+        // Last one should be the owner, everyone thing else is a request.
+        // We will forward the requests to the correct processor.
+        assert(pr[i - 1].o == 1);
+        for (; j < i - 1; j++) {
+          pr[j].o = pr[i - 1].p;
+          array_cat(struct request_t, &fwds, &pr[j], 1);
+        }
+        j = i;
+      }
+    }
+    if (j < i) {
+      assert(pr[i - 1].o == 1);
+      for (; j < i - 1; j++) {
+        pr[j].o = pr[i - 1].p;
+        array_cat(struct request_t, &fwds, &pr[j], 1);
+      }
+    }
+  }
+  array_free(&rqsts);
+
+  sarray_transfer(struct request_t, &fwds, o, 1, cr);
+
+  if (fwds.n > 0) {
+    sarray_sort(struct request_t, fwds.ptr, fwds.n, r, 1, bfr);
+    struct request_t *pf = (struct request_t *)fwds.ptr;
+
+    uint *adj_off = A->adj_off, *adj_idx = A->adj_idx, i, j, k, ke;
+    scalar *adj_val = A->adj_val;
+    ulong *fldg = (IS_CSC(A) ? A->rows : A->cols);
+
+    struct mij m = {.r = 0, .c = 0, .idx = 0, .p = 0, .v = 0};
+    if (IS_CSC(A)) {
+      for (i = 0, j = 0; i < fwds.n; i++) {
+        for (; j < nn && fldf[j] < pf[i].r; j++)
+          ;
+        assert(fldf[j] == pf[i].r);
+        k = adj_off[j], ke = adj_off[j + 1];
+        for (; k < ke && fldg[adj_idx[k]] <= K; k++)
+          ;
+        m.c = fldf[j], m.p = pf[i].p;
+        for (; k < ke; k++) {
+          m.r = fldg[adj_idx[k]], m.v = adj_val[k];
+          array_cat(struct mij, data, &m, 1);
+        }
+      }
+    } else if (IS_CSR(A)) {
+      for (i = 0, j = 0; i < fwds.n; i++) {
+        for (; j < nn && fldf[j] < pf[i].r; j++)
+          ;
+        assert(fldf[j] == pf[i].r);
+        k = adj_off[j], ke = adj_off[j + 1];
+        for (; k < ke && fldg[adj_idx[k]] < K; k++)
+          ;
+        m.r = fldf[j], m.p = pf[i].p;
+        for (; k < ke; k++) {
+          m.c = fldg[adj_idx[k]], m.v = adj_val[k];
+          array_cat(struct mij, data, &m, 1);
+        }
+      }
+    }
+  }
+  array_free(&fwds);
+
+  sarray_transfer(struct mij, data, p, 1, cr);
+}
 
 static void iluc_update_row(struct array *tij, scalar l_ki, const ulong K,
                             const ulong I, struct par_mat *U, struct par_mat *E,
@@ -1001,11 +1110,14 @@ static void iluc_update_col(struct array *tij, scalar u_ik, const ulong K,
 static void iluc_level(int lvl, uint *lvl_off, struct par_mat *L,
                        struct par_mat *U, struct crystal *cr, int verbose,
                        buffer *bfr) {
-  struct array uij, lij, tij, mplrs;
+  struct array uij, lij, tij;
   array_init(struct mij, &uij, U->rn * 30);
   array_init(struct mij, &lij, L->cn * 30);
   array_init(struct mij, &tij, 30);
+
+  struct array mplrs, data;
   array_init(struct mij, &mplrs, 30);
+  array_init(struct mij, &data, 30);
 
   struct par_mat *Uc = NULL, *Lc = NULL;
 
@@ -1013,7 +1125,9 @@ static void iluc_level(int lvl, uint *lvl_off, struct par_mat *L,
   uint i, k, j, je;
   for (k = lvl_off[lvl - 1]; k < lvl_off[lvl]; k++) {
     const ulong K = U->rows[k];
-    iluc_get_multipliers(&mplrs, lvl, lvl_off, K, Uc, cr, bfr);
+    iluc_get_multipliers(&mplrs, lvl, lvl_off, K, Lc, cr, bfr);
+    iluc_get_data(&data, K, &mplrs, Uc, cr, bfr);
+    printf("\tdata.n = %u\n", data.n);
 
     // Init z[1:k] = 0, z[k:n] = a_{k, k:n}, i.e., z = u_{k,:}
     tij.n = 0, m.r = K;
@@ -1082,7 +1196,8 @@ static void iluc_level(int lvl, uint *lvl_off, struct par_mat *L,
   }
 
   par_mat_free(Uc), par_mat_free(Lc);
-  array_free(&uij), array_free(&lij), array_free(&tij), array_free(&mplrs);
+  array_free(&uij), array_free(&lij), array_free(&tij);
+  array_free(&data), array_free(&mplrs);
 }
 
 static void iluc(struct ilu *ilu, buffer *bfr) {
