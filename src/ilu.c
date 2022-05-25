@@ -17,6 +17,11 @@ struct e2n_t {
   ulong e, n;
 };
 
+struct request_t {
+  ulong r;
+  uint p, o;
+};
+
 static int find_unique_nbrs(struct array *e2nm, uint n, int nv,
                             const ulong *ids, const slong *vtx,
                             struct crystal *cr, buffer *bfr) {
@@ -56,11 +61,6 @@ static int local_dof(const ulong *rows, const ulong I, const uint n) {
 // Fill dofs array with unique dofs found in this processr
 static int update_keys(struct array *keys, struct array *nbrs, const uint ln,
                        const ulong *lids, struct crystal *cr, buffer *bfr) {
-  struct request_t {
-    ulong r;
-    uint p, o;
-  };
-
   uint i, j;
   struct array temp, rqst;
   array_init(struct request_t, &temp, nbrs->n);
@@ -663,7 +663,7 @@ static void ilu0(struct ilu *ilu, buffer *bfr) {
 }
 
 //=============================================================================
-// ILUC
+// ILUC - serial
 //
 static void iluc_update_row(struct array *tij, scalar l_ki, const ulong K,
                             const ulong I, struct par_mat *U, struct par_mat *E,
@@ -777,6 +777,89 @@ static void iluc_update_col(struct array *tij, scalar u_ik, const ulong K,
   }
 }
 
+static void iluc_level_serial(int lvl, uint *lvl_off, struct par_mat *L,
+                              struct par_mat *U, struct crystal *cr,
+                              int verbose, buffer *bfr) {
+  struct array uij, lij, tij;
+  array_init(struct mij, &uij, U->rn * 30);
+  array_init(struct mij, &lij, L->cn * 30);
+  array_init(struct mij, &tij, 30);
+
+  struct par_mat *Uc = NULL, *Lc = NULL;
+
+  struct mij m = {.r = 0, .c = 0, .idx = 0, .p = 0, .v = 0};
+  uint i, k, j, je;
+  for (k = lvl_off[lvl - 1]; k < lvl_off[lvl]; k++) {
+    const ulong K = U->rows[k];
+
+    // Init z[1:k] = 0, z[k:n] = a_{k, k:n}, i.e., z = u_{k,:}
+    tij.n = 0, m.r = K;
+    for (j = U->adj_off[k], je = U->adj_off[k + 1]; j < je; j++) {
+      m.c = U->cols[U->adj_idx[j]], m.v = U->adj_val[j];
+      array_cat(struct mij, &tij, &m, 1);
+    }
+
+    // Update z if if l_ki != 0 for all I, 1 <= I < K
+    // Following implementation is serial for now
+    for (i = 0; i < k && Lc->cols[i] < K; i++) {
+      j = Lc->adj_off[i], je = Lc->adj_off[i + 1];
+      for (; j < je && Lc->rows[Lc->adj_idx[j]] < K; j++)
+        ;
+      if (j < je && Lc->rows[Lc->adj_idx[j]] == K)
+        iluc_update_row(&tij, Lc->adj_val[j], K, Lc->cols[i], Uc, NULL, bfr);
+    }
+
+    // Set u_{k, :} = z and find u_kk
+    array_cat(struct mij, &uij, tij.ptr, tij.n);
+    struct mij *pt = (struct mij *)tij.ptr;
+    scalar u_kk = 1;
+    if (tij.n > 0 && fabs(pt[0].v) > 1e-10)
+      u_kk = pt[0].v;
+
+    // Init w[1:k] = 0, w[k] = 1, w[k+1:n] = a_{k+1:n, k}, i.e., w = l_{:, k}
+    tij.n = 0, m.c = K;
+    for (j = L->adj_off[k] + 1, je = L->adj_off[k + 1]; j < je; j++) {
+      m.r = L->rows[L->adj_idx[j]], m.v = L->adj_val[j];
+      array_cat(struct mij, &tij, &m, 1);
+    }
+
+    // Update w if u_ik != 0 for all I, 1 <= I < K
+    // Following implementation is serial for now
+    for (i = 0; i < k && Uc->rows[i] < K; i++) {
+      j = Uc->adj_off[i], je = Uc->adj_off[i + 1];
+      for (; j < je && Uc->cols[Uc->adj_idx[j]] < K; j++)
+        ;
+      if (j < je && Uc->cols[Uc->adj_idx[j]] == K)
+        iluc_update_col(&tij, Uc->adj_val[j], K, Uc->rows[i], Lc, NULL, bfr);
+    }
+
+    // Set l_{:, k} = w
+    pt = (struct mij *)tij.ptr;
+    for (j = 0; j < tij.n; j++)
+      pt[j].v /= u_kk;
+    array_cat(struct mij, &lij, tij.ptr, tij.n);
+    m.r = m.c = K, m.v = 1;
+    array_cat(struct mij, &lij, &m, 1);
+
+    if (Uc == NULL || Lc == NULL)
+      Uc = tcalloc(struct par_mat, 1), Lc = tcalloc(struct par_mat, 1);
+    else
+      par_mat_free(Uc), par_mat_free(Lc);
+
+    par_mat_setup(Uc, &uij, 1, 0, bfr);
+    par_mat_setup(Lc, &lij, 0, 0, bfr);
+  }
+
+  char *val = getenv("PARRSB_DUMP_ILUC");
+  if (val != NULL && atoi(val) != 0) {
+    par_mat_dump("LL.txt", Lc, cr, bfr);
+    par_mat_dump("UU.txt", Uc, cr, bfr);
+  }
+
+  par_mat_free(Uc), par_mat_free(Lc);
+  array_free(&uij), array_free(&lij), array_free(&tij);
+}
+
 // At each communication step, each processor will send for the rows (or cols)
 // they need. If P processors are active, there are only P requests.
 struct mplr_t {
@@ -795,11 +878,6 @@ static void iluc_get_multipliers(struct array *mplrs, int lvl, uint *lvl_off,
   assert(!IS_DIAG(A));
   assert(lvl >= 1);
 
-  struct request_t {
-    ulong f;
-    uint p, o;
-  };
-
   struct comm *c = &cr->comm;
 
   // Even if K == 0, we add all the row ids corresponding to the non-zero values
@@ -814,10 +892,10 @@ static void iluc_get_multipliers(struct array *mplrs, int lvl, uint *lvl_off,
   array_init(struct request_t, &rqst, 30);
   array_init(struct request_t, &temp, 30);
 
-  struct request_t t = {.f = 0, .p = 0, .o = 1};
+  struct request_t t = {.r = 0, .p = 0, .o = 1};
   uint s = adj_off[lvl_off[0]], e = adj_off[lvl_off[lvl - 1]];
   for (; s < e; s++) {
-    t.f = fldf[adj_idx[s]], t.p = t.f % c->np;
+    t.r = fldf[adj_idx[s]], t.p = t.r % c->np;
     array_cat(struct request_t, &rqst, &t, 1);
   }
 
@@ -827,7 +905,7 @@ static void iluc_get_multipliers(struct array *mplrs, int lvl, uint *lvl_off,
   if (K > 0) {
     for (uint i = lvl_off[lvl - 1]; i < nn; i++) {
       for (s = adj_off[i], e = adj_off[i + 1]; s < e; s++) {
-        t.f = fldf[adj_idx[s]], t.p = t.f % c->np;
+        t.r = fldf[adj_idx[s]], t.p = t.r % c->np;
         array_cat(struct request_t, &rqst, &t, 1);
       }
     }
@@ -835,10 +913,10 @@ static void iluc_get_multipliers(struct array *mplrs, int lvl, uint *lvl_off,
 
   if (rqst.n > 0) {
     // Sort and find unique elements
-    sarray_sort(struct request_t, rqst.ptr, rqst.n, f, 1, bfr);
+    sarray_sort(struct request_t, rqst.ptr, rqst.n, r, 1, bfr);
     struct request_t *pr = (struct request_t *)rqst.ptr;
     for (e = 1, s = 0; e < rqst.n; e++) {
-      if (pr[e].f != pr[s].f) {
+      if (pr[e].r != pr[s].r) {
         array_cat(struct request_t, &temp, &pr[s], 1);
         s = e;
       }
@@ -852,7 +930,7 @@ static void iluc_get_multipliers(struct array *mplrs, int lvl, uint *lvl_off,
   }
 
   if (K > 0) {
-    t.f = K, t.p = K % c->np, t.o = 0;
+    t.r = K, t.p = K % c->np, t.o = 0;
     array_cat(struct request_t, &rqst, &t, 1);
   }
 
@@ -861,10 +939,10 @@ static void iluc_get_multipliers(struct array *mplrs, int lvl, uint *lvl_off,
   // Okay, we got all the requests (if any) and non-zero row/col ids in the same
   // processor. Now we forward the requests to the original owners.
   if (rqst.n > 0) {
-    sarray_sort_2(struct request_t, rqst.ptr, rqst.n, f, 1, o, 0, bfr);
+    sarray_sort_2(struct request_t, rqst.ptr, rqst.n, r, 1, o, 0, bfr);
     struct request_t *pr = (struct request_t *)rqst.ptr;
     for (e = 1, s = 0; e < rqst.n; e++) {
-      if (pr[e].f != pr[s].f) {
+      if (pr[e].r != pr[s].r) {
         if (pr[s].o == 0) { // This is a request
           uint p = pr[s].p;
           for (s = s + 1; s < e; s++) {
@@ -909,15 +987,15 @@ static void iluc_get_multipliers(struct array *mplrs, int lvl, uint *lvl_off,
     sarray_sort(struct mplr_t, temp.ptr, temp.n, f, 1, bfr);
     struct mplr_t *pt = (struct mplr_t *)temp.ptr;
 
-    sarray_sort(struct request_t, rqst.ptr, rqst.n, f, 1, bfr);
+    sarray_sort(struct request_t, rqst.ptr, rqst.n, r, 1, bfr);
     struct request_t *pr = (struct request_t *)rqst.ptr;
 
     for (uint i = 0, j = 0; i < rqst.n; i++) {
-      while (j < temp.n && pt[j].f < pr[i].f)
+      while (j < temp.n && pt[j].f < pr[i].r)
         j++;
-      assert(j < temp.n && pt[j].f == pr[i].f);
+      assert(j < temp.n && pt[j].f == pr[i].r);
       uint p = pr[i].o;
-      for (; j < temp.n && pt[j].f == pr[i].f; j++) {
+      for (; j < temp.n && pt[j].f == pr[i].r; j++) {
         pt[j].p = p;
         array_cat(struct mij, mplrs, &pt[j], 1);
       }
@@ -929,9 +1007,9 @@ static void iluc_get_multipliers(struct array *mplrs, int lvl, uint *lvl_off,
   sarray_transfer(struct mplr_t, mplrs, p, 1, cr);
 #if DEBUG
   if (mplrs->n > 0) {
-    struct mplr_t *pr = (struct mplr_t *)mplrs->ptr;
+    struct mplr_t *pm = (struct mplr_t *)mplrs->ptr;
     for (uint j = 0; j < mplrs->n; j++)
-      printf("\tf = %llu g = %llu\n", pr[j].f, pr[j].g);
+      printf("\tf = %llu g = %llu\n", pm[j].r, pm[j].g);
   }
 #endif
 }
@@ -943,11 +1021,6 @@ static void iluc_get_data(struct array *data, struct array *mplrs, ulong K,
     return;
 
   assert(!IS_DIAG(A));
-
-  struct request_t {
-    ulong r;
-    uint p, o;
-  };
 
   struct comm *c = &cr->comm;
 
@@ -1111,9 +1184,12 @@ static void iluc_update(struct array *tij, ulong K, struct array *mplrs,
   array_free(&tmp);
 }
 
-static void iluc_level_aux(int lvl, uint *lvl_off, struct par_mat *L,
-                           struct par_mat *U, struct crystal *cr, int verbose,
-                           buffer *bfr) {
+//=============================================================================
+// ILUC - parallel
+//
+static void iluc_level(struct par_mat *Lc, struct par_mat *Uc, int lvl,
+                       uint *lvl_off, struct par_mat *L, struct par_mat *U,
+                       struct crystal *cr, int verbose, buffer *bfr) {
   struct array uij, lij, tij;
   array_init(struct mij, &uij, U->rn * 30);
   array_init(struct mij, &lij, L->cn * 30);
@@ -1122,8 +1198,6 @@ static void iluc_level_aux(int lvl, uint *lvl_off, struct par_mat *L,
   struct array mplrs, data;
   array_init(struct mij, &mplrs, 30);
   array_init(struct mij, &data, 30);
-
-  struct par_mat *Uc = NULL, *Lc = NULL;
 
   struct mij m = {.r = 0, .c = 0, .idx = 0, .p = 0, .v = 0};
   uint i, k, j, je;
@@ -1188,107 +1262,13 @@ static void iluc_level_aux(int lvl, uint *lvl_off, struct par_mat *L,
     m.r = m.c = K, m.v = 1;
     array_cat(struct mij, &lij, &m, 1);
 
-    if (Uc == NULL || Lc == NULL)
-      Uc = tcalloc(struct par_mat, 1), Lc = tcalloc(struct par_mat, 1);
-    else
-      par_mat_free(Uc), par_mat_free(Lc);
-
+    par_mat_free(Uc), par_mat_free(Lc);
     par_mat_setup(Uc, &uij, 1, 0, bfr);
     par_mat_setup(Lc, &lij, 0, 0, bfr);
   }
 
-  char *val = getenv("PARRSB_DUMP_ILUC");
-  if (val != NULL && atoi(val) != 0) {
-    par_mat_dump("LL.txt", Lc, cr, bfr);
-    par_mat_dump("UU.txt", Uc, cr, bfr);
-  }
-
-  par_mat_free(Uc), par_mat_free(Lc);
   array_free(&uij), array_free(&lij), array_free(&tij);
   array_free(&mplrs), array_free(&data);
-}
-
-static void iluc_level(int lvl, uint *lvl_off, struct par_mat *L,
-                       struct par_mat *U, struct crystal *cr, int verbose,
-                       buffer *bfr) {
-  struct array uij, lij, tij;
-  array_init(struct mij, &uij, U->rn * 30);
-  array_init(struct mij, &lij, L->cn * 30);
-  array_init(struct mij, &tij, 30);
-
-  struct par_mat *Uc = NULL, *Lc = NULL;
-
-  struct mij m = {.r = 0, .c = 0, .idx = 0, .p = 0, .v = 0};
-  uint i, k, j, je;
-  for (k = lvl_off[lvl - 1]; k < lvl_off[lvl]; k++) {
-    const ulong K = U->rows[k];
-
-    // Init z[1:k] = 0, z[k:n] = a_{k, k:n}, i.e., z = u_{k,:}
-    tij.n = 0, m.r = K;
-    for (j = U->adj_off[k], je = U->adj_off[k + 1]; j < je; j++) {
-      m.c = U->cols[U->adj_idx[j]], m.v = U->adj_val[j];
-      array_cat(struct mij, &tij, &m, 1);
-    }
-
-    // Update z if if l_ki != 0 for all I, 1 <= I < K
-    // Following implementation is serial for now
-    for (i = 0; i < k && Lc->cols[i] < K; i++) {
-      j = Lc->adj_off[i], je = Lc->adj_off[i + 1];
-      for (; j < je && Lc->rows[Lc->adj_idx[j]] < K; j++)
-        ;
-      if (j < je && Lc->rows[Lc->adj_idx[j]] == K)
-        iluc_update_row(&tij, Lc->adj_val[j], K, Lc->cols[i], Uc, NULL, bfr);
-    }
-
-    // Set u_{k, :} = z and find u_kk
-    array_cat(struct mij, &uij, tij.ptr, tij.n);
-    struct mij *pt = (struct mij *)tij.ptr;
-    scalar u_kk = 1;
-    if (tij.n > 0 && fabs(pt[0].v) > 1e-10)
-      u_kk = pt[0].v;
-
-    // Init w[1:k] = 0, w[k] = 1, w[k+1:n] = a_{k+1:n, k}, i.e., w = l_{:, k}
-    tij.n = 0, m.c = K;
-    for (j = L->adj_off[k] + 1, je = L->adj_off[k + 1]; j < je; j++) {
-      m.r = L->rows[L->adj_idx[j]], m.v = L->adj_val[j];
-      array_cat(struct mij, &tij, &m, 1);
-    }
-
-    // Update w if u_ik != 0 for all I, 1 <= I < K
-    // Following implementation is serial for now
-    for (i = 0; i < k && Uc->rows[i] < K; i++) {
-      j = Uc->adj_off[i], je = Uc->adj_off[i + 1];
-      for (; j < je && Uc->cols[Uc->adj_idx[j]] < K; j++)
-        ;
-      if (j < je && Uc->cols[Uc->adj_idx[j]] == K)
-        iluc_update_col(&tij, Uc->adj_val[j], K, Uc->rows[i], Lc, NULL, bfr);
-    }
-
-    // Set l_{:, k} = w
-    pt = (struct mij *)tij.ptr;
-    for (j = 0; j < tij.n; j++)
-      pt[j].v /= u_kk;
-    array_cat(struct mij, &lij, tij.ptr, tij.n);
-    m.r = m.c = K, m.v = 1;
-    array_cat(struct mij, &lij, &m, 1);
-
-    if (Uc == NULL || Lc == NULL)
-      Uc = tcalloc(struct par_mat, 1), Lc = tcalloc(struct par_mat, 1);
-    else
-      par_mat_free(Uc), par_mat_free(Lc);
-
-    par_mat_setup(Uc, &uij, 1, 0, bfr);
-    par_mat_setup(Lc, &lij, 0, 0, bfr);
-  }
-
-  char *val = getenv("PARRSB_DUMP_ILUC");
-  if (val != NULL && atoi(val) != 0) {
-    par_mat_dump("LL.txt", Lc, cr, bfr);
-    par_mat_dump("UU.txt", Uc, cr, bfr);
-  }
-
-  par_mat_free(Uc), par_mat_free(Lc);
-  array_free(&uij), array_free(&lij), array_free(&tij);
 }
 
 // We are going to separate A matrix to L and U where L is the strictly lower
@@ -1296,7 +1276,7 @@ static void iluc_level(int lvl, uint *lvl_off, struct par_mat *L,
 // diagonal). Since A is in CSR format, extracting U (in CSR format) is easy.
 // L will be distributed by columns and we need to figure out the owner of a
 // given column.
-static void iluc_aux(struct ilu *ilu, buffer *bfr) {
+static void iluc_sep_lu(struct ilu *ilu, buffer *bfr) {
   // Recover the communicator
   struct crystal *cr = &ilu->cr;
   struct comm *c = &cr->comm;
@@ -1356,7 +1336,7 @@ static void iluc_aux(struct ilu *ilu, buffer *bfr) {
 
 static void iluc(struct ilu *ilu, buffer *bfr) {
   // Setup L and U
-  iluc_aux(ilu, bfr);
+  iluc_sep_lu(ilu, bfr);
 
   // Do a sanity check
   struct par_mat *L = &ilu->L, *U = &ilu->U;
@@ -1370,7 +1350,19 @@ static void iluc(struct ilu *ilu, buffer *bfr) {
     par_mat_dump("U.txt", &ilu->U, &ilu->cr, bfr);
   }
 
-  iluc_level_aux(1, ilu->lvl_off, &ilu->L, &ilu->U, &ilu->cr, 0, bfr);
+  // This is temporary -- it will go away
+  struct par_mat Lc, Uc;
+  par_mat_setup(&Uc, NULL, 1, 0, bfr);
+  par_mat_setup(&Lc, NULL, 0, 0, bfr);
+  iluc_level(&Lc, &Uc, 1, ilu->lvl_off, &ilu->L, &ilu->U, &ilu->cr, 0, bfr);
+
+  val = getenv("PARRSB_DUMP_ILUC");
+  if (val != NULL && atoi(val) != 0) {
+    par_mat_dump("LL.txt", &Lc, &ilu->cr, bfr);
+    par_mat_dump("UU.txt", &Uc, &ilu->cr, bfr);
+  }
+
+  par_mat_free(&Lc), par_mat_free(&Uc);
 }
 
 //=============================================================================
