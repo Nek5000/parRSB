@@ -872,9 +872,6 @@ static void iluc_get_multipliers(struct array *mplrs, int lvl, uint *lvl_off,
                                  ulong K, struct par_mat *A, struct crystal *cr,
                                  buffer *bfr) {
   mplrs->n = 0;
-  if (A->adj_off == NULL || A->adj_idx == NULL)
-    return;
-
   assert(!IS_DIAG(A));
   assert(lvl >= 1);
 
@@ -891,10 +888,12 @@ static void iluc_get_multipliers(struct array *mplrs, int lvl, uint *lvl_off,
   uint nn = (IS_CSC(A) ? A->cn : A->rn);
 
   struct request_t t = {.r = 0, .p = 0, .o = 1};
-  uint s = adj_off[0], e = adj_off[nn];
-  for (; s < e; s++) {
-    t.r = fldf[adj_idx[s]], t.p = t.r % c->np;
-    array_cat(struct request_t, &rqst, &t, 1);
+  uint s, e;
+  for (s = 0; s < nn; s++) {
+    for (e = adj_off[s]; e < adj_off[s + 1]; e++) {
+      t.r = fldf[adj_idx[e]], t.p = t.r % c->np;
+      array_cat(struct request_t, &rqst, &t, 1);
+    }
   }
 
   if (rqst.n > 0) {
@@ -998,9 +997,6 @@ static void iluc_get_multipliers(struct array *mplrs, int lvl, uint *lvl_off,
 static void iluc_get_data(struct array *data, struct array *mplrs, ulong K,
                           struct par_mat *A, struct crystal *cr, buffer *bfr) {
   data->n = 0;
-  if (A == NULL)
-    return;
-
   assert(!IS_DIAG(A));
 
   struct comm *c = &cr->comm;
@@ -1056,7 +1052,7 @@ static void iluc_get_data(struct array *data, struct array *mplrs, ulong K,
 
   sarray_transfer(struct request_t, &fwds, o, 0, cr);
 
-  if (fwds.n > 0) {
+  if (A != NULL) {
     sarray_sort(struct request_t, fwds.ptr, fwds.n, r, 1, bfr);
     struct request_t *pf = (struct request_t *)fwds.ptr;
 
