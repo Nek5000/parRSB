@@ -1212,10 +1212,12 @@ static void iluc_level(struct par_mat *Lc, struct par_mat *Uc,
     // Set u_{k, :} = z and find u_kk
     scalar u_kk = 1;
     struct mij *pt = (struct mij *)tij.ptr;
-    if (active) {
-      array_cat(struct mij, uij, tij.ptr, tij.n);
-      if (tij.n > 0 && fabs(pt[0].v) > 1e-10)
+    if (active && tij.n > 0) {
+      if (fabs(pt[0].v) > 1e-12)
         u_kk = pt[0].v;
+      else // Temporary workaround till pivoting is implemented
+        pt[0].v = u_kk;
+      array_cat(struct mij, uij, tij.ptr, tij.n);
     }
 
     // Init w[1:K] = 0, w[K] = 1, w[K+1:n] = a_{K+1:n, K}, i.e., w = l_{:, K}
