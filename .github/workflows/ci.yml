@@ -143,7 +143,7 @@ jobs:
     strategy:
       matrix:
         test: [box_2x2x2, pyramid, solid, ethier, vortex, expansion]
-        np: [1]
+        np: [1, 2, 3, 4]
       fail-fast: false
     name: "ILUC: ${{ matrix.test }}, NP = ${{ matrix.np }}"
     env:
