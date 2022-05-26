@@ -166,7 +166,7 @@ void find_nbrs(struct array *arr, const ulong *eid, const slong *vtx,
   array_init(struct nbr, &vertices, nelt * nv);
 
   struct comm *c = &cr->comm;
-  struct nbr v;
+  struct nbr v = {.r = 0, .c = 0, .proc = 0};
   uint i, j;
   for (i = 0; i < nelt; i++) {
     v.r = eid[i];
@@ -181,8 +181,8 @@ void find_nbrs(struct array *arr, const ulong *eid, const slong *vtx,
   sarray_sort(struct nbr, vertices.ptr, vertices.n, c, 1, buf);
 
   // FIXME: Assumes quads or hexes
-  struct nbr *pv = (struct nbr *)vertices.ptr, t;
-  array_init(struct nbr, arr, vertices.n * 10);
+  struct nbr *pv = (struct nbr *)vertices.ptr, t = {.r = 0, .c = 0, .proc = 0};
+  array_init(struct nbr, arr, vertices.n * 10 + 1);
   uint s = 0, e;
   while (s < vertices.n) {
     e = s + 1;

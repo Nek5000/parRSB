@@ -322,53 +322,71 @@ static int rsb_lvls(uint *lvl_off, uint *lvl_owner, ulong *lvl_ids,
   // the element.
 
   uint size = n * nv;
-  sint *lvl = tcalloc(sint, 2 * n), *in = tcalloc(sint, size);
-  if (lvl == NULL || in == NULL) {
-    fprintf(stderr, "Failed to allocate lvl, owner and in !\n");
+  sint *in = tcalloc(sint, size);
+  sint *lvl = tcalloc(sint, n);
+  sint *owner = tcalloc(sint, n);
+  if (owner == NULL || lvl == NULL || in == NULL) {
+    fprintf(stderr, "Failed to allocate lvl, owner or in !\n");
     exit(1);
   }
 
   struct comm c, t;
   comm_dup(&c, ci);
 
-  sint nlvls = 1;
+  uint i;
+  sint nlvls = 1, j;
   while (c.np > 1) {
     struct gs_data *gsh = gs_setup(vtx, size, &c, 0, gs_pairwise, 0);
 
     int bin = (c.id >= (c.np + 1) / 2);
-    for (uint i = 0; i < size; i++)
+    for (i = 0; i < size; i++)
       in[i] = bin;
 
     gs(in, gs_int, gs_max, 0, gsh, bfr);
 
     if (bin == 1) {
-      for (uint i = 0; i < size; i++)
+      for (i = 0; i < size; i++)
         in[i] = 0;
     }
 
     gs(in, gs_int, gs_max, 0, gsh, bfr);
 
-    for (uint i = 0; i < n; i++) {
-      for (int j = 0; j < nv; j++) {
+    sint ownr = 0;
+    for (i = 0; i < n; i++) {
+      for (j = 0; j < nv; j++) {
         if (in[i * nv + j] > 0) {
-          if (lvl[i] == 0)
+          if (lvl[i] == 0) {
             lvl[i] = nlvls;
+            ownr = ci->id + 1;
+          }
           break;
         }
       }
     }
-    nlvls++;
-    gs_free(gsh);
 
+    comm_allreduce(&c, gs_int, gs_max, &ownr, 1, buf);
+
+    for (i = 0; i < n; i++) {
+      if (lvl[i] == nlvls)
+        owner[i] = ownr - 1;
+    }
+
+    nlvls++;
+
+    gs_free(gsh);
     comm_split(&c, bin, c.id, &t), comm_free(&c);
     comm_dup(&c, &t), comm_free(&t);
   }
   comm_free(&c);
 
+  int rem = 0;
   for (uint i = 0; i < n; i++) {
-    if (lvl[i] == 0)
+    if (lvl[i] == 0) {
       lvl[i] = nlvls;
+      owner[i] = ci->id;
+    }
   }
+  nlvls += rem;
 
   comm_allreduce(ci, gs_int, gs_max, &nlvls, 1, buf);
   if (verbose > 0) {
@@ -379,30 +397,6 @@ static int rsb_lvls(uint *lvl_off, uint *lvl_owner, ulong *lvl_ids,
   // Reverse the level numbers
   for (uint i = 0; i < n; i++)
     lvl[i] = nlvls - lvl[i];
-
-  struct gs_data *gsh = gs_setup(vtx, size, ci, 0, gs_pairwise, 0);
-  sint *owner = lvl + n;
-  for (int l = 0; l < nlvls; l++) {
-    for (uint i = 0; i < n; i++) {
-      if (lvl[i] == l)
-        for (int j = 0; j < nv; j++)
-          in[i * nv + j] = ci->id;
-      else
-        for (int j = 0; j < nv; j++)
-          in[i * nv + j] = 0;
-    }
-
-    gs(in, gs_int, gs_max, 0, gsh, bfr);
-
-    for (uint i = 0; i < n; i++) {
-      if (lvl[i] == l) {
-        for (int j = 0; j < nv; j++) {
-          if (owner[i] < in[i * nv + j])
-            owner[i] = in[i * nv + j];
-        }
-      }
-    }
-  }
 
   struct linfo_t {
     uint lvl, owner;
@@ -429,7 +423,7 @@ static int rsb_lvls(uint *lvl_off, uint *lvl_owner, ulong *lvl_ids,
   }
 
   array_free(&linfos);
-  free(lvl), free(in);
+  free(owner), free(lvl), free(in);
 
   return nlvls;
 }
@@ -884,8 +878,8 @@ static void iluc_get_multipliers(struct array *mplrs, int lvl, uint *lvl_off,
   array_init(struct request_t, &temp, 30);
 
   ulong *fldf = (IS_CSC(A) ? A->rows : A->cols);
-  uint *adj_off = A->adj_off, *adj_idx = A->adj_idx;
   uint nn = (IS_CSC(A) ? A->cn : A->rn);
+  uint *adj_off = A->adj_off, *adj_idx = A->adj_idx;
 
   struct request_t t = {.r = 0, .p = 0, .o = 1};
   uint s, e;
@@ -958,8 +952,8 @@ static void iluc_get_multipliers(struct array *mplrs, int lvl, uint *lvl_off,
   // will send all the non-zero elements in row r to the requesting processor
   // now. Let's first sort all the entries in L by row id just to make it easy
   // for us to find.
-  if (rqst.n > 0) {
-    array_init(struct mplr_t, &temp, nn * 30);
+  array_init(struct mplr_t, &temp, 30);
+  if (rqst.n > 0 && nn > 0) {
     ulong *fldg = (IS_CSC(A) ? A->cols : A->rows);
     scalar *adj_val = A->adj_val;
 
@@ -971,13 +965,13 @@ static void iluc_get_multipliers(struct array *mplrs, int lvl, uint *lvl_off,
         array_cat(struct mplr_t, &temp, &m, 1);
       }
     }
-    sarray_sort(struct mplr_t, temp.ptr, temp.n, f, 1, bfr);
+    sarray_sort_2(struct mplr_t, temp.ptr, temp.n, f, 1, g, 1, bfr);
     struct mplr_t *pt = (struct mplr_t *)temp.ptr;
 
     sarray_sort(struct request_t, rqst.ptr, rqst.n, r, 1, bfr);
     struct request_t *pr = (struct request_t *)rqst.ptr;
 
-    for (uint i = 0, j = 0; i < rqst.n; i++) {
+    for (uint i = 0, j = 0; i < rqst.n && j < temp.n; i++) {
       while (j < temp.n && pt[j].f < pr[i].r)
         j++;
       assert(j < temp.n && pt[j].f == pr[i].r);
@@ -987,11 +981,15 @@ static void iluc_get_multipliers(struct array *mplrs, int lvl, uint *lvl_off,
         array_cat(struct mplr_t, mplrs, &pt[k], 1);
       }
     }
-    array_free(&temp);
   }
+  array_free(&temp);
   array_free(&rqst);
 
   sarray_transfer(struct mplr_t, mplrs, p, 0, cr);
+  if (rqst.n > 0 && nn == 0) {
+    printf("ERROR !!!\n");
+    exit(1);
+  }
 }
 
 static void iluc_get_data(struct array *data, struct array *mplrs, ulong K,
@@ -1006,15 +1004,16 @@ static void iluc_get_data(struct array *data, struct array *mplrs, ulong K,
   array_init(struct request_t, &rqsts, nn);
 
   ulong *fldf = (IS_CSC(A) ? A->cols : A->rows);
-  struct request_t t = {.r = 0, .p = 0, .o = 0};
+  struct request_t t = {.r = 0, .p = 0, .o = 1};
   for (uint i = 0; i < nn; i++) {
-    t.r = fldf[i], t.p = t.r % c->np, t.o = 1;
+    t.r = fldf[i], t.p = t.r % c->np;
     array_cat(struct request_t, &rqsts, &t, 1);
   }
 
   struct mplr_t *pm = (struct mplr_t *)mplrs->ptr;
+  t.o = 0;
   for (uint i = 0; i < mplrs->n; i++) {
-    t.r = pm[i].g, t.p = t.r % c->np, t.o = 0;
+    t.r = pm[i].g, t.p = t.r % c->np;
     array_cat(struct request_t, &rqsts, &t, 1);
   }
 
@@ -1052,17 +1051,18 @@ static void iluc_get_data(struct array *data, struct array *mplrs, ulong K,
 
   sarray_transfer(struct request_t, &fwds, o, 0, cr);
 
-  if (A != NULL) {
+  if (nn > 0 && fwds.n > 0) {
     sarray_sort(struct request_t, fwds.ptr, fwds.n, r, 1, bfr);
     struct request_t *pf = (struct request_t *)fwds.ptr;
 
-    uint *adj_off = A->adj_off, *adj_idx = A->adj_idx, i, j, k, ke;
+    uint *adj_off = A->adj_off, *adj_idx = A->adj_idx;
     scalar *adj_val = A->adj_val;
     ulong *fldg = (IS_CSC(A) ? A->rows : A->cols);
 
+    uint i, j, k, ke;
     struct mij m = {.r = 0, .c = 0, .idx = 0, .p = 0, .v = 0};
     if (IS_CSC(A)) {
-      for (i = 0, j = 0; i < fwds.n; i++) {
+      for (i = 0, j = 0; i < fwds.n && j < nn; i++) {
         for (; j < nn && fldf[j] < pf[i].r; j++)
           ;
         assert(fldf[j] == pf[i].r);
@@ -1077,13 +1077,14 @@ static void iluc_get_data(struct array *data, struct array *mplrs, ulong K,
         }
       }
     } else if (IS_CSR(A)) {
-      for (i = 0, j = 0; i < fwds.n; i++) {
+      for (i = 0, j = 0; i < fwds.n && j < nn; i++) {
         for (; j < nn && fldf[j] < pf[i].r; j++)
           ;
         assert(fldf[j] == pf[i].r);
         m.r = fldf[j], m.p = pf[i].p;
 
         k = adj_off[j], ke = adj_off[j + 1];
+        // This for loop is not necessary
         for (; k < ke && fldg[adj_idx[k]] < m.r; k++)
           ;
         for (; k < ke; k++) {
@@ -1109,7 +1110,7 @@ static void iluc_update(struct array *tij, ulong K, struct array *mplrs,
       sarray_sort_2(struct mij, data->ptr, data->n, r, 1, c, 1, bfr);
       struct mij *pd = (struct mij *)data->ptr;
       m.r = K;
-      for (uint i = 0, j = 0; i < mplrs->n; i++) {
+      for (uint i = 0, j = 0; i < mplrs->n && j < data->n; i++) {
         for (; j < data->n && pd[j].r == pm[i].g && pd[j].c < K; j++)
           ;
         for (; j < data->n && pd[j].r == pm[i].g; j++) {
@@ -1121,7 +1122,7 @@ static void iluc_update(struct array *tij, ulong K, struct array *mplrs,
       sarray_sort_2(struct mij, data->ptr, data->n, c, 1, r, 1, bfr);
       struct mij *pd = (struct mij *)data->ptr;
       m.c = K;
-      for (uint i = 0, j = 0; i < mplrs->n; i++) {
+      for (uint i = 0, j = 0; i < mplrs->n && j < data->n; i++) {
         for (; j < data->n && pd[j].c == pm[i].g && pd[j].r <= K; j++)
           ;
         for (; j < data->n && pd[j].c == pm[i].g; j++) {
@@ -1175,10 +1176,8 @@ static void iluc_level(struct par_mat *Lc, struct par_mat *Uc,
                        struct array *lij, struct array *uij, int lvl,
                        uint *lvl_off, struct par_mat *L, struct par_mat *U,
                        struct crystal *cr, int verbose, buffer *bfr) {
-  struct array tij;
+  struct array tij, mplrs, data;
   array_init(struct mij, &tij, 30);
-
-  struct array mplrs, data;
   array_init(struct mij, &mplrs, 30);
   array_init(struct mij, &data, 30);
 
@@ -1189,14 +1188,14 @@ static void iluc_level(struct par_mat *Lc, struct par_mat *Uc,
   comm_allreduce(&cr->comm, gs_int, gs_max, &size, 1, buf);
   e = s + size;
 
-  struct mij m = {.r = 0, .c = 0, .idx = 0, .p = 0, .v = 0};
-  uint i, k, j, je, active;
+  uint i, k, j, je;
   ulong K;
   for (k = s; k < e; k++) {
     // Init z[1:K] = 0, z[K:n] = a_{K, K:n}, i.e., z = u_{K,:}
-    K = 0, tij.n = 0, m.r = 0, m.c = 0, m.v = 0;
-    active = (k < lvl_off[lvl]);
-    if (active) {
+    K = 0, tij.n = 0;
+    struct mij m = {.r = 0, .c = 0, .idx = 0, .p = 0, .v = 0};
+    uint on = (k < lvl_off[lvl]);
+    if (on) {
       K = m.r = U->rows[k];
       for (j = U->adj_off[k], je = U->adj_off[k + 1]; j < je; j++) {
         m.c = U->cols[U->adj_idx[j]], m.v = U->adj_val[j];
@@ -1212,17 +1211,15 @@ static void iluc_level(struct par_mat *Lc, struct par_mat *Uc,
     // Set u_{k, :} = z and find u_kk
     scalar u_kk = 1;
     struct mij *pt = (struct mij *)tij.ptr;
-    if (active && tij.n > 0) {
+    if (on && tij.n > 0) {
       if (fabs(pt[0].v) > 1e-12)
         u_kk = pt[0].v;
-      else // Temporary workaround till pivoting is implemented
-        pt[0].v = u_kk;
       array_cat(struct mij, uij, tij.ptr, tij.n);
     }
 
     // Init w[1:K] = 0, w[K] = 1, w[K+1:n] = a_{K+1:n, K}, i.e., w = l_{:, K}
     tij.n = 0, m.c = 0, m.r = 0, m.v = 0;
-    if (active) {
+    if (on) {
       K = m.c = L->cols[k];
       for (j = L->adj_off[k] + 1, je = L->adj_off[k + 1]; j < je; j++) {
         m.r = L->rows[L->adj_idx[j]], m.v = L->adj_val[j];
@@ -1240,13 +1237,13 @@ static void iluc_level(struct par_mat *Lc, struct par_mat *Uc,
     for (j = 0; j < tij.n; j++)
       pt[j].v /= u_kk;
 
-    if (active) {
+    if (on) {
       m.r = m.c = K, m.v = 1;
       array_cat(struct mij, &tij, &m, 1);
       array_cat(struct mij, lij, tij.ptr, tij.n);
     }
 
-    if (active) {
+    if (on) {
       par_mat_free(Uc), par_mat_free(Lc);
       par_mat_setup(Uc, uij, 1, 0, bfr);
       par_mat_setup(Lc, lij, 0, 0, bfr);
@@ -1378,6 +1375,9 @@ static int ilu_setup_aux(struct ilu *ilu, int nlvls, uint *lvl_off,
     ulong e;
   };
 
+  struct crystal *cr = &ilu->cr;
+  struct comm *c = &cr->comm;
+
   // Send the elements in each level to the owner
   struct array elms;
   array_init(struct elm, &elms, n);
@@ -1401,7 +1401,6 @@ static int ilu_setup_aux(struct ilu *ilu, int nlvls, uint *lvl_off,
     }
   }
 
-  struct crystal *cr = &ilu->cr;
   sarray_transfer(struct elm, &elms, p, 1, cr);
   sarray_sort_2(struct elm, elms.ptr, elms.n, lvl, 0, e, 1, bfr);
 
@@ -1421,7 +1420,6 @@ static int ilu_setup_aux(struct ilu *ilu, int nlvls, uint *lvl_off,
 
   // Number rows now: All the elements in Level 0 are numbered before Level
   // 1 and so on.
-  struct comm *c = &cr->comm;
   ulong *ids = trealloc(ulong, ids, elms.n);
   ulong ng = 0;
   for (int l = 0; l < ilu->nlvls; l++) {
@@ -1461,6 +1459,8 @@ static int ilu_setup_aux(struct ilu *ilu, int nlvls, uint *lvl_off,
   par_csr_setup(&ilu->A, &eij, 0, bfr);
   array_free(&eij);
 
+  printf("id: %u A.rn = %u\n", c->id, ilu->A.rn);
+
   if (verbose > 1) {
     for (int l = 0; l < ilu->nlvls; l++) {
       for (uint i = ilu->lvl_off[l]; i < ilu->lvl_off[l + 1]; i++) {
@@ -1499,7 +1499,7 @@ struct ilu *ilu_setup(const uint n, const int nv, const long long *vtxll,
 
   uint *lvl_off = tcalloc(uint, 100 + n), *lvl_owner = lvl_off + 100;
   ulong *lvl_ids = tcalloc(ulong, n);
-  int nlvls = find_lvls(lvl_off, lvl_owner, lvl_ids, n, nv, ids, vtx, 0,
+  int nlvls = find_lvls(lvl_off, lvl_owner, lvl_ids, n, nv, ids, vtx, 1,
                         &ilu->cr, verbose, &bfr);
   ilu_setup_aux(ilu, nlvls, lvl_off, lvl_owner, lvl_ids, n, nv, vtx, verbose,
                 &bfr);
