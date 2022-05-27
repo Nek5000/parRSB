@@ -384,6 +384,7 @@ static int rsb_lvls(uint *lvl_off, uint *lvl_owner, ulong *lvl_ids,
     if (lvl[i] == 0) {
       lvl[i] = nlvls;
       owner[i] = ci->id;
+      rem = 1;
     }
   }
   nlvls += rem;
