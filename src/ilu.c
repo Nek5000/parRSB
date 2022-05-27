@@ -959,7 +959,6 @@ static void iluc_get_multipliers(struct array *mplrs, ulong K, int type,
     // TODO: The sort is not necessary
 #define FILL_RQST(ff, gg)                                                      \
   do {                                                                         \
-    sarray_sort_2(struct mij, A->ptr, A->n, ff, 1, gg, 1, bfr);                \
     struct mij *pa = (struct mij *)A->ptr;                                     \
     for (uint i = 0, j = 0; i < rqst.n && j < A->n; i++) {                     \
       for (; j < A->n && pa[j].ff < pr[i].r; j++)                              \
@@ -1071,7 +1070,6 @@ static void iluc_get_data(struct array *data, struct array *mplrs, ulong K,
 
 #define FILL_RQST(f, g, no_diag)                                               \
   do {                                                                         \
-    sarray_sort_2(struct mij, A->ptr, A->n, f, 1, g, 1, bfr);                  \
     struct mij *pa = (struct mij *)A->ptr;                                     \
     for (i = 0, j = 0; i < fwds.n && j < A->n; i++) {                          \
       for (; j < A->n && pa[j].f < pf[i].r; j++)                               \
