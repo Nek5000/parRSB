@@ -1063,7 +1063,7 @@ static void iluc_get_data(struct array *data, ulong K, int type,
     scalar v;
     struct eij m = {.r = 0, .c = 0, .p = 0, .v = 0};
 
-#define FILL_RQST(f, g)                                                        \
+#define FILL_RQST(f, g, nd)                                                    \
   do {                                                                         \
     struct mij *pa = (struct mij *)A->ptr;                                     \
     struct mij *pb = (struct mij *)B->ptr;                                     \
@@ -1078,7 +1078,8 @@ static void iluc_get_data(struct array *data, ulong K, int type,
         for (; l < B->n && pb[l].f < pa[k].g; l++)                             \
           ;                                                                    \
         assert(l < B->n && pb[l].f == pa[k].g);                                \
-        for (n = l; (n < B->n && pb[n].f == pa[k].g && pb[n].g < m.f); n++)    \
+        for (n = l; n < B->n && pb[n].f == pa[k].g && (pb[n].g < m.f + nd);    \
+             n++)                                                              \
           ;                                                                    \
         for (; n < B->n && pb[n].f == pa[k].g; n++) {                          \
           m.g = pb[n].g, m.v = -v * pb[n].v;                                   \
@@ -1089,9 +1090,9 @@ static void iluc_get_data(struct array *data, ulong K, int type,
   } while (0)
 
     if (type == CSC)
-      FILL_RQST(r, c);
+      FILL_RQST(r, c, 0);
     else
-      FILL_RQST(c, r);
+      FILL_RQST(c, r, 1);
 
 #undef FILL_RQST
   }
@@ -1118,10 +1119,7 @@ static void iluc_update(struct array *tij, ulong K, struct array *data, int row,
       sarray_sort(struct eij, data->ptr, data->n, c, 1, bfr);
       struct eij *pd = (struct eij *)data->ptr;
       m.r = K;
-      // FIXME: This shouldn't be here
-      for (j = 0; j < data->n && pd[j].c < K; j++)
-        ;
-      for (j; j < data->n; j++) {
+      for (j = 0; j < data->n; j++) {
         m.c = pd[j].c, m.v = pd[j].v;
         array_cat(struct mij, tij, &m, 1);
       }
@@ -1129,10 +1127,6 @@ static void iluc_update(struct array *tij, ulong K, struct array *data, int row,
       sarray_sort(struct eij, data->ptr, data->n, r, 1, bfr);
       struct eij *pd = (struct eij *)data->ptr;
       m.c = K;
-
-      // FIXME: This shouldn't be here
-      for (j = 0; j < data->n && pd[j].r <= K; j++)
-        ;
       for (; j < data->n; j++) {
         m.r = pd[j].r, m.v = pd[j].v;
         array_cat(struct mij, tij, &m, 1);
