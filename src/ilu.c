@@ -1129,6 +1129,7 @@ static void iluc_update(struct array *tij, ulong K, struct array *data, int row,
       sarray_sort(struct eij, data->ptr, data->n, r, 1, bfr);
       struct eij *pd = (struct eij *)data->ptr;
       m.c = K;
+
       // FIXME: This shouldn't be here
       for (j = 0; j < data->n && pd[j].r <= K; j++)
         ;
@@ -1183,10 +1184,11 @@ static void iluc_level(struct array *lij, struct array *uij, int lvl,
                        uint *lvl_off, struct par_mat *L, struct par_mat *U,
                        struct crystal *cr, int verbose, buffer *bfr) {
   // Work arrays
-  struct array rij, cij, data;
+  struct array rij, cij, data, wrk;
   array_init(struct mij, &rij, 30);
   array_init(struct mij, &cij, 30);
   array_init(struct eij, &data, 30);
+  array_init(struct eij, &wrk, 30);
 
   struct array rqst, fwds;
   array_init(struct request_t, &rqst, 30);
@@ -1201,40 +1203,41 @@ static void iluc_level(struct array *lij, struct array *uij, int lvl,
   uint i, k, j, je;
   ulong K;
   for (k = s; k < e; k++) {
+    K = (k < lvl_off[lvl]) ? U->rows[k] : 0;
+
+    // Fetch required data (combine with the other call below)
+    iluc_get_data(&data, K, CSC, lij, uij, cr, &rqst, &fwds, bfr);
     // Init z[1:K] = 0, z[K:n] = a_{K, K:n}, i.e., z = u_{K,:}
-    K = 0, rij.n = 0;
+    rij.n = 0;
     struct mij m = {.r = 0, .c = 0, .idx = 0, .p = 0, .v = 0};
-    uint on = (k < lvl_off[lvl]);
-    if (on) {
-      K = m.r = U->rows[k];
+    if (K) {
+      m.r = K;
       for (j = U->adj_off[k], je = U->adj_off[k + 1]; j < je; j++) {
         m.c = U->cols[U->adj_idx[j]], m.v = U->adj_val[j];
         array_cat(struct mij, &rij, &m, 1);
       }
     }
-
     // Update z if l_KI != 0 for all I, 1 <= I < K
-    iluc_get_data(&data, K, CSC, lij, uij, cr, &rqst, &fwds, bfr);
     iluc_update(&rij, K, &data, 1, bfr);
 
+    // Fetch required data (combine with the other call above)
+    iluc_get_data(&data, K, CSR, uij, lij, cr, &rqst, &fwds, bfr);
     // Init w[1:K] = 0, w[K] = 1, w[K+1:n] = a_{K+1:n, K}, i.e., w = l_{:, K}
-    cij.n = 0, m.c = 0, m.r = 0, m.v = 0;
-    if (on) {
-      K = m.c = L->cols[k];
+    cij.n = 0;
+    if (K) {
+      m.c = K;
       for (j = L->adj_off[k] + 1, je = L->adj_off[k + 1]; j < je; j++) {
         m.r = L->rows[L->adj_idx[j]], m.v = L->adj_val[j];
         array_cat(struct mij, &cij, &m, 1);
       }
     }
-
     // Update w if u_IK != 0 for all I, 1 <= I < K
-    iluc_get_data(&data, K, CSR, uij, lij, cr, &rqst, &fwds, bfr);
     iluc_update(&cij, K, &data, 0, bfr);
 
     // Set u_{k, :} = z and find u_kk
     scalar u_kk = 1;
     struct mij *pt = (struct mij *)rij.ptr;
-    if (on) {
+    if (K) {
       if (rij.n > 0 && fabs(pt[0].v) > 1e-12)
         u_kk = pt[0].v;
       array_cat(struct mij, uij, rij.ptr, rij.n);
@@ -1245,14 +1248,14 @@ static void iluc_level(struct array *lij, struct array *uij, int lvl,
     for (j = 0; j < cij.n; j++)
       pt[j].v /= u_kk;
 
-    if (on) {
+    if (K) {
       m.r = m.c = K, m.v = 1;
       array_cat(struct mij, &cij, &m, 1);
       array_cat(struct mij, lij, cij.ptr, cij.n);
     }
   }
 
-  array_free(&rij), array_free(&cij), array_free(&data);
+  array_free(&rij), array_free(&cij), array_free(&data), array_free(&wrk);
   array_free(&rqst), array_free(&fwds);
 }
 
