@@ -856,7 +856,7 @@ static void iluc_level_serial(int lvl, uint *lvl_off, struct par_mat *L,
 // At each communication step, each processor will send for the rows (or cols)
 // they need. If P processors are active, there are only P requests.
 struct eij {
-  ulong f, g;
+  ulong r, c;
   uint p;
   scalar v;
 };
@@ -954,18 +954,18 @@ static void iluc_get_multipliers(struct array *mplrs, ulong K, int type,
     struct request_t *pr = (struct request_t *)rqst.ptr;
 
     // TODO: Replace A by struct mplrs_t
-    struct eij m = {.f = 0, .g = 0, .p = 0, .v = 0};
+    struct eij m = {.r = 0, .c = 0, .p = 0, .v = 0};
 
-#define FILL_RQST(ff, gg)                                                      \
+#define FILL_RQST(f, g)                                                        \
   do {                                                                         \
     struct mij *pa = (struct mij *)A->ptr;                                     \
     for (uint i = 0, j = 0; i < rqst.n && j < A->n; i++) {                     \
-      for (; j < A->n && pa[j].ff < pr[i].r; j++)                              \
+      for (; j < A->n && pa[j].f < pr[i].r; j++)                               \
         ;                                                                      \
-      assert(j < A->n && pa[j].ff == pr[i].r);                                 \
-      m.f = pr[i].r, m.p = pr[i].o;                                            \
-      for (uint k = j; k < A->n && pa[k].ff == pr[i].r; k++) {                 \
-        m.g = pa[k].gg, m.v = pa[k].v;                                         \
+      assert(j < A->n && pa[j].f == pr[i].r);                                  \
+      m.r = pr[i].r, m.p = pr[i].o;                                            \
+      for (uint k = j; k < A->n && pa[k].f == pr[i].r; k++) {                  \
+        m.c = pa[k].g, m.v = pa[k].v;                                          \
         array_cat(struct eij, mplrs, &m, 1);                                   \
       }                                                                        \
     }                                                                          \
@@ -1025,7 +1025,7 @@ static void iluc_get_data(struct array *data, struct array *mplrs, ulong K,
   struct eij *pm = (struct eij *)mplrs->ptr;
   t.o = 0;
   for (uint i = 0; i < mplrs->n; i++) {
-    t.r = pm[i].g, t.p = t.r % c->np;
+    t.r = pm[i].c, t.p = t.r % c->np;
     array_cat(struct request_t, &rqsts, &t, 1);
   }
 
@@ -1098,7 +1098,7 @@ static void iluc_get_data(struct array *data, struct array *mplrs, ulong K,
 
 static void iluc_update(struct array *tij, ulong K, struct array *mplrs,
                         struct array *data, int row, buffer *bfr) {
-  sarray_sort(struct eij, mplrs->ptr, mplrs->n, g, 1, bfr);
+  sarray_sort(struct eij, mplrs->ptr, mplrs->n, c, 1, bfr);
   struct eij *pm = (struct eij *)mplrs->ptr;
 
   struct mij m = {.r = 0, .c = 0, .idx = 0, .p = 0, .v = 0};
@@ -1108,9 +1108,9 @@ static void iluc_update(struct array *tij, ulong K, struct array *mplrs,
       struct mij *pd = (struct mij *)data->ptr;
       m.r = K;
       for (uint i = 0, j = 0; i < mplrs->n && j < data->n; i++) {
-        for (; j < data->n && pd[j].r == pm[i].g && pd[j].c < K; j++)
+        for (; j < data->n && pd[j].r == pm[i].c && pd[j].c < K; j++)
           ;
-        for (; j < data->n && pd[j].r == pm[i].g; j++) {
+        for (; j < data->n && pd[j].r == pm[i].c; j++) {
           m.c = pd[j].c, m.v = -pm[i].v * pd[j].v;
           array_cat(struct mij, tij, &m, 1);
         }
@@ -1120,9 +1120,9 @@ static void iluc_update(struct array *tij, ulong K, struct array *mplrs,
       struct mij *pd = (struct mij *)data->ptr;
       m.c = K;
       for (uint i = 0, j = 0; i < mplrs->n && j < data->n; i++) {
-        for (; j < data->n && pd[j].c == pm[i].g && pd[j].r <= K; j++)
+        for (; j < data->n && pd[j].c == pm[i].c && pd[j].r <= K; j++)
           ;
-        for (; j < data->n && pd[j].c == pm[i].g; j++) {
+        for (; j < data->n && pd[j].c == pm[i].c; j++) {
           m.r = pd[j].r, m.v = -pm[i].v * pd[j].v;
           array_cat(struct mij, tij, &m, 1);
         }
