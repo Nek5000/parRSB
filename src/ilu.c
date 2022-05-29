@@ -1080,20 +1080,10 @@ static void iluc_get_data(struct array *data, ulong K, int type,
       for (k = j; k < A->n && pa[k].f == m.f && pa[k].g < m.f; k++) {          \
         v = pa[k].v;                                                           \
         for (; l < B->n && pb[l].f < pa[k].g; l++)                             \
-          if (K == 2) {                                                        \
-            printf("\tl=%u pb[l].f=%llu pa[k].g=%llu\n", l, pb[l].f, pa[k].g); \
-          }                                                                    \
-        if (K == 2)                                                            \
-          printf("\tj=%u v=%lf pa[k].g=%llu m.f=%llu\n", j, v, pa[k].g, m.f);  \
+          ;                                                                    \
         assert(l < B->n && pb[l].f == pa[k].g);                                \
-        for (n = l; (n < B->n) && (pb[n].f == pa[k].g) && (pb[n].g < m.f);     \
-             n++)                                                              \
-          if (K == 2) {                                                        \
-            printf("n=%u pb[n].f=%llu pa[k].g=%llu m.f=%llu\n", n, pb[n].f,    \
-                   pa[k].g, m.f);                                              \
-          }                                                                    \
-        if (K == 2)                                                            \
-          printf("\tn=%u l=%u B->n = %u\n", n, l, B->n);                       \
+        for (n = l; (n < B->n && pb[n].f == pa[k].g && pb[n].g < m.f); n++)    \
+          ;                                                                    \
         for (; n < B->n && pb[n].f == pa[k].g; n++) {                          \
           m.g = pb[n].g, m.v = -v * pb[n].v;                                   \
           array_cat(struct eij, data, &m, 1);                                  \
