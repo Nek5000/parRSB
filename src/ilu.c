@@ -855,7 +855,7 @@ static void iluc_level_serial(int lvl, uint *lvl_off, struct par_mat *L,
 
 // At each communication step, each processor will send for the rows (or cols)
 // they need. If P processors are active, there are only P requests.
-struct mplr_t {
+struct eij {
   ulong f, g;
   uint p;
   scalar v;
@@ -954,9 +954,8 @@ static void iluc_get_multipliers(struct array *mplrs, ulong K, int type,
     struct request_t *pr = (struct request_t *)rqst.ptr;
 
     // TODO: Replace A by struct mplrs_t
-    struct mplr_t m = {.f = 0, .g = 0, .p = 0, .v = 0};
+    struct eij m = {.f = 0, .g = 0, .p = 0, .v = 0};
 
-    // TODO: The sort is not necessary
 #define FILL_RQST(ff, gg)                                                      \
   do {                                                                         \
     struct mij *pa = (struct mij *)A->ptr;                                     \
@@ -967,7 +966,7 @@ static void iluc_get_multipliers(struct array *mplrs, ulong K, int type,
       m.f = pr[i].r, m.p = pr[i].o;                                            \
       for (uint k = j; k < A->n && pa[k].ff == pr[i].r; k++) {                 \
         m.g = pa[k].gg, m.v = pa[k].v;                                         \
-        array_cat(struct mplr_t, mplrs, &m, 1);                                \
+        array_cat(struct eij, mplrs, &m, 1);                                   \
       }                                                                        \
     }                                                                          \
   } while (0)
@@ -981,7 +980,7 @@ static void iluc_get_multipliers(struct array *mplrs, ulong K, int type,
   }
   array_free(&rqst);
 
-  sarray_transfer(struct mplr_t, mplrs, p, 0, cr);
+  sarray_transfer(struct eij, mplrs, p, 0, cr);
 }
 
 static void iluc_get_data(struct array *data, struct array *mplrs, ulong K,
@@ -1023,7 +1022,7 @@ static void iluc_get_data(struct array *data, struct array *mplrs, ulong K,
 
 #undef INIT_RQST
 
-  struct mplr_t *pm = (struct mplr_t *)mplrs->ptr;
+  struct eij *pm = (struct eij *)mplrs->ptr;
   t.o = 0;
   for (uint i = 0; i < mplrs->n; i++) {
     t.r = pm[i].g, t.p = t.r % c->np;
@@ -1099,8 +1098,8 @@ static void iluc_get_data(struct array *data, struct array *mplrs, ulong K,
 
 static void iluc_update(struct array *tij, ulong K, struct array *mplrs,
                         struct array *data, int row, buffer *bfr) {
-  sarray_sort(struct mplr_t, mplrs->ptr, mplrs->n, g, 1, bfr);
-  struct mplr_t *pm = (struct mplr_t *)mplrs->ptr;
+  sarray_sort(struct eij, mplrs->ptr, mplrs->n, g, 1, bfr);
+  struct eij *pm = (struct eij *)mplrs->ptr;
 
   struct mij m = {.r = 0, .c = 0, .idx = 0, .p = 0, .v = 0};
   if (K) {
