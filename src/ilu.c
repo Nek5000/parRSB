@@ -983,8 +983,8 @@ static void iluc_get_multipliers(struct array *mplrs, ulong K, int type,
   sarray_transfer(struct eij, mplrs, p, 0, cr);
 }
 
-static void iluc_get_data(struct array *data, struct array *mplrs, ulong K,
-                          int type, struct array *A, struct crystal *cr,
+static void iluc_get_data(struct array *data, ulong K, int type,
+                          struct array *A, struct array *B, struct crystal *cr,
                           buffer *bfr) {
   data->n = 0;
   struct comm *c = &cr->comm;
@@ -1016,16 +1016,14 @@ static void iluc_get_data(struct array *data, struct array *mplrs, ulong K,
   } while (0)
 
   if (type == CSC)
-    INIT_RQST(c, r, &rqsts);
-  else
     INIT_RQST(r, c, &rqsts);
+  else
+    INIT_RQST(c, r, &rqsts);
 
 #undef INIT_RQST
 
-  struct eij *pm = (struct eij *)mplrs->ptr;
-  t.o = 0;
-  for (uint i = 0; i < mplrs->n; i++) {
-    t.r = pm[i].c, t.p = t.r % c->np;
+  if (K > 0) {
+    t.r = K, t.p = K % c->np, t.o = 0;
     array_cat(struct request_t, &rqsts, &t, 1);
   }
 
@@ -1036,98 +1034,119 @@ static void iluc_get_data(struct array *data, struct array *mplrs, ulong K,
   if (rqsts.n > 0) {
     sarray_sort_2(struct request_t, rqsts.ptr, rqsts.n, r, 1, o, 0, bfr);
     struct request_t *pr = (struct request_t *)rqsts.ptr;
-
-    uint i = 1, j = 0;
-    for (; i < rqsts.n; i++) {
-      if (pr[i].r != pr[j].r) {
-        // Last one should be the owner, everyone thing else is a request.
-        // We will forward the requests to the correct processor.
-        assert(pr[i - 1].o == 1);
-        for (; j < i - 1; j++) {
-          pr[j].o = pr[i - 1].p;
-          array_cat(struct request_t, &fwds, &pr[j], 1);
+    uint s, e;
+    for (e = 1, s = 0; e < rqsts.n; e++) {
+      if (pr[e].r != pr[s].r) {
+        if (pr[s].o == 0) { // This is a request
+          uint p = pr[s].p;
+          for (s = s + 1; s < e; s++) {
+            pr[s].o = p;
+            array_cat(struct request_t, &fwds, &pr[s], 1);
+          }
         }
-        j = i;
+        s = e;
       }
     }
-    if (j < i) {
-      assert(pr[i - 1].o == 1);
-      for (; j < i - 1; j++) {
-        pr[j].o = pr[i - 1].p;
-        array_cat(struct request_t, &fwds, &pr[j], 1);
+    if (s < e && pr[s].o == 0) {
+      uint p = pr[s].p;
+      for (s = s + 1; s < e; s++) {
+        pr[s].o = p;
+        array_cat(struct request_t, &fwds, &pr[s], 1);
       }
     }
   }
   array_free(&rqsts);
 
-  sarray_transfer(struct request_t, &fwds, o, 0, cr);
+  sarray_transfer(struct request_t, &fwds, p, 0, cr);
 
   if (fwds.n > 0 && A->n > 0) {
     sarray_sort(struct request_t, fwds.ptr, fwds.n, r, 1, bfr);
     struct request_t *pf = (struct request_t *)fwds.ptr;
 
-    uint i, j, k, ke;
+    uint i, j, k, l, n;
+    scalar v;
     struct eij m = {.r = 0, .c = 0, .p = 0, .v = 0};
 
-#define FILL_RQST(f, g, no_diag)                                               \
+#define FILL_RQST(f, g)                                                        \
   do {                                                                         \
     struct mij *pa = (struct mij *)A->ptr;                                     \
-    for (i = 0, j = 0; i < fwds.n && j < A->n; i++) {                          \
-      for (; j < A->n && pa[j].f < pf[i].r; j++)                               \
+    struct mij *pb = (struct mij *)B->ptr;                                     \
+    for (i = 0, j = 0; i < fwds.n; i++) {                                      \
+      l = 0;                                                                   \
+      m.f = pf[i].r, m.p = pf[i].o;                                            \
+      for (; j < A->n && pa[j].f < m.f; j++)                                   \
         ;                                                                      \
-      assert(j < A->n && pa[j].f == pf[i].r);                                  \
-      m.f = pf[i].r, m.p = pf[i].p;                                            \
-      for (k = j; k < A->n && pa[k].f == m.f && pa[k].g < m.f + no_diag; k++)  \
-        ;                                                                      \
-      for (; k < A->n && pa[k].f == m.f; k++) {                                \
-        m.g = pa[k].g, m.v = pa[k].v;                                          \
-        array_cat(struct eij, data, &m, 1);                                    \
+      assert(j < A->n && pa[j].f == m.f);                                      \
+      for (k = j; k < A->n && pa[k].f == m.f && pa[k].g < m.f; k++) {          \
+        v = pa[k].v;                                                           \
+        for (; l < B->n && pb[l].f < pa[k].g; l++)                             \
+          if (K == 2) {                                                        \
+            printf("\tl=%u pb[l].f=%llu pa[k].g=%llu\n", l, pb[l].f, pa[k].g); \
+          }                                                                    \
+        if (K == 2)                                                            \
+          printf("\tj=%u v=%lf pa[k].g=%llu m.f=%llu\n", j, v, pa[k].g, m.f);  \
+        assert(l < B->n && pb[l].f == pa[k].g);                                \
+        for (n = l; (n < B->n) && (pb[n].f == pa[k].g) && (pb[n].g < m.f);     \
+             n++)                                                              \
+          if (K == 2) {                                                        \
+            printf("n=%u pb[n].f=%llu pa[k].g=%llu m.f=%llu\n", n, pb[n].f,    \
+                   pa[k].g, m.f);                                              \
+          }                                                                    \
+        if (K == 2)                                                            \
+          printf("\tn=%u l=%u B->n = %u\n", n, l, B->n);                       \
+        for (; n < B->n && pb[n].f == pa[k].g; n++) {                          \
+          m.g = pb[n].g, m.v = -v * pb[n].v;                                   \
+          array_cat(struct eij, data, &m, 1);                                  \
+        }                                                                      \
       }                                                                        \
     }                                                                          \
   } while (0)
 
     if (type == CSC)
-      FILL_RQST(c, r, 1);
+      FILL_RQST(r, c);
     else
-      FILL_RQST(r, c, 0);
+      FILL_RQST(c, r);
 
 #undef FILL_RQST
   }
   array_free(&fwds);
 
+  if (type == CSC)
+    sarray_sort_2(struct mij, A->ptr, A->n, c, 1, r, 1, bfr);
+  else
+    sarray_sort_2(struct mij, A->ptr, A->n, r, 1, c, 1, bfr);
+
   sarray_transfer(struct eij, data, p, 0, cr);
 }
 
-static void iluc_update(struct array *tij, ulong K, struct array *mplrs,
-                        struct array *data, int row, buffer *bfr) {
-  sarray_sort(struct eij, mplrs->ptr, mplrs->n, c, 1, bfr);
-  struct eij *pm = (struct eij *)mplrs->ptr;
+static void iluc_update(struct array *tij, ulong K, struct array *data, int row,
+                        buffer *bfr) {
+  // FIXME: This can be done more efficiently
 
   struct mij m = {.r = 0, .c = 0, .idx = 0, .p = 0, .v = 0};
+  uint j;
   if (K) {
     if (row) {
-      sarray_sort_2(struct eij, data->ptr, data->n, r, 1, c, 1, bfr);
+      sarray_sort(struct eij, data->ptr, data->n, c, 1, bfr);
       struct eij *pd = (struct eij *)data->ptr;
       m.r = K;
-      for (uint i = 0, j = 0; i < mplrs->n && j < data->n; i++) {
-        for (; j < data->n && pd[j].r == pm[i].c && pd[j].c < K; j++)
-          ;
-        for (; j < data->n && pd[j].r == pm[i].c; j++) {
-          m.c = pd[j].c, m.v = -pm[i].v * pd[j].v;
-          array_cat(struct mij, tij, &m, 1);
-        }
+      // FIXME: This shouldn't be here
+      for (j = 0; j < data->n && pd[j].c < K; j++)
+        ;
+      for (j; j < data->n; j++) {
+        m.c = pd[j].c, m.v = pd[j].v;
+        array_cat(struct mij, tij, &m, 1);
       }
     } else {
-      sarray_sort_2(struct eij, data->ptr, data->n, c, 1, r, 1, bfr);
+      sarray_sort(struct eij, data->ptr, data->n, r, 1, bfr);
       struct eij *pd = (struct eij *)data->ptr;
       m.c = K;
-      for (uint i = 0, j = 0; i < mplrs->n && j < data->n; i++) {
-        for (; j < data->n && pd[j].c == pm[i].c && pd[j].r <= K; j++)
-          ;
-        for (; j < data->n && pd[j].c == pm[i].c; j++) {
-          m.r = pd[j].r, m.v = -pm[i].v * pd[j].v;
-          array_cat(struct mij, tij, &m, 1);
-        }
+      // FIXME: This shouldn't be here
+      for (j = 0; j < data->n && pd[j].r <= K; j++)
+        ;
+      for (; j < data->n; j++) {
+        m.r = pd[j].r, m.v = pd[j].v;
+        array_cat(struct mij, tij, &m, 1);
       }
     }
   }
@@ -1165,6 +1184,7 @@ static void iluc_update(struct array *tij, ulong K, struct array *mplrs,
     tij->n = 0;
     array_cat(struct mij, tij, tmp.ptr, tmp.n);
   }
+
   array_free(&tmp);
 }
 
@@ -1174,10 +1194,9 @@ static void iluc_update(struct array *tij, ulong K, struct array *mplrs,
 static void iluc_level(struct array *lij, struct array *uij, int lvl,
                        uint *lvl_off, struct par_mat *L, struct par_mat *U,
                        struct crystal *cr, int verbose, buffer *bfr) {
-  struct array rij, cij, mplrs, data;
+  struct array rij, cij, data;
   array_init(struct mij, &rij, 30);
   array_init(struct mij, &cij, 30);
-  array_init(struct eij, &mplrs, 30);
   array_init(struct eij, &data, 30);
 
   uint s = lvl_off[lvl - 1], e = lvl_off[lvl];
@@ -1203,9 +1222,8 @@ static void iluc_level(struct array *lij, struct array *uij, int lvl,
     }
 
     // Update z if l_KI != 0 for all I, 1 <= I < K
-    iluc_get_multipliers(&mplrs, K, CSC, lij, cr, bfr);
-    iluc_get_data(&data, &mplrs, K, CSR, uij, cr, bfr);
-    iluc_update(&rij, K, &mplrs, &data, 1, bfr);
+    iluc_get_data(&data, K, CSC, lij, uij, cr, bfr);
+    iluc_update(&rij, K, &data, 1, bfr);
 
     // Init w[1:K] = 0, w[K] = 1, w[K+1:n] = a_{K+1:n, K}, i.e., w = l_{:, K}
     cij.n = 0, m.c = 0, m.r = 0, m.v = 0;
@@ -1218,9 +1236,8 @@ static void iluc_level(struct array *lij, struct array *uij, int lvl,
     }
 
     // Update w if u_IK != 0 for all I, 1 <= I < K
-    iluc_get_multipliers(&mplrs, K, CSR, uij, cr, bfr);
-    iluc_get_data(&data, &mplrs, K, CSC, lij, cr, bfr);
-    iluc_update(&cij, K, &mplrs, &data, 0, bfr);
+    iluc_get_data(&data, K, CSR, uij, lij, cr, bfr);
+    iluc_update(&cij, K, &data, 0, bfr);
 
     // Set u_{k, :} = z and find u_kk
     scalar u_kk = 1;
@@ -1244,7 +1261,7 @@ static void iluc_level(struct array *lij, struct array *uij, int lvl,
   }
 
   array_free(&rij), array_free(&cij);
-  array_free(&mplrs), array_free(&data);
+  array_free(&data);
 }
 
 // We are going to separate A matrix to L and U where L is the strictly lower
