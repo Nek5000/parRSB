@@ -985,13 +985,10 @@ static void iluc_get_multipliers(struct array *mplrs, ulong K, int type,
 
 static void iluc_get_data(struct array *data, ulong K, int type,
                           struct array *A, struct array *B, struct crystal *cr,
+                          struct array *rqsts, struct array *fwds,
                           buffer *bfr) {
-  data->n = 0;
+  data->n = rqsts->n = fwds->n = 0;
   struct comm *c = &cr->comm;
-
-  struct array rqsts, fwds;
-  array_init(struct request_t, &rqsts, 30);
-  array_init(struct request_t, &fwds, 30);
 
   struct request_t t = {.r = 0, .p = 0, .o = 1};
 
@@ -1016,32 +1013,32 @@ static void iluc_get_data(struct array *data, ulong K, int type,
   } while (0)
 
   if (type == CSC)
-    INIT_RQST(r, c, &rqsts);
+    INIT_RQST(r, c, rqsts);
   else
-    INIT_RQST(c, r, &rqsts);
+    INIT_RQST(c, r, rqsts);
 
 #undef INIT_RQST
 
   if (K > 0) {
     t.r = K, t.p = K % c->np, t.o = 0;
-    array_cat(struct request_t, &rqsts, &t, 1);
+    array_cat(struct request_t, rqsts, &t, 1);
   }
 
-  sarray_transfer(struct request_t, &rqsts, p, 1, cr);
+  sarray_transfer(struct request_t, rqsts, p, 1, cr);
 
   // Okay, we got all the requests (if any) and non-zero row/col ids in the same
   // processor. Now we forward the requests to the original owners.
-  if (rqsts.n > 0) {
-    sarray_sort_2(struct request_t, rqsts.ptr, rqsts.n, r, 1, o, 0, bfr);
-    struct request_t *pr = (struct request_t *)rqsts.ptr;
+  if (rqsts->n > 0) {
+    sarray_sort_2(struct request_t, rqsts->ptr, rqsts->n, r, 1, o, 0, bfr);
+    struct request_t *pr = (struct request_t *)rqsts->ptr;
     uint s, e;
-    for (e = 1, s = 0; e < rqsts.n; e++) {
+    for (e = 1, s = 0; e < rqsts->n; e++) {
       if (pr[e].r != pr[s].r) {
         if (pr[s].o == 0) { // This is a request
           uint p = pr[s].p;
           for (s = s + 1; s < e; s++) {
             pr[s].o = p;
-            array_cat(struct request_t, &fwds, &pr[s], 1);
+            array_cat(struct request_t, fwds, &pr[s], 1);
           }
         }
         s = e;
@@ -1051,17 +1048,16 @@ static void iluc_get_data(struct array *data, ulong K, int type,
       uint p = pr[s].p;
       for (s = s + 1; s < e; s++) {
         pr[s].o = p;
-        array_cat(struct request_t, &fwds, &pr[s], 1);
+        array_cat(struct request_t, fwds, &pr[s], 1);
       }
     }
   }
-  array_free(&rqsts);
 
-  sarray_transfer(struct request_t, &fwds, p, 0, cr);
+  sarray_transfer(struct request_t, fwds, p, 0, cr);
 
-  if (fwds.n > 0 && A->n > 0) {
-    sarray_sort(struct request_t, fwds.ptr, fwds.n, r, 1, bfr);
-    struct request_t *pf = (struct request_t *)fwds.ptr;
+  if (fwds->n > 0) {
+    sarray_sort(struct request_t, fwds->ptr, fwds->n, r, 1, bfr);
+    struct request_t *pf = (struct request_t *)fwds->ptr;
 
     uint i, j, k, l, n;
     scalar v;
@@ -1071,7 +1067,7 @@ static void iluc_get_data(struct array *data, ulong K, int type,
   do {                                                                         \
     struct mij *pa = (struct mij *)A->ptr;                                     \
     struct mij *pb = (struct mij *)B->ptr;                                     \
-    for (i = 0, j = 0; i < fwds.n; i++) {                                      \
+    for (i = 0, j = 0; i < fwds->n; i++) {                                     \
       l = 0;                                                                   \
       m.f = pf[i].r, m.p = pf[i].o;                                            \
       for (; j < A->n && pa[j].f < m.f; j++)                                   \
@@ -1099,12 +1095,14 @@ static void iluc_get_data(struct array *data, ulong K, int type,
 
 #undef FILL_RQST
   }
-  array_free(&fwds);
 
   if (type == CSC)
     sarray_sort_2(struct mij, A->ptr, A->n, c, 1, r, 1, bfr);
   else
     sarray_sort_2(struct mij, A->ptr, A->n, r, 1, c, 1, bfr);
+
+  // TODO: Condense before sending
+  // sarray_sort(struct eij, data->ptr, data->n, p, 0, bfr);
 
   sarray_transfer(struct eij, data, p, 0, cr);
 }
@@ -1184,17 +1182,21 @@ static void iluc_update(struct array *tij, ulong K, struct array *data, int row,
 static void iluc_level(struct array *lij, struct array *uij, int lvl,
                        uint *lvl_off, struct par_mat *L, struct par_mat *U,
                        struct crystal *cr, int verbose, buffer *bfr) {
+  // Work arrays
   struct array rij, cij, data;
   array_init(struct mij, &rij, 30);
   array_init(struct mij, &cij, 30);
   array_init(struct eij, &data, 30);
 
-  uint s = lvl_off[lvl - 1], e = lvl_off[lvl];
-  sint size = e - s;
+  struct array rqst, fwds;
+  array_init(struct request_t, &rqst, 30);
+  array_init(struct request_t, &fwds, 30);
 
-  sint buf[2];
+  // Figure out start and end of the level and agree on a range
+  uint s = lvl_off[lvl - 1];
+  sint buf[2], size = lvl_off[lvl] - s;
   comm_allreduce(&cr->comm, gs_int, gs_max, &size, 1, buf);
-  e = s + size;
+  uint e = s + size;
 
   uint i, k, j, je;
   ulong K;
@@ -1212,7 +1214,7 @@ static void iluc_level(struct array *lij, struct array *uij, int lvl,
     }
 
     // Update z if l_KI != 0 for all I, 1 <= I < K
-    iluc_get_data(&data, K, CSC, lij, uij, cr, bfr);
+    iluc_get_data(&data, K, CSC, lij, uij, cr, &rqst, &fwds, bfr);
     iluc_update(&rij, K, &data, 1, bfr);
 
     // Init w[1:K] = 0, w[K] = 1, w[K+1:n] = a_{K+1:n, K}, i.e., w = l_{:, K}
@@ -1226,7 +1228,7 @@ static void iluc_level(struct array *lij, struct array *uij, int lvl,
     }
 
     // Update w if u_IK != 0 for all I, 1 <= I < K
-    iluc_get_data(&data, K, CSR, uij, lij, cr, bfr);
+    iluc_get_data(&data, K, CSR, uij, lij, cr, &rqst, &fwds, bfr);
     iluc_update(&cij, K, &data, 0, bfr);
 
     // Set u_{k, :} = z and find u_kk
@@ -1250,8 +1252,8 @@ static void iluc_level(struct array *lij, struct array *uij, int lvl,
     }
   }
 
-  array_free(&rij), array_free(&cij);
-  array_free(&data);
+  array_free(&rij), array_free(&cij), array_free(&data);
+  array_free(&rqst), array_free(&fwds);
 }
 
 // We are going to separate A matrix to L and U where L is the strictly lower
