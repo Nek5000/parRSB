@@ -76,22 +76,17 @@ static void mg_setup_aux(struct mg *d, const uint lvl, const int factor,
 
   ulong ngc = ng / factor;
   ngc += (ngc == 0) * (ng > 1);
+
   const uint npc = (ngc < c->np ? ngc : c->np);
   const uint nelt = ngc / npc, nrem = ngc % npc;
 
   uint i, j, je, k = 0;
   struct mij m;
   for (i = 0; i < M->rn; i++) {
-    m.r = (M->rows[i] + factor - 1) / factor;
-    if (m.r > ngc)
-      m.r--;
-    assert(m.r > 0);
+    m.r = M->rows[i] / factor, m.r += (m.r == 0);
     set_proc(&m, nelt, nrem, npc);
     for (j = M->adj_off[i], je = M->adj_off[i + 1]; j < je; j++) {
-      m.c = (M->cols[M->adj_idx[j]] + factor - 1) / factor;
-      if (m.c > ngc)
-        m.c--;
-      assert(m.c > 0);
+      m.c = M->cols[M->adj_idx[j]] / factor, m.c += (m.c == 0);
       m.v = M->adj_val[j];
       array_cat(struct mij, entries, &m, 1);
     }
