@@ -2,7 +2,7 @@
 #include <math.h>
 
 struct mg_lvl {
-  int nsmooth;
+  uint nsmooth;
   scalar sigma;
   struct gs_data *J; // Interpolation from level i to i + 1
   struct gs_data *Q; // gs handle for matrix vector product
@@ -10,9 +10,8 @@ struct mg_lvl {
 };
 
 struct mg {
-  int nlevels;
+  uint nlevels, *level_off;
   struct mg_lvl **levels;
-  uint *level_off;
   scalar *buf;
 };
 
@@ -36,76 +35,76 @@ static scalar sigma_cheb(int k, int n, scalar lmin, scalar lmax) {
   return 1 / lamk;
 }
 
+static void inline set_proc(struct mij *m, uint nelt, uint nrem, uint np) {
+  assert(m->r > 0);
+
+  if (nrem == 0)
+    m->p = (m->r - 1) / nelt;
+  else {
+    uint s = np - nrem;
+    ulong t = nelt * s;
+    if (m->r <= t)
+      m->p = (m->r - 1) / nelt;
+    else
+      m->p = s + (m->r - (t + 1)) / (nelt + 1);
+  }
+
+  assert(m->p >= 0 && m->p < np);
+}
+
 static void mg_setup_aux(struct mg *d, const uint lvl, const int factor,
                          const struct comm *c, struct crystal *cr,
                          struct array *entries, buffer *bfr) {
   assert(lvl > 0);
   struct par_mat *M = d->levels[lvl - 1]->M;
-  uint nnz = M->rn > 0 ? M->adj_off[M->rn] + IS_DIAG(M) * M->rn : 0;
+  uint nnz = M->rn > 0 ? M->adj_off[M->rn] + M->rn : 0;
 
   // Reserve enough space in the array
-  array_reserve(struct mij, entries, nnz);
-  entries->n = 0;
+  array_reserve(struct mij, entries, nnz), entries->n = 0;
 
   // Reserve enough memory for gs ids for interpolation
   slong *ids = (slong *)tcalloc(slong, 2 * M->rn);
 
+  // Calculate coarse level parameters: ngc, npc, nelt, nrem
+  slong out[2][1], wrk[2][1], in = M->rn;
+  comm_scan(out, c, gs_long, gs_add, &in, 1, wrk);
+  ulong ng = out[1][0];
+
+  // Coarse level, probably should stop way before this.
+  // if (ng == 1) {
+  // }
+
+  ulong ngc = (ng + factor - 1) / factor;
+  const uint npc = (ngc < c->np ? ngc : c->np);
+  const uint nelt = ngc / npc, nrem = ngc % npc;
+
   // Calculate the minimum row id
-  slong rs = M->rn > 0 ? M->rows[0] : LLONG_MAX, b;
-  comm_allreduce(c, gs_long, gs_min, &rs, 1, &b);
+  slong rs = (M->rn > 0 ? M->rows[0] : LLONG_MAX);
+  comm_allreduce(c, gs_long, gs_min, &rs, 1, wrk);
   rs -= 1;
 
-  // Calculate coarse level parameters: ngc, npc, nelt, nrem
-  slong out[2][1], bf[2][1], in = M->rn;
-  comm_scan(out, c, gs_long, gs_add, &in, 1, bf);
-  ulong ng = out[1][0], ngc = (ng + factor - 1) / factor;
-  uint npc = ngc < c->np ? ngc : c->np;
-  uint nelt = ngc / npc, nrem = ngc % npc;
-
-#define SETP(p, r, np, nelt, nrem)                                             \
-  {                                                                            \
-    if (nrem == 0)                                                             \
-      p = (r - 1) / nelt;                                                      \
-    else {                                                                     \
-      uint s = np - nrem;                                                      \
-      ulong t = nelt * s;                                                      \
-      if (r <= t)                                                              \
-        p = (r - 1) / nelt;                                                    \
-      else                                                                     \
-        p = s + (r - t - 1) / (nelt + 1);                                      \
-    }                                                                          \
-    assert(p >= 0 && p < np);                                                  \
-  }
-
-  uint i, j, k = 0, n = 0;
+  uint i, j, je, k = 0;
   struct mij m;
   for (i = 0; i < M->rn; i++) {
     ulong r = M->rows[i] - rs;
-    for (j = M->adj_off[i]; j < M->adj_off[i + 1]; j++) {
-      m.r = (r + factor - 1) / factor;
-      if (m.r > ngc)
-        m.r--;
-      m.c = (M->cols[M->adj_idx[j]] - rs + factor - 1) / factor;
-      if (m.c > ngc)
-        m.c--;
-      m.v = M->adj_val[j];
-      assert(m.r > 0);
-      assert(m.c > 0);
-      SETP(m.p, m.r, npc, nelt, nrem);
-      array_cat(struct mij, entries, &m, 1);
-    }
     m.r = (r + factor - 1) / factor;
     if (m.r > ngc)
       m.r--;
-    m.c = m.r;
     assert(m.r > 0);
+    set_proc(&m, nelt, nrem, npc);
+    for (j = M->adj_off[i], je = M->adj_off[i + 1]; j < je; j++) {
+      m.c = (M->cols[M->adj_idx[j]] - rs + factor - 1) / factor;
+      if (m.c > ngc)
+        m.c--;
+      assert(m.c > 0);
+      m.v = M->adj_val[j];
+      array_cat(struct mij, entries, &m, 1);
+    }
+    m.c = m.r;
     m.v = M->diag_val[i];
-    SETP(m.p, m.r, npc, nelt, nrem);
     ids[k++] = -m.c;
     array_cat(struct mij, entries, &m, 1);
   }
-
-#undef SETP
 
   sarray_transfer(struct mij, entries, p, 0, cr);
   sarray_sort_2(struct mij, entries->ptr, entries->n, r, 1, c, 1, bfr);
