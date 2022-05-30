@@ -67,12 +67,28 @@ jobs:
 
           mpirun -np ${{ matrix.np }} --hostfile hostfile ./genmap \
             --mesh ${{ matrix.test }} --tol=${tol} --no-dump --test
-      - name: genmap-mg
+      - name: genmap-mg-factor-2
         if: always()
         shell: bash
         run: |
           export PARRSB_RSB_PRE=0
           export PARRSB_RSB_ALGO=1
+
+          cp hostfile build/examples/genmap parRSB-tests/${{ matrix.test }}
+
+          cd parRSB-tests/${{ matrix.test }}
+
+          tol=(`cat test.txt | grep tol`); tol=${tol[2]}
+
+          mpirun -np ${{ matrix.np }} --hostfile hostfile ./genmap \
+            --mesh ${{ matrix.test }} --tol=${tol} --no-dump --test
+      - name: genmap-mg-factor-4
+        if: always()
+        shell: bash
+        run: |
+          export PARRSB_RSB_PRE=0
+          export PARRSB_RSB_ALGO=1
+          export PARRSB_RSB_MG_FACTOR=4
 
           cp hostfile build/examples/genmap parRSB-tests/${{ matrix.test }}
 
