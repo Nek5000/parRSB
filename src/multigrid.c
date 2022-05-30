@@ -19,7 +19,7 @@ struct mg {
 static int logbll(slong n, int a) {
   assert(a > 0);
 
-  int k = 1;
+  int k = (n > 0);
   while (n > 1)
     n = (n + a - 1) / a, k++;
 
@@ -128,8 +128,8 @@ struct mg *mg_setup(const struct par_mat *M, const int factor,
   assert(IS_CSR(M));
   assert(M->rn == 0 || IS_DIAG(M));
 
-  slong out[2][1], bf[2][1], in = M->rn;
-  comm_scan(out, c, gs_long, gs_add, &in, 1, bf);
+  slong out[2][1], wrk[2][1], in = M->rn;
+  comm_scan(out, c, gs_long, gs_add, &in, 1, wrk);
   slong rg = out[1][0];
 
   struct mg *d = (struct mg *)tcalloc(struct mg, 1);
@@ -143,35 +143,37 @@ struct mg *mg_setup(const struct par_mat *M, const int factor,
   }
 
   d->levels = (struct mg_lvl **)tcalloc(struct mg_lvl *, d->nlevels);
+  d->level_off = tcalloc(uint, d->nlevels + 1);
+
+  // Setup Level 1, keeps a pointer to input matrix
   d->levels[0] = (struct mg_lvl *)tcalloc(struct mg_lvl, 1);
   d->levels[0]->nsmooth = 3;
   d->levels[0]->sigma = sigma_cheb(1, d->levels[0]->nsmooth + 1, 1, 2);
   d->levels[0]->M = (struct par_mat *)M;
   d->levels[0]->Q = setup_Q(M, c, bfr);
 
-  d->level_off = tcalloc(uint, d->nlevels + 1);
   d->level_off[0] = 0;
   d->level_off[1] = M->rn;
 
   uint nnz = M->rn > 0 ? M->adj_off[M->rn] + M->rn : 0;
-  struct array entries;
-  array_init(struct mij, &entries, nnz);
+  struct array mijs;
+  array_init(struct mij, &mijs, nnz);
 
-  uint i = 1;
-  for (; i < d->nlevels; i++) {
-    mg_setup_aux(d, i, factor, c, cr, &entries, bfr);
-    struct par_mat *M = d->levels[i]->M;
-    if (M->rn > 0 && M->adj_off[M->rn] + M->rn > nnz)
-      nnz = M->adj_off[M->rn] + M->rn;
-    d->level_off[i + 1] = d->level_off[i] + M->rn;
-    d->levels[i]->nsmooth = 3;
-    d->levels[i]->sigma = sigma_cheb(1, d->levels[i]->nsmooth + 1, 1, 2);
+  uint l = 1;
+  for (; l < d->nlevels; l++) {
+    mg_setup_aux(d, l, factor, c, cr, &mijs, bfr);
+    struct par_mat *Ml = d->levels[l]->M;
+    if (Ml->rn > 0 && Ml->adj_off[Ml->rn] + Ml->rn > nnz)
+      nnz = Ml->adj_off[Ml->rn] + Ml->rn;
+    d->level_off[l + 1] = d->level_off[l] + Ml->rn;
+    d->levels[l]->nsmooth = 3;
+    d->levels[l]->sigma = sigma_cheb(1, d->levels[l]->nsmooth + 1, 1, 2);
   }
 
-  d->levels[i - 1]->J = NULL;
+  d->levels[l - 1]->J = NULL;
   d->buf = tcalloc(scalar, 5 * d->level_off[d->nlevels] + nnz);
 
-  array_free(&entries);
+  array_free(&mijs);
 
   return d;
 }
