@@ -26,7 +26,17 @@ static int logbll(slong n, int a) {
   return k;
 }
 
-static void mg_lvl_setup(struct mg *d, const uint lvl, const int factor,
+//=============================================================================
+// MG setup
+//
+static scalar sigma_cheb(int k, int n, scalar lmin, scalar lmax) {
+  k = (k - 1) % n + 1;
+  scalar theta = M_PI * (k - 0.5) / n;
+  scalar lamk = lmin + 0.5 * (lmax - lmin) * (cos(theta) + 1);
+  return 1 / lamk;
+}
+
+static void mg_setup_aux(struct mg *d, const uint lvl, const int factor,
                          const struct comm *c, struct crystal *cr,
                          struct array *entries, buffer *bfr) {
   assert(lvl > 0);
@@ -122,16 +132,20 @@ struct mg *mg_setup(const struct par_mat *M, const int factor,
   comm_scan(out, c, gs_long, gs_add, &in, 1, bf);
   slong rg = out[1][0];
 
-  if (rg == 0)
-    return NULL;
-
   struct mg *d = (struct mg *)tcalloc(struct mg, 1);
   d->nlevels = logbll(rg, factor);
-  d->levels = (struct mg_lvl **)tcalloc(struct mg_lvl *, d->nlevels);
 
+  if (d->nlevels == 0) {
+    d->levels = NULL;
+    d->level_off = NULL;
+    d->buf = NULL;
+    return d;
+  }
+
+  d->levels = (struct mg_lvl **)tcalloc(struct mg_lvl *, d->nlevels);
   d->levels[0] = (struct mg_lvl *)tcalloc(struct mg_lvl, 1);
   d->levels[0]->nsmooth = 3;
-  d->levels[0]->sigma = 0.6;
+  d->levels[0]->sigma = sigma_cheb(1, d->levels[0]->nsmooth + 1, 1, 2);
   d->levels[0]->M = (struct par_mat *)M;
   d->levels[0]->Q = setup_Q(M, c, bfr);
 
@@ -143,15 +157,15 @@ struct mg *mg_setup(const struct par_mat *M, const int factor,
   struct array entries;
   array_init(struct mij, &entries, nnz);
 
-  uint i;
-  for (i = 1; i < d->nlevels; i++) {
-    mg_lvl_setup(d, i, factor, c, cr, &entries, bfr);
+  uint i = 1;
+  for (; i < d->nlevels; i++) {
+    mg_setup_aux(d, i, factor, c, cr, &entries, bfr);
     struct par_mat *M = d->levels[i]->M;
     if (M->rn > 0 && M->adj_off[M->rn] + M->rn > nnz)
       nnz = M->adj_off[M->rn] + M->rn;
     d->level_off[i + 1] = d->level_off[i] + M->rn;
     d->levels[i]->nsmooth = 3;
-    d->levels[i]->sigma = 0.6;
+    d->levels[i]->sigma = sigma_cheb(1, d->levels[i]->nsmooth + 1, 1, 2);
   }
 
   d->levels[i - 1]->J = NULL;
@@ -162,6 +176,9 @@ struct mg *mg_setup(const struct par_mat *M, const int factor,
   return d;
 }
 
+//==============================================================================
+// MG V-cycle and related functions
+//
 void mg_vcycle(scalar *u1, scalar *rhs, struct mg *d, struct comm *c,
                buffer *bfr) {
   if (d == NULL)
@@ -271,6 +288,8 @@ void mg_free(struct mg *d) {
       free(d->level_off), d->level_off = NULL;
     if (d->buf != NULL)
       free(d->buf), d->buf = NULL;
-    free(d), d = NULL;
+    // We don't set d to NULL here -- we need to pass struct `struct mg **d` to
+    // mg_free in order to do so
+    free(d);
   }
 }
