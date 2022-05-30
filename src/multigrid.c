@@ -78,22 +78,16 @@ static void mg_setup_aux(struct mg *d, const uint lvl, const int factor,
   const uint npc = (ngc < c->np ? ngc : c->np);
   const uint nelt = ngc / npc, nrem = ngc % npc;
 
-  // Calculate the minimum row id
-  slong rs = (M->rn > 0 ? M->rows[0] : LLONG_MAX);
-  comm_allreduce(c, gs_long, gs_min, &rs, 1, wrk);
-  rs -= 1;
-
   uint i, j, je, k = 0;
   struct mij m;
   for (i = 0; i < M->rn; i++) {
-    ulong r = M->rows[i] - rs;
-    m.r = (r + factor - 1) / factor;
+    m.r = (M->rows[i] + factor - 1) / factor;
     if (m.r > ngc)
       m.r--;
     assert(m.r > 0);
     set_proc(&m, nelt, nrem, npc);
     for (j = M->adj_off[i], je = M->adj_off[i + 1]; j < je; j++) {
-      m.c = (M->cols[M->adj_idx[j]] - rs + factor - 1) / factor;
+      m.c = (M->cols[M->adj_idx[j]] + factor - 1) / factor;
       if (m.c > ngc)
         m.c--;
       assert(m.c > 0);
