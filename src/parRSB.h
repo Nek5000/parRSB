@@ -19,18 +19,18 @@ extern "C" {
 // Partitioning
 //
 typedef struct {
-  /* General options */
+  // General options
   int partitioner;   // 0 - RSB, 1 - RCB, 2 - RIB (Default: 0)
   int verbose_level; // 0, 1, 2, .. etc (Default: 1)
   int profile_level; // 0, 1, 2, .. etc (Default: 0)
 
-  /* RSB specific */
+  // RSB specific
   int rsb_algo;      // 0 - Lanczos, 1 - RQI (Default: 0)
   int rsb_pre;       // 0 - None, 1 - RCB , 2 - RIB (Default: 1)
   int rsb_grammian;  // 0 or 1 (Default: 1)
-  int rsb_mg_factor; // 2 or 4 (Default: 4)
+  int rsb_mg_factor; // Coarsening factor (>1) (Default: 2)
 
-  /* Other */
+  // Other
   int repair; // 0 - No, 1 - Yes (Default: 1)
 } parrsb_options;
 

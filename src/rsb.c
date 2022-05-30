@@ -7,7 +7,7 @@
 #include <genmap-impl.h>
 #include <parRSB.h>
 
-parrsb_options parrsb_default_options = {0, 2, 1, 0, 1, 0, 4, 1};
+parrsb_options parrsb_default_options = {0, 2, 1, 0, 1, 0, 2, 1};
 
 static char *ALGO[3] = {"RSB", "RCB", "RIB"};
 

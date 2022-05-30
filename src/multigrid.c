@@ -20,7 +20,7 @@ static int logbll(slong n, int a) {
 
   int k = (n > 0);
   while (n > 1)
-    n = (n + a - 1) / a, k++;
+    n /= a, k++;
 
   return k;
 }
@@ -74,7 +74,8 @@ static void mg_setup_aux(struct mg *d, const uint lvl, const int factor,
   // if (ng == 1) {
   // }
 
-  ulong ngc = (ng + factor - 1) / factor;
+  ulong ngc = ng / factor;
+  ngc += (ngc == 0) * (ng > 1);
   const uint npc = (ngc < c->np ? ngc : c->np);
   const uint nelt = ngc / npc, nrem = ngc % npc;
 
