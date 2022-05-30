@@ -986,8 +986,8 @@ static void iluc_get_multipliers(struct array *mplrs, ulong K, int type,
 static void iluc_get_data(struct array *data, ulong K, int type,
                           struct array *A, struct array *B, struct crystal *cr,
                           struct array *rqsts, struct array *fwds,
-                          buffer *bfr) {
-  data->n = rqsts->n = fwds->n = 0;
+                          struct array *work, buffer *bfr) {
+  work->n = data->n = rqsts->n = fwds->n = 0;
   struct comm *c = &cr->comm;
 
   struct request_t t = {.r = 0, .p = 0, .o = 1};
@@ -1083,7 +1083,7 @@ static void iluc_get_data(struct array *data, ulong K, int type,
           ;                                                                    \
         for (; n < B->n && pb[n].f == pa[k].g; n++) {                          \
           m.g = pb[n].g, m.v = -v * pb[n].v;                                   \
-          array_cat(struct eij, data, &m, 1);                                  \
+          array_cat(struct eij, work, &m, 1);                                  \
         }                                                                      \
       }                                                                        \
     }                                                                          \
@@ -1097,13 +1097,30 @@ static void iluc_get_data(struct array *data, ulong K, int type,
 #undef FILL_RQST
   }
 
-  if (type == CSC)
+  if (type == CSC) {
     sarray_sort_2(struct mij, A->ptr, A->n, c, 1, r, 1, bfr);
-  else
+    sarray_sort_2(struct eij, work->ptr, work->n, r, 1, c, 1, bfr);
+  } else {
     sarray_sort_2(struct mij, A->ptr, A->n, r, 1, c, 1, bfr);
+    sarray_sort_2(struct eij, work->ptr, work->n, c, 1, r, 1, bfr);
+  }
 
-  // TODO: Condense before sending
-  // sarray_sort(struct eij, data->ptr, data->n, p, 0, bfr);
+  // We only have one request per processor, so sorting by processor
+  // is the same as sorting by row id. But just to be safe we will sort
+  // by row id.
+  struct eij *pw = (struct eij *)work->ptr;
+  if (work->n > 0) {
+    uint i = 1, j = 0;
+    for (; i < work->n; i++) {
+      if ((pw[i].r != pw[j].r) || (pw[i].c != pw[j].c)) {
+        array_cat(struct eij, data, &pw[j], 1);
+        j = i;
+      } else
+        pw[j].v += pw[i].v;
+    }
+    if (j < i)
+      array_cat(struct eij, data, &pw[j], 1);
+  }
 
   sarray_transfer(struct eij, data, p, 0, cr);
 }
@@ -1178,11 +1195,11 @@ static void iluc_level(struct array *lij, struct array *uij, int lvl,
                        uint *lvl_off, struct par_mat *L, struct par_mat *U,
                        struct crystal *cr, int verbose, buffer *bfr) {
   // Work arrays
-  struct array rij, cij, data, wrk;
+  struct array rij, cij, data, work;
   array_init(struct mij, &rij, 30);
   array_init(struct mij, &cij, 30);
   array_init(struct eij, &data, 30);
-  array_init(struct eij, &wrk, 30);
+  array_init(struct eij, &work, 30);
 
   struct array rqst, fwds;
   array_init(struct request_t, &rqst, 30);
@@ -1200,7 +1217,7 @@ static void iluc_level(struct array *lij, struct array *uij, int lvl,
     K = (k < lvl_off[lvl]) ? U->rows[k] : 0;
 
     // Fetch required data (combine with the other call below)
-    iluc_get_data(&data, K, CSC, lij, uij, cr, &rqst, &fwds, bfr);
+    iluc_get_data(&data, K, CSC, lij, uij, cr, &rqst, &fwds, &work, bfr);
     // Init z[1:K] = 0, z[K:n] = a_{K, K:n}, i.e., z = u_{K,:}
     rij.n = 0;
     struct mij m = {.r = 0, .c = 0, .idx = 0, .p = 0, .v = 0};
@@ -1215,7 +1232,7 @@ static void iluc_level(struct array *lij, struct array *uij, int lvl,
     iluc_update(&rij, K, &data, 1, bfr);
 
     // Fetch required data (combine with the other call above)
-    iluc_get_data(&data, K, CSR, uij, lij, cr, &rqst, &fwds, bfr);
+    iluc_get_data(&data, K, CSR, uij, lij, cr, &rqst, &fwds, &work, bfr);
     // Init w[1:K] = 0, w[K] = 1, w[K+1:n] = a_{K+1:n, K}, i.e., w = l_{:, K}
     cij.n = 0;
     if (K) {
@@ -1249,7 +1266,7 @@ static void iluc_level(struct array *lij, struct array *uij, int lvl,
     }
   }
 
-  array_free(&rij), array_free(&cij), array_free(&data), array_free(&wrk);
+  array_free(&rij), array_free(&cij), array_free(&data), array_free(&work);
   array_free(&rqst), array_free(&fwds);
 }
 
