@@ -8,7 +8,9 @@ extern void comm_split(const struct comm *old, int bin, int key,
                        struct comm *new_);
 
 //=============================================================================
-// ILU levels: Currently there are two methods of finding levels
+// ILU levels
+//
+// Currently there are two methods of finding levels
 //   1. Based on final element distribution among processors (dst_lvls)
 //   2. Based on RSB levels while partitioning (rsb_lvls)
 struct key_t {
@@ -448,26 +450,21 @@ static int find_lvls(uint *lvl_off, uint *lvl_owner, ulong *lvl_ids,
 }
 
 //=============================================================================
-// Common functions for ILU(0) and ILUt
+// ILU
 //
 struct ilu {
-  int nlvls, type;
+  // User input
+  int type /* ILU(0), ILUC, etc. */, pivot /* to pivot or not */;
+  scalar tol; // 1st dropping rule: Entry is dropped abs(aij) < tol
+  uint p; // 2nd dropping rul: Entries are dropped so that total nnz per row is
+          // less than p
+
+  // Calculated values internal to ILU
+  int nlvls;
   uint *lvl_off;
-  scalar tol;
   struct par_mat A, L, U;
   struct crystal cr;
 };
-
-inline static int copy_row(struct array *arr, const uint i, const uint p,
-                           struct par_mat *A) {
-  struct mij t = {.r = A->rows[i], .c = 0, .idx = 0, .p = p, .v = 0.0};
-  for (uint j = A->adj_off[i]; j < A->adj_off[i + 1]; j++) {
-    t.c = A->cols[A->adj_idx[j]], t.v = A->adj_val[j];
-    array_cat(struct mij, arr, &t, 1);
-  }
-
-  return 0;
-}
 
 //=============================================================================
 // ILU(0)
@@ -541,7 +538,12 @@ static int ilu0_get_rows(struct par_mat *E, int lvl, uint *lvl_off,
     for (j = i; j < requests.n && ptr[j].ri == ri; j++) {
       // No need to send to owner
       if (ptr[j].p != c->id) {
-        copy_row(&sends, ro, ptr[j].p, A);
+        // copy_row(&sends, ro, ptr[j].p, A);
+        struct mij m = {.r = A->rows[ro], .idx = 0, .p = ptr[j].p};
+        for (uint k = A->adj_off[ro], ke = A->adj_off[ro + 1]; k < ke; k++) {
+          m.c = A->cols[A->adj_idx[k]], m.v = A->adj_val[k];
+          array_cat(struct mij, &sends, &m, 1);
+        }
       }
     }
   }
