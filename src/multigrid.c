@@ -2,8 +2,8 @@
 #include <math.h>
 
 struct mg_lvl {
-  uint nsmooth;
-  scalar sigma;
+  uint npres, nposts;
+  scalar over;
   struct gs_data *J; // Interpolation from level i to i + 1
   struct gs_data *Q; // gs handle for matrix vector product
   struct par_mat *M;
@@ -70,10 +70,6 @@ static void mg_setup_aux(struct mg *d, const uint lvl, const int factor,
   comm_scan(out, c, gs_long, gs_add, &in, 1, wrk);
   ulong ng = out[1][0];
 
-  // Coarse level, probably should stop way before this.
-  // if (ng == 1) {
-  // }
-
   ulong ngc = ng / factor;
   ngc += (ngc == 0) * (ng > 1);
 
@@ -136,8 +132,9 @@ struct mg *mg_setup(const struct par_mat *M, const int factor,
 
   // Setup Level 1, keeps a pointer to input matrix
   d->levels[0] = (struct mg_lvl *)tcalloc(struct mg_lvl, 1);
-  d->levels[0]->nsmooth = 3;
-  d->levels[0]->sigma = sigma_cheb(1, d->levels[0]->nsmooth + 1, 1, 2);
+  d->levels[0]->npres = 3;
+  d->levels[0]->nposts = 0;
+  d->levels[0]->over = 1.5;
   d->levels[0]->M = (struct par_mat *)M;
   d->levels[0]->Q = setup_Q(M, c, bfr);
 
@@ -155,8 +152,9 @@ struct mg *mg_setup(const struct par_mat *M, const int factor,
     if (Ml->rn > 0 && Ml->adj_off[Ml->rn] + Ml->rn > nnz)
       nnz = Ml->adj_off[Ml->rn] + Ml->rn;
     d->level_off[l + 1] = d->level_off[l] + Ml->rn;
-    d->levels[l]->nsmooth = 3;
-    d->levels[l]->sigma = sigma_cheb(1, d->levels[l]->nsmooth + 1, 1, 2);
+    d->levels[l]->npres = 3;
+    d->levels[l]->nposts = 0;
+    d->levels[l]->over = 1.5;
   }
 
   d->levels[l - 1]->J = NULL;
@@ -190,12 +188,9 @@ void mg_vcycle(scalar *u1, scalar *rhs, struct mg *d, struct comm *c,
     off = lvl_off[lvl], n = lvl_off[lvl + 1] - off;
     struct mg_lvl *l = lvls[lvl];
     struct par_mat *M = l->M;
-    assert(IS_CSR(M));
-    assert(n == 0 || IS_DIAG(M));
-    assert(n == M->rn);
 
     // u = sigma*inv(D)*rhs
-    scalar sigma = l->sigma;
+    scalar sigma = sigma_cheb(1, l->npres + 1, 1, 2);
     for (j = 0; j < n; j++)
       u[off + j] = sigma * r[off + j] / M->diag_val[j];
 
@@ -206,8 +201,8 @@ void mg_vcycle(scalar *u1, scalar *rhs, struct mg *d, struct comm *c,
     for (j = 0; j < n; j++)
       r[off + j] = r[off + j] - Gs[off + j];
 
-    for (i = 0; i < l->nsmooth - 1; i++) {
-      sigma = sigma + 0.066666 / l->nsmooth;
+    for (i = 1; i <= l->npres; i++) {
+      sigma = sigma_cheb(i + 1, l->npres + 1, 1, 2);
 
       // s = sigma*inv(D)*r, u = u + s
       for (j = 0; j < n; j++) {
@@ -233,7 +228,6 @@ void mg_vcycle(scalar *u1, scalar *rhs, struct mg *d, struct comm *c,
   if (n == 1) {
     struct mg_lvl *l = lvls[nlevels - 1];
     struct par_mat *M = l->M;
-    assert(M->rn == 1);
     if (fabs(M->diag_val[0]) > 1e-6)
       u[off] = r[off] / M->diag_val[0];
     else
@@ -241,7 +235,6 @@ void mg_vcycle(scalar *u1, scalar *rhs, struct mg *d, struct comm *c,
     r[off] = u[off];
   }
 
-  scalar over = 1.33333;
   for (int lvl = nlevels - 2; lvl >= 0; lvl--) {
     struct mg_lvl *l = lvls[lvl];
     off = lvl_off[lvl];
@@ -251,7 +244,7 @@ void mg_vcycle(scalar *u1, scalar *rhs, struct mg *d, struct comm *c,
     // u = u + over*J*e
     n = lvl_off[lvl + 1] - off;
     for (j = 0; j < n; j++)
-      r[off + j] = over * r[off + j] + u[off + j];
+      r[off + j] = l->over * r[off + j] + u[off + j];
   }
 
   // Avoid this
