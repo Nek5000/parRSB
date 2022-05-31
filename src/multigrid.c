@@ -170,26 +170,28 @@ struct mg *mg_setup(const struct par_mat *M, const int factor,
 //
 void mg_vcycle(scalar *u1, scalar *rhs, struct mg *d, struct comm *c,
                buffer *bfr) {
-  if (d == NULL)
+  if (d->nlevels == 0)
     return;
 
-  int nlevels = d->nlevels;
-  uint *lvl_off = d->level_off, nnz = lvl_off[nlevels], i;
+  uint *lvl_off = d->level_off, nnz = lvl_off[d->nlevels];
   scalar *s = d->buf, *Gs = s + nnz, *r = Gs + nnz, *u = r + nnz;
-  for (i = 0; i < nnz; i++)
-    s[i] = Gs[i] = r[i] = u[i] = 0.0;
-  for (i = 0; i < lvl_off[1]; i++)
+  for (uint i = 0; i < nnz; i++) {
+    s[i] = Gs[i] = 0.0;
+    r[i] = u[i] = 0.0;
+  }
+  for (uint i = 0; i < lvl_off[1]; i++)
     r[i] = rhs[i];
 
   scalar *buf = u + nnz;
-  uint n, j, off;
-  struct mg_lvl **lvls = d->levels;
-  for (int lvl = 0; lvl < nlevels - 1; lvl++) {
-    off = lvl_off[lvl], n = lvl_off[lvl + 1] - off;
-    struct mg_lvl *l = lvls[lvl];
+  uint i, j, n, off;
+  for (int lvl = 0; lvl < d->nlevels - 1; lvl++) {
+    off = lvl_off[lvl];
+    n = lvl_off[lvl + 1] - off;
+
+    struct mg_lvl *l = d->levels[lvl];
     struct par_mat *M = l->M;
 
-    // u = sigma*inv(D)*rhs
+    // u = sigma * inv(D) * rhs
     scalar sigma = sigma_cheb(1, l->npres + 1, 1, 2);
     for (j = 0; j < n; j++)
       u[off + j] = sigma * r[off + j] / M->diag_val[j];
@@ -210,7 +212,7 @@ void mg_vcycle(scalar *u1, scalar *rhs, struct mg *d, struct comm *c,
         u[off + j] += s[off + j];
       }
 
-      // G*s
+      // Gs = G*s
       mat_vec_csr(Gs + off, s + off, M, l->Q, buf, bfr);
 
       // r = r - Gs
@@ -223,10 +225,11 @@ void mg_vcycle(scalar *u1, scalar *rhs, struct mg *d, struct comm *c,
   }
 
   // Coarsest level
-  off = lvl_off[nlevels - 1], n = lvl_off[nlevels] - off;
+  off = lvl_off[d->nlevels - 1];
+  n = lvl_off[d->nlevels] - off;
 
   if (n == 1) {
-    struct mg_lvl *l = lvls[nlevels - 1];
+    struct mg_lvl *l = d->levels[d->nlevels - 1];
     struct par_mat *M = l->M;
     if (fabs(M->diag_val[0]) > 1e-6)
       u[off] = r[off] / M->diag_val[0];
@@ -235,8 +238,8 @@ void mg_vcycle(scalar *u1, scalar *rhs, struct mg *d, struct comm *c,
     r[off] = u[off];
   }
 
-  for (int lvl = nlevels - 2; lvl >= 0; lvl--) {
-    struct mg_lvl *l = lvls[lvl];
+  for (int lvl = d->nlevels - 2; lvl >= 0; lvl--) {
+    struct mg_lvl *l = d->levels[lvl];
     off = lvl_off[lvl];
     // J*e
     gs(r + off, gs_double, gs_add, 0, l->J, bfr);
