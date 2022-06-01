@@ -462,7 +462,7 @@ struct ilu {
   uint p;
 
   // Calculated values internal to ILU
-  uint nlvls, *lvl_off, *pivot;
+  uint nlvls, *lvl_off;
   ulong *perm;
   struct par_mat A, L, U;
   struct crystal cr;
@@ -1056,8 +1056,14 @@ static void iluc(struct ilu *ilu, buffer *bfr) {
 //=============================================================================
 // ILUCP
 //
-static void ilucp_get_data(struct array *data, ulong K, int type,
-                           struct array *A, struct array *B, struct crystal *cr,
+struct pivot_t {
+  ulong k;
+  uint p, pivot;
+};
+
+static void ilucp_get_data(struct array *data, ulong P, int type,
+                           struct array *A, ulong K, struct array *B,
+                           struct array *pvts, struct crystal *cr,
                            struct array *rqsts, struct array *fwds,
                            struct array *work, buffer *bfr) {
   work->n = data->n = rqsts->n = fwds->n = 0;
@@ -1092,8 +1098,8 @@ static void ilucp_get_data(struct array *data, ulong K, int type,
 
 #undef INIT_RQST
 
-  if (K > 0) {
-    t.r = K, t.p = K % c->np, t.o = 0;
+  if (P > 0) {
+    t.r = P, t.p = P % c->np, t.o = 0;
     array_cat(struct request_t, rqsts, &t, 1);
   }
 
@@ -1132,7 +1138,7 @@ static void ilucp_get_data(struct array *data, ulong K, int type,
     sarray_sort(struct request_t, fwds->ptr, fwds->n, r, 1, bfr);
     struct request_t *pf = (struct request_t *)fwds->ptr;
 
-    uint i, j, k, l, n;
+    uint i, j, k, l, n, o;
     scalar v;
     struct eij_t m = {.r = 0, .c = 0, .p = 0, .v = 0};
 
@@ -1146,17 +1152,29 @@ static void ilucp_get_data(struct array *data, ulong K, int type,
       for (; j < A->n && pa[j].f < m.f; j++)                                   \
         ;                                                                      \
       assert(j < A->n && pa[j].f == m.f);                                      \
-      for (k = j; k < A->n && pa[k].f == m.f && pa[k].g < m.f; k++) {          \
+      for (k = j; k < A->n && pa[k].f == m.f && pa[k].g < K; k++) {            \
         v = pa[k].v;                                                           \
         for (; l < B->n && pb[l].f < pa[k].g; l++)                             \
           ;                                                                    \
         assert(l < B->n && pb[l].f == pa[k].g);                                \
-        for (n = l; n < B->n && pb[n].f == pa[k].g && (pb[n].g < m.f + nd);    \
-             n++)                                                              \
+        for (n = l; n < B->n && pb[n].f == pa[k].g && (pb[n].g < K + nd); n++) \
           ;                                                                    \
-        for (; n < B->n && pb[n].f == pa[k].g; n++) {                          \
-          m.g = pb[n].g, m.v = -v * pb[n].v;                                   \
-          array_cat(struct eij_t, work, &m, 1);                                \
+        if (pvts != NULL) {                                                    \
+          struct pivot_t *pp = (struct pivot_t *)pvts->ptr;                    \
+          o = 0;                                                               \
+          for (; n < B->n && pb[n].f == pa[k].g; n++) {                        \
+            m.g = pb[n].g, m.v = -v * pb[n].v;                                 \
+            while (o < pvts->n && pp[o].k < m.g)                               \
+              o++;                                                             \
+            assert(o < pvts->n && pp[o].k == m.g);                             \
+            if (!pp[o].pivot)                                                  \
+              array_cat(struct eij_t, work, &m, 1);                            \
+          }                                                                    \
+        } else {                                                               \
+          for (; n < B->n && pb[n].f == pa[k].g; n++) {                        \
+            m.g = pb[n].g, m.v = -v * pb[n].v;                                 \
+            array_cat(struct eij_t, work, &m, 1);                              \
+          }                                                                    \
         }                                                                      \
       }                                                                        \
     }                                                                          \
@@ -1198,8 +1216,90 @@ static void ilucp_get_data(struct array *data, ulong K, int type,
   sarray_transfer(struct eij_t, data, p, 0, cr);
 }
 
+static ulong ilucp_find_pvt(ulong *perm, uint k, int lvl, uint *lvl_off,
+                            struct array *row, struct crystal *cr,
+                            buffer *bfr) {
+  // First sort by the absolute value and then setup a gs handle to iteratively
+  // select a pivot
+  ulong p = 0;
+  if (k < lvl_off[lvl]) {
+    scalar v = 0;
+    struct mij *pr = (struct mij *)row->ptr;
+    for (uint i = 0; i < row->n && pr[i].c < lvl_off[lvl]; i++) {
+      if (fabs(pr[i].v) > v) {
+        v = fabs(pr[i].v);
+        p = pr[i].c;
+      }
+    }
+    perm[k] = p;
+  }
+  return p;
+}
+
+static void ilucp_update_pvts(struct array *pvts, struct array *rij,
+                              ulong *perm, uint k, int lvl, uint *lvl_off,
+                              struct crystal *cr, buffer *bfr) {
+  struct comm *c = &cr->comm;
+
+  struct pivot_t t = {.k = 0, .pivot = 0};
+  struct mij *pr = (struct mij *)rij->ptr;
+  for (uint i = 0; i < rij->n; i++) {
+    t.k = pr[i].c, t.p = t.k % c->np;
+    array_cat(struct pivot_t, pvts, &t, 1);
+  }
+
+  uint e = (k < lvl_off[lvl] ? k : lvl_off[lvl]);
+  t.pivot = 1;
+  for (uint i = 0; i < e; i++) {
+    t.k = perm[i], t.p = t.k % c->np;
+    array_cat(struct pivot_t, pvts, &t, 1);
+  }
+
+  if (pvts->n > 0) {
+    struct array temp;
+    array_init(struct pivot_t, &temp, pvts->n + 1);
+
+    sarray_sort_2(struct pivot_t, pvts->ptr, pvts->n, k, 1, pivot, 1, bfr);
+    struct pivot_t *pp = (struct pivot_t *)pvts->ptr;
+    uint i = 1, j = 0;
+    for (; i < pvts->n; i++) {
+      if (pp[i].k != pp[j].k) {
+        array_cat(struct pivot_t, &temp, &pp[i - 1], 1);
+        j = i;
+      }
+    }
+    if (j < i)
+      array_cat(struct pivot_t, &temp, &pp[i - 1], 1);
+    pvts->n = 0;
+    array_cat(struct pivot_t, pvts, temp.ptr, temp.n);
+    array_free(&temp);
+  }
+
+  sarray_transfer(struct pivot_t, pvts, p, 1, cr);
+  sarray_sort_2(struct pivot_t, pvts->ptr, pvts->n, k, 1, pivot, 0, bfr);
+
+  if (pvts->n > 0) {
+    struct pivot_t *pp = (struct pivot_t *)pvts->ptr;
+    uint i = 1, j = 0;
+    for (; i < pvts->n; i++) {
+      if (pp[i].k != pp[j].k) {
+        for (; j < i - 1; j++)
+          pp[j].pivot = pp[i - 1].pivot;
+        j = i;
+      }
+    }
+    if (j < i) {
+      for (; j < i - 1; j++)
+        pp[j].pivot = pp[i - 1].pivot;
+    }
+  }
+
+  sarray_transfer(struct pivot_t, pvts, p, 1, cr);
+  sarray_sort(struct pivot_t, pvts->ptr, pvts->n, k, 1, bfr);
+}
+
 static void ilucp_level(struct array *lij, struct array *uij,
-                        struct array *pcols, int lvl, struct ilu *ilu,
+                        struct array *pvts, int lvl, struct ilu *ilu,
                         buffer *bfr) {
   // Work arrays
   struct array rij, cij, data, work;
@@ -1221,47 +1321,57 @@ static void ilucp_level(struct array *lij, struct array *uij,
   comm_allreduce(&cr->comm, gs_int, gs_max, &size, 1, buf);
   uint e = s + size;
 
-  uint *pivot = ilu->pivot;
-  uint i, k, j, je;
+  uint i, j, je, k, l;
   ulong K;
   for (k = s; k < e; k++) {
     K = (k < lvl_off[lvl]) ? U->rows[k] : 0;
 
-    // Sync the pivots: Basically everyone gets updated about which cols of U
-    // have become pivots. Can't be done through a gs call, will have to send
-    // all the cols in U and the current row a_k along with the info if its
-    // a pivot.
-
     // Fetch required data. We will skip the data in the  columns which were
     // choosen as pivots.
-    ilucp_get_data(&data, K, CSC, lij, uij, cr, &rqst, &fwds, &work, bfr);
+    ilucp_get_data(&data, K, CSC, lij, K, uij, pvts, cr, &rqst, &fwds, &work,
+                   bfr);
 
     // Init z[1:K] = 0, z[K:n] = a_{K, K:n}, i.e., z = u_{K,:} and skip the
     // columns which have been choosen as pivots.
     rij.n = 0;
-    struct mij m = {.r = 0, .c = 0, .idx = 0, .p = 0, .v = 0};
     if (K) {
-      m.r = K;
-      for (j = U->adj_off[k], je = U->adj_off[k + 1]; j < je; j++) {
+      struct mij m = {.r = K, .c = 0, .idx = 0, .p = 0, .v = 0};
+      struct pivot_t *pp = (struct pivot_t *)pvts->ptr;
+      for (j = U->adj_off[k], je = U->adj_off[k + 1], l = 0; j < je; j++) {
         m.c = U->cols[U->adj_idx[j]], m.v = U->adj_val[j];
-        array_cat(struct mij, &rij, &m, 1);
+        while (l < pvts->n && pp[l].k < m.c)
+          l++;
+        assert(l < pp[l].k == m.c);
+        if (!pp[l].pivot)
+          array_cat(struct mij, &rij, &m, 1);
       }
     }
+
     // Update z if l_KI != 0 for all I, 1 <= I < K
     iluc_update(&rij, K, &data, 1, bfr);
 
     // Select the pivot now -- all the active processors have to agree on their
     // own pivot. If two processors share the same pivot, smallest one wins and
-    // others have to conced. So we will send a pivot candidate list and make
-    // each processor pick one.
+    // others have to concede and find another one. So we will send a pivot
+    // candidate list and make each processor pick one. Right now the candidate
+    // list = updated row.
+    ulong P = ilucp_find_pvt(ilu->perm, k, lvl, lvl_off, &rij, cr, bfr);
+
+    // Sync the pivots: Basically everyone gets updated about which cols of U
+    // have become pivots. Can't be done through a gs call, will have to send
+    // all the cols in U and the current row a_k along with the info if its
+    // a pivot.
+    ilucp_update_pvts(pvts, &rij, ilu->perm, k, lvl, lvl_off, cr, bfr);
 
     // Fetch required data for col updated. Can't combine with above call when
     // we pivot? Will need to reimplement this part
-    iluc_get_data(&data, K, CSR, uij, lij, cr, &rqst, &fwds, &work, bfr);
+    ilucp_get_data(&data, P, CSR, uij, K, lij, NULL, cr, &rqst, &fwds, &work,
+                   bfr);
+
     // Init w[1:K] = 0, w[K] = 1, w[K+1:n] = a_{K+1:n, K}, i.e., w = l_{:, K}
     cij.n = 0;
     if (K) {
-      m.c = K;
+      struct mij m = {.r = 0, .c = K, .idx = 0, .p = 0, .v = 0};
       for (j = L->adj_off[k] + 1, je = L->adj_off[k + 1]; j < je; j++) {
         m.r = L->rows[L->adj_idx[j]], m.v = L->adj_val[j];
         array_cat(struct mij, &cij, &m, 1);
@@ -1271,6 +1381,7 @@ static void ilucp_level(struct array *lij, struct array *uij,
     iluc_update(&cij, K, &data, 0, bfr);
 
     // Set u_{k, :} = z and find u_kk
+    // FIXME: This should u_{perm[k],perm[k]}}, not u_kk
     scalar u_kk = 1;
     struct mij *pt = (struct mij *)rij.ptr;
     if (K) {
@@ -1285,7 +1396,7 @@ static void ilucp_level(struct array *lij, struct array *uij,
       pt[j].v /= u_kk;
 
     if (K) {
-      m.r = m.c = K, m.v = 1;
+      struct mij m = {.r = K, .c = K, .idx = 0, .p = 0, .v = 1};
       array_cat(struct mij, &cij, &m, 1);
       array_cat(struct mij, lij, cij.ptr, cij.n);
     }
@@ -1311,15 +1422,23 @@ static void ilucp(struct ilu *ilu, buffer *bfr) {
     par_mat_dump("U.txt", U, cr, bfr);
   }
 
-  ilu->pivot = tcalloc(uint, A->rn);
   ilu->perm = tcalloc(ulong, A->rn);
 
   struct array uij, lij;
   array_init(struct mij, &uij, A->rn * 30 + 1);
   array_init(struct mij, &lij, A->rn * 30 + 1);
 
+  // Initialize with the columns of U, i.e, columns of L
+  struct array pvts;
+  array_init(struct pivot_t, &pvts, L->cn + 1);
+  struct pivot_t t = {.k = 0, .pivot = 0};
+  for (uint i = 0; i < L->cn; i++) {
+    t.k = L->cols[i], t.p = t.k % c->np;
+    array_cat(struct pivot_t, &pvts, &t, 1);
+  }
+
   for (int l = 1; l <= ilu->nlvls; l++)
-    iluc_level(&lij, &uij, l, ilu, bfr);
+    ilucp_level(&lij, &uij, &pvts, l, ilu, bfr);
 
   par_mat_free(L), par_mat_free(U);
   par_mat_setup(U, &uij, CSR, 0, bfr);
@@ -1331,7 +1450,7 @@ static void ilucp(struct ilu *ilu, buffer *bfr) {
     par_mat_dump("UU.txt", U, cr, bfr);
   }
 
-  array_free(&lij), array_free(&uij);
+  array_free(&lij), array_free(&uij), array_free(&pvts);
 }
 
 //=============================================================================
@@ -1444,7 +1563,7 @@ struct ilu *ilu_setup(const uint n, const int nv, const long long *vtxll,
   struct ilu *ilu = tcalloc(struct ilu, 1);
 
   ilu->type = type, ilu->tol = tol, ilu->verbose = verbose;
-  ilu->lvl_off = NULL, ilu->pivot = NULL, ilu->perm = NULL;
+  ilu->lvl_off = NULL, ilu->perm = NULL;
   crystal_init(&ilu->cr, &c);
 
   slong *vtx = tcalloc(slong, n * nv);
@@ -1512,8 +1631,6 @@ void ilu_free(struct ilu *ilu) {
       free(ilu->lvl_off), ilu->lvl_off = NULL;
     if (ilu->perm)
       free(ilu->perm), ilu->perm = NULL;
-    if (ilu->pivot)
-      free(ilu->pivot), ilu->pivot = NULL;
     free(ilu);
   }
 }
