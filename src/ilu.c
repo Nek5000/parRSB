@@ -662,7 +662,7 @@ static void ilu0(struct ilu *ilu, buffer *bfr) {
 //=============================================================================
 // ILUC
 //
-struct eij {
+struct eij_t {
   ulong r, c;
   uint p;
   scalar v;
@@ -809,7 +809,7 @@ static void iluc_get_data(struct array *data, ulong K, int type,
 
     uint i, j, k, l, n;
     scalar v;
-    struct eij m = {.r = 0, .c = 0, .p = 0, .v = 0};
+    struct eij_t m = {.r = 0, .c = 0, .p = 0, .v = 0};
 
 #define FILL_RQST(f, g, nd)                                                    \
   do {                                                                         \
@@ -831,7 +831,7 @@ static void iluc_get_data(struct array *data, ulong K, int type,
           ;                                                                    \
         for (; n < B->n && pb[n].f == pa[k].g; n++) {                          \
           m.g = pb[n].g, m.v = -v * pb[n].v;                                   \
-          array_cat(struct eij, work, &m, 1);                                  \
+          array_cat(struct eij_t, work, &m, 1);                                \
         }                                                                      \
       }                                                                        \
     }                                                                          \
@@ -847,30 +847,30 @@ static void iluc_get_data(struct array *data, ulong K, int type,
 
   if (type == CSC) {
     sarray_sort_2(struct mij, A->ptr, A->n, c, 1, r, 1, bfr);
-    sarray_sort_2(struct eij, work->ptr, work->n, r, 1, c, 1, bfr);
+    sarray_sort_2(struct eij_t, work->ptr, work->n, r, 1, c, 1, bfr);
   } else {
     sarray_sort_2(struct mij, A->ptr, A->n, r, 1, c, 1, bfr);
-    sarray_sort_2(struct eij, work->ptr, work->n, c, 1, r, 1, bfr);
+    sarray_sort_2(struct eij_t, work->ptr, work->n, c, 1, r, 1, bfr);
   }
 
   // We only have one request per processor, so sorting by processor
   // is the same as sorting by row id. But just to be safe we will sort
   // by row id.
-  struct eij *pw = (struct eij *)work->ptr;
+  struct eij_t *pw = (struct eij_t *)work->ptr;
   if (work->n > 0) {
     uint i = 1, j = 0;
     for (; i < work->n; i++) {
       if ((pw[i].r != pw[j].r) || (pw[i].c != pw[j].c)) {
-        array_cat(struct eij, data, &pw[j], 1);
+        array_cat(struct eij_t, data, &pw[j], 1);
         j = i;
       } else
         pw[j].v += pw[i].v;
     }
     if (j < i)
-      array_cat(struct eij, data, &pw[j], 1);
+      array_cat(struct eij_t, data, &pw[j], 1);
   }
 
-  sarray_transfer(struct eij, data, p, 0, cr);
+  sarray_transfer(struct eij_t, data, p, 0, cr);
 }
 
 static void iluc_update(struct array *tij, ulong K, struct array *data, int row,
@@ -881,16 +881,16 @@ static void iluc_update(struct array *tij, ulong K, struct array *data, int row,
   uint j;
   if (K) {
     if (row) {
-      sarray_sort(struct eij, data->ptr, data->n, c, 1, bfr);
-      struct eij *pd = (struct eij *)data->ptr;
+      sarray_sort(struct eij_t, data->ptr, data->n, c, 1, bfr);
+      struct eij_t *pd = (struct eij_t *)data->ptr;
       m.r = K;
       for (j = 0; j < data->n; j++) {
         m.c = pd[j].c, m.v = pd[j].v;
         array_cat(struct mij, tij, &m, 1);
       }
     } else {
-      sarray_sort(struct eij, data->ptr, data->n, r, 1, bfr);
-      struct eij *pd = (struct eij *)data->ptr;
+      sarray_sort(struct eij_t, data->ptr, data->n, r, 1, bfr);
+      struct eij_t *pd = (struct eij_t *)data->ptr;
       m.c = K;
       for (; j < data->n; j++) {
         m.r = pd[j].r, m.v = pd[j].v;
@@ -942,8 +942,8 @@ static void iluc_level(struct array *lij, struct array *uij, int lvl,
   struct array rij, cij, data, work;
   array_init(struct mij, &rij, 30);
   array_init(struct mij, &cij, 30);
-  array_init(struct eij, &data, 30);
-  array_init(struct eij, &work, 30);
+  array_init(struct eij_t, &data, 30);
+  array_init(struct eij_t, &work, 30);
 
   struct array rqst, fwds;
   array_init(struct request_t, &rqst, 30);
@@ -1134,7 +1134,7 @@ static void ilucp_get_data(struct array *data, ulong K, int type,
 
     uint i, j, k, l, n;
     scalar v;
-    struct eij m = {.r = 0, .c = 0, .p = 0, .v = 0};
+    struct eij_t m = {.r = 0, .c = 0, .p = 0, .v = 0};
 
 #define FILL_RQST(f, g, nd)                                                    \
   do {                                                                         \
@@ -1156,7 +1156,7 @@ static void ilucp_get_data(struct array *data, ulong K, int type,
           ;                                                                    \
         for (; n < B->n && pb[n].f == pa[k].g; n++) {                          \
           m.g = pb[n].g, m.v = -v * pb[n].v;                                   \
-          array_cat(struct eij, work, &m, 1);                                  \
+          array_cat(struct eij_t, work, &m, 1);                                \
         }                                                                      \
       }                                                                        \
     }                                                                          \
@@ -1172,40 +1172,41 @@ static void ilucp_get_data(struct array *data, ulong K, int type,
 
   if (type == CSC) {
     sarray_sort_2(struct mij, A->ptr, A->n, c, 1, r, 1, bfr);
-    sarray_sort_2(struct eij, work->ptr, work->n, r, 1, c, 1, bfr);
+    sarray_sort_2(struct eij_t, work->ptr, work->n, r, 1, c, 1, bfr);
   } else {
     sarray_sort_2(struct mij, A->ptr, A->n, r, 1, c, 1, bfr);
-    sarray_sort_2(struct eij, work->ptr, work->n, c, 1, r, 1, bfr);
+    sarray_sort_2(struct eij_t, work->ptr, work->n, c, 1, r, 1, bfr);
   }
 
   // We only have one request per processor, so sorting by processor
   // is the same as sorting by row id. But just to be safe we will sort
   // by row id.
-  struct eij *pw = (struct eij *)work->ptr;
+  struct eij_t *pw = (struct eij_t *)work->ptr;
   if (work->n > 0) {
     uint i = 1, j = 0;
     for (; i < work->n; i++) {
       if ((pw[i].r != pw[j].r) || (pw[i].c != pw[j].c)) {
-        array_cat(struct eij, data, &pw[j], 1);
+        array_cat(struct eij_t, data, &pw[j], 1);
         j = i;
       } else
         pw[j].v += pw[i].v;
     }
     if (j < i)
-      array_cat(struct eij, data, &pw[j], 1);
+      array_cat(struct eij_t, data, &pw[j], 1);
   }
 
-  sarray_transfer(struct eij, data, p, 0, cr);
+  sarray_transfer(struct eij_t, data, p, 0, cr);
 }
 
-static void ilucp_level(struct array *lij, struct array *uij, int lvl,
-                        struct ilu *ilu, buffer *bfr) {
+static void ilucp_level(struct array *lij, struct array *uij,
+                        struct array *pcols, int lvl, struct ilu *ilu,
+                        buffer *bfr) {
   // Work arrays
   struct array rij, cij, data, work;
   array_init(struct mij, &rij, 30);
   array_init(struct mij, &cij, 30);
-  array_init(struct eij, &data, 30);
-  array_init(struct eij, &work, 30);
+  array_init(struct eij_t, &data, 30);
+  array_init(struct eij_t, &work, 30);
 
   struct array rqst, fwds;
   array_init(struct request_t, &rqst, 30);
