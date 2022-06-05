@@ -1,14 +1,8 @@
-load 'L.txt'
-load 'U.txt'
+load 'A.txt'
 load 'LL.txt'
 load 'UU.txt'
 
-L = spconvert(L);
-U = spconvert(U);
-n = size(L, 1);
-I = speye(n);
-A = L + U - I;
-
+A = spconvert(A);
 LL = spconvert(LL);
 UU = spconvert(UU);
 err = norm(A - LL * UU, Inf);

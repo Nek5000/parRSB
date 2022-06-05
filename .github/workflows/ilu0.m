@@ -1,7 +1,7 @@
-load 'pre.txt';
-load 'post.txt';
-A = spconvert(pre);
-B = spconvert(post);
+load 'A.txt';
+load 'B.txt';
+A = spconvert(A);
+B = spconvert(B);
 
 [L, U] = ilu(A);
 n = size(A, 1);

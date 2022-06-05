@@ -140,8 +140,7 @@ jobs:
         if: always()
         shell: bash
         run: |
-          export PARRSB_DUMP_ILU_PRE=1
-          export PARRSB_DUMP_ILU_POST=1
+          export PARRSB_DUMP_ILU=1
 
           cp hostfile build/examples/ilu .github/workflows/ilu0.m parRSB-tests/${{ matrix.test }}
 
@@ -157,7 +156,7 @@ jobs:
         if: always()
         shell: bash
         run: |
-          export PARRSB_DUMP_ILUC=1
+          export PARRSB_DUMP_ILU=1
 
           cp hostfile build/examples/ilu .github/workflows/iluc.m parRSB-tests/${{ matrix.test }}
 

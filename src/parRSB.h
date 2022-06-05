@@ -28,7 +28,7 @@ typedef struct {
   int rsb_algo;      // 0 - Lanczos, 1 - RQI (Default: 0)
   int rsb_pre;       // 0 - None, 1 - RCB , 2 - RIB (Default: 1)
   int rsb_grammian;  // 0 or 1 (Default: 1)
-  int rsb_mg_factor; // Coarsening factor (>1) (Default: 2)
+  int rsb_mg_factor; // Coarsening factor for MG (>1) (Default: 2)
 
   // Other
   int repair; // 0 - No, 1 - Yes (Default: 1)

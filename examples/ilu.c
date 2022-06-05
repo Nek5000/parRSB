@@ -38,9 +38,9 @@ int main(int argc, char *argv[]) {
   err = (part == NULL);
   parrsb_check_error(err, MPI_COMM_WORLD);
 
-  parrsb_options options = parrsb_default_options;
-  err = parrsb_part_mesh(part, NULL, vl, coord, nelt, nv, options,
-                         MPI_COMM_WORLD);
+  parrsb_options paropt = parrsb_default_options;
+  err =
+      parrsb_part_mesh(part, NULL, vl, coord, nelt, nv, paropt, MPI_COMM_WORLD);
   parrsb_check_error(err, MPI_COMM_WORLD);
 
   // Redistribute data based on identified partitions
@@ -49,8 +49,12 @@ int main(int argc, char *argv[]) {
   parrsb_check_error(err, MPI_COMM_WORLD);
 
   // Setup ILU
-  struct ilu *ilu =
-      ilu_setup(nelt, nv, vl, in->type, in->tol, MPI_COMM_WORLD, in->verbose);
+  ilu_options iluopt = {.type = in->type,
+                        .verbose = in->verbose,
+                        .tol = in->tol,
+                        .pivot = 0,
+                        .nnz_per_row = 0};
+  struct ilu *ilu = ilu_setup(nelt, nv, vl, &iluopt, MPI_COMM_WORLD);
   ilu_free(ilu);
 
   // Free resources

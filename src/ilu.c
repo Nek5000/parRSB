@@ -453,13 +453,11 @@ static int find_lvls(uint *lvl_off, uint *lvl_owner, ulong *lvl_ids,
 // ILU
 //
 struct ilu {
-  // Type: ILU(0), ILUC, etc.
-  int type;
-  int verbose;
+  int pivot, verbose;
   // 1st dropping rule: An entry a_ij is dropped abs(a_ij) < tol
   scalar tol;
   // 2nd dropping rule: Entries are dropped so that total nnz per row/col < p
-  uint p;
+  uint nnz_per_row;
 
   // Calculated values internal to ILU
   uint nlvls, *lvl_off;
@@ -731,14 +729,14 @@ static void iluc_sep_lu(struct ilu *ilu, buffer *bfr) {
   array_free(&lijs);
 }
 
-static void iluc_get_data(struct array *data, ulong K, int type,
-                          struct array *A, struct array *B, struct crystal *cr,
-                          struct array *rqsts, struct array *fwds,
-                          struct array *work, buffer *bfr) {
-  work->n = data->n = rqsts->n = fwds->n = 0;
-  struct comm *c = &cr->comm;
-
+static void iluc_fwrd_rqsts(struct array *fwds, struct array *rqsts,
+                            const int type, const ulong K,
+                            const struct array *A, struct crystal *cr,
+                            buffer *bfr) {
+  fwds->n = rqsts->n = 0;
   struct request_t t = {.r = 0, .p = 0, .o = 1};
+
+  struct comm *c = &cr->comm;
 
 #define INIT_RQST(f, g, arr)                                                   \
   do {                                                                         \
@@ -764,7 +762,6 @@ static void iluc_get_data(struct array *data, ulong K, int type,
     INIT_RQST(r, c, rqsts);
   else
     INIT_RQST(c, r, rqsts);
-
 #undef INIT_RQST
 
   if (K > 0) {
@@ -779,8 +776,8 @@ static void iluc_get_data(struct array *data, ulong K, int type,
   if (rqsts->n > 0) {
     sarray_sort_2(struct request_t, rqsts->ptr, rqsts->n, r, 1, o, 0, bfr);
     struct request_t *pr = (struct request_t *)rqsts->ptr;
-    uint s, e;
-    for (e = 1, s = 0; e < rqsts->n; e++) {
+    uint s = 0, e = 1;
+    for (; e < rqsts->n; e++) {
       if (pr[e].r != pr[s].r) {
         if (pr[s].o == 0) { // This is a request
           uint p = pr[s].p;
@@ -802,7 +799,46 @@ static void iluc_get_data(struct array *data, ulong K, int type,
   }
 
   sarray_transfer(struct request_t, fwds, p, 0, cr);
+}
 
+static void iluc_send_data(struct array *data, const int type, struct array *A,
+                           struct array *work, struct crystal *cr,
+                           buffer *bfr) {
+  if (type == CSC) {
+    sarray_sort_2(struct mij, A->ptr, A->n, c, 1, r, 1, bfr);
+    sarray_sort_2(struct eij_t, work->ptr, work->n, r, 1, c, 1, bfr);
+  } else {
+    sarray_sort_2(struct mij, A->ptr, A->n, r, 1, c, 1, bfr);
+    sarray_sort_2(struct eij_t, work->ptr, work->n, c, 1, r, 1, bfr);
+  }
+
+  // We only have one request per processor, so sorting by processor is the
+  // same as sorting by row id. But just to be safe we will sort by row id.
+  data->n = 0;
+  if (work->n > 0) {
+    struct eij_t *pw = (struct eij_t *)work->ptr;
+    uint i = 1, j = 0;
+    for (; i < work->n; i++) {
+      if ((pw[i].r != pw[j].r) || (pw[i].c != pw[j].c)) {
+        array_cat(struct eij_t, data, &pw[j], 1);
+        j = i;
+      } else
+        pw[j].v += pw[i].v;
+    }
+    if (j < i)
+      array_cat(struct eij_t, data, &pw[j], 1);
+  }
+
+  sarray_transfer(struct eij_t, data, p, 0, cr);
+}
+
+static void iluc_get_data(struct array *data, ulong K, int type,
+                          struct array *A, struct array *B, struct crystal *cr,
+                          struct array *rqsts, struct array *fwds,
+                          struct array *work, buffer *bfr) {
+  iluc_fwrd_rqsts(fwds, rqsts, type, K, A, cr, bfr);
+
+  work->n = 0;
   if (fwds->n > 0) {
     sarray_sort(struct request_t, fwds->ptr, fwds->n, r, 1, bfr);
     struct request_t *pf = (struct request_t *)fwds->ptr;
@@ -845,38 +881,12 @@ static void iluc_get_data(struct array *data, ulong K, int type,
 #undef FILL_RQST
   }
 
-  if (type == CSC) {
-    sarray_sort_2(struct mij, A->ptr, A->n, c, 1, r, 1, bfr);
-    sarray_sort_2(struct eij_t, work->ptr, work->n, r, 1, c, 1, bfr);
-  } else {
-    sarray_sort_2(struct mij, A->ptr, A->n, r, 1, c, 1, bfr);
-    sarray_sort_2(struct eij_t, work->ptr, work->n, c, 1, r, 1, bfr);
-  }
-
-  // We only have one request per processor, so sorting by processor
-  // is the same as sorting by row id. But just to be safe we will sort
-  // by row id.
-  struct eij_t *pw = (struct eij_t *)work->ptr;
-  if (work->n > 0) {
-    uint i = 1, j = 0;
-    for (; i < work->n; i++) {
-      if ((pw[i].r != pw[j].r) || (pw[i].c != pw[j].c)) {
-        array_cat(struct eij_t, data, &pw[j], 1);
-        j = i;
-      } else
-        pw[j].v += pw[i].v;
-    }
-    if (j < i)
-      array_cat(struct eij_t, data, &pw[j], 1);
-  }
-
-  sarray_transfer(struct eij_t, data, p, 0, cr);
+  iluc_send_data(data, type, A, work, cr, bfr);
 }
 
 static void iluc_update(struct array *tij, ulong K, struct array *data, int row,
                         buffer *bfr) {
   // FIXME: This can be done more efficiently
-
   struct mij m = {.r = 0, .c = 0, .idx = 0, .p = 0, .v = 0};
   uint j;
   if (K) {
@@ -937,13 +947,12 @@ static void iluc_update(struct array *tij, ulong K, struct array *data, int row,
 }
 
 static void iluc_level(struct array *lij, struct array *uij, int lvl,
-                       struct ilu *ilu, buffer *bfr) {
+                       struct ilu *ilu, struct array *data, struct array *work,
+                       buffer *bfr) {
   // Work arrays
-  struct array rij, cij, data, work;
+  struct array rij, cij;
   array_init(struct mij, &rij, 30);
   array_init(struct mij, &cij, 30);
-  array_init(struct eij_t, &data, 30);
-  array_init(struct eij_t, &work, 30);
 
   struct array rqst, fwds;
   array_init(struct request_t, &rqst, 30);
@@ -958,39 +967,39 @@ static void iluc_level(struct array *lij, struct array *uij, int lvl,
   comm_allreduce(&cr->comm, gs_int, gs_max, &size, 1, buf);
   uint e = s + size;
 
-  uint i, k, j, je;
+  uint i, j, je, k;
   ulong K;
   for (k = s; k < e; k++) {
     K = (k < lvl_off[lvl]) ? U->rows[k] : 0;
 
     // Fetch required data (combine with the other call below)
-    iluc_get_data(&data, K, CSC, lij, uij, cr, &rqst, &fwds, &work, bfr);
+    iluc_get_data(data, K, CSC, lij, uij, cr, &rqst, &fwds, work, bfr);
     // Init z[1:K] = 0, z[K:n] = a_{K, K:n}, i.e., z = u_{K,:}
     rij.n = 0;
-    struct mij m = {.r = 0, .c = 0, .idx = 0, .p = 0, .v = 0};
     if (K) {
-      m.r = K;
+      struct mij m = {.r = K, .c = 0, .idx = 0, .p = 0, .v = 0};
       for (j = U->adj_off[k], je = U->adj_off[k + 1]; j < je; j++) {
         m.c = U->cols[U->adj_idx[j]], m.v = U->adj_val[j];
         array_cat(struct mij, &rij, &m, 1);
       }
     }
     // Update z if l_KI != 0 for all I, 1 <= I < K
-    iluc_update(&rij, K, &data, 1, bfr);
+    iluc_update(&rij, K, data, 1, bfr);
 
     // Fetch required data (combine with the other call above)
-    iluc_get_data(&data, K, CSR, uij, lij, cr, &rqst, &fwds, &work, bfr);
+    iluc_get_data(data, K, CSR, uij, lij, cr, &rqst, &fwds, work, bfr);
+
     // Init w[1:K] = 0, w[K] = 1, w[K+1:n] = a_{K+1:n, K}, i.e., w = l_{:, K}
     cij.n = 0;
     if (K) {
-      m.c = K;
+      struct mij m = {.r = 0, .c = K, .idx = 0, .p = 0, .v = 0};
       for (j = L->adj_off[k] + 1, je = L->adj_off[k + 1]; j < je; j++) {
         m.r = L->rows[L->adj_idx[j]], m.v = L->adj_val[j];
         array_cat(struct mij, &cij, &m, 1);
       }
     }
     // Update w if u_IK != 0 for all I, 1 <= I < K
-    iluc_update(&cij, K, &data, 0, bfr);
+    iluc_update(&cij, K, data, 0, bfr);
 
     // Set u_{k, :} = z and find u_kk
     scalar u_kk = 1;
@@ -1007,50 +1016,14 @@ static void iluc_level(struct array *lij, struct array *uij, int lvl,
       pt[j].v /= u_kk;
 
     if (K) {
-      m.r = m.c = K, m.v = 1;
+      struct mij m = {.r = K, .c = K, .idx = 0, .p = 0, .v = 1};
       array_cat(struct mij, &cij, &m, 1);
       array_cat(struct mij, lij, cij.ptr, cij.n);
     }
   }
 
-  array_free(&rij), array_free(&cij), array_free(&data), array_free(&work);
+  array_free(&rij), array_free(&cij);
   array_free(&rqst), array_free(&fwds);
-}
-
-static void iluc(struct ilu *ilu, buffer *bfr) {
-  struct crystal *cr = &ilu->cr;
-  struct comm *c = &cr->comm;
-
-  // Setup L and U
-  iluc_sep_lu(ilu, bfr);
-
-  // Do a sanity check
-  struct par_mat *A = &ilu->A, *L = &ilu->L, *U = &ilu->U;
-  char *val = getenv("PARRSB_DUMP_ILUC");
-  if (val != NULL && atoi(val) != 0) {
-    par_mat_dump("A.txt", A, cr, bfr);
-    par_mat_dump("L.txt", L, cr, bfr);
-    par_mat_dump("U.txt", U, cr, bfr);
-  }
-
-  struct array uij, lij;
-  array_init(struct mij, &uij, A->rn * 30 + 1);
-  array_init(struct mij, &lij, A->rn * 30 + 1);
-
-  for (int l = 1; l <= ilu->nlvls; l++)
-    iluc_level(&lij, &uij, l, ilu, bfr);
-
-  par_mat_free(L), par_mat_free(U);
-  par_mat_setup(U, &uij, CSR, 0, bfr);
-  par_mat_setup(L, &lij, CSC, 0, bfr);
-
-  val = getenv("PARRSB_DUMP_ILUC");
-  if (val != NULL && atoi(val) != 0) {
-    par_mat_dump("LL.txt", L, cr, bfr);
-    par_mat_dump("UU.txt", U, cr, bfr);
-  }
-
-  array_free(&lij), array_free(&uij);
 }
 
 //=============================================================================
@@ -1066,74 +1039,9 @@ static void ilucp_get_data(struct array *data, ulong P, int type,
                            struct array *pvts, struct crystal *cr,
                            struct array *rqsts, struct array *fwds,
                            struct array *work, buffer *bfr) {
-  work->n = data->n = rqsts->n = fwds->n = 0;
-  struct comm *c = &cr->comm;
+  iluc_fwrd_rqsts(fwds, rqsts, type, P, A, cr, bfr);
 
-  struct request_t t = {.r = 0, .p = 0, .o = 1};
-
-#define INIT_RQST(f, g, arr)                                                   \
-  do {                                                                         \
-    if (A->n > 0) {                                                            \
-      sarray_sort_2(struct mij, A->ptr, A->n, f, 1, g, 1, bfr);                \
-      struct mij *pa = (struct mij *)A->ptr;                                   \
-      uint i = 1, j = 0;                                                       \
-      for (; i < A->n; i++) {                                                  \
-        if (pa[i].f != pa[j].f) {                                              \
-          t.r = pa[j].f, t.p = t.r % c->np;                                    \
-          array_cat(struct request_t, arr, &t, 1);                             \
-          j = i;                                                               \
-        }                                                                      \
-      }                                                                        \
-      if (j < i) {                                                             \
-        t.r = pa[j].f, t.p = t.r % c->np;                                      \
-        array_cat(struct request_t, arr, &t, 1);                               \
-      }                                                                        \
-    }                                                                          \
-  } while (0)
-
-  if (type == CSC)
-    INIT_RQST(r, c, rqsts);
-  else
-    INIT_RQST(c, r, rqsts);
-
-#undef INIT_RQST
-
-  if (P > 0) {
-    t.r = P, t.p = P % c->np, t.o = 0;
-    array_cat(struct request_t, rqsts, &t, 1);
-  }
-
-  sarray_transfer(struct request_t, rqsts, p, 1, cr);
-
-  // Okay, we got all the requests (if any) and non-zero row/col ids in the same
-  // processor. Now we forward the requests to the original owners.
-  if (rqsts->n > 0) {
-    sarray_sort_2(struct request_t, rqsts->ptr, rqsts->n, r, 1, o, 0, bfr);
-    struct request_t *pr = (struct request_t *)rqsts->ptr;
-    uint s, e;
-    for (e = 1, s = 0; e < rqsts->n; e++) {
-      if (pr[e].r != pr[s].r) {
-        if (pr[s].o == 0) { // This is a request
-          uint p = pr[s].p;
-          for (s = s + 1; s < e; s++) {
-            pr[s].o = p;
-            array_cat(struct request_t, fwds, &pr[s], 1);
-          }
-        }
-        s = e;
-      }
-    }
-    if (s < e && pr[s].o == 0) {
-      uint p = pr[s].p;
-      for (s = s + 1; s < e; s++) {
-        pr[s].o = p;
-        array_cat(struct request_t, fwds, &pr[s], 1);
-      }
-    }
-  }
-
-  sarray_transfer(struct request_t, fwds, p, 0, cr);
-
+  work->n = 0;
   if (fwds->n > 0) {
     sarray_sort(struct request_t, fwds->ptr, fwds->n, r, 1, bfr);
     struct request_t *pf = (struct request_t *)fwds->ptr;
@@ -1188,32 +1096,7 @@ static void ilucp_get_data(struct array *data, ulong P, int type,
 #undef FILL_RQST
   }
 
-  if (type == CSC) {
-    sarray_sort_2(struct mij, A->ptr, A->n, c, 1, r, 1, bfr);
-    sarray_sort_2(struct eij_t, work->ptr, work->n, r, 1, c, 1, bfr);
-  } else {
-    sarray_sort_2(struct mij, A->ptr, A->n, r, 1, c, 1, bfr);
-    sarray_sort_2(struct eij_t, work->ptr, work->n, c, 1, r, 1, bfr);
-  }
-
-  // We only have one request per processor, so sorting by processor
-  // is the same as sorting by row id. But just to be safe we will sort
-  // by row id.
-  struct eij_t *pw = (struct eij_t *)work->ptr;
-  if (work->n > 0) {
-    uint i = 1, j = 0;
-    for (; i < work->n; i++) {
-      if ((pw[i].r != pw[j].r) || (pw[i].c != pw[j].c)) {
-        array_cat(struct eij_t, data, &pw[j], 1);
-        j = i;
-      } else
-        pw[j].v += pw[i].v;
-    }
-    if (j < i)
-      array_cat(struct eij_t, data, &pw[j], 1);
-  }
-
-  sarray_transfer(struct eij_t, data, p, 0, cr);
+  iluc_send_data(data, type, A, work, cr, bfr);
 }
 
 static ulong ilucp_find_pvt(ulong *perm, uint k, int lvl, uint *lvl_off,
@@ -1298,15 +1181,13 @@ static void ilucp_update_pvts(struct array *pvts, struct array *rij,
   sarray_sort(struct pivot_t, pvts->ptr, pvts->n, k, 1, bfr);
 }
 
-static void ilucp_level(struct array *lij, struct array *uij,
-                        struct array *pvts, int lvl, struct ilu *ilu,
-                        buffer *bfr) {
+static void ilucp_level(struct array *lij, struct array *uij, int lvl,
+                        struct ilu *ilu, struct array *pvts, struct array *data,
+                        struct array *work, buffer *bfr) {
   // Work arrays
-  struct array rij, cij, data, work;
+  struct array rij, cij;
   array_init(struct mij, &rij, 30);
   array_init(struct mij, &cij, 30);
-  array_init(struct eij_t, &data, 30);
-  array_init(struct eij_t, &work, 30);
 
   struct array rqst, fwds;
   array_init(struct request_t, &rqst, 30);
@@ -1328,7 +1209,7 @@ static void ilucp_level(struct array *lij, struct array *uij,
 
     // Fetch required data. We will skip the data in the  columns which were
     // choosen as pivots.
-    ilucp_get_data(&data, K, CSC, lij, K, uij, pvts, cr, &rqst, &fwds, &work,
+    ilucp_get_data(data, K, CSC, lij, K, uij, pvts, cr, &rqst, &fwds, work,
                    bfr);
 
     // Init z[1:K] = 0, z[K:n] = a_{K, K:n}, i.e., z = u_{K,:} and skip the
@@ -1348,7 +1229,7 @@ static void ilucp_level(struct array *lij, struct array *uij,
     }
 
     // Update z if l_KI != 0 for all I, 1 <= I < K
-    iluc_update(&rij, K, &data, 1, bfr);
+    iluc_update(&rij, K, data, 1, bfr);
 
     // Select the pivot now -- all the active processors have to agree on their
     // own pivot. If two processors share the same pivot, smallest one wins and
@@ -1365,7 +1246,7 @@ static void ilucp_level(struct array *lij, struct array *uij,
 
     // Fetch required data for col updated. Can't combine with above call when
     // we pivot? Will need to reimplement this part
-    ilucp_get_data(&data, P, CSR, uij, K, lij, NULL, cr, &rqst, &fwds, &work,
+    ilucp_get_data(data, P, CSR, uij, K, lij, NULL, cr, &rqst, &fwds, work,
                    bfr);
 
     // Init w[1:K] = 0, w[K] = 1, w[K+1:n] = a_{K+1:n, K}, i.e., w = l_{:, K}
@@ -1378,7 +1259,7 @@ static void ilucp_level(struct array *lij, struct array *uij,
       }
     }
     // Update w if u_IK != 0 for all I, 1 <= I < K
-    iluc_update(&cij, K, &data, 0, bfr);
+    iluc_update(&cij, K, data, 0, bfr);
 
     // Set u_{k, :} = z and find u_kk
     // FIXME: This should u_{perm[k],perm[k]}}, not u_kk
@@ -1402,55 +1283,55 @@ static void ilucp_level(struct array *lij, struct array *uij,
     }
   }
 
-  array_free(&rij), array_free(&cij), array_free(&data), array_free(&work);
-  array_free(&rqst), array_free(&fwds);
+  array_free(&rij), array_free(&cij), array_free(&rqst), array_free(&fwds);
 }
 
-static void ilucp(struct ilu *ilu, buffer *bfr) {
+static void iluc(struct ilu *ilu, buffer *bfr) {
   struct crystal *cr = &ilu->cr;
   struct comm *c = &cr->comm;
 
   // Setup L and U
   iluc_sep_lu(ilu, bfr);
 
-  // Do a sanity check
   struct par_mat *A = &ilu->A, *L = &ilu->L, *U = &ilu->U;
-  char *val = getenv("PARRSB_DUMP_ILUC");
-  if (val != NULL && atoi(val) != 0) {
-    par_mat_dump("A.txt", A, cr, bfr);
-    par_mat_dump("L.txt", L, cr, bfr);
-    par_mat_dump("U.txt", U, cr, bfr);
-  }
 
-  ilu->perm = tcalloc(ulong, A->rn);
-
-  struct array uij, lij;
+  struct array uij, lij, data, work;
   array_init(struct mij, &uij, A->rn * 30 + 1);
   array_init(struct mij, &lij, A->rn * 30 + 1);
+  array_init(struct eij_t, &data, A->rn * 30 + 1);
+  array_init(struct eij_t, &work, A->rn * 30 + 1);
 
-  // Initialize with the columns of U, i.e, columns of L
   struct array pvts;
   array_init(struct pivot_t, &pvts, L->cn + 1);
-  struct pivot_t t = {.k = 0, .pivot = 0};
-  for (uint i = 0; i < L->cn; i++) {
-    t.k = L->cols[i], t.p = t.k % c->np;
-    array_cat(struct pivot_t, &pvts, &t, 1);
-  }
 
-  for (int l = 1; l <= ilu->nlvls; l++)
-    ilucp_level(&lij, &uij, &pvts, l, ilu, bfr);
+  if (ilu->pivot) {
+    ilu->perm = tcalloc(ulong, A->rn);
+    // Initialize with the columns of U, i.e, columns of L
+    struct pivot_t t = {.k = 0, .pivot = 0};
+    for (uint i = 0; i < L->cn; i++) {
+      t.k = L->cols[i], t.p = t.k % c->np;
+      array_cat(struct pivot_t, &pvts, &t, 1);
+    }
+
+    for (int l = 1; l <= ilu->nlvls; l++)
+      ilucp_level(&lij, &uij, l, ilu, &pvts, &data, &work, bfr);
+  } else {
+    for (int l = 1; l <= ilu->nlvls; l++)
+      iluc_level(&lij, &uij, l, ilu, &data, &work, bfr);
+  }
 
   par_mat_free(L), par_mat_free(U);
   par_mat_setup(U, &uij, CSR, 0, bfr);
   par_mat_setup(L, &lij, CSC, 0, bfr);
 
-  val = getenv("PARRSB_DUMP_ILUC");
+  const char *val = getenv("PARRSB_DUMP_ILU");
   if (val != NULL && atoi(val) != 0) {
     par_mat_dump("LL.txt", L, cr, bfr);
     par_mat_dump("UU.txt", U, cr, bfr);
   }
 
-  array_free(&lij), array_free(&uij), array_free(&pvts);
+  array_free(&pvts);
+  array_free(&lij), array_free(&uij), array_free(&work), array_free(&data);
 }
 
 //=============================================================================
@@ -1554,21 +1435,20 @@ static int ilu_setup_aux(struct ilu *ilu, int nlvls, uint *lvl_off,
   return 0;
 }
 
-struct ilu *ilu_setup(const uint n, const int nv, const long long *vtxll,
-                      const int type, const double tol, const MPI_Comm comm,
-                      const int verbose) {
+struct ilu *ilu_setup(const uint n, const int nv, const long long *llvtx,
+                      const ilu_options *options, MPI_Comm comm) {
   struct comm c;
   comm_init(&c, comm);
 
   struct ilu *ilu = tcalloc(struct ilu, 1);
-
-  ilu->type = type, ilu->tol = tol, ilu->verbose = verbose;
+  ilu->pivot = options->pivot, ilu->verbose = options->verbose;
+  ilu->tol = options->tol, ilu->nnz_per_row = options->nnz_per_row;
   ilu->lvl_off = NULL, ilu->perm = NULL;
   crystal_init(&ilu->cr, &c);
 
   slong *vtx = tcalloc(slong, n * nv);
   for (uint i = 0; i < n * nv; i++)
-    vtx[i] = vtxll[i];
+    vtx[i] = llvtx[i];
 
   // Establish a numbering based on input
   slong out[2][1], buf[2][1], in = n;
@@ -1585,32 +1465,29 @@ struct ilu *ilu_setup(const uint n, const int nv, const long long *vtxll,
   uint *lvl_off = tcalloc(uint, 100 + n), *lvl_owner = lvl_off + 100;
   ulong *lvl_ids = tcalloc(ulong, n);
   int nlvls = find_lvls(lvl_off, lvl_owner, lvl_ids, n, nv, ids, vtx, 1,
-                        &ilu->cr, verbose, &bfr);
-  ilu_setup_aux(ilu, nlvls, lvl_off, lvl_owner, lvl_ids, n, nv, vtx, verbose,
-                &bfr);
+                        &ilu->cr, ilu->verbose, &bfr);
+  ilu_setup_aux(ilu, nlvls, lvl_off, lvl_owner, lvl_ids, n, nv, vtx,
+                ilu->verbose, &bfr);
 
-  char *val = getenv("PARRSB_DUMP_ILU_PRE");
+  char *val = getenv("PARRSB_DUMP_ILU");
   if (val != NULL && atoi(val) != 0)
-    par_mat_dump("pre.txt", &ilu->A, &ilu->cr, &bfr);
+    par_mat_dump("A.txt", &ilu->A, &ilu->cr, &bfr);
 
   // Setup the ILU factors
-  switch (type) {
+  switch (options->type) {
   case 0:
     ilu0(ilu, &bfr);
     break;
   case 1:
     iluc(ilu, &bfr);
     break;
-  case 2:
-    ilucp(ilu, &bfr);
-    break;
   default:
     break;
   }
 
-  val = getenv("PARRSB_DUMP_ILU_POST");
+  val = getenv("PARRSB_DUMP_ILU");
   if (val != NULL && atoi(val) != 0)
-    par_mat_dump("post.txt", &ilu->A, &ilu->cr, &bfr);
+    par_mat_dump("B.txt", &ilu->A, &ilu->cr, &bfr);
 
   free(ids), free(vtx), free(lvl_off), free(lvl_ids);
   buffer_free(&bfr), comm_free(&c);
