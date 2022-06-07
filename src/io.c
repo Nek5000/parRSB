@@ -2,8 +2,8 @@
 #include <stdio.h>
 
 #include "con.h"
-#include <genmap-impl.h>
-#include <parRSB.h>
+#include "genmap-impl.h"
+#include "parRSB.h"
 
 #define GC_RE2_HEADER_LEN 80
 #define GC_CO2_HEADER_LEN 132

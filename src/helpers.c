@@ -1,8 +1,8 @@
 #include <getopt.h>
 #include <stdio.h>
 
-#include <genmap-impl.h>
-#include <parRSB.h>
+#include "genmap-impl.h"
+#include "parRSB.h"
 
 int parrsb_dist_mesh(unsigned int *nelt_, long long **vl_, double **coord_,
                      int *part, int nv, MPI_Comm comm) {
@@ -63,6 +63,44 @@ int parrsb_dist_mesh(unsigned int *nelt_, long long **vl_, double **coord_,
   crystal_free(&cr);
   comm_free(&c);
   array_free(&elements);
+
+  return 0;
+}
+
+int parrsb_setup_mesh(unsigned int *nelt, int *nv, long long **vl,
+                      double **coord, struct parrsb_input *in, MPI_Comm comm) {
+  int id, err;
+  MPI_Comm_rank(comm, &id);
+
+  // Read the geometry from the .re2 file
+  unsigned int nbcs;
+  long long *bcs = NULL;
+  err = parrsb_read_mesh(nelt, nv, NULL, coord, &nbcs, &bcs, in->mesh, comm, 1);
+  parrsb_check_error(err, comm);
+
+  // Find connectivity
+  *vl = (long long *)calloc(*nelt * *nv, sizeof(long long));
+  err = (*vl == NULL);
+  parrsb_check_error(err, comm);
+
+  int ndim = (*nv == 8 ? 3 : 2);
+  err = parrsb_conn_mesh(*vl, *coord, *nelt, ndim, bcs, nbcs, in->tol, comm, 0);
+  parrsb_check_error(err, comm);
+
+  // Partition the mesh
+  int *part = (int *)calloc(*nelt, sizeof(int));
+  err = (part == NULL);
+  parrsb_check_error(err, comm);
+
+  parrsb_options paropt = parrsb_default_options;
+  err = parrsb_part_mesh(part, NULL, *vl, *coord, *nelt, *nv, paropt, comm);
+  parrsb_check_error(err, comm);
+
+  // Redistribute data based on identified partitions
+  err = parrsb_dist_mesh(nelt, vl, coord, part, *nv, comm);
+  parrsb_check_error(err, comm);
+
+  free(part), free(bcs);
 
   return 0;
 }

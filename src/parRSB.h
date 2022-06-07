@@ -88,6 +88,9 @@ struct parrsb_input {
 int parrsb_dist_mesh(unsigned int *nelt, long long **vl, double **coord,
                      int *part, int nv, MPI_Comm comm);
 
+int parrsb_setup_mesh(unsigned int *nelt, int *nv, long long **vl,
+                      double **coord, struct parrsb_input *in, MPI_Comm comm);
+
 void parrsb_print_part_stat(long long *vtx, int nelt, int nv, MPI_Comm comm);
 
 void parrsb_get_part_stat(int *nc, int *ns, int *nss, int *nel, long long *vtx,
