@@ -4,9 +4,8 @@
 #include <genmap-impl.h>
 #include <parRSB.h>
 
-int parrsb_distribute_elements(unsigned int *nelt_, long long **vl_,
-                               double **coord_, int *part, int nv,
-                               MPI_Comm comm) {
+int parrsb_dist_mesh(unsigned int *nelt_, long long **vl_, double **coord_,
+                     int *part, int nv, MPI_Comm comm) {
   typedef struct {
     int proc;
     long long vtx[MAXNV];

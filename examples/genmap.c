@@ -58,7 +58,7 @@ int main(int argc, char *argv[]) {
 
   // Redistribute data based on identified partitions
   if (active == 1)
-    err = parrsb_distribute_elements(&nelt, &vl, &coord, part, nv, comm);
+    err = parrsb_dist_mesh(&nelt, &vl, &coord, part, nv, comm);
   parrsb_check_error(err, comm);
 
   if (active == 1) {

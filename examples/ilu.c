@@ -44,8 +44,7 @@ int main(int argc, char *argv[]) {
   parrsb_check_error(err, MPI_COMM_WORLD);
 
   // Redistribute data based on identified partitions
-  err =
-      parrsb_distribute_elements(&nelt, &vl, &coord, part, nv, MPI_COMM_WORLD);
+  err = parrsb_dist_mesh(&nelt, &vl, &coord, part, nv, MPI_COMM_WORLD);
   parrsb_check_error(err, MPI_COMM_WORLD);
 
   // Setup ILU

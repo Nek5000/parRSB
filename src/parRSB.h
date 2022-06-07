@@ -85,9 +85,8 @@ struct parrsb_input {
   int verbose; // Verbosity, default: 0
 };
 
-int parrsb_distribute_elements(unsigned int *nelt, long long **vl,
-                               double **coord, int *part, int nv,
-                               MPI_Comm comm);
+int parrsb_dist_mesh(unsigned int *nelt, long long **vl, double **coord,
+                     int *part, int nv, MPI_Comm comm);
 
 void parrsb_print_part_stat(long long *vtx, int nelt, int nv, MPI_Comm comm);
 
