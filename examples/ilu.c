@@ -12,9 +12,6 @@ int main(int argc, char *argv[]) {
   int err = (in == NULL);
   parrsb_check_error(err, comm);
 
-  int id;
-  MPI_Comm_rank(comm, &id);
-
   // Read the geometry from the .re2 file, find connectiviy, partition and then
   // distribute the mesh.
   unsigned int nelt;

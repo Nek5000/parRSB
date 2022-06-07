@@ -27,14 +27,13 @@ static void schur_test(const unsigned int nelt, const int nv,
   double *b = (double *)tcalloc(double, nelt);
   double sum = 0;
   for (int i = 0; i < nelt; i++) {
-    b[i] = (rand() % 50 + 1.0) / 2.5;
+    b[i] = (rand() % 50 + 1.0) / 10;
     sum += b[i];
   }
   MPI_Allreduce(MPI_IN_PLACE, &sum, 1, MPI_DOUBLE, MPI_SUM, comm);
 
-  long ng = nelt;
-  MPI_Allreduce(MPI_IN_PLACE, &ng, 1, MPI_LONG, MPI_SUM, comm);
-
+  long long ng = nelt;
+  MPI_Allreduce(MPI_IN_PLACE, &ng, 1, MPI_LONG_LONG, MPI_SUM, comm);
   sum /= ng;
 
   double norm = 0;
@@ -64,56 +63,32 @@ static void schur_test(const unsigned int nelt, const int nv,
     fflush(stdout);
   }
 
-  free(b), free(x), buffer_free(&bfr), coarse_free(crs);
+  free(b), free(x);
+  buffer_free(&bfr);
+  coarse_free(crs);
 }
 
 int main(int argc, char *argv[]) {
   MPI_Init(&argc, &argv);
+  MPI_Comm comm = MPI_COMM_WORLD;
 
-  struct parrsb_input *in = parrsb_parse_input(argc, argv, MPI_COMM_WORLD);
+  struct parrsb_input *in = parrsb_parse_input(argc, argv, comm);
   int err = (in == NULL);
-  parrsb_check_error(err, MPI_COMM_WORLD);
+  parrsb_check_error(err, comm);
 
-  int id;
-  MPI_Comm_rank(MPI_COMM_WORLD, &id);
-
-  // Read the geometry from the .re2 file
-  unsigned int nelt, nbcs;
-  double *coord = NULL;
-  long long *bcs = NULL;
+  // Read the geometry from the .re2 file, find connectiviy, partition and then
+  // distribute the mesh.
+  unsigned int nelt;
   int nv;
-  err = parrsb_read_mesh(&nelt, &nv, NULL, &coord, &nbcs, &bcs, in->mesh,
-                         MPI_COMM_WORLD, 1);
-  parrsb_check_error(err, MPI_COMM_WORLD);
+  long long *vl = NULL;
+  double *coord = NULL;
+  parrsb_setup_mesh(&nelt, &nv, &vl, &coord, in, comm);
 
-  // Find connectivity
-  long long *vl = (long long *)calloc(nelt * nv, sizeof(long long));
-  err = (vl == NULL);
-  parrsb_check_error(err, MPI_COMM_WORLD);
-
-  int ndim = (nv == 8 ? 3 : 2);
-  err = parrsb_conn_mesh(vl, coord, nelt, ndim, bcs, nbcs, in->tol,
-                         MPI_COMM_WORLD, 0);
-  parrsb_check_error(err, MPI_COMM_WORLD);
-
-  // Partition the mesh
-  int *part = (int *)calloc(nelt, sizeof(int));
-  err = (part == NULL);
-  parrsb_check_error(err, MPI_COMM_WORLD);
-
-  parrsb_options options = parrsb_default_options;
-  err = parrsb_part_mesh(part, NULL, vl, coord, nelt, nv, options,
-                         MPI_COMM_WORLD);
-  parrsb_check_error(err, MPI_COMM_WORLD);
-
-  // Redistribute data based on identified partitions
-  err = parrsb_dist_mesh(&nelt, &vl, &coord, part, nv, MPI_COMM_WORLD);
-  parrsb_check_error(err, MPI_COMM_WORLD);
-
-  schur_test(nelt, nv, vl, MPI_COMM_WORLD);
+  schur_test(nelt, nv, vl, comm);
 
   // Free resources
-  free(part), free(vl), free(coord), free(bcs), free(in);
+  free(vl), free(coord);
+  free(in);
   MPI_Finalize();
 
   return 0;
