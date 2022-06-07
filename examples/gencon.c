@@ -81,7 +81,7 @@ int main(int argc, char *argv[]) {
   parrsb_check_error(err, MPI_COMM_WORLD);
 
   int ndim = nv == 8 ? 3 : 2;
-  err = parrsb_find_conn(vl, coord, nelt, ndim, bcs, nbcs, in->tol,
+  err = parrsb_conn_mesh(vl, coord, nelt, ndim, bcs, nbcs, in->tol,
                          MPI_COMM_WORLD, 0);
   parrsb_check_error(err, MPI_COMM_WORLD);
 

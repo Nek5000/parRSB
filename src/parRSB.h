@@ -46,13 +46,13 @@ void fparrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
 //==============================================================================
 // Connectivity
 //
-int parrsb_find_conn(long long *vtx, double *coord, int nel, int nDim,
+int parrsb_conn_mesh(long long *vtx, double *coord, int nel, int nDim,
                      long long *periodicInfo, int nPeriodicFaces, double tol,
                      MPI_Comm comm, int verbose);
 
-#define fparrsb_find_conn                                                      \
-  FORTRAN_UNPREFIXED(fparrsb_find_conn, FPARRSB_FIND_CONN)
-void fparrsb_find_conn(long long *vtx, double *coord, int *nel, int *nDim,
+#define fparrsb_conn_mesh                                                      \
+  FORTRAN_UNPREFIXED(fparrsb_conn_mesh, FPARRSB_CONN_MESH)
+void fparrsb_conn_mesh(long long *vtx, double *coord, int *nel, int *nDim,
                        long long *periodicInfo, int *nPeriodicFaces,
                        double *tol, MPI_Fint *fcomm, int *verbose, int *err);
 

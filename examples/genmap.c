@@ -34,7 +34,7 @@ int main(int argc, char *argv[]) {
 
   int ndim = (nv == 8 ? 3 : 2);
   if (active == 1)
-    err = parrsb_find_conn(vl, coord, nelt, ndim, bcs, nbcs, in->tol, comm, 0);
+    err = parrsb_conn_mesh(vl, coord, nelt, ndim, bcs, nbcs, in->tol, comm, 0);
   parrsb_check_error(err, comm);
 
   // Print pre-partition statistics

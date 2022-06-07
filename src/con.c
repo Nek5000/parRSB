@@ -1243,7 +1243,7 @@ static int transferBoundaryFaces(Mesh mesh, struct comm *c) {
 //     ordering, nv = 8 if ndim == 3 (Hex) or nv = 4 if ndim = 2 (Quad).
 // Output:
 //   vtx[nelt, nv]: Global numbering of vertices of elements
-int parrsb_find_conn(long long *vtx, double *coord, int nelt, int ndim,
+int parrsb_conn_mesh(long long *vtx, double *coord, int nelt, int ndim,
                      long long *periodicInfo, int nPeriodicFaces, double tol,
                      MPI_Comm comm, int verbose) {
   struct comm c;
@@ -1358,11 +1358,11 @@ int parrsb_find_conn(long long *vtx, double *coord, int nelt, int ndim,
 //=============================================================================
 // Fortran interface
 //
-void fparrsb_find_conn(long long *vtx, double *coord, int *nelt, int *ndim,
+void fparrsb_conn_mesh(long long *vtx, double *coord, int *nelt, int *ndim,
                        long long *periodicInfo, int *nPeriodicFaces,
                        double *tol, MPI_Fint *fcomm, int *verbose, int *err) {
   *err = 1;
   MPI_Comm c = MPI_Comm_f2c(*fcomm);
-  *err = parrsb_find_conn(vtx, coord, *nelt, *ndim, periodicInfo,
+  *err = parrsb_conn_mesh(vtx, coord, *nelt, *ndim, periodicInfo,
                           *nPeriodicFaces, *tol, c, *verbose);
 }
