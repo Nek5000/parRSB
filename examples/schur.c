@@ -14,7 +14,7 @@ static void schur_test(const unsigned int nelt, const int nv,
 
   MPI_Barrier(comm);
   double t = MPI_Wtime();
-  struct coarse *crs = coarse_setup(nelt, nv, vl, comm);
+  struct coarse *crs = coarse_setup(nelt, nv, vl, 0, comm);
   t = MPI_Wtime() - t;
 
   if (id == 0) {

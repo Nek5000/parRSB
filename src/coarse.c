@@ -95,6 +95,7 @@ static ulong number_rows(ulong *elem, ulong *ls_, ulong *lg_, uint *ln_,
 //
 
 struct coarse {
+  int type;
   ulong ls, lg, is, ig;
   uint ln, in, *idx;
   struct comm c;
@@ -102,7 +103,7 @@ struct coarse {
 };
 
 struct coarse *coarse_setup(const unsigned int nelt, const int nv,
-                            const long long *vtx_, MPI_Comm comm) {
+                            const long long *llvtx, int type, MPI_Comm comm) {
   buffer bfr;
   buffer_init(&bfr, 1024);
 
@@ -115,9 +116,10 @@ struct coarse *coarse_setup(const unsigned int nelt, const int nv,
   uint size = nelt * nv;
   slong *vtx = tcalloc(slong, size);
   for (uint i = 0; i < size; i++)
-    vtx[i] = vtx_[i];
+    vtx[i] = llvtx[i];
 
   struct coarse *crs = tcalloc(struct coarse, 1);
+  crs->type = type;
   comm_dup(&crs->c, &c);
 
   ulong *eid = tcalloc(ulong, nelt);
@@ -131,7 +133,13 @@ struct coarse *coarse_setup(const unsigned int nelt, const int nv,
   compress_nbrs(&eij, &nbrs, &bfr);
   array_free(&nbrs), free(eid);
 
-  schur_setup(crs, &eij, ng, &c, &cr, &bfr);
+  switch (type) {
+  case 0:
+    schur_setup(crs, &eij, ng, &c, &cr, &bfr);
+    break;
+  default:
+    break;
+  }
 
   array_free(&eij), free(vtx);
   crystal_free(&cr), comm_free(&c), buffer_free(&bfr);
@@ -140,15 +148,27 @@ struct coarse *coarse_setup(const unsigned int nelt, const int nv,
 }
 
 int coarse_solve(scalar *x, scalar *b, struct coarse *crs, buffer *bfr) {
-  schur_solve(x, b, crs, bfr);
+  switch (crs->type) {
+  case 0:
+    schur_solve(x, b, crs, bfr);
+    break;
+  default:
+    break;
+  }
   return 0;
 }
 
 int coarse_free(struct coarse *crs) {
   if (crs != NULL) {
-    schur_free(crs);
+    switch (crs->type) {
+    case 0:
+      schur_free(crs);
+      break;
+    default:
+      break;
+    }
     if (crs->idx != NULL)
-      free(crs->idx), crs->idx = NULL;
+      free(crs->idx);
     comm_free(&crs->c);
     free(crs), crs = NULL;
   }
