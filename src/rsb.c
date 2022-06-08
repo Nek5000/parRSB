@@ -12,9 +12,9 @@ parrsb_options parrsb_default_options = {0, 2, 1, 0, 1, 0, 2, 1};
 static char *ALGO[3] = {"RSB", "RCB", "RIB"};
 
 static int if_number(const char *c) {
-  int i;
-  for (i = 0; i < strnlen(c, 32) && isdigit(c[i]); i++)
-    ;
+  int i = 0;
+  while (i < strnlen(c, 32) && isdigit(c[i]))
+    i++;
   return i == strnlen(c, 32);
 }
 
@@ -52,20 +52,8 @@ static void print_options(parrsb_options *options) {
 
 #undef PRINT_OPTION
 
-// Load balance input data
 static size_t load_balance(struct array *elist, uint nel, int nv, double *coord,
                            long long *vtx, struct crystal *cr, buffer *bfr) {
-  slong out[2][1], buf[2][1];
-  slong in = nel;
-  comm_scan(out, &cr->comm, gs_long, gs_add, &in, 1, buf);
-  slong start = out[0][0];
-  slong nelg = out[1][0];
-
-  int size = cr->comm.np;
-  uint nstar = nelg / size;
-  uint nrem = nelg - nstar * size;
-  slong lower = (nstar + 1) * nrem;
-
   size_t unit_size;
   struct rcb_element *element = NULL;
 
@@ -78,6 +66,15 @@ static size_t load_balance(struct array *elist, uint nel, int nv, double *coord,
   element->origin = cr->comm.id;
 
   array_init_(elist, nel, unit_size, __FILE__, __LINE__);
+
+  slong out[2][1], wrk[2][1], in = nel;
+  comm_scan(out, &cr->comm, gs_long, gs_add, &in, 1, wrk);
+  slong start = out[0][0], nelg = out[1][0];
+
+  uint size = cr->comm.np;
+  uint nstar = nelg / size;
+  uint nrem = nelg - nstar * size;
+  slong lower = (nstar + 1) * nrem;
 
   int ndim = (nv == 8) ? 3 : 2;
   int e, n, v;
@@ -97,8 +94,6 @@ static size_t load_balance(struct array *elist, uint nel, int nv, double *coord,
 
     array_cat_(unit_size, elist, element, 1, __FILE__, __LINE__);
   }
-  // Sanity check
-  assert(elist->n == nel);
 
   if (vtx != NULL) { // RSB
     struct rsb_element *elements = elist->ptr;
@@ -120,40 +115,37 @@ static size_t load_balance(struct array *elist, uint nel, int nv, double *coord,
 }
 
 static void restore_original(int *part, int *seq, struct crystal *cr,
-                             struct array *elist, size_t unit_size,
-                             buffer *bfr) {
-  sarray_transfer_(elist, unit_size, offsetof(struct rcb_element, origin), 1,
-                   cr);
+                             struct array *elist, size_t usize, buffer *bfr) {
+  sarray_transfer_(elist, usize, offsetof(struct rcb_element, origin), 1, cr);
   uint nel = elist->n;
 
-  if (unit_size == sizeof(struct rsb_element)) // RSB
+  if (usize == sizeof(struct rsb_element)) // RSB
     sarray_sort(struct rsb_element, elist->ptr, nel, globalId, 1, bfr);
-  else if (unit_size == sizeof(struct rcb_element)) // RCB
+  else if (usize == sizeof(struct rcb_element)) // RCB
     sarray_sort(struct rcb_element, elist->ptr, nel, globalId, 1, bfr);
 
   struct rcb_element *element;
   uint e;
   for (e = 0; e < nel; e++) {
-    element = (struct rcb_element *)((char *)elist->ptr + e * unit_size);
+    element = (struct rcb_element *)((char *)elist->ptr + e * usize);
     part[e] = element->origin; // element[e].origin;
   }
 
   if (seq != NULL) {
     for (e = 0; e < nel; e++) {
-      element = (struct rcb_element *)((char *)elist->ptr + e * unit_size);
+      element = (struct rcb_element *)((char *)elist->ptr + e * usize);
       seq[e] = element->seq; // element[e].seq;
     }
   }
 }
 
-/*
- * part = [nel], out,
- * seq = [nel], out,
- * vtx = [nel x nv], in,
- * coord = [nel x nv x ndim], in,
- * nel = in,
- * nv = in,
- * options = in */
+// part = [nel], out,
+// seq = [nel], out,
+// vtx = [nel x nv], in,
+// coord = [nel x nv x ndim], in,
+// nel = in,
+// nv = in,
+// options = in
 int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
                      int nel, int nv, parrsb_options options, MPI_Comm comm) {
   update_options(&options);
@@ -189,15 +181,13 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
   MPI_Comm comma;
   MPI_Comm_split(c.c, nel > 0, c.id, &comma);
 
+  metric_init();
+  struct comm ca;
+  comm_init(&ca, comma);
+
   if (nel > 0) {
-    metric_init();
-
-    struct comm ca;
-    comm_init(&ca, comma);
-
-    slong out[2][1], buf[2][1];
-    slong in = nel;
-    comm_scan(out, &ca, gs_long, gs_add, &in, 1, buf);
+    slong out[2][1], wrk[2][1], in = nel;
+    comm_scan(out, &ca, gs_long, gs_add, &in, 1, wrk);
     slong nelg = out[1][0];
 
     if (ca.np > nelg) {
@@ -222,10 +212,10 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
     default:
       break;
     }
-
-    metric_finalize();
-    comm_free(&ca);
   }
+
+  metric_finalize();
+  comm_free(&ca);
   MPI_Comm_free(&comma);
 
 #if defined(GENMAP_OCCA)
