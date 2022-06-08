@@ -890,18 +890,6 @@ int schur_solve(scalar *x, scalar *b, struct coarse *crs, buffer *bfr) {
   // Solve: A_ll z_l = r_l
   for (uint i = 0; i < ln; i++)
     rhs[i] = b[idx[i]];
-#ifdef DUMPI
-  printf("%d bl = ", c->id);
-  for (uint i = 0; i < ln; i++)
-    printf("%lf ", rhs[i]);
-  printf("\n");
-  fflush(stdout);
-  printf("%d bi = ", c->id);
-  for (uint i = 0; i < in; i++)
-    printf("%lf ", b[idx[ln + i]]);
-  printf("\n");
-  fflush(stdout);
-#endif
 
   comm_barrier(c);
   double t = comm_time();
@@ -910,40 +898,15 @@ int schur_solve(scalar *x, scalar *b, struct coarse *crs, buffer *bfr) {
   if (c->id == 0)
     printf("\t cholesky_solve 1: %lf\n", t);
 
-#ifdef DUMPI
-  printf("%d zl = ", c->id);
-  for (uint i = 0; i < ln; i++)
-    printf("%lf ", zl[i]);
-  printf("\n");
-  fflush(stdout);
-#endif
-
   comm_barrier(c);
   t = comm_time();
   // Solve: A_ss x_i = fi where fi = r_i - E zl
   Ezl(rhs, &schur->A_sl, schur->Q_sl, zl, crs->ls, in, bfr);
-#ifdef DUMPI
-  printf("%d Ezl = ", c->id);
-  for (uint i = 0; i < in; i++)
-    printf("%lf ", rhs[i]);
-  printf("\n");
-  fflush(stdout);
-#endif
-
   for (uint i = 0; i < in; i++)
     rhs[i] = b[idx[ln + i]] - rhs[i];
   t = comm_time() - t;
   if (c->id == 0)
     printf("\tset rhs: %lf\n", t);
-#ifdef DUMPI
-  printf("%d fi = ", c->id);
-  for (uint i = 0; i < in; i++)
-    printf("%lf ", rhs[i]);
-  printf("\n");
-  fflush(stdout);
-#endif
-
-  assert(in == schur->A_ss.rn);
 
   comm_barrier(c);
   t = comm_time();
@@ -952,26 +915,10 @@ int schur_solve(scalar *x, scalar *b, struct coarse *crs, buffer *bfr) {
   if (c->id == 0)
     printf("\tproject: %lf\n", t);
 
-#ifdef DUMPI
-  printf("%d xi = ", c->id);
-  for (uint i = 0; i < in; i++)
-    printf("%lf ", xi[i]);
-  printf("\n");
-  fflush(stdout);
-#endif
-
   // Solve A_ll xl = fl where fl = r_l - F xi
   for (uint i = 0; i < ln; i++)
     rhs[i] = 0;
   Fxi(rhs, &schur->A_ls, schur->Q_ls, xi, crs->ls, in, bfr);
-#ifdef DUMPI
-  printf("%d Fxi = ", c->id);
-  for (uint i = 0; i < ln; i++)
-    printf("%lf ", rhs[i]);
-  printf("\n");
-  fflush(stdout);
-#endif
-
   for (uint i = 0; i < ln; i++)
     rhs[i] = b[idx[i]] - rhs[i];
 
@@ -981,14 +928,6 @@ int schur_solve(scalar *x, scalar *b, struct coarse *crs, buffer *bfr) {
   t = comm_time() - t;
   if (c->id == 0)
     printf("\tcholesky_solve 2: %lf\n", t);
-
-#ifdef DUMPI
-  printf("%d xl = ", c->id);
-  for (uint i = 0; i < ln; i++)
-    printf("%lf ", xl[i]);
-  printf("\n");
-  fflush(stdout);
-#endif
 
   for (uint i = 0; i < ln + in; i++)
     x[idx[i]] = xl[i];
