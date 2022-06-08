@@ -156,9 +156,10 @@ static int project(scalar *x, uint n, scalar *b, struct laplacian *L,
   if (ng == 0)
     return 0;
 
-  scalar *z = (scalar *)tcalloc(scalar, (6 + 2 * miter + 2) * n);
+  scalar *z = (scalar *)tcalloc(scalar, 6 * n);
   scalar *w = z + n, *r = w + n, *p = r + n, *z0 = p + n, *dz = z0 + n;
-  scalar *P = dz + n, *W = P + n * (miter + 1);
+  scalar *P = tcalloc(scalar, 2 * (miter + 1) * n);
+  scalar *W = P + n * (miter + 1);
 
   uint i;
   for (i = 0; i < n; i++)
@@ -248,6 +249,7 @@ static int project(scalar *x, uint n, scalar *b, struct laplacian *L,
   }
 
   free(z);
+  free(P);
 
   return i == miter ? i : i + 1;
 }
