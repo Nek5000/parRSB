@@ -721,18 +721,22 @@ static int project(scalar *x, scalar *b, const struct schur *schur, ulong ls,
     z[i] = r[i];
   if (null_space)
     ortho(z, n, ng, c);
+
   scalar rz1 = dot(z, z, n);
   comm_allreduce(c, gs_double, gs_add, &rz1, 1, buf);
 
   for (i = 0; i < n; i++)
     p[i] = z[i];
 
+  double t;
   scalar alpha, beta, rzt, rz2;
-
   uint j, k;
   for (i = 0; i < miter; i++) {
     // Action of S - E (LU)^-1 F
+    comm_barrier(c);
+    t = comm_time();
     schur_action(w, schur, p, ls, wrk, bfr);
+    metric_acc(SCHUR_PROJECT_OPERATOR, comm_time() - t);
 
     scalar pw = dot(p, w, n);
     comm_allreduce(c, gs_double, gs_add, &pw, 1, buf);
@@ -757,7 +761,10 @@ static int project(scalar *x, scalar *b, const struct schur *schur, ulong ls,
     for (j = 0; j < n; j++)
       z0[j] = z[j];
 
+    comm_barrier(c);
+    t = comm_time();
     mg_vcycle(z, r, d, c, bfr);
+    metric_acc(SCHUR_PROJECT_PRECOND, comm_time() - t);
 
     rzt = rz1;
     if (null_space)
@@ -891,43 +898,35 @@ int schur_solve(scalar *x, scalar *b, struct coarse *crs, buffer *bfr) {
   for (uint i = 0; i < ln; i++)
     rhs[i] = b[idx[i]];
 
-  comm_barrier(c);
-  double t = comm_time();
+  metric_tic(c, SCHUR_SOLVE_CHOL1);
   cholesky_solve(zl, &schur->A_ll, rhs);
-  t = comm_time() - t;
-  if (c->id == 0)
-    printf("\t cholesky_solve 1: %lf\n", t);
+  metric_toc(c, SCHUR_SOLVE_CHOL1);
 
-  comm_barrier(c);
-  t = comm_time();
+  metric_tic(c, SCHUR_SOLVE_SETRHS1);
   // Solve: A_ss x_i = fi where fi = r_i - E zl
   Ezl(rhs, &schur->A_sl, schur->Q_sl, zl, crs->ls, in, bfr);
   for (uint i = 0; i < in; i++)
     rhs[i] = b[idx[ln + i]] - rhs[i];
-  t = comm_time() - t;
-  if (c->id == 0)
-    printf("\tset rhs: %lf\n", t);
+  metric_toc(c, SCHUR_SOLVE_SETRHS1);
 
-  comm_barrier(c);
-  t = comm_time();
+  metric_tic(c, SCHUR_SOLVE_PROJECT);
   project(xi, rhs, schur, crs->ls, c, 100, 1, 1, bfr);
-  t = comm_time() - t;
-  if (c->id == 0)
-    printf("\tproject: %lf\n", t);
+  metric_toc(c, SCHUR_SOLVE_PROJECT);
 
   // Solve A_ll xl = fl where fl = r_l - F xi
+  metric_tic(c, SCHUR_SOLVE_SETRHS2);
   for (uint i = 0; i < ln; i++)
     rhs[i] = 0;
   Fxi(rhs, &schur->A_ls, schur->Q_ls, xi, crs->ls, in, bfr);
   for (uint i = 0; i < ln; i++)
     rhs[i] = b[idx[i]] - rhs[i];
+  metric_toc(c, SCHUR_SOLVE_SETRHS2);
 
-  comm_barrier(c);
-  t = comm_time();
+  metric_tic(c, SCHUR_SOLVE_CHOL2);
   cholesky_solve(xl, &schur->A_ll, rhs);
-  t = comm_time() - t;
-  if (c->id == 0)
-    printf("\tcholesky_solve 2: %lf\n", t);
+  metric_toc(c, SCHUR_SOLVE_CHOL2);
+
+  metric_push_level();
 
   for (uint i = 0; i < ln + in; i++)
     x[idx[i]] = xl[i];
