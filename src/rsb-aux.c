@@ -21,7 +21,7 @@ static void check_rsb_partition(struct comm *gc, int max_pass, int max_iter) {
   int i;
   for (i = 0; i < max_levels; i++) {
     sint converged = 1;
-    int val = (int)metric_get_value(i, FIEDLER_NITER);
+    int val = (int)metric_get_value(i, RSB_FIEDLER_NITER);
     if (val >= max_pass * max_iter)
       converged = 0;
 
@@ -45,7 +45,7 @@ static void check_rsb_partition(struct comm *gc, int max_pass, int max_iter) {
     }
 
     sint ncomps, minc, maxc;
-    ncomps = minc = maxc = (sint)metric_get_value(i, COMPONENTS);
+    ncomps = minc = maxc = (sint)metric_get_value(i, RSB_COMPONENTS);
     comm_allreduce(gc, gs_int, gs_min, &minc, 1, &ibfr);
     comm_allreduce(gc, gs_int, gs_max, &maxc, 1, &ibfr);
 
@@ -88,7 +88,7 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
 
   while (lc.np > 1) {
     // Run RCB, RIB pre-step or just sort by global id
-    metric_tic(&lc, PRE);
+    metric_tic(&lc, RSB_PRE);
     if (options->rsb_pre == 0) // Sort by global id
       parallel_sort(struct rsb_element, elements, globalId, gs_long, 0, 1, &lc,
                     bfr);
@@ -96,30 +96,30 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
       rcb(elements, sizeof(struct rsb_element), ndim, &lc, bfr);
     else if (options->rsb_pre == 2) // RIB
       rib(elements, sizeof(struct rsb_element), ndim, &lc, bfr);
-    metric_toc(&lc, PRE);
+    metric_toc(&lc, RSB_PRE);
 
     // Run fiedler
-    metric_tic(&lc, FIEDLER);
+    metric_tic(&lc, RSB_FIEDLER);
     fiedler(elements->ptr, elements->n, nv, max_iter, options->rsb_algo, &lc,
             bfr);
-    metric_toc(&lc, FIEDLER);
+    metric_toc(&lc, RSB_FIEDLER);
 
     // Sort by Fiedler vector
-    metric_tic(&lc, FIEDLER_SORT);
+    metric_tic(&lc, RSB_FIEDLER_SORT);
     parallel_sort_2(struct rsb_element, elements, fiedler, gs_double, globalId,
                     gs_long, 0, 1, &lc, bfr);
-    metric_toc(&lc, FIEDLER_SORT);
+    metric_toc(&lc, RSB_FIEDLER_SORT);
 
     // Bisect, repair and balance
     int bin = (lc.id >= (lc.np + 1) / 2);
     struct comm tc;
     comm_split(&lc, bin, lc.id, &tc);
 
-    metric_tic(&lc, REPAIR_BALANCE);
+    metric_tic(&lc, RSB_REPAIR_BALANCE);
     if (options->repair > 0)
       repair_partitions(elements, nv, &tc, &lc, bin, gc, bfr);
     balance_partitions(elements, nv, &tc, &lc, bin, bfr);
-    metric_toc(&lc, REPAIR_BALANCE);
+    metric_toc(&lc, RSB_REPAIR_BALANCE);
 
     comm_free(&lc);
     comm_dup(&lc, &tc);

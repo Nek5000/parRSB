@@ -1,7 +1,7 @@
+#include "genmap-impl.h"
+#include "gslib.h"
 #include <limits.h>
 #include <time.h>
-
-#include <genmap-impl.h>
 
 #define MAXMETS 5100
 #define MAXLVLS 20
@@ -12,16 +12,15 @@ static double *stack;
 static uint stack_size;
 
 void metric_init() {
-  uint i;
-  for (i = 0; i < MAXMETS; i++)
+  for (uint i = 0; i < MAXMETS; i++)
     metrics[i] = 0.0;
-  GenmapCalloc(MAXSIZE, &stack);
+  stack = tcalloc(double, MAXSIZE);
   stack_size = 0;
 }
 
 void metric_finalize() {
   if (stack != NULL)
-    GenmapFree(stack);
+    free(stack), stack = NULL;
 }
 
 void metric_acc(metric m, double val) { metrics[m] += val; }
@@ -60,16 +59,10 @@ void metric_push_level() {
 uint metric_get_levels() { return stack_size; }
 
 void metric_print(struct comm *c, int profile_level) {
-  double *min, *max, *sum, *buf;
-  GenmapCalloc(MAXSIZE, &min);
-  GenmapCalloc(MAXSIZE, &max);
-  GenmapCalloc(MAXSIZE, &sum);
-  GenmapCalloc(MAXSIZE, &buf);
+  double *min = tcalloc(double, 4 * MAXSIZE);
+  double *max = min + MAXSIZE, *sum = max + MAXSIZE, *buf = sum + MAXSIZE;
 
-  uint max_size = stack_size * MAXMETS;
-  assert(max_size <= MAXSIZE);
-
-  uint i;
+  uint max_size = stack_size * MAXMETS, i;
   for (i = 0; i < max_size; i++)
     min[i] = max[i] = sum[i] = stack[i];
 
@@ -82,29 +75,28 @@ void metric_print(struct comm *c, int profile_level) {
 #define SUMMARY(i, m)                                                          \
   sum[i * MAXMETS + m], min[i * MAXMETS + m], max[i * MAXMETS + m]
 
-  int j;
   for (i = 0; i < stack_size; i++) {
     if (c->id == 0 && profile_level > 0) {
       printf("level=%02d\n", i);
-      printf("  PRE                    : %g/%g/%g\n", SUMMARY(i, PRE));
-      printf("  FIEDLER                : %g/%g/%g\n", SUMMARY(i, FIEDLER));
-      printf("  LANCZOS                : %g/%g/%g\n", SUMMARY(i, LANCZOS));
-      printf("  FIEDLER_NITER          : %g/%g/%g\n",
-             SUMMARY(i, FIEDLER_NITER));
-      printf("  PROJECT_NITER          : %g/%g/%g\n",
-             SUMMARY(i, PROJECT_NITER));
-      printf("    LAPLACIAN            : %g/%g/%g\n", SUMMARY(i, LAPLACIAN));
-      printf("  FIEDLER_SORT           : %g/%g/%g\n", SUMMARY(i, FIEDLER_SORT));
-      printf("  REPAIR_BALANCE         : %g/%g/%g\n",
-             SUMMARY(i, REPAIR_BALANCE));
+      printf("  RSB_PRE                    : %g/%g/%g\n", SUMMARY(i, RSB_PRE));
+      printf("  RSB_FIEDLER                : %g/%g/%g\n",
+             SUMMARY(i, RSB_FIEDLER));
+      printf("  RSB_LANCZOS                : %g/%g/%g\n",
+             SUMMARY(i, RSB_LANCZOS));
+      printf("  RSB_FIEDLER_NITER          : %g/%g/%g\n",
+             SUMMARY(i, RSB_FIEDLER_NITER));
+      printf("  RSB_PROJECT_NITER          : %g/%g/%g\n",
+             SUMMARY(i, RSB_PROJECT_NITER));
+      printf("    RSB_LAPLACIAN            : %g/%g/%g\n",
+             SUMMARY(i, RSB_LAPLACIAN));
+      printf("  RSB_FIEDLER_SORT           : %g/%g/%g\n",
+             SUMMARY(i, RSB_FIEDLER_SORT));
+      printf("  RSB_REPAIR_BALANCE         : %g/%g/%g\n",
+             SUMMARY(i, RSB_REPAIR_BALANCE));
     }
   }
 
-  GenmapFree(min);
-  GenmapFree(max);
-  GenmapFree(sum);
-  GenmapFree(buf);
-
+  free(min);
 #undef SUMMARY
 }
 

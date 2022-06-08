@@ -296,10 +296,10 @@ static int inverse(scalar *y, uint lelt, struct rsb_element *elems, int nv,
   int grammian = 0;
 
   for (i = 0; i < miter; i++) {
-    metric_tic(gsc, PROJECT);
+    metric_tic(gsc, RSB_PROJECT);
     int ppfi = project(y, lelt, z, wl, d, gsc, 100, 1, 0, buf);
-    metric_toc(gsc, PROJECT);
-    metric_acc(END, ppfi);
+    metric_toc(gsc, RSB_PROJECT);
+    metric_acc(RSB_PROJECT_NITER, ppfi);
 
     ortho(y, lelt, nelg, gsc);
 
@@ -560,9 +560,9 @@ static int lanczos_aux(scalar *diag, scalar *upper, scalar *rr, uint lelt,
     // vec_ortho(gsc, p, nelg);
     ortho(p, lelt, nelg, gsc);
 
-    metric_tic(gsc, LAPLACIAN);
+    metric_tic(gsc, RSB_LAPLACIAN);
     laplacian(w, gl, p, bfr);
-    metric_toc(gsc, LAPLACIAN);
+    metric_toc(gsc, RSB_LAPLACIAN);
 
     scalar ww = dot(w, w, lelt);
     comm_allreduce(gsc, gs_double, gs_add, &ww, 1, buf);
@@ -612,7 +612,7 @@ static int lanczos_aux(scalar *diag, scalar *upper, scalar *rr, uint lelt,
 static int lanczos(scalar *fiedler, uint lelt, struct rsb_element *elems,
                    int nv, scalar *initv, struct comm *gsc, int miter,
                    slong nelg, buffer *bfr) {
-  metric_tic(gsc, LANCZOS);
+  metric_tic(gsc, RSB_LANCZOS);
 
   struct laplacian *wl;
 #if defined(GENMAP_OCCA)
@@ -668,7 +668,7 @@ static int lanczos(scalar *fiedler, uint lelt, struct rsb_element *elems,
 #endif
   laplacian_free(wl);
 
-  metric_toc(gsc, LANCZOS);
+  metric_toc(gsc, RSB_LANCZOS);
 
   return ipass;
 }
@@ -704,7 +704,7 @@ int fiedler(struct rsb_element *elems, uint lelt, int nv, int max_iter,
     iter = lanczos(fiedler, lelt, elems, nv, initv, gsc, max_iter, nelg, buf);
   else if (algo == 1)
     iter = inverse(fiedler, lelt, elems, nv, initv, gsc, max_iter, nelg, buf);
-  metric_acc(FIEDLER_NITER, iter);
+  metric_acc(RSB_FIEDLER_NITER, iter);
 
   GenmapScalar norm = 0;
   for (i = 0; i < lelt; i++)

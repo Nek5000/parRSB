@@ -252,7 +252,7 @@ int balance_partitions(struct array *elements, int nv, struct comm *lc,
 
   nelt = elements->n;
   sint ncomp = get_components(NULL, elements->ptr, lc, bfr, nelt, nv);
-  metric_acc(COMPONENTS, ncomp);
+  metric_acc(RSB_COMPONENTS, ncomp);
 
   free(ids);
   gs_free(gsh);
