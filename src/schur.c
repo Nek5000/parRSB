@@ -690,9 +690,6 @@ static int project(scalar *x, scalar *b, const struct schur *schur, ulong ls,
                    struct comm *c, int miter, int null_space, int verbose,
                    buffer *bfr) {
   const struct par_mat *S = &schur->A_ss;
-  assert(IS_CSR(S));
-  assert(S->rn == 0 || IS_DIAG(S));
-
   struct mg *d = schur->M;
 
   slong out[2][1], buf[2][1], in = S->rn;
@@ -710,8 +707,10 @@ static int project(scalar *x, scalar *b, const struct schur *schur, ulong ls,
   scalar *W = P + n * (miter + 1);
 
   uint i;
-  for (i = 0; i < n; i++)
-    x[i] = 0, r[i] = b[i];
+  for (i = 0; i < n; i++) {
+    x[i] = 0;
+    r[i] = b[i];
+  }
 
   scalar rr = dot(r, r, n);
   comm_allreduce(c, gs_double, gs_add, &rr, 1, buf);
@@ -739,27 +738,25 @@ static int project(scalar *x, scalar *b, const struct schur *schur, ulong ls,
     alpha = rz1 / pw;
 
     pw = 1 / sqrt(pw);
-    for (j = 0; j < n; j++)
-      W[i * n + j] = pw * w[j], P[i * n + j] = pw * p[j];
+    for (j = 0; j < n; j++) {
+      W[i * n + j] = pw * w[j];
+      P[i * n + j] = pw * p[j];
+    }
 
-    for (j = 0; j < n; j++)
-      x[j] += alpha * p[j], r[j] -= alpha * w[j];
+    for (j = 0; j < n; j++) {
+      x[j] += alpha * p[j];
+      r[j] -= alpha * w[j];
+    }
 
     rr = dot(r, r, n);
     comm_allreduce(c, gs_double, gs_add, &rr, 1, buf);
-
     if (rr < rtol || sqrt(rr) < tol)
       break;
 
     for (j = 0; j < n; j++)
       z0[j] = z[j];
 
-#if 1
     mg_vcycle(z, r, d, c, bfr);
-#else
-    for (j = 0; j < n; j++)
-      z[j] = r[j];
-#endif
 
     rzt = rz1;
     if (null_space)
@@ -772,9 +769,11 @@ static int project(scalar *x, scalar *b, const struct schur *schur, ulong ls,
     rz2 = dot(r, dz, n);
     comm_allreduce(c, gs_double, gs_add, &rz2, 1, buf);
 
-    if (c->id == 0 && verbose > 0)
+    if (c->id == 0 && verbose > 0) {
       printf("rr = %e rtol = %e rz0 = %e rz1 = %e rz2 = %e\n", rr, rtol, rzt,
              rz1, rz2);
+      fflush(stdout);
+    }
 
     beta = rz2 / rzt;
     for (j = 0; j < n; j++)
