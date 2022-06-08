@@ -1,4 +1,5 @@
 #include "coarse.h"
+#include "metrics.h"
 #include "multigrid.h"
 #include <math.h>
 

@@ -1,6 +1,7 @@
 #include "coarse.h"
 #include "genmap-impl.h"
 #include "ilu.h"
+#include "metrics.h"
 #include "sort.h"
 #include <limits.h>
 #include <time.h>

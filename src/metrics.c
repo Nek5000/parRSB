@@ -1,4 +1,4 @@
-#include "genmap-impl.h"
+#include "metrics.h"
 #include "gslib.h"
 #include <limits.h>
 #include <time.h>

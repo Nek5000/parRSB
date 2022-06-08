@@ -1,10 +1,10 @@
+#include "genmap-impl.h"
+#include "metrics.h"
+#include "sort.h"
 #include <limits.h>
 #include <math.h>
 #include <stdio.h>
 #include <time.h>
-
-#include <genmap-impl.h>
-#include <sort.h>
 
 struct unmarked {
   uint index;

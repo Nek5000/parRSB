@@ -1,11 +1,11 @@
+#include "genmap-impl.h"
+#include "metrics.h"
+#include "parRSB.h"
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-
-#include <genmap-impl.h>
-#include <parRSB.h>
 
 parrsb_options parrsb_default_options = {0, 2, 1, 0, 1, 0, 2, 1};
 
