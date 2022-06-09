@@ -118,6 +118,8 @@ void metric_crs_print(struct comm *c, int profile_level) {
              SUMMARY(i, SCHUR_SOLVE_SETRHS1));
       printf("  SCHUR_SOLVE_PROJECT: %g/%g/%g\n",
              SUMMARY(i, SCHUR_SOLVE_PROJECT));
+      printf("\tSCHUR_PROJECT_NITER: %g/%g/%g\n",
+             SUMMARY(i, SCHUR_PROJECT_NITER));
       printf("\tSCHUR_PROJECT_OPERATOR: %g/%g/%g\n",
              SUMMARY(i, SCHUR_PROJECT_OPERATOR));
       printf("\tSCHUR_PROJECT_PRECOND : %g/%g/%g\n",

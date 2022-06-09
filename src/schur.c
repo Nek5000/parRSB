@@ -911,8 +911,9 @@ int schur_solve(scalar *x, scalar *b, struct coarse *crs, buffer *bfr) {
   metric_toc(c, SCHUR_SOLVE_SETRHS1);
 
   metric_tic(c, SCHUR_SOLVE_PROJECT);
-  project(xi, rhs, schur, crs->ls, c, 100, 1, 1, bfr);
+  int iter = project(xi, rhs, schur, crs->ls, c, 100, 1, 1, bfr);
   metric_toc(c, SCHUR_SOLVE_PROJECT);
+  metric_acc(SCHUR_PROJECT_NITER, iter);
 
   // Solve A_ll xl = fl where fl = r_l - F xi
   metric_tic(c, SCHUR_SOLVE_SETRHS2);
