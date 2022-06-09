@@ -9,8 +9,14 @@
 
 static void schur_test(const unsigned int nelt, const int nv,
                        const long long *vl, MPI_Comm comm) {
-  int id;
+  int id, np;
   MPI_Comm_rank(comm, &id);
+  MPI_Comm_size(comm, &np);
+
+  if (id == 0) {
+    printf("MPI Ranks = %d", np);
+    fflush(stdout);
+  }
 
   MPI_Barrier(comm);
   double t = MPI_Wtime();
