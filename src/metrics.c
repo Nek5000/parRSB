@@ -18,11 +18,6 @@ void metric_init() {
   stack_size = 0;
 }
 
-void metric_finalize() {
-  if (stack != NULL)
-    free(stack), stack = NULL;
-}
-
 void metric_acc(metric m, double val) { metrics[m] += val; }
 
 void metric_set(metric m, double val) { metrics[m] = val; }
@@ -58,9 +53,10 @@ void metric_push_level() {
 
 uint metric_get_levels() { return stack_size; }
 
-void metric_print(struct comm *c, int profile_level) {
-  double *min = tcalloc(double, 4 * MAXSIZE);
-  double *max = min + MAXSIZE, *sum = max + MAXSIZE, *buf = sum + MAXSIZE;
+static void metric_print_aux(double **mini, struct comm *c, int profile_level) {
+  *mini = tcalloc(double, 4 * MAXSIZE);
+  double *min = *mini, *max = min + MAXSIZE, *sum = max + MAXSIZE,
+         *buf = sum + MAXSIZE;
 
   uint max_size = stack_size * MAXMETS, i;
   for (i = 0; i < max_size; i++)
@@ -71,10 +67,17 @@ void metric_print(struct comm *c, int profile_level) {
   comm_allreduce(c, gs_double, gs_add, sum, MAXSIZE, buf); // sum
   for (i = 0; i < max_size; i++)
     sum[i] /= c->np;
+}
 
 #define SUMMARY(i, m)                                                          \
   sum[i * MAXMETS + m], min[i * MAXMETS + m], max[i * MAXMETS + m]
 
+void metric_rsb_print(struct comm *c, int profile_level) {
+  double *min = NULL;
+  metric_print_aux(&min, c, profile_level);
+  double *max = min + MAXSIZE, *sum = max + MAXSIZE;
+
+  uint i;
   for (i = 0; i < stack_size; i++) {
     if (c->id == 0 && profile_level > 0) {
       printf("level=%02d\n", i);
@@ -96,8 +99,45 @@ void metric_print(struct comm *c, int profile_level) {
     }
   }
 
-  free(min);
+  if (min)
+    free(min);
+}
+
+void metric_crs_print(struct comm *c, int profile_level) {
+  double *min = NULL;
+  metric_print_aux(&min, c, profile_level);
+  double *max = min + MAXSIZE, *sum = max + MAXSIZE;
+
+  uint i;
+  for (i = 0; i < stack_size; i++) {
+    if (c->id == 0 && profile_level > 0) {
+      printf("level=%02d\n", i);
+      printf("  SCHUR_SOLVE_CHOL1  : %g/%g/%g\n",
+             SUMMARY(i, SCHUR_SOLVE_CHOL1));
+      printf("  SCHUR_SOLVE_SETRHS1: %g/%g/%g\n",
+             SUMMARY(i, SCHUR_SOLVE_SETRHS1));
+      printf("  SCHUR_SOLVE_PROJECT: %g/%g/%g\n",
+             SUMMARY(i, SCHUR_SOLVE_PROJECT));
+      printf("\tSCHUR_PROJECT_OPERATOR: %g/%g/%g\n",
+             SUMMARY(i, SCHUR_PROJECT_OPERATOR));
+      printf("\tSCHUR_PROJECT_PRECOND : %g/%g/%g\n",
+             SUMMARY(i, SCHUR_PROJECT_PRECOND));
+      printf("  SCHUR_SOLVE_SETRHS2: %g/%g/%g\n",
+             SUMMARY(i, SCHUR_SOLVE_SETRHS2));
+      printf("  SCHUR_SOLVE_CHOL2  : %g/%g/%g\n",
+             SUMMARY(i, SCHUR_SOLVE_CHOL2));
+    }
+  }
+
+  if (min)
+    free(min);
+}
+
 #undef SUMMARY
+
+void metric_finalize() {
+  if (stack != NULL)
+    free(stack), stack = NULL;
 }
 
 #undef MAXMETS

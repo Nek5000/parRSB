@@ -1,4 +1,5 @@
 #include "coarse.h"
+#include "metrics.h"
 
 extern int schur_setup(struct coarse *crs, struct array *eij, const ulong ng,
                        struct comm *c, struct crystal *cr, buffer *bfr);
@@ -148,6 +149,8 @@ struct coarse *coarse_setup(const unsigned int nelt, const int nv,
 }
 
 int coarse_solve(scalar *x, scalar *b, struct coarse *crs, buffer *bfr) {
+  metric_init();
+
   switch (crs->type) {
   case 0:
     schur_solve(x, b, crs, bfr);
@@ -155,6 +158,10 @@ int coarse_solve(scalar *x, scalar *b, struct coarse *crs, buffer *bfr) {
   default:
     break;
   }
+
+  metric_push_level();
+  metric_crs_print(&crs->c, 1);
+
   return 0;
 }
 

@@ -926,8 +926,6 @@ int schur_solve(scalar *x, scalar *b, struct coarse *crs, buffer *bfr) {
   cholesky_solve(xl, &schur->A_ll, rhs);
   metric_toc(c, SCHUR_SOLVE_CHOL2);
 
-  metric_push_level();
-
   for (uint i = 0; i < ln + in; i++)
     x[idx[i]] = xl[i];
 
