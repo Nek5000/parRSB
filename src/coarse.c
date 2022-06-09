@@ -17,8 +17,8 @@ static ulong number_rows(ulong *elem, ulong *ls_, ulong *lg_, uint *ln_,
                          const slong *vtx, const uint nelt, const int nv,
                          const struct comm *ci, buffer *bfr) {
   uint npts = nelt * nv;
-  int nnz = npts > 0;
 
+  int nnz = (npts > 0);
   struct comm c;
   comm_split(ci, nnz, ci->id, &c);
 
@@ -28,16 +28,17 @@ static ulong number_rows(ulong *elem, ulong *ls_, ulong *lg_, uint *ln_,
     while (c.np > 1) {
       struct gs_data *gsh = gs_setup(vtx, npts, &c, 0, gs_pairwise, 0);
 
-      int bin = c.id >= (c.np + 1) / 2;
+      int bin = (c.id >= (c.np + 1) / 2);
       assert(bin == 0 || bin == 1);
       for (i = 0; i < npts; i++)
         dof[i] = bin;
 
       gs(dof, gs_int, gs_add, 0, gsh, bfr);
 
-      if (bin == 1)
+      if (bin == 1) {
         for (i = 0; i < npts; i++)
           dof[i] = 0;
+      }
 
       gs(dof, gs_int, gs_add, 0, gsh, bfr);
 
@@ -66,11 +67,12 @@ static ulong number_rows(ulong *elem, ulong *ls_, ulong *lg_, uint *ln_,
   comm_free(&c);
 
   uint in = 0, ln = 0;
-  for (i = 0; i < nelt; i++)
+  for (i = 0; i < nelt; i++) {
     if (elem[i] > 0)
       in++;
     else
       ln++;
+  }
   *in_ = in, *ln_ = ln;
 
   slong inp[2] = {ln, in}, out[2][2], buf[2][2];

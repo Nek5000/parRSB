@@ -38,9 +38,9 @@ static scalar sigma_cheb(int k, int n, scalar lmin, scalar lmax) {
 static void inline set_proc(struct mij *m, uint nelt, uint nrem, uint np) {
   assert(m->r > 0);
 
-  if (nrem == 0)
+  if (nrem == 0) {
     m->p = (m->r - 1) / nelt;
-  else {
+  } else {
     uint s = np - nrem;
     ulong t = nelt * s;
     if (m->r <= t)
@@ -76,13 +76,18 @@ static void mg_setup_aux(struct mg *d, const uint lvl, const int factor,
   const uint npc = (ngc < c->np ? ngc : c->np);
   const uint nelt = ngc / npc, nrem = ngc % npc;
 
+  // Calculate the minimum row id
+  slong rs = (M->rn > 0 ? M->rows[0] : LLONG_MAX);
+  comm_allreduce(c, gs_long, gs_min, &rs, 1, wrk);
+  rs -= 1;
+
   uint i, j, je, k = 0;
   struct mij m;
   for (i = 0; i < M->rn; i++) {
-    m.r = M->rows[i] / factor, m.r += (m.r == 0);
+    m.r = (M->rows[i] - rs) / factor, m.r += (m.r == 0);
     set_proc(&m, nelt, nrem, npc);
     for (j = M->adj_off[i], je = M->adj_off[i + 1]; j < je; j++) {
-      m.c = M->cols[M->adj_idx[j]] / factor, m.c += (m.c == 0);
+      m.c = (M->cols[M->adj_idx[j]] - rs) / factor, m.c += (m.c == 0);
       m.v = M->adj_val[j];
       array_cat(struct mij, entries, &m, 1);
     }

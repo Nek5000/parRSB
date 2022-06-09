@@ -810,6 +810,7 @@ static int project(scalar *x, scalar *b, const struct schur *schur, ulong ls,
 }
 
 struct coarse {
+  int type;
   ulong ls, lg, is, ig;
   uint ln, in, *idx;
   struct comm c;
