@@ -46,6 +46,7 @@ int compress_nbrs(struct array *eij, struct array *nbr, buffer *bfr);
 // TODO: Rename to mat_setup
 int csr_setup(struct mat *mat, struct array *entries, int sep, buffer *buf);
 int mat_print(struct mat *mat);
+void mat_dump(const char *name, struct mat *A, struct crystal *cr, buffer *bfr);
 int mat_free(struct mat *mat);
 
 // Input array `entries` is of type `struct mij`
@@ -74,4 +75,7 @@ struct gs_data *setup_Q(const struct par_mat *M, const struct comm *c,
                         buffer *bfr);
 void mat_vec_csr(scalar *y, const scalar *x, const struct par_mat *M,
                  struct gs_data *gsh, scalar *buf, buffer *bfr);
+
+void par_arr_dump(const char *name, struct array *arr, struct crystal *cr,
+                  buffer *bfr);
 #endif // _MAT_H_

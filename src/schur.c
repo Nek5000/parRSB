@@ -840,14 +840,15 @@ int schur_setup(struct coarse *crs, struct array *eij, const ulong ng,
     else
       array_cat(struct mij, &ss, &ptr[i], 1);
   }
-  assert(ls.n == sl.n); // For symmetric matrices
+  // For symmetric matrices
+  assert(ls.n == sl.n);
 
   // Setup local block diagonal (B)
   struct mat B;
   csr_setup(&B, &ll, 0, bfr);
   cholesky_factor(&schur->A_ll, &B, bfr);
-#ifdef DUMPA
-  mat_print(&B);
+#ifdef DUMP4
+  mat_dump("B.txt", &B, cr, bfr);
 #endif
   mat_free(&B);
   array_free(&ll);
@@ -857,27 +858,37 @@ int schur_setup(struct coarse *crs, struct array *eij, const ulong ng,
   assert(schur->A_ll.n == crs->ln);
   distribute_by_columns(&sl, crs->ls, crs->ln, c, cr, bfr);
   par_csc_setup(&schur->A_sl, &sl, 0, bfr);
-#ifdef DUMPA
-  par_mat_print(&schur->A_sl);
+#ifdef DUMP4
+  par_mat_dump("E.txt", &schur->A_sl, cr, bfr);
 #endif
   array_free(&sl);
   schur->Q_sl = setup_Ezl_Q(&schur->A_sl, crs->lg + crs->is, crs->in, c, bfr);
 
   // Setup S
   par_csr_setup(&schur->A_ss, &ss, 1, bfr);
-#ifdef DUMPA
+#ifdef DUMP4
   par_mat_print(&schur->A_ss);
+  par_mat_dump("S.txt", &schur->A_ss, cr, bfr);
 #endif
   array_free(&ss);
   schur->Q_ss = setup_Q(&schur->A_ss, c, bfr);
 
   // Setup F
   par_csr_setup(&schur->A_ls, &ls, 0, bfr);
-#ifdef DUMPA
-  par_mat_print(&schur->A_ls);
+#ifdef DUMP4
+  par_mat_dump("F.txt", &schur->A_ls, cr, bfr);
 #endif
   array_free(&ls);
   schur->Q_ls = setup_Fxi_Q(&schur->A_ls, crs->lg + crs->is, crs->in, c, bfr);
+
+  char *val = getenv("PARRSB_DUMP_SCHUR");
+  if (val != NULL && atoi(val) != 0) {
+    slong nl = schur->A_ll.n, wrk[2];
+    comm_allreduce(&cr->comm, gs_long, gs_add, &nl, 1, wrk);
+    char name[BUFSIZ];
+    snprintf(name, BUFSIZ, "A_nl_%lld.txt", nl);
+    par_arr_dump(name, eij, cr, bfr);
+  }
 
   // Setup the preconditioner for the Schur complement matrix
   schur->M = schur_precond_setup(&schur->A_ll, &schur->A_ls, &schur->A_ss,

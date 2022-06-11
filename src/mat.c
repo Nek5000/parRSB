@@ -149,6 +149,43 @@ int mat_print(struct mat *mat) {
   return 0;
 }
 
+void mat_dump(const char *name, struct mat *A, struct crystal *cr,
+              buffer *bfr) {
+  struct array mijs;
+  array_init(struct mij, &mijs, 1024);
+
+  struct mij m = {.r = 0, .c = 0, .idx = 0, .p = 0, .v = 0};
+
+  uint i, j;
+  for (i = 0; i < A->n; i++) {
+    m.r = A->start + i;
+    for (j = A->Lp[i]; j < A->Lp[i + 1]; j++) {
+      m.c = A->start + A->Li[j], m.v = A->L[j];
+      array_cat(struct mij, &mijs, &m, 1);
+    }
+    if (A->D != NULL) {
+      m.c = m.r, m.v = A->D[i];
+      array_cat(struct mij, &mijs, &m, 1);
+    }
+  }
+
+  sarray_transfer(struct mij, &mijs, p, 1, cr);
+  sarray_sort_2(struct mij, mijs.ptr, mijs.n, r, 1, c, 1, bfr);
+
+  struct comm *c = &cr->comm;
+  if (c->id == 0) {
+    FILE *fp = fopen(name, "w+");
+    if (fp != NULL) {
+      struct mij *pm = (struct mij *)mijs.ptr;
+      for (uint i = 0; i < mijs.n; i++)
+        fprintf(fp, "%llu %llu %.15lf\n", pm[i].r, pm[i].c, pm[i].v);
+      fclose(fp);
+    }
+  }
+
+  array_free(&mijs);
+}
+
 int mat_free(struct mat *mat) {
   FREE(mat, Lp);
   FREE(mat, Li);
@@ -506,8 +543,6 @@ void par_mat_print(struct par_mat *A) {
 
 void par_mat_dump(const char *name, struct par_mat *A, struct crystal *cr,
                   buffer *bfr) {
-  assert(!IS_DIAG(A));
-
   struct array mijs;
   array_init(struct mij, &mijs, 1024);
 
@@ -519,12 +554,20 @@ void par_mat_dump(const char *name, struct par_mat *A, struct crystal *cr,
         t.c = A->cols[A->adj_idx[j]], t.v = A->adj_val[j];
         array_cat(struct mij, &mijs, &t, 1);
       }
+      if (IS_DIAG(A)) {
+        t.c = t.r, t.v = A->diag_val[i];
+        array_cat(struct mij, &mijs, &t, 1);
+      }
     }
   } else if (IS_CSC(A)) {
     for (uint i = 0; i < A->cn; i++) {
       t.c = A->cols[i];
       for (uint j = A->adj_off[i]; j < A->adj_off[i + 1]; j++) {
         t.r = A->rows[A->adj_idx[j]], t.v = A->adj_val[j];
+        array_cat(struct mij, &mijs, &t, 1);
+      }
+      if (IS_DIAG(A)) {
+        t.r = t.c, t.v = A->diag_val[i];
         array_cat(struct mij, &mijs, &t, 1);
       }
     }
@@ -559,25 +602,9 @@ int par_mat_free(struct par_mat *A) {
   return 0;
 }
 
-struct par_mat *par_csr_setup_con(const uint nelt, const ulong *eid,
-                                  const slong *vtx, int nv, int sep,
-                                  struct comm *c, struct crystal *cr,
-                                  buffer *bfr) {
-  struct array nbrs, eij;
-  array_init(struct nbr, &nbrs, 100);
-  array_init(struct mij, &eij, 100);
-
-  find_nbrs(&nbrs, eid, vtx, nelt, nv, cr, bfr);
-  compress_nbrs(&eij, &nbrs, bfr);
-  array_free(&nbrs);
-
-  struct par_mat *M = tcalloc(struct par_mat, 1);
-  par_csr_setup(M, &eij, sep, bfr);
-  array_free(&eij);
-
-  return M;
-}
-
+//------------------------------------------------------------------------------
+// compress entries of a matrix
+//
 static int compress_mij(struct array *eij, struct array *entries, buffer *bfr) {
   eij->n = 0;
   if (entries->n == 0)
@@ -617,6 +644,25 @@ static int compress_mij(struct array *eij, struct array *entries, buffer *bfr) {
     pe[k].v = -s;
     i = j;
   }
+}
+
+struct par_mat *par_csr_setup_con(const uint nelt, const ulong *eid,
+                                  const slong *vtx, int nv, int sep,
+                                  struct comm *c, struct crystal *cr,
+                                  buffer *bfr) {
+  struct array nbrs, eij;
+  array_init(struct nbr, &nbrs, 100);
+  array_init(struct mij, &eij, 100);
+
+  find_nbrs(&nbrs, eid, vtx, nelt, nv, cr, bfr);
+  compress_nbrs(&eij, &nbrs, bfr);
+  array_free(&nbrs);
+
+  struct par_mat *M = tcalloc(struct par_mat, 1);
+  par_csr_setup(M, &eij, sep, bfr);
+  array_free(&eij);
+
+  return M;
 }
 
 struct par_mat *par_csr_setup_ext(struct array *entries, int sep, buffer *bfr) {
@@ -701,6 +747,28 @@ void mat_vec_csr(scalar *y, const scalar *x, const struct par_mat *M,
   for (i = 0; i < n; i++) {
     for (y[i] *= D[i], j = Lp[i], je = Lp[i + 1]; j != je; j++)
       y[i] += L[j] * buf[j];
+  }
+}
+
+//------------------------------------------------------------------------------
+// Dump and array in parallel
+void par_arr_dump(const char *name, struct array *arr, struct crystal *cr,
+                  buffer *bfr) {
+  struct mij *ptr = arr->ptr;
+  for (uint i = 0; i < arr->n; i++)
+    ptr[i].p = 0;
+  sarray_transfer(struct mij, arr, p, 0, cr);
+  sarray_sort_2(struct mij, arr->ptr, arr->n, r, 1, c, 1, bfr);
+
+  struct comm *c = &cr->comm;
+  if (c->id == 0) {
+    FILE *fp = fopen(name, "w+");
+    if (fp != NULL) {
+      struct mij *ptr = (struct mij *)arr->ptr;
+      for (uint i = 0; i < arr->n; i++)
+        fprintf(fp, "%llu %llu %.15lf\n", ptr[i].r, ptr[i].c, ptr[i].v);
+      fclose(fp);
+    }
   }
 }
 
