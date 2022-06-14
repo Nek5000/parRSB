@@ -179,15 +179,14 @@ void mg_vcycle(scalar *u1, scalar *rhs, struct mg *d, struct comm *c,
     return;
 
   uint *lvl_off = d->level_off, nnz = lvl_off[d->nlevels];
-  scalar *s = d->buf, *Gs = s + nnz, *r = Gs + nnz, *u = r + nnz;
-  for (uint i = 0; i < nnz; i++) {
-    s[i] = Gs[i] = 0.0;
-    r[i] = u[i] = 0.0;
-  }
+  scalar *r = d->buf;
+  for (uint i = 0; i < 4 * nnz; i++)
+    r[i] = 0;
   for (uint i = 0; i < lvl_off[1]; i++)
     r[i] = rhs[i];
 
-  scalar *buf = u + nnz;
+  scalar *s = r + nnz, *Gs = s + nnz, *u = Gs + nnz, *wrk = u + nnz;
+
   uint i, j, n, off;
   for (int lvl = 0; lvl < d->nlevels - 1; lvl++) {
     off = lvl_off[lvl];
@@ -202,7 +201,7 @@ void mg_vcycle(scalar *u1, scalar *rhs, struct mg *d, struct comm *c,
       u[off + j] = sigma * r[off + j] / M->diag_val[j];
 
     // G*u
-    mat_vec_csr(Gs + off, u + off, M, l->Q, buf, bfr);
+    mat_vec_csr(Gs + off, u + off, M, l->Q, wrk, bfr);
 
     // r = rhs - Gu
     for (j = 0; j < n; j++)
@@ -211,16 +210,15 @@ void mg_vcycle(scalar *u1, scalar *rhs, struct mg *d, struct comm *c,
     for (i = 1; i <= l->npres; i++) {
       sigma = sigma_cheb(i + 1, l->npres + 1, 1, 2);
 
-      // s = sigma*inv(D)*r, u = u + s
+      // s = sigma * inv(D) * r
+      // u = u + s
       for (j = 0; j < n; j++) {
         s[off + j] = sigma * r[off + j] / M->diag_val[j];
         u[off + j] += s[off + j];
       }
 
-      // Gs = G*s
-      mat_vec_csr(Gs + off, s + off, M, l->Q, buf, bfr);
-
       // r = r - Gs
+      mat_vec_csr(Gs + off, s + off, M, l->Q, wrk, bfr);
       for (j = 0; j < n; j++)
         r[off + j] = r[off + j] - Gs[off + j];
     }
