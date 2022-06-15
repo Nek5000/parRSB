@@ -74,7 +74,7 @@ static void setup_rhs(double *b, const unsigned int nelt, MPI_Comm comm) {
   norm = sqrt(norm);
 
   for (int i = 0; i < nelt; i++)
-    b[i] /= sum;
+    b[i] /= norm;
 }
 
 int main(int argc, char *argv[]) {
@@ -111,7 +111,7 @@ int main(int argc, char *argv[]) {
   buffer_init(&bfr, 1024);
   MPI_Barrier(comm);
   t = MPI_Wtime();
-  coarse_solve(x, b, 1e-13, crs, &bfr);
+  coarse_solve(x, b, in->crs_tol, crs, &bfr);
   double tsolve = MPI_Wtime() - t;
 
   double err_norm = check_err(b, x, nelt, nv, vl, comm, &bfr);
@@ -120,6 +120,8 @@ int main(int argc, char *argv[]) {
            np, tsetup, tsolve, err_norm);
     fflush(stdout);
   }
+  err = (err_norm > 10 * in->crs_tol);
+  parrsb_check_error(err, comm);
 
   // Free resources
   buffer_free(&bfr);

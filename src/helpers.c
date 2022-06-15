@@ -228,13 +228,14 @@ struct parrsb_input *parrsb_parse_input(int argc, char *argv[], MPI_Comm comm) {
   struct parrsb_input *in = tcalloc(struct parrsb_input, 1);
 
   // General parRSB options
-  in->mesh = NULL, in->tol = 0.2, in->test = 0, in->dump = 1, in->verbose = 0;
+  in->mesh = NULL, in->tol = 2e-1, in->test = 0, in->dump = 1, in->verbose = 0;
   MPI_Comm_size(comm, &in->nactive);
 
   // ILU
-  in->ilu_type = 0, in->ilu_tol = 0.1;
+  in->ilu_type = 0, in->ilu_tol = 1e-1;
 
   // Coarse solve
+  in->crs_tol = 1e-3;
 
   static struct option long_options[] = {{"mesh", required_argument, 0, 0},
                                          {"tol", optional_argument, 0, 1},
