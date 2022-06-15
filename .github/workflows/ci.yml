@@ -217,4 +217,4 @@ jobs:
           tol=(`cat test.txt | grep tol`); tol=${tol[2]}
 
           mpirun -np ${{ matrix.np }} --hostfile hostfile ./coarse \
-            --mesh ${{ matrix.test }} --tol=${tol}
+            --mesh ${{ matrix.test }} --tol=${tol} --crs_tol=1e-12

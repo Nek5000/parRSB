@@ -86,7 +86,8 @@ struct parrsb_input {
   int ilu_type;   // ILU type, default: 0
   double ilu_tol; // ILU tolerance, default: 0.1
 
-  double crs_tol; // Coarse tolerance
+  int crs_type;   // Coarse solver type, default: 0
+  double crs_tol; // Coarse tolerance, default: 1e-3
 };
 
 int parrsb_dist_mesh(unsigned int *nelt, long long **vl, double **coord,

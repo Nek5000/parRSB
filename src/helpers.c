@@ -235,7 +235,7 @@ struct parrsb_input *parrsb_parse_input(int argc, char *argv[], MPI_Comm comm) {
   in->ilu_type = 0, in->ilu_tol = 1e-1;
 
   // Coarse solve
-  in->crs_tol = 1e-3;
+  in->crs_type = 0, in->crs_tol = 1e-3;
 
   static struct option long_options[] = {{"mesh", required_argument, 0, 0},
                                          {"tol", optional_argument, 0, 1},
@@ -245,6 +245,8 @@ struct parrsb_input *parrsb_parse_input(int argc, char *argv[], MPI_Comm comm) {
                                          {"verbose", optional_argument, 0, 5},
                                          {"ilu_type", optional_argument, 0, 10},
                                          {"ilu_tol", optional_argument, 0, 11},
+                                         {"crs_type", optional_argument, 0, 20},
+                                         {"crs_tol", optional_argument, 0, 21},
                                          {0, 0, 0, 0}};
 
   for (;;) {
@@ -277,6 +279,12 @@ struct parrsb_input *parrsb_parse_input(int argc, char *argv[], MPI_Comm comm) {
       break;
     case 11:
       in->ilu_tol = atof(optarg);
+      break;
+    case 20:
+      in->crs_type = atoi(optarg);
+      break;
+    case 21:
+      in->crs_tol = atof(optarg);
       break;
     default:
       exit(1);
