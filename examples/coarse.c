@@ -114,13 +114,13 @@ int main(int argc, char *argv[]) {
   coarse_solve(x, b, in->crs_tol, crs, &bfr);
   double tsolve = MPI_Wtime() - t;
 
-  double err_norm = check_err(b, x, nelt, nv, vl, comm, &bfr);
+  double enorm = check_err(b, x, nelt, nv, vl, comm, &bfr);
   if (id == 0) {
     printf("MPI Ranks = %d\ncoarse_setup: %lf\ncoarse_solve = %lf\nerr = %lf\n",
-           np, tsetup, tsolve, err_norm);
+           np, tsetup, tsolve, enorm);
     fflush(stdout);
   }
-  err = (err_norm > 10 * in->crs_tol);
+  err = (enorm > 10 * in->crs_tol);
   parrsb_check_error(err, comm);
 
   // Free resources
