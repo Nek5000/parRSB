@@ -15,17 +15,17 @@
 #define GC_MAX_NEIGHBORS 3
 #define GC_MAX_FACE_VERTICES 4
 
-struct Point_private {
+struct point_t {
   GenmapScalar dx, x[3];
   uint proc, origin;
   int ifSegment;
   ulong sequenceId, elementId, globalId;
 };
-typedef struct Point_private *Point;
+typedef struct point_t *Point;
 
 struct Boundary_private {
   ulong elementId, faceId;
-  struct Point_private face[4];
+  struct point_t face[4];
   uint proc;
   long bc[2];
 };
@@ -60,7 +60,7 @@ int mesh_init(Mesh *m_, int nel, int ndim) {
   m->nNeighbors = ndim;
   m->nVertex = (ndim == 2) ? 4 : 8;
 
-  array_init(struct Point_private, &m->elements, 10);
+  array_init(struct point_t, &m->elements, 10);
   m->elements.n = 0;
   array_init(struct Boundary_private, &m->boundary, 10);
   m->boundary.n = 0;
@@ -84,7 +84,7 @@ void get_vertex_ids(long long **vertex_ids_, Mesh mesh) {
   GenmapMalloc(nelt * nv, vertex_ids_);
   long long *vertex_ids = *vertex_ids_;
 
-  Point ptr = mesh->elements.ptr;
+  struct point_t *ptr = (struct point_t *)mesh->elements.ptr;
   int e, v, count = 0;
   for (e = 0; e < nelt; e++) {
     for (v = 0; v < nv; v++) {
@@ -104,7 +104,7 @@ void get_vertex_coordinates(double **coords_, Mesh mesh) {
 
   double *coords = *coords_ = tcalloc(double, size);
 
-  Point ptr = mesh->elements.ptr;
+  struct point_t *ptr = (struct point_t *)mesh->elements.ptr;
   int e, v, d;
   int count = 0;
   for (e = 0; e < nelt; e++)
@@ -146,20 +146,16 @@ int NEIGHBOR_MAP[GC_MAX_VERTICES][GC_MAX_NEIGHBORS] = {
 
 static inline double diff_sqr(double x, double y) { return (x - y) * (x - y); }
 
-static inline double distance_2d(struct Point_private *a,
-                                 struct Point_private *b) {
+static inline double distance_2d(struct point_t *a, struct point_t *b) {
   return diff_sqr(a->x[0], b->x[0]) + diff_sqr(a->x[1], b->x[1]);
 }
 
-static inline double distance_3d(struct Point_private *a,
-                                 struct Point_private *b) {
+static inline double distance_3d(struct point_t *a, struct point_t *b) {
   return distance_2d(a, b) + diff_sqr(a->x[2], b->x[2]);
 }
 
 int findMinNeighborDistance(Mesh mesh) {
-  Point p = mesh->elements.ptr;
-  Point e = p + mesh->nVertex * mesh->nelt;
-
+  struct point_t *p = mesh->elements.ptr;
   int nDim = mesh->nDim;
   int nVertex = mesh->nVertex;
 
@@ -294,13 +290,13 @@ static int sortSegmentsLocal(Mesh mesh, int dim, buffer *bfr) {
     if (s < nPoints - 1 && e - s > 1) {
       switch (dim) {
       case 0:
-        tuple_sort(struct Point_private, &points[s], e - s, x[0]);
+        tuple_sort(struct point_t, &points[s], e - s, x[0]);
         break;
       case 1:
-        tuple_sort(struct Point_private, &points[s], e - s, x[1]);
+        tuple_sort(struct point_t, &points[s], e - s, x[1]);
         break;
       case 2:
-        tuple_sort(struct Point_private, &points[s], e - s, x[2]);
+        tuple_sort(struct point_t, &points[s], e - s, x[2]);
         break;
       default:
         break;
@@ -327,16 +323,16 @@ static int sortSegments(Mesh mesh, struct comm *c, int dim, buffer *bfr) {
     // Parallel sort -- we haven't localized the problem yet
     switch (dim) {
     case 0:
-      parallel_sort(struct Point_private, &mesh->elements, x[0], gs_scalar,
-                    bin_sort, 1, c, bfr);
+      parallel_sort(struct point_t, &mesh->elements, x[0], gs_scalar, bin_sort,
+                    1, c, bfr);
       break;
     case 1:
-      parallel_sort(struct Point_private, &mesh->elements, x[1], gs_scalar,
-                    bin_sort, 1, c, bfr);
+      parallel_sort(struct point_t, &mesh->elements, x[1], gs_scalar, bin_sort,
+                    1, c, bfr);
       break;
     case 2:
-      parallel_sort(struct Point_private, &mesh->elements, x[2], gs_scalar,
-                    bin_sort, 1, c, bfr);
+      parallel_sort(struct point_t, &mesh->elements, x[2], gs_scalar, bin_sort,
+                    1, c, bfr);
       break;
     default:
       break;
@@ -355,15 +351,15 @@ static int sendLastPoint(struct array *arr, Mesh mesh, struct comm *c) {
   Point pts = mesh->elements.ptr;
   sint npts = mesh->elements.n;
 
-  struct Point_private lastp = pts[npts - 1];
+  struct point_t lastp = pts[npts - 1];
   lastp.proc = (c->id + 1) % c->np;
 
-  array_init(struct Point_private, arr, 1);
-  array_cat(struct Point_private, arr, &lastp, 1);
+  array_init(struct point_t, arr, 1);
+  array_cat(struct point_t, arr, &lastp, 1);
 
   struct crystal cr;
   crystal_init(&cr, c);
-  sarray_transfer(struct Point_private, arr, proc, 1, &cr);
+  sarray_transfer(struct point_t, arr, proc, 1, &cr);
   crystal_free(&cr);
 
   return 0;
@@ -389,7 +385,7 @@ static int findSegments(Mesh mesh, struct comm *c, int i,
     sendLastPoint(&arr, mesh, c);
 
     if (c->id > 0) {
-      struct Point_private *lastp = arr.ptr;
+      struct point_t *lastp = arr.ptr;
       GenmapScalar d = diff_sqr(lastp->x[i], pts->x[i]);
       GenmapScalar dx = min(lastp->dx, pts->dx) * tolSquared;
       if (d > dx)
@@ -523,7 +519,7 @@ static int rearrangeSegments(Mesh mesh, struct comm *seg, buffer *bfr) {
 
     struct crystal cr;
     crystal_init(&cr, seg);
-    sarray_transfer(struct Point_private, &mesh->elements, proc, 0, &cr);
+    sarray_transfer(struct point_t, &mesh->elements, proc, 0, &cr);
     crystal_free(&cr);
 
     struct comm new;
@@ -532,8 +528,8 @@ static int rearrangeSegments(Mesh mesh, struct comm *seg, buffer *bfr) {
     comm_dup(seg, &new);
     comm_free(&new);
 
-    parallel_sort(struct Point_private, &mesh->elements, globalId, gs_long,
-                  bin_sort, 1, seg, bfr);
+    parallel_sort(struct point_t, &mesh->elements, globalId, gs_long, bin_sort,
+                  1, seg, bfr);
   }
 
   return 0;
@@ -628,11 +624,11 @@ static int setGlobalID(Mesh mesh, struct comm *c) {
 static int sendBack(Mesh mesh, struct comm *c, buffer *bfr) {
   struct crystal cr;
   crystal_init(&cr, c);
-  sarray_transfer(struct Point_private, &mesh->elements, origin, 0, &cr);
+  sarray_transfer(struct point_t, &mesh->elements, origin, 0, &cr);
   crystal_free(&cr);
 
-  sarray_sort(struct Point_private, mesh->elements.ptr, mesh->elements.n,
-              sequenceId, 1, bfr);
+  sarray_sort(struct point_t, mesh->elements.ptr, mesh->elements.n, sequenceId,
+              1, bfr);
 
   return 0;
 }
@@ -658,8 +654,8 @@ struct minPair_private {
 typedef struct minPair_private *minPair;
 
 static int compressPeriodicVertices(Mesh mesh, struct comm *c, buffer *bfr) {
-  parallel_sort(struct Point_private, &mesh->elements, globalId, gs_long, 0, 0,
-                c, bfr);
+  parallel_sort(struct point_t, &mesh->elements, globalId, gs_long, 0, 0, c,
+                bfr);
 
   Point points = mesh->elements.ptr;
   uint npoints = mesh->elements.n;
@@ -905,7 +901,7 @@ static int setPeriodicFaceCoordinates(Mesh mesh, struct comm *c, buffer *buf) {
   sarray_sort(struct Boundary_private, bPtr, bSize, elementId, 1, buf);
 
   /* Need element array to be sorted by sequenceId */
-  sarray_sort(struct Point_private, ePtr, eSize, sequenceId, 1, buf);
+  sarray_sort(struct point_t, ePtr, eSize, sequenceId, 1, buf);
 
   int faces[GC_MAX_FACES][GC_MAX_FACE_VERTICES];
   if (mesh->nDim == 3)
@@ -1318,7 +1314,7 @@ int parrsb_conn_mesh(long long *vtx, double *coord, int nelt, int ndim,
   int nvertex = mesh->nVertex;
   uint nunits = nvertex * nelt;
 
-  struct Point_private p;
+  struct point_t p;
   uint i, j, k, l;
   for (i = 0; i < nelt; i++) {
     for (k = 0; k < nvertex; k++) {
@@ -1329,7 +1325,7 @@ int parrsb_conn_mesh(long long *vtx, double *coord, int nelt, int ndim,
       p.sequenceId = nvertex * (start + i) + k;
       p.origin = rank;
 
-      array_cat(struct Point_private, &mesh->elements, &p, 1);
+      array_cat(struct point_t, &mesh->elements, &p, 1);
     }
   }
   assert(mesh->elements.n == nunits);
