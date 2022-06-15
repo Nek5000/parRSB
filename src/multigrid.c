@@ -114,9 +114,11 @@ static void mg_setup_aux(struct mg *d, const uint lvl, const int factor,
 }
 
 struct mg *mg_setup(const struct par_mat *M, const int factor,
-                    const struct comm *c, struct crystal *cr, buffer *bfr) {
+                    struct crystal *cr, buffer *bfr) {
   assert(IS_CSR(M));
   assert(M->rn == 0 || IS_DIAG(M));
+
+  struct comm *c = &cr->comm;
 
   slong out[2][1], wrk[2][1], in = M->rn;
   comm_scan(out, c, gs_long, gs_add, &in, 1, wrk);

@@ -1,8 +1,8 @@
 #include "coarse.h"
 #include "metrics.h"
 
-extern int schur_setup(struct coarse *crs, struct array *eij, const ulong ng,
-                       struct comm *c, struct crystal *cr, buffer *bfr);
+extern int schur_setup(struct coarse *crs, struct array *eij,
+                       struct crystal *cr, buffer *bfr);
 extern int schur_solve(scalar *x, scalar *b, scalar tol, struct coarse *crs,
                        buffer *bfr);
 extern int schur_free(struct coarse *crs);
@@ -10,27 +10,32 @@ extern int schur_free(struct coarse *crs);
 extern void comm_split(const struct comm *old, int bin, int key,
                        struct comm *new_);
 
+struct coarse {
+  int type;
+  ulong ls, lg, is, ig;
+  uint ln, in, *idx;
+  struct comm c;
+  void *solver;
+};
+
 //------------------------------------------------------------------------------
 // Number rows, local first then interface. Returns global number of local
 // elements.
-static ulong number_rows(ulong *elem, ulong *ls_, ulong *lg_, uint *ln_,
-                         ulong *is_, ulong *ig_, uint *in_, uint **idx_,
-                         const slong *vtx, const uint nelt, const int nv,
-                         const struct comm *ci, buffer *bfr) {
+static ulong number_rows(ulong *elem, struct coarse *crs, const slong *vtx,
+                         const uint nelt, const int nv, buffer *bfr) {
   uint npts = nelt * nv;
-
   int nnz = (npts > 0);
+
   struct comm c;
-  comm_split(ci, nnz, ci->id, &c);
+  comm_split(&crs->c, nnz, crs->c.id, &c);
 
   uint i, j;
   if (nnz > 0) {
-    int *dof = tcalloc(int, npts), level = 1;
+    int level = 1, *dof = tcalloc(int, npts);
     while (c.np > 1) {
       struct gs_data *gsh = gs_setup(vtx, npts, &c, 0, gs_pairwise, 0);
 
       int bin = (c.id >= (c.np + 1) / 2);
-      assert(bin == 0 || bin == 1);
       for (i = 0; i < npts; i++)
         dof[i] = bin;
 
@@ -67,55 +72,34 @@ static ulong number_rows(ulong *elem, ulong *ls_, ulong *lg_, uint *ln_,
 
   comm_free(&c);
 
-  uint in = 0, ln = 0;
-  for (i = 0; i < nelt; i++) {
+  for (i = crs->in = crs->ln = 0; i < nelt; i++) {
     if (elem[i] > 0)
-      in++;
+      crs->in++;
     else
-      ln++;
+      crs->ln++;
   }
-  *in_ = in, *ln_ = ln;
 
-  slong inp[2] = {ln, in}, out[2][2], buf[2][2];
-  comm_scan(out, ci, gs_long, gs_add, inp, 2, buf);
-  ulong ls = *ls_ = out[0][0] + 1, is = *is_ = out[0][1] + 1;
-  ulong lg = *lg_ = out[1][0], ig = *ig_ = out[1][1];
+  slong in[2] = {crs->ln, crs->in}, out[2][2], wrk[2][2];
+  comm_scan(out, &crs->c, gs_long, gs_add, in, 2, wrk);
+  crs->ls = out[0][0] + 1, crs->lg = out[1][0];
+  crs->is = out[0][1] + 1, crs->ig = out[1][1];
 
-  uint *idx = *idx_ = tcalloc(uint, nelt);
-  for (i = ln = in = 0; i < nelt; i++)
+  crs->idx = tcalloc(uint, nelt);
+  for (uint i = 0, ln = 0, in = 0; i < nelt; i++) {
     if (elem[i] > 0)
-      elem[i] = lg + is++, idx[*ln_ + in++] = i;
+      elem[i] = crs->lg + crs->is + in, crs->idx[crs->ln + in++] = i;
     else
-      elem[i] = ls++, idx[ln++] = i;
-  assert(*ln_ == ln);      // Sanity check
-  assert(*in_ == in);      // Sanity check
-  assert(ln + in == nelt); // Sanity check
-
-  return lg;
+      elem[i] = crs->ls + ln, crs->idx[ln++] = i;
+  }
 }
 
 //------------------------------------------------------------------------------
 // Setup coarse grid system
 //
-
-struct coarse {
-  int type;
-  ulong ls, lg, is, ig;
-  uint ln, in, *idx;
-  struct comm c;
-  void *solver;
-};
-
 struct coarse *coarse_setup(const unsigned int nelt, const int nv,
                             const long long *llvtx, int type, MPI_Comm comm) {
   buffer bfr;
   buffer_init(&bfr, 1024);
-
-  struct comm c;
-  comm_init(&c, comm);
-
-  struct crystal cr;
-  crystal_init(&cr, &c);
 
   uint size = nelt * nv;
   slong *vtx = tcalloc(slong, size);
@@ -124,29 +108,35 @@ struct coarse *coarse_setup(const unsigned int nelt, const int nv,
 
   struct coarse *crs = tcalloc(struct coarse, 1);
   crs->type = type;
-  comm_dup(&crs->c, &c);
+
+  comm_init(&crs->c, comm);
 
   ulong *eid = tcalloc(ulong, nelt);
-  ulong ng = number_rows(eid, &crs->ls, &crs->lg, &crs->ln, &crs->is, &crs->ig,
-                         &crs->in, &crs->idx, vtx, nelt, nv, &c, &bfr);
+  number_rows(eid, crs, vtx, nelt, nv, &bfr);
+
+  struct crystal cr;
+  crystal_init(&cr, &crs->c);
+
   struct array nbrs, eij;
   find_nbrs(&nbrs, eid, vtx, nelt, nv, &cr, &bfr);
+  free(vtx), free(eid);
   // Convert `struct nbr` -> `struct mij` and compress
   // entries which share the same (r, c) values. Set the
   // diagonal element to have zero row sum
   compress_nbrs(&eij, &nbrs, &bfr);
-  array_free(&nbrs), free(eid);
+  array_free(&nbrs);
 
   switch (type) {
   case 0:
-    schur_setup(crs, &eij, ng, &c, &cr, &bfr);
+    schur_setup(crs, &eij, &cr, &bfr);
     break;
   default:
     break;
   }
 
-  array_free(&eij), free(vtx);
-  crystal_free(&cr), comm_free(&c), buffer_free(&bfr);
+  array_free(&eij);
+  crystal_free(&cr);
+  buffer_free(&bfr);
 
   return crs;
 }

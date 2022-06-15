@@ -286,7 +286,7 @@ static int inverse(scalar *y, uint lelt, struct rsb_element *elems, int nv,
   char *fc = getenv("PARRSB_RSB_MG_FACTOR");
   if (fc != NULL)
     factor = atoi(fc);
-  struct mg *d = mg_setup(L, factor, gsc, &cr, buf);
+  struct mg *d = mg_setup(L, factor, &cr, buf);
   crystal_free(&cr);
 
   scalar *err = tcalloc(scalar, 2 * lelt + miter * (lelt + miter + 1));

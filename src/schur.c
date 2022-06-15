@@ -218,8 +218,8 @@ static int S_owns_row(const ulong r, const ulong *rows, const uint n) {
 // by columns similar to row distribution of S.
 static int schur_setup_G(struct par_mat *G, scalar tol, const struct mat *L,
                          const struct par_mat *F, const ulong *srows,
-                         const uint srn, const struct comm *c,
-                         struct crystal *const cr, buffer *bfr) {
+                         const uint srn, struct crystal *const cr,
+                         buffer *bfr) {
   assert(IS_CSR(F));
   assert(!IS_DIAG(F));
 
@@ -263,7 +263,7 @@ static int schur_setup_G(struct par_mat *G, scalar tol, const struct mat *L,
           cols = (slong *)trealloc(slong, cols, size);
           owners = (sint *)trealloc(sint, owners, size);
         }
-        owners[k] = S_owns_row(m.c, srows, srn) < srn ? c->id : -1;
+        owners[k] = S_owns_row(m.c, srows, srn) < srn ? cr->comm.id : -1;
         cols[k++] = m.c;
         array_cat(struct mij, &unique, &m, 1);
       }
@@ -273,7 +273,7 @@ static int schur_setup_G(struct par_mat *G, scalar tol, const struct mat *L,
   // Set the destination processor for elements in unique. Since W will be in
   // CSR and share the same row distribution as S, we use gslib and row
   // distribution of S to find the destination processor.
-  struct gs_data *gsh = gs_setup(cols, k, c, 0, gs_pairwise, 1);
+  struct gs_data *gsh = gs_setup(cols, k, &cr->comm, 0, gs_pairwise, 1);
   gs(owners, gs_int, gs_max, 0, gsh, bfr);
   free(gsh);
 
@@ -297,8 +297,8 @@ static int schur_setup_G(struct par_mat *G, scalar tol, const struct mat *L,
 // W will be in CSR format and distributed by rows similar to distribution of S.
 static int schur_setup_W(struct par_mat *W, scalar tol, const struct mat *L,
                          const struct par_mat *E, const ulong *srows,
-                         const uint srn, const struct comm *c,
-                         struct crystal *const cr, buffer *bfr) {
+                         const uint srn, struct crystal *const cr,
+                         buffer *bfr) {
   assert(IS_CSC(E));
   assert(!IS_DIAG(E));
 
@@ -343,7 +343,7 @@ static int schur_setup_W(struct par_mat *W, scalar tol, const struct mat *L,
           rows = (slong *)trealloc(slong, rows, size);
           owners = (sint *)trealloc(sint, owners, size);
         }
-        owners[k] = S_owns_row(m.r, srows, srn) < srn ? c->id : -1;
+        owners[k] = S_owns_row(m.r, srows, srn) < srn ? cr->comm.id : -1;
         rows[k++] = m.r;
         array_cat(struct mij, &unique, &m, 1);
       }
@@ -353,7 +353,7 @@ static int schur_setup_W(struct par_mat *W, scalar tol, const struct mat *L,
   // Set the destination processor for elements in unique. Since W will be in
   // CSR and share the same row distribution as S, we use gslib and row
   // distribution of S to find the destination processor.
-  struct gs_data *gsh = gs_setup(rows, k, c, 0, gs_pairwise, 0);
+  struct gs_data *gsh = gs_setup(rows, k, &cr->comm, 0, gs_pairwise, 0);
   gs(owners, gs_int, gs_max, 0, gsh, bfr);
   free(gsh);
 
@@ -376,8 +376,7 @@ static int schur_setup_W(struct par_mat *W, scalar tol, const struct mat *L,
 // C = A - B; A and B should be in CSR format with the same row
 // distribution across processors
 static int sparse_sub(struct par_mat *C, const struct par_mat *A,
-                      const struct par_mat *B, const struct comm *c,
-                      struct crystal *const cr, buffer *bfr) {
+                      const struct par_mat *B, buffer *bfr) {
   assert(IS_CSR(A));
   assert(IS_CSR(B));
 
@@ -442,7 +441,7 @@ static int sparse_sub(struct par_mat *C, const struct par_mat *A,
 
 static int sparse_gemm(struct par_mat *WG, const struct par_mat *W,
                        const struct par_mat *G, struct crystal *cr,
-                       const struct comm *c, buffer *bfr) {
+                       buffer *bfr) {
   // W is in CSR, G is in CSC; we multiply rows of W by shifting
   // the columns of G from processor to processor. This is not scalable
   // at all -- need to do a 2D partition of the matrices W and G.
@@ -457,7 +456,7 @@ static int sparse_gemm(struct par_mat *WG, const struct par_mat *W,
   struct mij m;
   uint i, j, je;
   for (i = 0; i < G->cn; i++) {
-    m.c = G->cols[i], m.p = c->id;
+    m.c = G->cols[i], m.p = cr->comm.id;
     for (j = G->adj_off[i], je = G->adj_off[i + 1]; j != je; j++) {
       m.r = G->rows[G->adj_idx[j]];
       m.v = G->adj_val[j];
@@ -471,7 +470,7 @@ static int sparse_gemm(struct par_mat *WG, const struct par_mat *W,
     ptr[i].idx = i;
 
   uint idx;
-  for (uint p = 0; p < c->np; p++) {
+  for (uint p = 0; p < cr->comm.np; p++) {
     for (i = 0; i < W->rn; i++) {
       m.r = W->rows[i], idx = 0;
       for (j = W->adj_off[i], je = W->adj_off[i + 1]; j < je; j++) {
@@ -486,7 +485,7 @@ static int sparse_gemm(struct par_mat *WG, const struct par_mat *W,
       }
     }
 
-    sint next = (c->id + 1) % c->np;
+    sint next = (cr->comm.id + 1) % cr->comm.np;
     for (i = 0; i < gij.n; i++)
       ptr[i].p = next;
     sarray_transfer(struct mij, &gij, p, 0, cr);
@@ -503,22 +502,23 @@ static int sparse_gemm(struct par_mat *WG, const struct par_mat *W,
   return 0;
 }
 
-static struct mg *
-schur_precond_setup(const struct mat *L, const struct par_mat *F,
-                    const struct par_mat *S, const struct par_mat *E,
-                    const struct comm *c, struct crystal *cr, buffer *bfr) {
+static struct mg *schur_precond_setup(const struct mat *L,
+                                      const struct par_mat *F,
+                                      const struct par_mat *S,
+                                      const struct par_mat *E,
+                                      struct crystal *cr, buffer *bfr) {
   // TODO: Sparsify W and G when they are built
   struct par_mat W, G, WG;
-  schur_setup_G(&G, 0.1, L, F, S->rows, S->rn, c, cr, bfr);
-  schur_setup_W(&W, 0.1, L, E, S->rows, S->rn, c, cr, bfr);
-  sparse_gemm(&WG, &W, &G, cr, c, bfr);
+  schur_setup_G(&G, 0.1, L, F, S->rows, S->rn, cr, bfr);
+  schur_setup_W(&W, 0.1, L, E, S->rows, S->rn, cr, bfr);
+  sparse_gemm(&WG, &W, &G, cr, bfr);
 #ifdef DUMPWG
   par_mat_print(&WG);
 #endif
 
   // P is CSR
   struct par_mat *P = tcalloc(struct par_mat, 1);
-  sparse_sub(P, S, &WG, c, cr, bfr);
+  sparse_sub(P, S, &WG, bfr);
 #ifdef DUMPP
   par_mat_print(P);
 #endif
@@ -527,7 +527,7 @@ schur_precond_setup(const struct mat *L, const struct par_mat *F,
   par_mat_free(&G);
   par_mat_free(&WG);
 
-  return mg_setup(P, 2, c, cr, bfr);
+  return mg_setup(P, 2, cr, bfr);
 }
 
 static struct gs_data *setup_Ezl_Q(struct par_mat *E, ulong s, uint n,
@@ -611,8 +611,7 @@ static int Fxi(scalar *y, const struct par_mat *F, struct gs_data *gsh,
 }
 
 static int distribute_by_columns(struct array *aij, ulong s, uint n,
-                                 struct comm *c, struct crystal *cr,
-                                 buffer *bfr) {
+                                 struct crystal *cr, buffer *bfr) {
   buffer_reserve(bfr, sizeof(slong) * aij->n);
   slong *cols = (slong *)bfr->ptr;
   sint *owner = (sint *)tcalloc(sint, aij->n);
@@ -622,12 +621,12 @@ static int distribute_by_columns(struct array *aij, ulong s, uint n,
   for (i = 0; i < aij->n; i++) {
     cols[i] = ptr[i].c;
     if (ptr[i].c >= s && ptr[i].c < s + n)
-      owner[i] = c->id;
+      owner[i] = cr->comm.id;
     else
       owner[i] = -1;
   }
 
-  struct gs_data *gsh = gs_setup(cols, aij->n, c, 0, gs_pairwise, 0);
+  struct gs_data *gsh = gs_setup(cols, aij->n, &cr->comm, 0, gs_pairwise, 0);
   gs(owner, gs_int, gs_max, 0, gsh, bfr);
 
   for (i = 0; i < aij->n; i++)
@@ -817,8 +816,8 @@ struct coarse {
   void *solver;
 };
 
-int schur_setup(struct coarse *crs, struct array *eij, const ulong ng,
-                struct comm *c, struct crystal *cr, buffer *bfr) {
+int schur_setup(struct coarse *crs, struct array *eij, struct crystal *cr,
+                buffer *bfr) {
   struct schur *schur = crs->solver = (struct schur *)tcalloc(struct schur, 1);
 
   // Setup A_ll
@@ -830,12 +829,12 @@ int schur_setup(struct coarse *crs, struct array *eij, const ulong ng,
 
   struct mij *ptr = (struct mij *)eij->ptr;
   for (uint i = 0; i < eij->n; i++) {
-    if (ptr[i].r <= ng) {
-      if (ptr[i].c <= ng)
+    if (ptr[i].r <= crs->lg) {
+      if (ptr[i].c <= crs->lg)
         array_cat(struct mij, &ll, &ptr[i], 1);
       else
         array_cat(struct mij, &ls, &ptr[i], 1);
-    } else if (ptr[i].c <= ng)
+    } else if (ptr[i].c <= crs->lg)
       array_cat(struct mij, &sl, &ptr[i], 1);
     else
       array_cat(struct mij, &ss, &ptr[i], 1);
@@ -856,13 +855,14 @@ int schur_setup(struct coarse *crs, struct array *eij, const ulong ng,
 
   // Setup E
   assert(schur->A_ll.n == crs->ln);
-  distribute_by_columns(&sl, crs->ls, crs->ln, c, cr, bfr);
+  distribute_by_columns(&sl, crs->ls, crs->ln, cr, bfr);
   par_csc_setup(&schur->A_sl, &sl, 0, bfr);
 #ifdef DUMP4
   par_mat_dump("E.txt", &schur->A_sl, cr, bfr);
 #endif
   array_free(&sl);
-  schur->Q_sl = setup_Ezl_Q(&schur->A_sl, crs->lg + crs->is, crs->in, c, bfr);
+  schur->Q_sl =
+      setup_Ezl_Q(&schur->A_sl, crs->lg + crs->is, crs->in, &cr->comm, bfr);
 
   // Setup S
   par_csr_setup(&schur->A_ss, &ss, 1, bfr);
@@ -871,7 +871,7 @@ int schur_setup(struct coarse *crs, struct array *eij, const ulong ng,
   par_mat_dump("S.txt", &schur->A_ss, cr, bfr);
 #endif
   array_free(&ss);
-  schur->Q_ss = setup_Q(&schur->A_ss, c, bfr);
+  schur->Q_ss = setup_Q(&schur->A_ss, &cr->comm, bfr);
 
   // Setup F
   par_csr_setup(&schur->A_ls, &ls, 0, bfr);
@@ -879,7 +879,8 @@ int schur_setup(struct coarse *crs, struct array *eij, const ulong ng,
   par_mat_dump("F.txt", &schur->A_ls, cr, bfr);
 #endif
   array_free(&ls);
-  schur->Q_ls = setup_Fxi_Q(&schur->A_ls, crs->lg + crs->is, crs->in, c, bfr);
+  schur->Q_ls =
+      setup_Fxi_Q(&schur->A_ls, crs->lg + crs->is, crs->in, &cr->comm, bfr);
 
   char *val = getenv("PARRSB_DUMP_SCHUR");
   if (val != NULL && atoi(val) != 0) {
@@ -892,7 +893,7 @@ int schur_setup(struct coarse *crs, struct array *eij, const ulong ng,
 
   // Setup the preconditioner for the Schur complement matrix
   schur->M = schur_precond_setup(&schur->A_ll, &schur->A_ls, &schur->A_ss,
-                                 &schur->A_sl, c, cr, bfr);
+                                 &schur->A_sl, cr, bfr);
 
   return 0;
 }
