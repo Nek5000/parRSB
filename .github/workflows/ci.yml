@@ -168,3 +168,53 @@ jobs:
             --mesh ${{ matrix.test }} --tol=${tol} --type=1
 
           octave-cli iluc.m
+  coarse:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        test: [box_2x2x2, box_10x1x1, box_3x5x7, pyramid, solid, ethier, vortex, expansion]
+        np: [1, 2, 3, 4]
+      fail-fast: false
+    name: "ILU: ${{ matrix.test }}, NP = ${{ matrix.np }}"
+    env:
+      GSVER: 1.0.7
+      CC: mpicc
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install apt dependencies
+        shell: bash
+        run: |
+          sudo apt -y update
+          sudo apt install -y mpich libmpich-dev python3-pytest
+          sudo apt install -y libblas-dev liblapack-dev
+          sudo apt install -y octave
+      - name: Build parRSB and clone tests
+        shell: bash
+        run: |
+          # Build gslib
+          wget --no-check-certificate -O v${GSVER}.tar.gz http://github.com/gslib/gslib/archive/v${GSVER}.tar.gz
+          mkdir gslib
+          tar -zxvf v${GSVER}.tar.gz -C ./gslib --strip-components=1
+          make -C gslib -j4
+
+          # Build parRSB
+          export GSLIBPATH=`pwd`/gslib/build/
+          make -j1
+
+          # Clone tests
+          git clone https://github.com/thilinarmtb/parRSB-tests.git
+
+          # For MPI
+          echo "localhost:4" > hostfile
+      - name: schur
+        if: always()
+        shell: bash
+        run: |
+          cp hostfile build/examples/ilu .github/workflows/ilu0.m parRSB-tests/${{ matrix.test }}
+
+          cd parRSB-tests/${{ matrix.test }}
+
+          tol=(`cat test.txt | grep tol`); tol=${tol[2]}
+
+          mpirun -np ${{ matrix.np }} --hostfile hostfile ./coarse \
+            --mesh ${{ matrix.test }} --tol=${tol}

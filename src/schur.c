@@ -688,8 +688,8 @@ static int schur_action(scalar *y, const struct schur *schur, scalar *x,
 }
 
 static int project(scalar *x, scalar *b, const struct schur *schur, ulong ls,
-                   struct comm *c, int miter, int null_space, int verbose,
-                   buffer *bfr) {
+                   struct comm *c, int miter, scalar tol, int null_space,
+                   int verbose, buffer *bfr) {
   const struct par_mat *S = &schur->A_ss;
   struct mg *d = schur->M;
 
@@ -715,7 +715,7 @@ static int project(scalar *x, scalar *b, const struct schur *schur, ulong ls,
 
   scalar rr = dot(r, r, n);
   comm_allreduce(c, gs_double, gs_add, &rr, 1, buf);
-  scalar tol = 1e-3, rtol = rr * tol * tol;
+  scalar rtol = rr * tol * tol;
 
   for (i = 0; i < n; i++)
     z[i] = r[i];
@@ -897,7 +897,8 @@ int schur_setup(struct coarse *crs, struct array *eij, const ulong ng,
   return 0;
 }
 
-int schur_solve(scalar *x, scalar *b, struct coarse *crs, buffer *bfr) {
+int schur_solve(scalar *x, scalar *b, scalar tol, struct coarse *crs,
+                buffer *bfr) {
   struct comm *c = &crs->c;
   struct schur *schur = crs->solver;
 
@@ -922,7 +923,7 @@ int schur_solve(scalar *x, scalar *b, struct coarse *crs, buffer *bfr) {
   metric_toc(c, SCHUR_SOLVE_SETRHS1);
 
   metric_tic(c, SCHUR_SOLVE_PROJECT);
-  int iter = project(xi, rhs, schur, crs->ls, c, 100, 1, 1, bfr);
+  int iter = project(xi, rhs, schur, crs->ls, c, 100, tol, 1, 0, bfr);
   metric_toc(c, SCHUR_SOLVE_PROJECT);
   metric_acc(SCHUR_PROJECT_NITER, iter);
 

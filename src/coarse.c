@@ -3,7 +3,8 @@
 
 extern int schur_setup(struct coarse *crs, struct array *eij, const ulong ng,
                        struct comm *c, struct crystal *cr, buffer *bfr);
-extern int schur_solve(scalar *x, scalar *b, struct coarse *crs, buffer *bfr);
+extern int schur_solve(scalar *x, scalar *b, scalar tol, struct coarse *crs,
+                       buffer *bfr);
 extern int schur_free(struct coarse *crs);
 
 extern void comm_split(const struct comm *old, int bin, int key,
@@ -150,12 +151,13 @@ struct coarse *coarse_setup(const unsigned int nelt, const int nv,
   return crs;
 }
 
-int coarse_solve(scalar *x, scalar *b, struct coarse *crs, buffer *bfr) {
+int coarse_solve(scalar *x, scalar *b, scalar tol, struct coarse *crs,
+                 buffer *bfr) {
   metric_init();
 
   switch (crs->type) {
   case 0:
-    schur_solve(x, b, crs, bfr);
+    schur_solve(x, b, tol, crs, bfr);
     break;
   default:
     break;

@@ -111,7 +111,7 @@ int main(int argc, char *argv[]) {
   buffer_init(&bfr, 1024);
   MPI_Barrier(comm);
   t = MPI_Wtime();
-  coarse_solve(x, b, crs, &bfr);
+  coarse_solve(x, b, 1e-13, crs, &bfr);
   double tsolve = MPI_Wtime() - t;
 
   double err_norm = check_err(b, x, nelt, nv, vl, comm, &bfr);
