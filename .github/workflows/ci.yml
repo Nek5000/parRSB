@@ -165,7 +165,7 @@ jobs:
           tol=(`cat test.txt | grep tol`); tol=${tol[2]}
 
           mpirun -np ${{ matrix.np }} --hostfile hostfile ./ilu \
-            --mesh ${{ matrix.test }} --tol=${tol} --type=1
+            --mesh ${{ matrix.test }} --tol=${tol} --ilu_type=1
 
           octave-cli iluc.m
   coarse:

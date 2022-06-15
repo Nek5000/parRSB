@@ -76,13 +76,14 @@ int parrsb_dump_part(char *name, unsigned int nelt, int nv, double *coord,
 // Auxiliary functions
 //
 struct parrsb_input {
-  char *mesh;  // Mesh name, required.
-  double tol;  // gencon tolerance, default: 0.2
-  int test;    // run tests, default: 0
-  int dump;    // dump the connectivity or map file, default: 1
-  int nactive; // # of active MPI ranks, default: MPI_Comm_size
-  int type;    // ILU type, default: 0
-  int verbose; // Verbosity, default: 0
+  char *mesh;     // Mesh name, required.
+  double tol;     // gencon tolerance, default: 0.2
+  int test;       // run tests, default: 0
+  int dump;       // dump the connectivity or map file, default: 1
+  int nactive;    // # of active MPI ranks, default: MPI_Comm_size
+  int verbose;    // Verbosity, default: 0
+  int ilu_type;   // ILU type, default: 0
+  double ilu_tol; // ILU tolerance, default: 0.1
 };
 
 int parrsb_dist_mesh(unsigned int *nelt, long long **vl, double **coord,

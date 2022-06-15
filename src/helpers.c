@@ -226,47 +226,56 @@ void parrsb_print_part_stat(long long *vtx, int nelt, int nv, MPI_Comm ce) {
 
 struct parrsb_input *parrsb_parse_input(int argc, char *argv[], MPI_Comm comm) {
   struct parrsb_input *in = tcalloc(struct parrsb_input, 1);
-  in->mesh = NULL, in->tol = 0.2, in->test = 0, in->dump = 1;
-  in->verbose = 0, in->type = 0;
+
+  // General parRSB options
+  in->mesh = NULL, in->tol = 0.2, in->test = 0, in->dump = 1, in->verbose = 0;
   MPI_Comm_size(comm, &in->nactive);
 
-  static struct option long_options[] = {{"mesh", required_argument, 0, 'm'},
-                                         {"tol", optional_argument, 0, 't'},
-                                         {"test", no_argument, 0, 'c'},
-                                         {"no-dump", no_argument, 0, 'd'},
-                                         {"nactive", optional_argument, 0, 'n'},
-                                         {"verbose", optional_argument, 0, 'v'},
-                                         {"type", optional_argument, 0, 'y'},
+  // ILU
+  in->ilu_type = 0, in->ilu_tol = 0.1;
+
+  // Coarse solve
+
+  static struct option long_options[] = {{"mesh", required_argument, 0, 0},
+                                         {"tol", optional_argument, 0, 1},
+                                         {"test", no_argument, 0, 2},
+                                         {"no-dump", no_argument, 0, 3},
+                                         {"nactive", optional_argument, 0, 4},
+                                         {"verbose", optional_argument, 0, 5},
+                                         {"ilu_type", optional_argument, 0, 10},
+                                         {"ilu_tol", optional_argument, 0, 11},
                                          {0, 0, 0, 0}};
 
   for (;;) {
-    int opt_idx = 0, c = getopt_long(argc, argv, "", long_options, &opt_idx);
+    int opt_idx = 0;
+    int c = getopt_long(argc, argv, "", long_options, &opt_idx);
     if (c == -1)
       break;
 
     switch (c) {
-    case 'm':
+    case 0:
       in->mesh = optarg;
       break;
-    case 't':
+    case 1:
       in->tol = atof(optarg);
       break;
-    case 'c':
+    case 2:
       in->test = 1;
       break;
-    case 'd':
+    case 3:
       in->dump = 0;
       break;
-    case 'n':
+    case 4:
       in->nactive = atoi(optarg);
       break;
-    case 'v':
+    case 5:
       in->verbose = atoi(optarg);
       break;
-    case 'y':
-      in->type = atoi(optarg);
+    case 10:
+      in->ilu_type = atoi(optarg);
       break;
-    case '?':
+    case 11:
+      in->ilu_tol = atof(optarg);
       break;
     default:
       exit(1);

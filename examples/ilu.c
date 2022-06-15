@@ -21,9 +21,9 @@ int main(int argc, char *argv[]) {
   parrsb_setup_mesh(&nelt, &nv, &vl, &coord, in, comm);
 
   // Setup ILU
-  ilu_options iluopt = {.type = in->type,
+  ilu_options iluopt = {.type = in->ilu_type,
                         .verbose = in->verbose,
-                        .tol = in->tol,
+                        .tol = in->ilu_tol,
                         .pivot = 0,
                         .nnz_per_row = 0};
   struct ilu *ilu = ilu_setup(nelt, nv, vl, &iluopt, comm);
