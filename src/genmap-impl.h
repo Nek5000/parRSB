@@ -1,14 +1,13 @@
 #ifndef _GENMAP_IMPL_H_
 #define _GENMAP_IMPL_H_
 
+#include "genmap-types.h"
+#include "parRSB.h"
 #include <assert.h>
 #include <math.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
-
-#include <genmap-types.h>
-#include <parRSB.h>
 
 #define GENMAP_ALIGN 32
 #define GENMAP_TOL 1e-12
