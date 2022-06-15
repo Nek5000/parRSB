@@ -1,12 +1,23 @@
+#include "genmap-impl.h"
+#include "parRSB.h"
 #include <math.h>
 #include <stdio.h>
 
-#include "con.h"
-#include "genmap-impl.h"
-#include "parRSB.h"
+#define READ_T(coords, buf, T, nv)                                             \
+  { memcpy((coords), buf, sizeof(T) * nv); }
+
+#define WRITE_T(dest, val, T, nunits)                                          \
+  {                                                                            \
+    memcpy(dest, val, sizeof(T) * nunits);                                     \
+    dest += sizeof(T) * nunits;                                                \
+  }
+
+#define WRITE_INT(dest, val)                                                   \
+  { memcpy(dest, &(val), sizeof(int)); }
 
 #define GC_RE2_HEADER_LEN 80
 #define GC_CO2_HEADER_LEN 132
+#define HEADER_LEN 132
 
 static int re2_header(uint *nelt_, int *nv_, ulong *nelgt_, ulong *nelgv_,
                       MPI_File file, struct comm *c) {
@@ -83,7 +94,7 @@ static int re2_coord(double **coord_, unsigned int nelt, int nv, MPI_File file,
   double *coord = *coord_ = tcalloc(double, coord_size);
 
   // Read elements for each rank
-  double x[GC_MAX_VERTICES], y[GC_MAX_VERTICES], z[GC_MAX_VERTICES];
+  double x[8], y[8], z[8];
   uint i;
   int k;
   if (ndim == 3) {
@@ -170,20 +181,24 @@ static int re2_boundary(unsigned int *nbcs_, long long **bcs_,
   MPI_Offset offset = bndry_off + sizeof(long) + start * nv * sizeof(long);
   MPI_File_read_at_all(file, offset, buf, read_size, MPI_BYTE, &st);
 
-  struct array barray;
-  array_init(struct Boundary_private, &barray, 10);
+  struct face_t {
+    long eid, fid, e1, e2;
+  };
+
+  struct array bfaces;
+  array_init(struct face_t, &bfaces, 10);
 
   double tmp[5];
   char cbc[4], *buf0 = buf;
-  struct Boundary_private boundary;
+  struct face_t bface;
   for (sint i = 0; i < nbcsl; i++) {
     READ_T(tmp, buf0, long, 1);
     buf0 += sizeof(long);
-    boundary.elementId = (long)tmp[0];
+    bface.eid = (long)tmp[0];
 
     READ_T(tmp, buf0, long, 1);
     buf0 += sizeof(long);
-    boundary.faceId = (long)tmp[0];
+    bface.fid = (long)tmp[0];
 
     READ_T(tmp, buf0, long, 5);
     buf0 += 5 * sizeof(long);
@@ -191,25 +206,25 @@ static int re2_boundary(unsigned int *nbcs_, long long **bcs_,
     buf0 += sizeof(long);
     cbc[3] = '\0';
 
-    if (strcmp(cbc, GC_PERIODIC) == 0) {
-      boundary.bc[0] = (long)tmp[0];
-      boundary.bc[1] = (long)tmp[1];
-      array_cat(struct Boundary_private, &barray, &boundary, 1);
+    if (strcmp(cbc, "P  ") == 0) {
+      bface.e1 = (long)tmp[0];
+      bface.e2 = (long)tmp[1];
+      array_cat(struct face_t, &bfaces, &bface, 1);
     }
   }
 
-  nbcs = *nbcs_ = barray.n;
-  struct Boundary_private *ptr = barray.ptr;
+  nbcs = *nbcs_ = bfaces.n;
   long long *bcs = *bcs_ = tcalloc(long long, 4 * nbcs);
 
+  struct face_t *ptr = bfaces.ptr;
   for (sint i = 0; i < nbcs; i++) {
-    bcs[4 * i + 0] = ptr[i].elementId;
-    bcs[4 * i + 1] = ptr[i].faceId;
-    bcs[4 * i + 2] = ptr[i].bc[0];
-    bcs[4 * i + 3] = ptr[i].bc[1];
+    bcs[4 * i + 0] = ptr[i].eid;
+    bcs[4 * i + 1] = ptr[i].fid;
+    bcs[4 * i + 2] = ptr[i].e1;
+    bcs[4 * i + 3] = ptr[i].e2;
   }
 
-  array_free(&barray);
+  array_free(&bfaces);
   free(buf);
 
   return 0;
@@ -352,9 +367,6 @@ int parrsb_read_mesh(unsigned int *nel, int *nv, long long **vl, double **coord,
   return 0;
 }
 
-#define WRITE_INT(dest, val)                                                   \
-  { memcpy(dest, &(val), sizeof(int)); }
-
 int parrsb_dump_con(char *name, unsigned int nelt, int nv, long long *vl,
                     MPI_Comm comm) {
   const char version[6] = "#v001";
@@ -427,10 +439,6 @@ int parrsb_dump_con(char *name, unsigned int nelt, int nv, long long *vl,
 
   return err;
 }
-
-#undef WRITE_INT
-
-#define HEADER_LEN 132
 
 int parrsb_dump_map(char *name, unsigned int nelt, int nv, long long *vtx,
                     int *pmap, MPI_Comm comm) {
@@ -513,16 +521,6 @@ int parrsb_dump_map(char *name, unsigned int nelt, int nv, long long *vtx,
   return errs;
 }
 
-#undef HEADER_LEN
-#undef GC_RE2_HEADER_LEN
-#undef GC_CO2_HEADER_LEN
-
-#define WRITE_T(dest, val, T, nunits)                                          \
-  {                                                                            \
-    memcpy(dest, val, sizeof(T) * nunits);                                     \
-    dest += sizeof(T) * nunits;                                                \
-  }
-
 int parrsb_dump_part(char *name, unsigned int nel, int nv, double *coord,
                      int gid, MPI_Comm comm) {
   struct comm c;
@@ -579,4 +577,10 @@ int parrsb_dump_part(char *name, unsigned int nel, int nv, double *coord,
   return err;
 }
 
+#undef HEADER_LEN
+#undef GC_CO2_HEADER_LEN
+#undef GC_RE2_HEADER_LEN
+
+#undef WRITE_INT
 #undef WRITE_T
+#undef READ_T

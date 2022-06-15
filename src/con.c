@@ -1,22 +1,64 @@
+#include "con.h"
+#include "genmap-impl.h"
+#include "sort.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 
-#include "con.h"
-#include "sort.h"
+#define min(a, b) ((a) < (b) ? (a) : (b))
+#define max(a, b) ((a) > (b) ? (a) : (b))
+
+// Upper bounds for elements and face quantities
+#define GC_MAX_FACES 6
+#define GC_MAX_VERTICES 8
+#define GC_MAX_NEIGHBORS 3
+#define GC_MAX_FACE_VERTICES 4
+
+struct Point_private {
+  GenmapScalar dx, x[3];
+  uint proc, origin;
+  int ifSegment;
+  ulong sequenceId, elementId, globalId;
+};
+typedef struct Point_private *Point;
+
+struct Boundary_private {
+  ulong elementId, faceId;
+  struct Point_private face[4];
+  uint proc;
+  long bc[2];
+};
+typedef struct Boundary_private *BoundaryFace;
+
+struct Mesh_private {
+  ulong nelgt, nelgv;
+  uint nelt;
+  int nDim, nVertex, nNeighbors;
+  struct array elements;
+  struct array boundary;
+};
+typedef struct Mesh_private *Mesh;
+
+typedef struct {
+  GenmapULong sequenceId;
+  int nNeighbors;
+  GenmapULong elementId;
+  GenmapULong vertexId;
+  uint workProc;
+} vertex;
 
 //==============================================================================
 // Mesh struct
 //
-int mesh_init(Mesh *m_, int nel, int nDim) {
+int mesh_init(Mesh *m_, int nel, int ndim) {
   GenmapMalloc(1, m_);
   Mesh m = *m_;
 
   m->nelt = nel;
-  m->nDim = nDim;
-  m->nNeighbors = nDim;
-  m->nVertex = (nDim == 2) ? 4 : 8;
+  m->nDim = ndim;
+  m->nNeighbors = ndim;
+  m->nVertex = (ndim == 2) ? 4 : 8;
 
   array_init(struct Point_private, &m->elements, 10);
   m->elements.n = 0;
@@ -758,15 +800,15 @@ static int findConnectedPeriodicPairs(Mesh mesh, BoundaryFace f_,
     GenmapScalar meanF = 0.0, meanG = 0.0;
 
     for (j = 0; j < nvf; j++) {
-      fMax = max(fMax, fabs(f.face.vertex[j].x[i]));
-      gMax = max(gMax, fabs(g.face.vertex[j].x[i]));
-      meanF += f.face.vertex[j].x[i];
-      meanG += g.face.vertex[j].x[i];
+      fMax = max(fMax, fabs(f.face[j].x[i]));
+      gMax = max(gMax, fabs(g.face[j].x[i]));
+      meanF += f.face[j].x[i];
+      meanG += g.face[j].x[i];
     }
 
     for (j = 0; j < nvf; j++) {
-      f.face.vertex[j].x[i] -= (meanF / nvf);
-      g.face.vertex[j].x[i] -= (meanG / nvf);
+      f.face[j].x[i] -= (meanF / nvf);
+      g.face[j].x[i] -= (meanG / nvf);
     }
   }
 
@@ -778,9 +820,9 @@ static int findConnectedPeriodicPairs(Mesh mesh, BoundaryFace f_,
       k = (j + i) % nvf;
       k = nvf - 1 - k;
       if (nDim == 3)
-        d2 += distance3D(f.face.vertex[j], g.face.vertex[k]);
+        d2 += distance3D(f.face[j], g.face[k]);
       else if (nDim == 2)
-        d2 += distance2D(f.face.vertex[j], g.face.vertex[k]);
+        d2 += distance2D(f.face[j], g.face[k]);
     }
     if (d2 < d2Min) {
       d2Min = d2;
@@ -803,8 +845,8 @@ static int findConnectedPeriodicPairs(Mesh mesh, BoundaryFace f_,
   for (i = 0; i < nvf; i++) {
     k = (i + shift) % nvf;
     k = nvf - 1 - k;
-    m.min = min(f.face.vertex[i].globalId, g.face.vertex[k].globalId);
-    m.orig = max(f.face.vertex[i].globalId, g.face.vertex[k].globalId);
+    m.min = min(f.face[i].globalId, g.face[k].globalId);
+    m.orig = max(f.face[i].globalId, g.face[k].globalId);
     array_cat(struct minPair_private, matched, &m, 1);
   }
 }
@@ -880,7 +922,7 @@ static int setPeriodicFaceCoordinates(Mesh mesh, struct comm *c, buffer *buf) {
     if (k < eSize && ePtr[k].elementId == bPtr[i].elementId) {
       int faceId = bPtr[i].faceId;
       for (j = 0; j < nvf; j++)
-        bPtr[i].face.vertex[j] = ePtr[k + faces[faceId][j] - 1];
+        bPtr[i].face[j] = ePtr[k + faces[faceId][j] - 1];
     }
     i++;
   }
@@ -1366,3 +1408,11 @@ void fparrsb_conn_mesh(long long *vtx, double *coord, int *nelt, int *ndim,
   *err = parrsb_conn_mesh(vtx, coord, *nelt, *ndim, periodicInfo,
                           *nPeriodicFaces, *tol, c, *verbose);
 }
+
+#undef GC_MAX_FACES
+#undef GC_MAX_VERTICES
+#undef GC_MAX_NEIGHBORS
+#undef GC_MAX_FACE_VERTICES
+
+#undef min
+#undef max

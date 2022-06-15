@@ -1,82 +1,15 @@
 #ifndef _GENMAP_GENCON_H_
 #define _GENMAP_GENCON_H_
 
-#include "genmap-impl.h"
+#include "gslib.h"
 
-// Upper bound for number of dimensions
-#define GC_MAX_DIM 3
+int parrsb_conn_mesh(long long *vtx, double *coord, int nelt, int ndim,
+                     long long *periodicInfo, int nPeriodicFaces, double tol,
+                     MPI_Comm comm, int verbose);
 
-// Boundary condition types
-#define GC_PERIODIC "P  "
-
-// Upper bounds for elements
-#define GC_MAX_FACES 6
-#define GC_MAX_VERTICES 8
-#define GC_MAX_NEIGHBORS 3
-
-// Upper bounds for faces
-#define GC_MAX_FACE_VERTICES 4
-
-typedef struct Point_private *Point;
-typedef struct Element_private *Element;
-typedef struct Boundary_private *BoundaryFace;
-typedef struct Mesh_private *Mesh;
-
-#define min(a, b) ((a) < (b) ? (a) : (b))
-#define max(a, b) ((a) > (b) ? (a) : (b))
-
-#define READ_T(coords, buf, T, nVertex)                                        \
-  memcpy((coords), buf, sizeof(T) * nVertex)
-
-// TODO: Use rsb_element here
-struct Point_private {
-  GenmapScalar dx;
-  GenmapScalar x[GC_MAX_DIM];
-  uint proc;
-  uint origin;
-  int ifSegment;
-  ulong sequenceId;
-  ulong elementId;
-  ulong globalId;
-};
-
-extern int faces3D[GC_MAX_FACES][GC_MAX_FACE_VERTICES];
-extern int faces2D[GC_MAX_FACES][GC_MAX_FACE_VERTICES];
-
-struct Face_private {
-  struct Point_private vertex[GC_MAX_FACE_VERTICES];
-};
-
-struct Element_private {
-  struct Point_private vertex[GC_MAX_VERTICES];
-};
-
-struct Boundary_private {
-  ulong elementId;
-  ulong faceId;
-  struct Face_private face;
-  uint proc;
-  long bc[2];
-};
-
-struct Mesh_private {
-  ulong nelgt;
-  ulong nelgv;
-  uint nelt;
-  int nDim;
-  int nVertex;
-  int nNeighbors;
-  struct array elements;
-  struct array boundary;
-};
-
-typedef struct {
-  GenmapULong sequenceId;
-  int nNeighbors;
-  GenmapULong elementId;
-  GenmapULong vertexId;
-  uint workProc;
-} vertex;
+void fparrsb_conn_mesh(long long *vtx, double *coord, int *nelt, int *ndim,
+                       long long *periodicInfo, int *nPeriodicFaces,
+                       double *tol, MPI_Fint *fcomm, int *verbose, int *err);
 
 /*
  Preprocessor Corner notation:      Symmetric Corner notation:
