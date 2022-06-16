@@ -1,5 +1,6 @@
 #include "coarse.h"
 #include "metrics.h"
+#include <float.h>
 
 extern int schur_setup(struct coarse *crs, struct array *eij,
                        struct crystal *cr, buffer *bfr);
@@ -21,8 +22,101 @@ struct coarse {
 //------------------------------------------------------------------------------
 // Number rows, local first then interface. Returns global number of local
 // elements.
-static ulong number_rows(ulong *elem, struct coarse *crs, const slong *vtx,
-                         const uint nelt, const int nv, buffer *bfr) {
+struct rcb_t {
+  uint i, s;
+  double coord[3];
+  slong vtx[8];
+};
+
+static void number_local(struct array *a, uint s, uint e, int ndim, int level,
+                         struct comm *c, buffer *bfr) {
+  sint size = e - s;
+  if (size <= 1)
+    return;
+
+  double max[3] = {-DBL_MAX, -DBL_MAX, -DBL_MAX},
+         min[3] = {DBL_MAX, DBL_MAX, DBL_MAX};
+
+  struct rcb_t *pa = (struct rcb_t *)a->ptr;
+  for (uint i = s; i < e; i++) {
+    for (int j = 0; j < ndim; j++) {
+      if (pa[i].coord[j] < min[j])
+        min[j] = pa[i].coord[j];
+      if (pa[i].coord[j] > max[j])
+        max[j] = pa[i].coord[j];
+    }
+  }
+
+  double len = max[0] - min[0];
+  int axis = 0;
+  for (int j = 1; j < ndim; j++) {
+    if (max[j] - min[j] > len)
+      axis = j, len = max[j] - min[j];
+  }
+
+  struct rcb_t *ps = pa + s;
+  switch (axis) {
+  case 0:
+    sarray_sort(struct rcb_t, ps, size, coord[0], 3, bfr);
+    break;
+  case 1:
+    sarray_sort(struct rcb_t, ps, size, coord[1], 3, bfr);
+    break;
+  case 2:
+    sarray_sort(struct rcb_t, ps, size, coord[2], 3, bfr);
+    break;
+  default:
+    break;
+  }
+
+  // Number the elements in the interface
+  int nv = (ndim == 3) ? 8 : 4;
+  uint npts = size * nv;
+
+  slong *vtx = tcalloc(slong, npts);
+  for (uint i = s, k = 0; i < e; i++) {
+    for (int j = 0; j < nv; j++, k++)
+      vtx[k] = pa[i].vtx[j];
+  }
+
+  struct gs_data *gsh = gs_setup(vtx, npts, c, 0, gs_pairwise, 0);
+
+  sint *dof = tcalloc(sint, npts);
+  uint mid = (s + e) / 2;
+  for (uint i = mid, k = (mid - s) * nv; i < e; i++) {
+    for (int j = 0; j < nv; j++, k++)
+      dof[k] = 1;
+  }
+
+  gs(dof, gs_int, gs_add, 0, gsh, bfr);
+
+  for (uint i = mid, k = (mid - s) * nv; i < e; i++) {
+    for (int j = 0; j < nv; j++, k++)
+      dof[k] = 0;
+  }
+
+  gs(dof, gs_int, gs_add, 0, gsh, bfr);
+
+  for (uint i = s; i < e; i++) {
+    uint k = i - s;
+    for (int j = 0; j < nv; j++) {
+      if (dof[k * nv + j] > 0 && pa[i].s == INT_MAX) {
+        pa[i].s = level;
+        break;
+      }
+    }
+  }
+
+  gs_free(gsh);
+  free(dof), free(vtx);
+
+  number_local(a, s, mid, ndim, level + 1, c, bfr);
+  number_local(a, mid, e, ndim, level + 1, c, bfr);
+}
+
+static void number_rows(ulong *elem, struct coarse *crs, const slong *vtx,
+                        const double *coord, const uint nelt, const int nv,
+                        buffer *bfr) {
   uint npts = nelt * nv;
   int nnz = (npts > 0);
 
@@ -70,8 +164,6 @@ static ulong number_rows(ulong *elem, struct coarse *crs, const slong *vtx,
     free(dof);
   }
 
-  comm_free(&c);
-
   for (i = crs->in = crs->ln = 0; i < nelt; i++) {
     if (elem[i] > 0)
       crs->in++;
@@ -84,20 +176,44 @@ static ulong number_rows(ulong *elem, struct coarse *crs, const slong *vtx,
   crs->ls = out[0][0] + 1, crs->lg = out[1][0];
   crs->is = out[0][1] + 1, crs->ig = out[1][1];
 
+  struct array local;
+  array_init(struct rcb_t, &local, crs->ln);
+
+  int ndim = (nv == 8) ? 3 : 2;
+
+  struct rcb_t t = {.s = INT_MAX};
   crs->idx = tcalloc(uint, nelt);
   for (uint i = 0, ln = 0, in = 0; i < nelt; i++) {
     if (elem[i] > 0)
       elem[i] = crs->lg + crs->is + in, crs->idx[crs->ln + in++] = i;
-    else
-      elem[i] = crs->ls + ln, crs->idx[ln++] = i;
+    else {
+      t.i = i;
+      memcpy(t.coord, &coord[i * ndim], ndim * sizeof(double));
+      memcpy(t.vtx, &vtx[i * nv], nv * sizeof(slong));
+      array_cat(struct rcb_t, &local, &t, 1);
+      // elem[i] = crs->ls + ln, crs->idx[ln++] = i;
+    }
   }
+
+  if (local.n > 0) {
+    number_local(&local, 0, local.n, ndim, 1, &c, bfr);
+
+    sarray_sort(struct rcb_t, local.ptr, local.n, s, 0, bfr);
+    struct rcb_t *pl = (struct rcb_t *)local.ptr;
+    for (sint i = local.n - 1, ln = 0; i >= 0; i--)
+      elem[pl[i].i] = crs->ls + ln, crs->idx[ln++] = pl[i].i;
+  }
+
+  comm_free(&c);
+  array_free(&local);
 }
 
 //------------------------------------------------------------------------------
 // Setup coarse grid system
 //
 struct coarse *coarse_setup(const unsigned int nelt, const int nv,
-                            const long long *llvtx, int type, MPI_Comm comm) {
+                            const long long *llvtx, const double *coord,
+                            int type, MPI_Comm comm) {
   buffer bfr;
   buffer_init(&bfr, 1024);
 
@@ -112,7 +228,7 @@ struct coarse *coarse_setup(const unsigned int nelt, const int nv,
   comm_init(&crs->c, comm);
 
   ulong *eid = tcalloc(ulong, nelt);
-  number_rows(eid, crs, vtx, nelt, nv, &bfr);
+  number_rows(eid, crs, vtx, coord, nelt, nv, &bfr);
 
   struct crystal cr;
   crystal_init(&cr, &crs->c);

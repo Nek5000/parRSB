@@ -81,11 +81,10 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
         struct comm *gc, buffer *bfr) {
   int max_iter = 50;
   int max_pass = 50;
+  int ndim = (nv == 8) ? 3 : 2;
 
   struct comm lc;
   comm_dup(&lc, gc);
-
-  int ndim = (nv == 8) ? 3 : 2;
 
   while (lc.np > 1) {
     // Run RCB, RIB pre-step or just sort by global id
@@ -128,9 +127,8 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
 
     metric_push_level();
   }
-
-  rcb_local(elements, sizeof(struct rsb_element), 0, elements->n, 3, bfr);
   comm_free(&lc);
+
   check_rsb_partition(gc, max_pass, max_iter);
 
   return 0;

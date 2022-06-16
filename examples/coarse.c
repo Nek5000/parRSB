@@ -100,7 +100,7 @@ int main(int argc, char *argv[]) {
 
   MPI_Barrier(comm);
   double t = MPI_Wtime();
-  struct coarse *crs = coarse_setup(nelt, nv, vl, in->crs_type, comm);
+  struct coarse *crs = coarse_setup(nelt, nv, vl, coord, in->crs_type, comm);
   double tsetup = MPI_Wtime() - t;
 
   double *b = tcalloc(double, nelt);
