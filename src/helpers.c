@@ -232,22 +232,24 @@ struct parrsb_input *parrsb_parse_input(int argc, char *argv[], MPI_Comm comm) {
   MPI_Comm_size(comm, &in->nactive);
 
   // ILU
-  in->ilu_type = 0, in->ilu_tol = 1e-1;
+  in->ilu_type = 0, in->ilu_tol = 1e-1, in->ilu_pivot = 0;
 
   // Coarse solve
   in->crs_type = 0, in->crs_tol = 1e-3;
 
-  static struct option long_options[] = {{"mesh", required_argument, 0, 0},
-                                         {"tol", optional_argument, 0, 1},
-                                         {"test", no_argument, 0, 2},
-                                         {"no-dump", no_argument, 0, 3},
-                                         {"nactive", optional_argument, 0, 4},
-                                         {"verbose", optional_argument, 0, 5},
-                                         {"ilu_type", optional_argument, 0, 10},
-                                         {"ilu_tol", optional_argument, 0, 11},
-                                         {"crs_type", optional_argument, 0, 20},
-                                         {"crs_tol", optional_argument, 0, 21},
-                                         {0, 0, 0, 0}};
+  static struct option long_options[] = {
+      {"mesh", required_argument, 0, 0},
+      {"tol", optional_argument, 0, 1},
+      {"test", no_argument, 0, 2},
+      {"no-dump", no_argument, 0, 3},
+      {"nactive", optional_argument, 0, 4},
+      {"verbose", optional_argument, 0, 5},
+      {"ilu_type", optional_argument, 0, 10},
+      {"ilu_tol", optional_argument, 0, 11},
+      {"ilu_pivot", optional_argument, 0, 12},
+      {"crs_type", optional_argument, 0, 20},
+      {"crs_tol", optional_argument, 0, 21},
+      {0, 0, 0, 0}};
 
   for (;;) {
     int opt_idx = 0;
@@ -279,6 +281,9 @@ struct parrsb_input *parrsb_parse_input(int argc, char *argv[], MPI_Comm comm) {
       break;
     case 11:
       in->ilu_tol = atof(optarg);
+      break;
+    case 12:
+      in->ilu_pivot = atof(optarg);
       break;
     case 20:
       in->crs_type = atoi(optarg);

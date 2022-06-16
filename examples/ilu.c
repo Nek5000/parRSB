@@ -22,9 +22,9 @@ int main(int argc, char *argv[]) {
 
   // Setup ILU
   ilu_options iluopt = {.type = in->ilu_type,
-                        .verbose = in->verbose,
                         .tol = in->ilu_tol,
-                        .pivot = 0,
+                        .pivot = in->ilu_pivot,
+                        .verbose = in->verbose,
                         .nnz_per_row = 0};
   struct ilu *ilu = ilu_setup(nelt, nv, vl, &iluopt, comm);
   ilu_free(ilu);

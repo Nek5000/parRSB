@@ -968,12 +968,12 @@ static void iluc_level(struct array *lij, struct array *uij, int lvl,
   uint e = s + size;
 
   uint i, j, je, k;
-  ulong K;
   for (k = s; k < e; k++) {
-    K = (k < lvl_off[lvl]) ? U->rows[k] : 0;
+    ulong K = (k < lvl_off[lvl]) ? U->rows[k] : 0;
 
     // Fetch required data (combine with the other call below)
     iluc_get_data(data, K, CSC, lij, uij, cr, &rqst, &fwds, work, bfr);
+
     // Init z[1:K] = 0, z[K:n] = a_{K, K:n}, i.e., z = u_{K,:}
     rij.n = 0;
     if (K) {
@@ -1203,9 +1203,8 @@ static void ilucp_level(struct array *lij, struct array *uij, int lvl,
   uint e = s + size;
 
   uint i, j, je, k, l;
-  ulong K;
   for (k = s; k < e; k++) {
-    K = (k < lvl_off[lvl]) ? U->rows[k] : 0;
+    ulong K = (k < lvl_off[lvl]) ? U->rows[k] : 0;
 
     // Fetch required data. We will skip the data in the  columns which were
     // choosen as pivots.
@@ -1222,7 +1221,7 @@ static void ilucp_level(struct array *lij, struct array *uij, int lvl,
         m.c = U->cols[U->adj_idx[j]], m.v = U->adj_val[j];
         while (l < pvts->n && pp[l].k < m.c)
           l++;
-        assert(l < pp[l].k == m.c);
+        assert(pp[l].k == m.c);
         if (!pp[l].pivot)
           array_cat(struct mij, &rij, &m, 1);
       }
@@ -1307,9 +1306,9 @@ static void iluc(struct ilu *ilu, buffer *bfr) {
   if (ilu->pivot) {
     ilu->perm = tcalloc(ulong, A->rn);
     // Initialize with the columns of U, i.e, columns of L
-    struct pivot_t t = {.k = 0, .pivot = 0};
-    for (uint i = 0; i < L->cn; i++) {
-      t.k = L->cols[i], t.p = t.k % c->np;
+    struct pivot_t t = {.k = 0, .p = 0, .pivot = 0};
+    for (uint i = 0; i < U->cn; i++) {
+      t.k = U->cols[i], t.p = t.k % c->np;
       array_cat(struct pivot_t, &pvts, &t, 1);
     }
 
@@ -1328,10 +1327,15 @@ static void iluc(struct ilu *ilu, buffer *bfr) {
   if (val != NULL && atoi(val) != 0) {
     par_mat_dump("LL.txt", L, cr, bfr);
     par_mat_dump("UU.txt", U, cr, bfr);
+    for (uint i = 0; i < A->rn; i++) {
+      printf("perm[%u] = %llu\n", i, ilu->perm[i]);
+      fflush(stdout);
+    }
   }
 
   array_free(&pvts);
-  array_free(&lij), array_free(&uij), array_free(&work), array_free(&data);
+  array_free(&lij), array_free(&uij);
+  array_free(&work), array_free(&data);
 }
 
 //=============================================================================
