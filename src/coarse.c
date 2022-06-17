@@ -97,8 +97,7 @@ static void number_local(struct array *a, uint s, uint e, int ndim, int level,
 
   gs(dof, gs_int, gs_add, 0, gsh, bfr);
 
-  for (uint i = s; i < e; i++) {
-    uint k = i - s;
+  for (uint i = s, k = 0; i < e; i++, k++) {
     for (int j = 0; j < nv; j++) {
       if (dof[k * nv + j] > 0 && pa[i].s == INT_MAX) {
         pa[i].s = level;

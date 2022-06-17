@@ -93,6 +93,17 @@ int main(int argc, char *argv[]) {
   double *coord = NULL;
   parrsb_setup_mesh(&nelt, &nv, &vl, &coord, in, comm);
 
+  int ndim = (nv == 8) ? 3 : 2;
+  double *centroids = tcalloc(double, nelt *ndim);
+  for (uint i = 0; i < nelt; i++) {
+    for (int j = 0; j < nv; j++) {
+      for (int d = 0; d < ndim; d++)
+        centroids[i * ndim + d] += coord[i * ndim * nv + j * ndim + d];
+    }
+    for (int d = 0; d < ndim; d++)
+      centroids[i * ndim + d] /= nv;
+  }
+
   // Setup the coarse solve with schur complement solver
   int id, np;
   MPI_Comm_rank(comm, &id);
@@ -100,7 +111,8 @@ int main(int argc, char *argv[]) {
 
   MPI_Barrier(comm);
   double t = MPI_Wtime();
-  struct coarse *crs = coarse_setup(nelt, nv, vl, coord, in->crs_type, comm);
+  struct coarse *crs =
+      coarse_setup(nelt, nv, vl, centroids, in->crs_type, comm);
   double tsetup = MPI_Wtime() - t;
 
   double *b = tcalloc(double, nelt);
@@ -126,7 +138,8 @@ int main(int argc, char *argv[]) {
   // Free resources
   buffer_free(&bfr);
   coarse_free(crs);
-  free(b), free(x), free(vl), free(coord), free(in);
+  free(b), free(x), free(vl), free(coord), free(centroids);
+  free(in);
   MPI_Finalize();
 
   return 0;
