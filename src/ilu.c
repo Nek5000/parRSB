@@ -1327,10 +1327,6 @@ static void iluc(struct ilu *ilu, buffer *bfr) {
   if (val != NULL && atoi(val) != 0) {
     par_mat_dump("LL.txt", L, cr, bfr);
     par_mat_dump("UU.txt", U, cr, bfr);
-    for (uint i = 0; i < A->rn; i++) {
-      printf("perm[%u] = %llu\n", i, ilu->perm[i]);
-      fflush(stdout);
-    }
   }
 
   array_free(&pvts);

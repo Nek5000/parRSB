@@ -283,7 +283,7 @@ struct parrsb_input *parrsb_parse_input(int argc, char *argv[], MPI_Comm comm) {
       in->ilu_tol = atof(optarg);
       break;
     case 12:
-      in->ilu_pivot = atof(optarg);
+      in->ilu_pivot = atoi(optarg);
       break;
     case 20:
       in->crs_type = atoi(optarg);
