@@ -13,17 +13,17 @@ extern int repair_partitions(struct array *elements, int nv, struct comm *tc,
                              buffer *bfr);
 extern int balance_partitions(struct array *elements, int nv, struct comm *lc,
                               struct comm *gc, int bin, buffer *bfr);
-extern int fiedler(struct rsb_element *elems, uint lelt, int nv, int max_iter,
-                   int algo, struct comm *gsc, buffer *buf);
+extern int fiedler(struct rsb_element *elems, uint lelt, int nv, int miter,
+                   int mpass, int algo, struct comm *gsc, buffer *buf);
 
-static void check_rsb_partition(struct comm *gc, int max_pass, int max_iter) {
+static void check_rsb_partition(struct comm *gc, int mpass, int miter) {
   int max_levels = log2ll(gc->np);
 
   int i;
   for (i = 0; i < max_levels; i++) {
     sint converged = 1;
     int val = (int)metric_get_value(i, RSB_FIEDLER_NITER);
-    if (val >= max_pass * max_iter)
+    if (val >= mpass * miter)
       converged = 0;
 
     sint ibfr;
@@ -40,7 +40,7 @@ static void check_rsb_partition(struct comm *gc, int max_pass, int max_iter) {
       if (gc->id == 0) {
         printf("Warning: Partitioner only reached a tolerance of %lf given %lf "
                "after %d x %d iterations in Level=%d!\n",
-               final, target, max_pass, max_iter, i);
+               final, target, mpass, miter, i);
         fflush(stdout);
       }
     }
@@ -59,31 +59,13 @@ static void check_rsb_partition(struct comm *gc, int max_pass, int max_iter) {
   }
 }
 
-static void rsb_local(struct rsb_element *elems, uint s, uint e, int nv,
-                      int max_iter, int max_pass, struct comm *lc,
-                      buffer *buf) {
-  // lc should contain only a single rank
-  if (e <= s)
-    return;
-
-  uint mid;
-  uint size = e - s;
-  if (size > 1) {
-    fiedler(elems + s, size, nv, max_iter, 0, lc, buf);
-    sarray_sort(struct rsb_element, elems + s, size, fiedler, 3, buf);
-    mid = (s + e) / 2;
-    rsb_local(elems, s, mid, nv, max_iter, max_pass, lc, buf);
-    rsb_local(elems, mid, e, nv, max_iter, max_pass, lc, buf);
-  }
-}
-
 int rsb(struct array *elements, parrsb_options *options, int nv,
         struct comm *gc, buffer *bfr) {
-  int max_iter = 50;
-  int max_pass = 50;
+  int miter = 50;
+  int mpass = 50;
   int ndim = (nv == 8) ? 3 : 2;
 
-  struct comm lc;
+  struct comm lc, tc;
   comm_dup(&lc, gc);
 
   while (lc.np > 1) {
@@ -100,8 +82,8 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
 
     // Run fiedler
     metric_tic(&lc, RSB_FIEDLER);
-    fiedler(elements->ptr, elements->n, nv, max_iter, options->rsb_algo, &lc,
-            bfr);
+    fiedler(elements->ptr, elements->n, nv, miter, mpass, options->rsb_algo,
+            &lc, bfr);
     metric_toc(&lc, RSB_FIEDLER);
 
     // Sort by Fiedler vector
@@ -112,7 +94,6 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
 
     // Bisect, repair and balance
     int bin = (lc.id >= (lc.np + 1) / 2);
-    struct comm tc;
     comm_split(&lc, bin, lc.id, &tc);
 
     metric_tic(&lc, RSB_REPAIR_BALANCE);
@@ -129,7 +110,7 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
   }
   comm_free(&lc);
 
-  check_rsb_partition(gc, max_pass, max_iter);
+  check_rsb_partition(gc, mpass, miter);
 
   return 0;
 }

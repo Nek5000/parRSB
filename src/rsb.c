@@ -7,11 +7,14 @@
 #include <string.h>
 #include <time.h>
 
-parrsb_options parrsb_default_options = {0, 2, 1, 0, 1, 0, 2, 1};
+extern void comm_split(const struct comm *old, int bin, int key,
+                       struct comm *new_);
+
+parrsb_options parrsb_default_options = {0, 1, 1, 0, 1, 0, 2, 0};
 
 static char *ALGO[3] = {"RSB", "RCB", "RIB"};
 
-static int if_number(const char *c) {
+static inline int if_number(const char *c) {
   int i = 0;
   while (i < strnlen(c, 32) && isdigit(c[i]))
     i++;
@@ -37,6 +40,7 @@ static void update_options(parrsb_options *options) {
 }
 
 #undef UPDATE_OPTION
+
 #define PRINT_OPTION(opt, str) printf("%s = %d\n", str, options->opt)
 
 static void print_options(parrsb_options *options) {
@@ -152,11 +156,9 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
 
   struct comm c;
   comm_init(&c, comm);
-  if (c.id == 0) {
-    if (options.verbose_level > 0)
-      printf("Running parRSB ...\n");
-    if (options.verbose_level > 1)
-      print_options(&options);
+  if (c.id == 0 && options.verbose_level > 0) {
+    printf("Running parRSB ...\n");
+    print_options(&options);
     fflush(stdout);
   }
 
@@ -177,14 +179,11 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
   struct array elist;
   size_t elem_size = load_balance(&elist, nel, nv, coord, vtx, &cr, &bfr);
 
-  // Run RSB now
-  MPI_Comm comma;
-  MPI_Comm_split(c.c, nel > 0, c.id, &comma);
-
-  metric_init();
   struct comm ca;
-  comm_init(&ca, comma);
+  comm_split(&c, nel > 0, c.id, &ca);
 
+  // Run RSB now
+  metric_init();
   if (nel > 0) {
     slong out[2][1], wrk[2][1], in = nel;
     comm_scan(out, &ca, gs_long, gs_add, &in, 1, wrk);
@@ -215,10 +214,8 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
 
     metric_rsb_print(&ca, options.profile_level);
   }
-
   metric_finalize();
   comm_free(&ca);
-  MPI_Comm_free(&comma);
 
 #if defined(GENMAP_OCCA)
   occa_free();
@@ -234,7 +231,8 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
     fflush(stdout);
   }
 
-  array_free(&elist), buffer_free(&bfr), crystal_free(&cr), comm_free(&c);
+  array_free(&elist), buffer_free(&bfr);
+  crystal_free(&cr), comm_free(&c);
 
   return 0;
 }

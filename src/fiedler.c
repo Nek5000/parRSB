@@ -257,8 +257,8 @@ static int project(scalar *x, uint n, scalar *b, struct laplacian *L,
 // Input z should be orthogonal to 1-vector, have unit norm.
 // inverse iteration should not change z.
 static int inverse(scalar *y, uint lelt, struct rsb_element *elems, int nv,
-                   scalar *z, struct comm *gsc, int miter, slong nelg,
-                   buffer *buf) {
+                   scalar *z, struct comm *gsc, int miter, int mpass,
+                   slong nelg, buffer *buf) {
   struct laplacian *wl = laplacian_init(elems, lelt, nv, GS, gsc, buf);
 
   // Reserve enough memory in buffer
@@ -611,7 +611,7 @@ static int lanczos_aux(scalar *diag, scalar *upper, scalar *rr, uint lelt,
 
 static int lanczos(scalar *fiedler, uint lelt, struct rsb_element *elems,
                    int nv, scalar *initv, struct comm *gsc, int miter,
-                   slong nelg, buffer *bfr) {
+                   int mpass, slong nelg, buffer *bfr) {
   metric_tic(gsc, RSB_LANCZOS);
 
   struct laplacian *wl;
@@ -660,7 +660,7 @@ static int lanczos(scalar *fiedler, uint lelt, struct rsb_element *elems,
 
     // vec_ortho(gsc, fiedler, nelg);
     ortho(fiedler, lelt, nelg, gsc);
-  } while (iter == miter && ipass++ < miter);
+  } while (iter == miter && ipass++ < mpass);
 
   free(alpha), free(rr), free(eVectors), free(eValues);
 #if defined(GENMAP_OCCA)
@@ -673,13 +673,13 @@ static int lanczos(scalar *fiedler, uint lelt, struct rsb_element *elems,
   return ipass;
 }
 
-int fiedler(struct rsb_element *elems, uint lelt, int nv, int max_iter,
+int fiedler(struct rsb_element *elems, uint lelt, int nv, int miter, int mpass,
             int algo, struct comm *gsc, buffer *buf) {
-  slong out[2][1], bfr[2][1], in = lelt;
-  comm_scan(out, gsc, gs_long, gs_add, &in, 1, bfr);
+  slong out[2][1], wrk[2][1], in = lelt;
+  comm_scan(out, gsc, gs_long, gs_add, &in, 1, wrk);
   slong start = out[0][0], nelg = out[1][0];
 
-  scalar *initv = tcalloc(scalar, 2 * lelt), *fiedler = initv + lelt;
+  scalar *initv = tcalloc(scalar, 2 * lelt), *f = initv + lelt;
   uint i;
   for (i = 0; i < lelt; i++) {
     initv[i] = start + i + 1.0;
@@ -691,7 +691,7 @@ int fiedler(struct rsb_element *elems, uint lelt, int nv, int max_iter,
   ortho(initv, lelt, nelg, gsc);
 
   // double rtr = vec_dot(initv, initv);
-  scalar rtr = dot(initv, initv, lelt), rni;
+  scalar rni, rtr = dot(initv, initv, lelt);
   comm_allreduce(gsc, gs_double, gs_add, &rtr, 1, &rni);
 
   rni = 1.0 / sqrt(rtr);
@@ -701,29 +701,25 @@ int fiedler(struct rsb_element *elems, uint lelt, int nv, int max_iter,
 
   int iter = 0;
   if (algo == 0)
-    iter = lanczos(fiedler, lelt, elems, nv, initv, gsc, max_iter, nelg, buf);
+    iter = lanczos(f, lelt, elems, nv, initv, gsc, miter, mpass, nelg, buf);
   else if (algo == 1)
-    iter = inverse(fiedler, lelt, elems, nv, initv, gsc, max_iter, nelg, buf);
+    iter = inverse(f, lelt, elems, nv, initv, gsc, miter, mpass, nelg, buf);
   metric_acc(RSB_FIEDLER_NITER, iter);
 
   GenmapScalar norm = 0;
   for (i = 0; i < lelt; i++)
-    norm += fiedler[i] * fiedler[i];
-#if 0
-  if (gsc->id == 0)
-    printf("fiedler norm = %lf\n", norm);
-#endif
+    norm += f[i] * f[i];
 
   GenmapScalar normi;
   comm_allreduce(gsc, gs_double, gs_add, &norm, 1, &normi);
   normi = 1.0 / sqrt(norm);
 
-  // vec_scale(fiedler, fiedler, normi);
+  // vec_scale(f, f, normi);
   for (i = 0; i < lelt; i++)
-    fiedler[i] *= normi;
+    f[i] *= normi;
 
   for (i = 0; i < lelt; i++)
-    elems[i].fiedler = fiedler[i];
+    elems[i].fiedler = f[i];
 
   free(initv);
   return 0;
