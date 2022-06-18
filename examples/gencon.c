@@ -30,9 +30,10 @@ static int test_parcon(unsigned int neltp, long long *vlp, char *name,
   gs(minp, gs_long, gs_min, 0, gsh, &bfr);
   gs(maxp, gs_long, gs_max, 0, gsh, &bfr);
 
-  for (i = 0; err == 0 && i < size; i++)
+  for (i = 0; err == 0 && i < size; i++) {
     if (minp[i] != maxp[i])
       err = 1;
+  }
 
   gs_free(gsh);
   gsh = gs_setup(vlp, size, &c, 0, gs_pairwise, 0);
@@ -43,9 +44,10 @@ static int test_parcon(unsigned int neltp, long long *vlp, char *name,
   gs(minp, gs_long, gs_min, 0, gsh, &bfr);
   gs(maxp, gs_long, gs_max, 0, gsh, &bfr);
 
-  for (i = 0; err == 0 && i < size; i++)
+  for (i = 0; err == 0 && i < size; i++) {
     if (minp[i] != maxp[i])
       err = 1;
+  }
 
   if (c.np == 1) {
     for (i = 0; err == 0 && i < size; i++)
@@ -80,20 +82,22 @@ int main(int argc, char *argv[]) {
   err = (vl == NULL);
   parrsb_check_error(err, MPI_COMM_WORLD);
 
-  int ndim = nv == 8 ? 3 : 2;
+  int ndim = (nv == 8 ? 3 : 2);
   err = parrsb_conn_mesh(vl, coord, nelt, ndim, bcs, nbcs, in->tol,
                          MPI_COMM_WORLD, 0);
   parrsb_check_error(err, MPI_COMM_WORLD);
 
   // Write connectivity to .co2 file if dump is on
-  if (in->dump == 1)
+  if (in->dump == 1) {
     err = parrsb_dump_con(in->mesh, nelt, nv, vl, MPI_COMM_WORLD);
-  parrsb_check_error(err, MPI_COMM_WORLD);
+    parrsb_check_error(err, MPI_COMM_WORLD);
+  }
 
   // Turns on testing if test is on
-  if (in->test == 1)
+  if (in->test == 1) {
     err = test_parcon(nelt, vl, in->mesh, MPI_COMM_WORLD);
-  parrsb_check_error(err, MPI_COMM_WORLD);
+    parrsb_check_error(err, MPI_COMM_WORLD);
+  }
 
   // Free resources
   free(vl), free(coord), free(bcs), free(in);
