@@ -70,18 +70,6 @@ int occa_lanczos_free();
 int occa_free();
 
 //------------------------------------------------------------------------------
-// Memory
-//
-int GenmapMallocArray(size_t n, size_t unit, void *p);
-int GenmapCallocArray(size_t n, size_t unit, void *p);
-int GenmapReallocArray(size_t n, size_t unit, void *p);
-int GenmapFree(void *p);
-
-#define GenmapMalloc(n, p) GenmapMallocArray((n), sizeof(**(p)), p)
-#define GenmapCalloc(n, p) GenmapCallocArray((n), sizeof(**(p)), p)
-#define GenmapRealloc(n, p) GenmapReallocArray((n), sizeof(**(p)), p)
-
-//------------------------------------------------------------------------------
 // Misc
 //
 int log2ll(long long n);

@@ -75,7 +75,7 @@ static sint converged(struct array *fdlr, GenmapScalar *fiedler, struct comm *c,
   return changed > 0 ? 0 : 1;
 }
 
-int power_serial(double *y, int N, double *A, int verbose) {
+int power_serial(double *y, uint N, double *A, int verbose) {
   time_t t;
   srand((unsigned)time(&t));
 
@@ -90,9 +90,7 @@ int power_serial(double *y, int N, double *A, int verbose) {
   for (i = 0; i < N; i++)
     y[i] *= normi;
 
-  double *Ay;
-  GenmapCalloc(N, &Ay);
-
+  double *Ay = tcalloc(double, N);
   int j, k, l;
   GenmapScalar err = 1.0, lambda;
   for (i = 0; i < 100; i++) {
@@ -116,16 +114,13 @@ int power_serial(double *y, int N, double *A, int verbose) {
     if (fabs(err) < 1.e-12)
       break;
   }
-
-  GenmapFree(Ay);
+  free(Ay);
 
   return i;
 }
 
-int inv_power_serial(double *y, int N, double *A, int verbose) {
-  double *Ainv;
-  GenmapCalloc(N * N, &Ainv);
-
+int inv_power_serial(double *y, uint N, double *A, int verbose) {
+  double *Ainv = tcalloc(double, N *N);
   int j, k;
   for (j = 0; j < N; j++) {
     for (k = 0; k < N; k++)
@@ -138,10 +133,9 @@ int inv_power_serial(double *y, int N, double *A, int verbose) {
     for (k = 0; k < N; k++)
       A[j * N + k] = Ainv[k * N + j];
   }
-
   j = power_serial(y, N, Ainv, verbose);
 
-  GenmapFree(Ainv);
+  free(Ainv);
 
   return j;
 }

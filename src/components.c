@@ -29,26 +29,21 @@ static int check_bin_val(int bin, struct comm *gc) {
 }
 
 // Find the number of disconnected components
-static sint get_components(sint *component, struct rsb_element *elements,
+static uint get_components(sint *component, struct rsb_element *elements,
                            struct comm *c, buffer *buf, uint nelt, uint nv) {
-  slong out[2][1], buff[2][1];
-  slong nelg = nelt;
-  comm_scan(out, c, gs_long, gs_add, &nelg, 1, buff);
-  nelg = out[1][0];
-  ulong start = out[0][0];
+  slong out[2][1], wrk[2][1], in = nelt;
+  comm_scan(out, c, gs_long, gs_add, &in, 1, wrk);
+  ulong nelg = out[1][0], start = out[0][0];
 
   if (nelg == 0)
     return 0;
 
-  GenmapLong *p, *ids;
-  GenmapMalloc(nelt * nv, &p);
-  GenmapMalloc(nelt * nv, &ids);
+  slong *p = tcalloc(slong, nelt * nv);
+  slong *ids = tcalloc(slong, nelt * nv);
 
   int null_input = 0;
-  if (component == NULL) {
-    GenmapMalloc(nelt, &component);
-    null_input = 1;
-  }
+  if (null_input = (component == NULL))
+    component = tcalloc(sint, nelt);
 
   uint e;
   for (e = 0; e < nelt; e++)
@@ -58,15 +53,11 @@ static sint get_components(sint *component, struct rsb_element *elements,
   array_init(struct unmarked, &arr, nelt);
 
   struct comm cc;
-
   struct unmarked u;
-  uint d;
-  slong nnz1, nnzg, nnzg0, nnzb;
-  slong nmarked = 0;
-  sint count = 0;
-
+  uint d, count = 0;
+  slong nnz1, nnzg, nnzg0, nnzb, nmarked = 0;
   do {
-    // Count unmarked elements
+    // count unmarked elements
     arr.n = 0;
     for (e = 0; e < nelt; e++) {
       if (component[e] == -1) {
@@ -75,9 +66,7 @@ static sint get_components(sint *component, struct rsb_element *elements,
       }
     }
 
-    int bin = 0;
-    if (arr.n > 0)
-      bin = 1;
+    int bin = (arr.n > 0);
     comm_split(c, bin, c->id, &cc);
 
     nnz1 = nnzg = nnzg0 = 0;
@@ -89,11 +78,10 @@ static sint get_components(sint *component, struct rsb_element *elements,
 
       // Mark the first non-marked element as seed
       struct unmarked *ptr = (struct unmarked *)arr.ptr;
-      slong first = start + ptr[0].index;
-      slong first_ = first;
-      comm_allreduce(&cc, gs_long, gs_min, &first_, 1, buff);
+      slong first = start + ptr[0].index, mfirst = first;
+      comm_allreduce(&cc, gs_long, gs_min, &mfirst, 1, wrk);
 
-      if (first_ == first) {
+      if (mfirst == first) {
         for (d = 0; d < nv; d++)
           p[0 * nv + d] = 1;
       }
@@ -127,22 +115,17 @@ static sint get_components(sint *component, struct rsb_element *elements,
         nnzg0 = nnzg, nnzg = nnz1;
         comm_allreduce(&cc, gs_long, gs_add, &nnzg, 1, &nnzb);
       } while (nnzg > nnzg0);
-
       gs_free(gsh);
     }
-
     comm_free(&cc);
 
     comm_allreduce(c, gs_long, gs_add, &nnz1, 1, &nnzb);
-    nmarked += nnz1;
-
-    count++;
+    nmarked += nnz1, count++;
   } while (nmarked < nelg);
 
-  GenmapFree(p);
-  GenmapFree(ids);
+  free(p), free(ids);
   if (null_input == 1)
-    GenmapFree(component);
+    free(component);
 
   return count;
 }

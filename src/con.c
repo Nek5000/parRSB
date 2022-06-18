@@ -52,18 +52,12 @@ typedef struct {
 // Mesh struct
 //
 int mesh_init(Mesh *m_, int nel, int ndim) {
-  GenmapMalloc(1, m_);
-  Mesh m = *m_;
-
-  m->nelt = nel;
-  m->nDim = ndim;
-  m->nNeighbors = ndim;
+  Mesh m = *m_ = tcalloc(struct Mesh_private, 1);
+  m->nelt = nel, m->nDim = ndim, m->nNeighbors = ndim;
   m->nVertex = (ndim == 2) ? 4 : 8;
 
   array_init(struct point_t, &m->elements, 10);
-  m->elements.n = 0;
   array_init(struct Boundary_private, &m->boundary, 10);
-  m->boundary.n = 0;
 
   return 0;
 }
@@ -71,26 +65,21 @@ int mesh_init(Mesh *m_, int nel, int ndim) {
 int mesh_free(Mesh m) {
   array_free(&m->elements);
   array_free(&m->boundary);
-
   free(m);
 
   return 0;
 }
 
-void get_vertex_ids(long long **vertex_ids_, Mesh mesh) {
+void get_vertex_ids(long long **vtx_, Mesh mesh) {
   int nelt = mesh->nelt;
   int nv = (mesh->nDim == 3) ? 8 : 4;
 
-  GenmapMalloc(nelt * nv, vertex_ids_);
-  long long *vertex_ids = *vertex_ids_;
+  long long *vtx = *vtx_ = tcalloc(long long, nelt *nv);
 
   struct point_t *ptr = (struct point_t *)mesh->elements.ptr;
-  int e, v, count = 0;
-  for (e = 0; e < nelt; e++) {
-    for (v = 0; v < nv; v++) {
-      vertex_ids[count] = ptr[count].globalId;
-      count++;
-    }
+  for (uint e = 0, count = 0; e < nelt; e++) {
+    for (int v = 0; v < nv; v++)
+      vtx[count] = ptr[count++].globalId;
   }
 }
 
@@ -699,12 +688,11 @@ static ulong findMinBelowI(ulong min, uint I, struct array *arr) {
 
 static int renumberPeriodicVertices(Mesh mesh, struct comm *c,
                                     struct array *matched, buffer *buf) {
-  minPair ptr = matched->ptr;
   uint size = matched->n;
+  slong *ids = tcalloc(slong, size);
 
-  slong *ids;
-  GenmapMalloc(size, &ids);
-  sint i;
+  minPair ptr = matched->ptr;
+  uint i;
   for (i = 0; i < size; i++)
     ids[i] = ptr[i].orig;
 
@@ -714,18 +702,16 @@ static int renumberPeriodicVertices(Mesh mesh, struct comm *c,
     ids[i] = ptr[i].min;
 
   gs(ids, gs_long, gs_min, 0, t, buf);
+  gs_free(t);
 
   for (i = 0; i < size; i++)
     ptr[i].min = ids[i];
-
-  GenmapFree(ids);
-  gs_free(t);
+  free(ids);
 
   sarray_sort_2(struct minPair_private, ptr, size, orig, 1, min, 1, buf);
 
   struct array compressed;
   array_init(struct minPair_private, &compressed, 10);
-  compressed.n = 0;
   if (size > 0)
     array_cat(struct minPair_private, &compressed, ptr, 1);
 
@@ -752,13 +738,10 @@ static int renumberPeriodicVertices(Mesh mesh, struct comm *c,
       ptr[i].min = findMinBelowI(ptr[i].min, i, &compressed);
   }
 
-  uint sizec = 0;
-  if (rank == 0)
-    sizec = size;
+  uint sizec = (rank == 0) * size;
   size = mesh->elements.n;
 
-  GenmapCalloc(size + sizec, &ids);
-
+  ids = tcalloc(slong, size + sizec);
   Point pnt = mesh->elements.ptr;
   for (i = 0; i < size; i++)
     ids[i] = pnt[i].globalId;
@@ -773,12 +756,12 @@ static int renumberPeriodicVertices(Mesh mesh, struct comm *c,
     ids[size + i] = ptr[i].min;
 
   gs(ids, gs_long, gs_min, 0, t, buf);
+  gs_free(t);
 
   for (i = 0; i < size; i++)
     pnt[i].globalId = ids[i];
+  free(ids);
 
-  gs_free(t);
-  GenmapFree(ids);
   array_free(&compressed);
 }
 
