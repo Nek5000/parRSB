@@ -13,14 +13,13 @@ extern int repair_partitions(struct array *elements, int nv, struct comm *tc,
                              buffer *bfr);
 extern int balance_partitions(struct array *elements, int nv, struct comm *lc,
                               struct comm *gc, int bin, buffer *bfr);
-extern int fiedler(struct rsb_element *elems, uint lelt, int nv, int miter,
-                   int mpass, int algo, struct comm *gsc, buffer *buf);
+extern int fiedler(struct array *elements, int nv, int miter, int mpass,
+                   int algo, struct comm *gsc, buffer *buf);
 
 static void check_rsb_partition(struct comm *gc, int mpass, int miter) {
   int max_levels = log2ll(gc->np);
 
-  int i;
-  for (i = 0; i < max_levels; i++) {
+  for (int i = 0; i < max_levels; i++) {
     sint converged = 1;
     int val = (int)metric_get_value(i, RSB_FIEDLER_NITER);
     if (val >= mpass * miter)
@@ -30,8 +29,7 @@ static void check_rsb_partition(struct comm *gc, int mpass, int miter) {
     comm_allreduce(gc, gs_int, gs_min, &converged, 1, &ibfr);
 
     if (converged == 0) {
-      double dbfr;
-      double final = (double)metric_get_value(i, TOL_FNL);
+      double final = (double)metric_get_value(i, TOL_FNL), dbfr;
       comm_allreduce(gc, gs_double, gs_min, &final, 1, &dbfr);
 
       double target = (double)metric_get_value(i, TOL_TGT);
@@ -82,8 +80,7 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
 
     // Run fiedler
     metric_tic(&lc, RSB_FIEDLER);
-    fiedler(elements->ptr, elements->n, nv, miter, mpass, options->rsb_algo,
-            &lc, bfr);
+    fiedler(elements, nv, miter, mpass, options->rsb_algo, &lc, bfr);
     metric_toc(&lc, RSB_FIEDLER);
 
     // Sort by Fiedler vector
