@@ -58,63 +58,58 @@ static void print_options(parrsb_options *options) {
 
 static size_t load_balance(struct array *elist, uint nel, int nv, double *coord,
                            long long *vtx, struct crystal *cr, buffer *bfr) {
-  size_t unit_size;
-  struct rcb_element *element = NULL;
+  struct comm *c = &cr->comm;
+  slong out[2][1], wrk[2][1], in = nel;
+  comm_scan(out, c, gs_long, gs_add, &in, 1, wrk);
+  slong start = out[0][0], nelg = out[1][0];
 
+  uint nstar = nelg / c->np, nrem = nelg - nstar * c->np;
+  slong lower = (nstar + 1) * nrem;
+
+  size_t unit_size;
   if (vtx == NULL) // RCB
     unit_size = sizeof(struct rcb_element);
-  else
+  else // RSB
     unit_size = sizeof(struct rsb_element);
-
-  element = (struct rcb_element *)calloc(1, unit_size);
-  element->origin = cr->comm.id;
 
   array_init_(elist, nel, unit_size, __FILE__, __LINE__);
 
-  slong out[2][1], wrk[2][1], in = nel;
-  comm_scan(out, &cr->comm, gs_long, gs_add, &in, 1, wrk);
-  slong start = out[0][0], nelg = out[1][0];
-
-  uint size = cr->comm.np;
-  uint nstar = nelg / size;
-  uint nrem = nelg - nstar * size;
-  slong lower = (nstar + 1) * nrem;
+  struct rcb_element *pe = (struct rcb_element *)calloc(1, unit_size);
+  pe->origin = c->id;
 
   int ndim = (nv == 8) ? 3 : 2;
-  int e, n, v;
-  for (e = 0; e < nel; ++e) {
-    slong eg = element->globalId = start + e + 1;
+  for (uint e = 0; e < nel; ++e) {
+    slong eg = pe->globalId = start + e + 1;
     if (eg <= lower)
-      element->proc = (eg - 1) / (nstar + 1);
+      pe->proc = (eg - 1) / (nstar + 1);
     else if (nstar != 0)
-      element->proc = (eg - 1 - lower) / nstar + nrem;
+      pe->proc = (eg - 1 - lower) / nstar + nrem;
 
-    element->coord[0] = element->coord[1] = element->coord[2] = 0.0;
-    for (v = 0; v < nv; v++)
-      for (n = 0; n < ndim; n++)
-        element->coord[n] += coord[e * ndim * nv + v * ndim + n];
-    for (n = 0; n < ndim; n++)
-      element->coord[n] /= nv;
+    pe->coord[0] = pe->coord[1] = pe->coord[2] = 0.0;
+    for (int v = 0; v < nv; v++)
+      for (int n = 0; n < ndim; n++)
+        pe->coord[n] += coord[e * ndim * nv + v * ndim + n];
+    for (int n = 0; n < ndim; n++)
+      pe->coord[n] /= nv;
 
-    array_cat_(unit_size, elist, element, 1, __FILE__, __LINE__);
+    array_cat_(unit_size, elist, pe, 1, __FILE__, __LINE__);
   }
 
   if (vtx != NULL) { // RSB
-    struct rsb_element *elements = elist->ptr;
-    for (e = 0; e < nel; e++)
-      for (v = 0; v < nv; v++)
-        elements[e].vertices[v] = vtx[e * nv + v];
+    struct rsb_element *pr = (struct rsb_element *)elist->ptr;
+    for (uint e = 0; e < nel; e++) {
+      for (int v = 0; v < nv; v++)
+        pr[e].vertices[v] = vtx[e * nv + v];
+    }
   }
 
   sarray_transfer_(elist, unit_size, offsetof(struct rcb_element, proc), 1, cr);
-  nel = elist->n;
-  if (vtx != NULL) // RSB
-    sarray_sort(struct rsb_element, elist->ptr, nel, globalId, 1, bfr);
-  else
-    sarray_sort(struct rcb_element, elist->ptr, nel, globalId, 1, bfr);
+  if (vtx == NULL) // RCB
+    sarray_sort(struct rcb_element, elist->ptr, elist->n, globalId, 1, bfr);
+  else // RSB
+    sarray_sort(struct rsb_element, elist->ptr, elist->n, globalId, 1, bfr);
 
-  free(element);
-
+  free(pe);
   return unit_size;
 }
 
@@ -177,7 +172,7 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
 
   // Load balance input data
   struct array elist;
-  size_t elem_size = load_balance(&elist, nel, nv, coord, vtx, &cr, &bfr);
+  size_t esize = load_balance(&elist, nel, nv, coord, vtx, &cr, &bfr);
 
   struct comm ca;
   comm_split(&c, nel > 0, c.id, &ca);
@@ -203,10 +198,10 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
       rsb(&elist, &options, nv, &ca, &bfr);
       break;
     case 1:
-      rcb(&elist, elem_size, ndim, &ca, &bfr);
+      rcb(&elist, esize, ndim, &ca, &bfr);
       break;
     case 2:
-      rib(&elist, elem_size, ndim, &ca, &bfr);
+      rib(&elist, esize, ndim, &ca, &bfr);
       break;
     default:
       break;
@@ -221,7 +216,7 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
   occa_free();
 #endif
 
-  restore_original(part, seq, &cr, &elist, elem_size, &bfr);
+  restore_original(part, seq, &cr, &elist, esize, &bfr);
 
   // Report time and finish
   genmap_barrier(&c);
