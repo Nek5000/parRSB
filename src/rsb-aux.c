@@ -6,18 +6,19 @@
 #include <limits.h>
 #include <time.h>
 
-extern void rcb_local(struct array *a, size_t unit_size, uint start, uint end,
-                      int ndim, buffer *buf);
+extern int rcb(struct array *elements, size_t unit_size, int ndim,
+               struct comm *c, buffer *bfr);
+extern int fiedler(struct array *elements, int nv, parrsb_options *options,
+                   struct comm *gsc, buffer *buf);
 extern int repair_partitions(struct array *elements, int nv, struct comm *tc,
                              struct comm *lc, int bin, struct comm *gc,
                              buffer *bfr);
 extern int balance_partitions(struct array *elements, int nv, struct comm *lc,
                               struct comm *gc, int bin, buffer *bfr);
-extern int fiedler(struct array *elements, int nv, int miter, int mpass,
-                   int algo, struct comm *gsc, buffer *buf);
 
-static void check_rsb_partition(struct comm *gc, int mpass, int miter) {
+static void check_rsb_partition(struct comm *gc, parrsb_options *options) {
   int max_levels = log2ll(gc->np);
+  int miter = options->rsb_max_iter, mpass = options->rsb_lanczos_max_restarts;
 
   for (int i = 0; i < max_levels; i++) {
     sint converged = 1;
@@ -57,10 +58,8 @@ static void check_rsb_partition(struct comm *gc, int mpass, int miter) {
   }
 }
 
-int rsb(struct array *elements, parrsb_options *options, int nv,
+int rsb(struct array *elements, int nv, parrsb_options *options,
         struct comm *gc, buffer *bfr) {
-  int miter = 50;
-  int mpass = 50;
   int ndim = (nv == 8) ? 3 : 2;
 
   struct comm lc, tc;
@@ -80,7 +79,7 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
 
     // Run fiedler
     metric_tic(&lc, RSB_FIEDLER);
-    fiedler(elements, nv, miter, mpass, options->rsb_algo, &lc, bfr);
+    fiedler(elements, nv, options, &lc, bfr);
     metric_toc(&lc, RSB_FIEDLER);
 
     // Sort by Fiedler vector
@@ -107,7 +106,7 @@ int rsb(struct array *elements, parrsb_options *options, int nv,
   }
   comm_free(&lc);
 
-  check_rsb_partition(gc, mpass, miter);
+  check_rsb_partition(gc, options);
 
   return 0;
 }

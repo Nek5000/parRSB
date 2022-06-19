@@ -7,51 +7,77 @@
 #include <string.h>
 #include <time.h>
 
-extern void comm_split(const struct comm *old, int bin, int key,
-                       struct comm *new_);
+extern int rsb(struct array *elements, int nv, parrsb_options *options,
+               struct comm *gc, buffer *bfr);
+extern int rcb(struct array *elements, size_t unit_size, int ndim,
+               struct comm *ci, buffer *bfr);
 
-parrsb_options parrsb_default_options = {0, 1, 1, 0, 1, 0, 2, 0};
+parrsb_options parrsb_default_options = {
+    0, // 0 - RSB, 1 - RCB, 2 -RIB
+    1, // Verbose level
+    1, // Profile level
+    // RSB
+    0,    // 0 - Lanczos, 1 RQI
+    1,    // 0 - None, 1 - RCB, 2 - RIB
+    50,   // Maiximum Lanczos or RQI iterations
+    0,    // Two level algorithm
+    1e-5, // Tolerance for Lanczos or RQI iteration
+    0,    // MG Grammian
+    2,    // MG coarsening factor
+    50,   // Lanczos maximum restarts
+    // Other
+    0 // Repair
+};
 
 static char *ALGO[3] = {"RSB", "RCB", "RIB"};
 
-static inline int if_number(const char *c) {
-  int i = 0;
-  while (i < strnlen(c, 32) && isdigit(c[i]))
-    i++;
-  return i == strnlen(c, 32);
-}
-
-#define UPDATE_OPTION(opt, str)                                                \
+#define UPDATE_OPTION(opt, str, is_int)                                        \
   {                                                                            \
     const char *val = getenv(str);                                             \
-    if (val != NULL && if_number(val))                                         \
-      options->opt = atoi(val);                                                \
+    if (val != NULL) {                                                         \
+      if (is_int)                                                              \
+        options->opt = atoi(val);                                              \
+      else                                                                     \
+        options->opt = atof(val);                                              \
+    }                                                                          \
   }
 
 static void update_options(parrsb_options *options) {
-  UPDATE_OPTION(partitioner, "PARRSB_PARTITIONER");
-  UPDATE_OPTION(verbose_level, "PARRSB_VERBOSE_LEVEL");
-  UPDATE_OPTION(profile_level, "PARRSB_PROFILE_LEVEL");
-  UPDATE_OPTION(rsb_algo, "PARRSB_RSB_ALGO");
-  UPDATE_OPTION(rsb_pre, "PARRSB_RSB_PRE");
-  UPDATE_OPTION(rsb_grammian, "PARRSB_RSB_GRAMMIAN");
-  UPDATE_OPTION(repair, "PARRSB_REPAIR");
-  UPDATE_OPTION(rsb_mg_factor, "PARRSB_RSB_MG_FACTOR");
+  UPDATE_OPTION(partitioner, "PARRSB_PARTITIONER", 1);
+  UPDATE_OPTION(verbose_level, "PARRSB_VERBOSE_LEVEL", 1);
+  UPDATE_OPTION(profile_level, "PARRSB_PROFILE_LEVEL", 1);
+  UPDATE_OPTION(rsb_algo, "PARRSB_RSB_ALGO", 1);
+  UPDATE_OPTION(rsb_pre, "PARRSB_RSB_PRE", 1);
+  UPDATE_OPTION(rsb_max_iter, "PARRSB_RSB_MAX_ITER", 1);
+  UPDATE_OPTION(rsb_two_level, "PARRSB_RSB_TWO_LEVEL", 1);
+  UPDATE_OPTION(rsb_tol, "PARRSB_RSB_TOL", 0);
+  UPDATE_OPTION(rsb_mg_grammian, "PARRSB_RSB_MG_GRAMMIAN", 1);
+  UPDATE_OPTION(rsb_mg_factor, "PARRSB_RSB_MG_FACTOR", 1);
+  UPDATE_OPTION(repair, "PARRSB_REPAIR", 1);
 }
 
 #undef UPDATE_OPTION
 
-#define PRINT_OPTION(opt, str) printf("%s = %d\n", str, options->opt)
+#define PRINT_OPTION(opt, str, is_int)                                         \
+  {                                                                            \
+    if (is_int)                                                                \
+      printf("%s = %d\n", str, options->opt);                                  \
+    else                                                                       \
+      printf("%s = %lf\n", str, options->opt);                                 \
+  }
 
 static void print_options(parrsb_options *options) {
-  PRINT_OPTION(partitioner, "PARRSB_PARTITIONER");
-  PRINT_OPTION(verbose_level, "PARRSB_VERBOSE_LEVEL");
-  PRINT_OPTION(profile_level, "PARRSB_PROFILE_LEVEL");
-  PRINT_OPTION(rsb_algo, "PARRSB_RSB_ALGO");
-  PRINT_OPTION(rsb_pre, "PARRSB_RSB_PRE");
-  PRINT_OPTION(rsb_grammian, "PARRSB_RSB_GRAMMIAN");
-  PRINT_OPTION(repair, "PARRSB_REPAIR");
-  PRINT_OPTION(rsb_mg_factor, "PARRSB_RSB_MG_FACTOR");
+  PRINT_OPTION(partitioner, "PARRSB_PARTITIONER", 1);
+  PRINT_OPTION(verbose_level, "PARRSB_VERBOSE_LEVEL", 1);
+  PRINT_OPTION(profile_level, "PARRSB_PROFILE_LEVEL", 1);
+  PRINT_OPTION(rsb_algo, "PARRSB_RSB_ALGO", 1);
+  PRINT_OPTION(rsb_pre, "PARRSB_RSB_PRE", 1);
+  PRINT_OPTION(rsb_max_iter, "PARRSB_RSB_MAX_ITER", 1);
+  PRINT_OPTION(rsb_two_level, "PARRSB_RSB_TWO_LEVEL", 1);
+  PRINT_OPTION(rsb_tol, "PARRSB_RSB_TOL", 0);
+  PRINT_OPTION(rsb_mg_grammian, "PARRSB_RSB_MG_GRAMMIAN", 1);
+  PRINT_OPTION(rsb_mg_factor, "PARRSB_RSB_MG_FACTOR", 1);
+  PRINT_OPTION(repair, "PARRSB_REPAIR", 1);
 }
 
 #undef PRINT_OPTION
@@ -195,7 +221,7 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
     int ndim = (nv == 8) ? 3 : 2;
     switch (options.partitioner) {
     case 0:
-      rsb(&elist, &options, nv, &ca, &bfr);
+      rsb(&elist, nv, &options, &ca, &bfr);
       break;
     case 1:
       rcb(&elist, esize, ndim, &ca, &bfr);
@@ -220,9 +246,9 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
 
   // Report time and finish
   genmap_barrier(&c);
-  t = comm_time() - t;
   if (c.id == 0 && options.verbose_level > 0) {
-    printf("par%s finished in %g s\n", ALGO[options.partitioner], t);
+    printf("par%s finished in %g s\n", ALGO[options.partitioner],
+           comm_time() - t);
     fflush(stdout);
   }
 

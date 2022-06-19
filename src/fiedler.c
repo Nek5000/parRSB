@@ -141,8 +141,8 @@ int inv_power_serial(double *y, uint N, double *A, int verbose) {
 }
 
 static int project(scalar *x, uint n, scalar *b, struct laplacian *L,
-                   struct mg *d, struct comm *c, int miter, int null_space,
-                   int verbose, buffer *bfr) {
+                   struct mg *d, struct comm *c, int miter, double tol,
+                   int null_space, int verbose, buffer *bfr) {
   slong out[2][1], buf[2][1], in = n;
   comm_scan(out, c, gs_long, gs_add, &in, 1, buf);
   ulong ng = out[1][0];
@@ -161,7 +161,7 @@ static int project(scalar *x, uint n, scalar *b, struct laplacian *L,
 
   scalar rr = dot(r, r, n);
   comm_allreduce(c, gs_double, gs_add, &rr, 1, buf);
-  scalar tol = 1e-3, rtol = rr * tol * tol;
+  scalar rtol = rr * tol * tol;
 
   for (i = 0; i < n; i++)
     z[i] = r[i];
@@ -200,12 +200,7 @@ static int project(scalar *x, uint n, scalar *b, struct laplacian *L,
     for (j = 0; j < n; j++)
       z0[j] = z[j];
 
-#if 1
     mg_vcycle(z, r, d, c, bfr);
-#else
-    for (j = 0; j < n; j++)
-      z[j] = r[j];
-#endif
 
     rzt = rz1;
     if (null_space)
@@ -251,7 +246,7 @@ static int project(scalar *x, uint n, scalar *b, struct laplacian *L,
 // Input z should be orthogonal to 1-vector, have unit norm.
 // inverse iteration should not change z.
 static int inverse(scalar *y, struct array *elements, int nv, scalar *z,
-                   struct comm *gsc, int miter, int mpass, int factor,
+                   struct comm *gsc, int miter, double tol, int factor,
                    int grammian, slong nelg, buffer *buf) {
   uint lelt = elements->n;
   struct rsb_element *elems = (struct rsb_element *)elements->ptr;
@@ -287,7 +282,7 @@ static int inverse(scalar *y, struct array *elements, int nv, scalar *z,
 
   for (i = 0; i < miter; i++) {
     metric_tic(gsc, RSB_PROJECT);
-    int ppfi = project(y, lelt, z, wl, d, gsc, 100, 1, 0, buf);
+    int ppfi = project(y, lelt, z, wl, d, gsc, 100, tol, 1, 0, buf);
     metric_toc(gsc, RSB_PROJECT);
     metric_acc(RSB_PROJECT_NITER, ppfi);
 
@@ -512,8 +507,8 @@ static int tqli(scalar *eVectors, scalar *eValues, sint n, scalar *diagonal,
 }
 
 static int lanczos_aux(scalar *diag, scalar *upper, scalar *rr, uint lelt,
-                       ulong nelg, int niter, scalar *f, struct laplacian *gl,
-                       struct comm *gsc, buffer *bfr) {
+                       ulong nelg, int niter, double tol, scalar *f,
+                       struct laplacian *gl, struct comm *gsc, buffer *bfr) {
   scalar *r = tcalloc(scalar, 3 * lelt), *p = r + lelt, *w = p + lelt;
   // vec_copy(r, f);
   uint i;
@@ -523,13 +518,14 @@ static int lanczos_aux(scalar *diag, scalar *upper, scalar *rr, uint lelt,
   // vec_ortho(gsc, r, nelg);
   ortho(r, lelt, nelg, gsc);
 
-  scalar eps = 1e-5, rtz1 = 1, pap = 0, alpha, beta, rtz2, pap_old;
+  scalar rtz1 = 1, pap = 0, alpha, beta, rtz2, pap_old;
 
   scalar rtr = dot(r, r, lelt), buf[2];
   comm_allreduce(gsc, gs_double, gs_add, &rtr, 1, buf);
-  scalar rnorm = sqrt(rtr), rni = 1.0 / rnorm, rtol = rnorm * eps;
+  scalar rnorm = sqrt(rtr), rtol = rnorm * tol;
 
   // vec_scale(rr[0], r, rni);
+  scalar rni = 1.0 / rnorm;
   for (i = 0; i < lelt; i++)
     rr[0 * lelt + i] = r[i] * rni;
 
@@ -601,7 +597,7 @@ static int lanczos_aux(scalar *diag, scalar *upper, scalar *rr, uint lelt,
 
 static int lanczos(scalar *fiedler, struct array *elements, int nv,
                    scalar *initv, struct comm *gsc, int miter, int mpass,
-                   slong nelg, buffer *bfr) {
+                   double tol, slong nelg, buffer *bfr) {
   metric_tic(gsc, RSB_LANCZOS);
 
   uint lelt = elements->n;
@@ -628,7 +624,8 @@ static int lanczos(scalar *fiedler, struct array *elements, int nv,
     iter = occa_lanczos_aux(alpha, beta, rr, lelt, nelg, miter, initv, wl, gsc,
                             bfr);
 #else
-    iter = lanczos_aux(alpha, beta, rr, lelt, nelg, miter, initv, wl, gsc, bfr);
+    iter = lanczos_aux(alpha, beta, rr, lelt, nelg, miter, tol, initv, wl, gsc,
+                       bfr);
 #endif
 
     // Use TQLI and find the minimum eigenvalue and associated vector
@@ -666,10 +663,9 @@ static int lanczos(scalar *fiedler, struct array *elements, int nv,
   return ipass;
 }
 
-int fiedler(struct array *elements, int nv, int miter, int mpass, int algo,
+int fiedler(struct array *elements, int nv, parrsb_options *options,
             struct comm *gsc, buffer *buf) {
   uint lelt = elements->n;
-  struct rsb_element *elems = (struct rsb_element *)elements->ptr;
 
   slong out[2][1], wrk[2][1], in = lelt;
   comm_scan(out, gsc, gs_long, gs_add, &in, 1, wrk);
@@ -695,10 +691,20 @@ int fiedler(struct array *elements, int nv, int miter, int mpass, int algo,
     initv[i] *= rni;
 
   int iter = 0;
-  if (algo == 0)
-    iter = lanczos(f, elements, nv, initv, gsc, miter, mpass, nelg, buf);
-  else if (algo == 1)
-    iter = inverse(f, elements, nv, initv, gsc, miter, mpass, 2, 0, nelg, buf);
+  switch (options->rsb_algo) {
+  case 0:
+    iter =
+        lanczos(f, elements, nv, initv, gsc, options->rsb_max_iter,
+                options->rsb_lanczos_max_restarts, options->rsb_tol, nelg, buf);
+    break;
+  case 1:
+    iter = inverse(f, elements, nv, initv, gsc, options->rsb_max_iter,
+                   options->rsb_tol, options->rsb_mg_factor,
+                   options->rsb_mg_grammian, nelg, buf);
+    break;
+  default:
+    break;
+  }
   metric_acc(RSB_FIEDLER_NITER, iter);
 
   GenmapScalar norm = 0;
@@ -713,6 +719,7 @@ int fiedler(struct array *elements, int nv, int miter, int mpass, int algo,
   for (uint i = 0; i < lelt; i++)
     f[i] *= normi;
 
+  struct rsb_element *elems = (struct rsb_element *)elements->ptr;
   for (uint i = 0; i < lelt; i++)
     elems[i].fiedler = f[i];
 

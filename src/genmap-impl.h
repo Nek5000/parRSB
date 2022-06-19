@@ -25,8 +25,6 @@ struct rcb_element {
   GenmapScalar coord[MAXDIM], fiedler;
 };
 
-int rcb(struct array *elements, size_t unit_size, int ndim, struct comm *c,
-        buffer *bfr);
 int rib(struct array *elements, size_t unit_size, int ndim, struct comm *c,
         buffer *bfr);
 
@@ -40,9 +38,6 @@ struct rsb_element {
   GenmapLong vertices[MAXNV];
   GenmapInt part;
 };
-
-int rsb(struct array *elements, parrsb_options *options, int nv,
-        struct comm *gc, buffer *bfr);
 
 //------------------------------------------------------------------------------
 // Laplacian
