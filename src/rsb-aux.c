@@ -68,13 +68,20 @@ int rsb(struct array *elements, int nv, parrsb_options *options,
   while (lc.np > 1) {
     // Run RCB, RIB pre-step or just sort by global id
     metric_tic(&lc, RSB_PRE);
-    if (options->rsb_pre == 0) // Sort by global id
+    switch (options->rsb_pre) {
+    case 0: // Sort by global id
       parallel_sort(struct rsb_element, elements, globalId, gs_long, 0, 1, &lc,
                     bfr);
-    else if (options->rsb_pre == 1) // RCB
+      break;
+    case 1: // RCB
       rcb(elements, sizeof(struct rsb_element), ndim, &lc, bfr);
-    else if (options->rsb_pre == 2) // RIB
+      break;
+    case 2: // RIB
       rib(elements, sizeof(struct rsb_element), ndim, &lc, bfr);
+      break;
+    default:
+      break;
+    }
     metric_toc(&lc, RSB_PRE);
 
     // Run fiedler

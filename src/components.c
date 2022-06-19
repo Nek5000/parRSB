@@ -326,8 +326,7 @@ int repair_partitions(struct array *elements, int nv, struct comm *tc,
 
     nelt = elements->n;
     cmpids = trealloc(sint, cmpids, nelt);
-    ncomp = get_components(cmpids, elements->ptr, tc, bfr, nelt, nv);
-    ncompg = ncomp;
+    ncompg = ncomp = get_components(cmpids, elements->ptr, tc, bfr, nelt, nv);
     comm_allreduce(lc, gs_long, gs_max, &ncompg, 1, &buf);
 
     free(cmpcnt);

@@ -4,16 +4,11 @@
 
 static void get_axis_len(double *length, size_t unit_size, char *elems,
                          uint nel, int ndim, struct comm *c) {
-  double min[3], max[3], buf[3];
-
-  sint i;
-  for (i = 0; i < ndim; i++) {
-    min[i] = DBL_MAX;
-    max[i] = -DBL_MAX;
-  }
+  double min[3] = {DBL_MAX, DBL_MAX, DBL_MAX},
+         max[3] = {-DBL_MAX, -DBL_MAX, -DBL_MAX};
 
   struct rcb_element *ei;
-  for (i = 0; i < nel; i++) {
+  for (uint i = 0; i < nel; i++) {
     ei = (struct rcb_element *)(elems + i * unit_size);
     if (ei->coord[0] < min[0])
       min[0] = ei->coord[0];
@@ -27,7 +22,7 @@ static void get_axis_len(double *length, size_t unit_size, char *elems,
   }
 
   if (ndim == 3) {
-    for (i = 0; i < nel; i++) {
+    for (uint i = 0; i < nel; i++) {
       ei = (struct rcb_element *)(elems + i * unit_size);
       if (ei->coord[2] < min[2])
         min[2] = ei->coord[2];
@@ -37,11 +32,12 @@ static void get_axis_len(double *length, size_t unit_size, char *elems,
   }
 
   if (c != NULL) {
-    comm_allreduce(c, gs_double, gs_min, min, 3, buf);
-    comm_allreduce(c, gs_double, gs_max, max, 3, buf);
+    double wrk[3];
+    comm_allreduce(c, gs_double, gs_min, min, 3, wrk);
+    comm_allreduce(c, gs_double, gs_max, max, 3, wrk);
   }
 
-  for (i = 0; i < ndim; i++)
+  for (uint i = 0; i < ndim; i++)
     length[i] = max[i] - min[i];
 }
 
@@ -145,7 +141,7 @@ static int rcb_level(struct array *a, size_t unit_size, int ndim,
 
 int rcb(struct array *elements, size_t unit_size, int ndim, struct comm *ci,
         buffer *bfr) {
-  struct comm c;
+  struct comm c, t;
   comm_dup(&c, ci);
 
   int size = c.np;
@@ -158,14 +154,12 @@ int rcb(struct array *elements, size_t unit_size, int ndim, struct comm *ci,
     if (rank < (size + 1) / 2)
       bin = 0;
 
-    MPI_Comm comm_rcb;
-    MPI_Comm_split(c.c, bin, rank, &comm_rcb);
+    comm_split(&c, bin, rank, &t);
     comm_free(&c);
-    comm_init(&c, comm_rcb);
-    MPI_Comm_free(&comm_rcb);
+    comm_dup(&c, &t);
+    comm_free(&t);
 
-    size = c.np;
-    rank = c.id;
+    size = c.np, rank = c.id;
   }
   comm_free(&c);
 
