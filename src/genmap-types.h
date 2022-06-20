@@ -3,11 +3,8 @@
 
 #include <float.h>
 
-typedef long long GenmapLong;
 typedef unsigned long long GenmapULong;
-#define GenmapLongFormat "%lld"
 #define GenmapULongFormat "%llu"
-#define GENMAP_LONG MPI_LONG_LONG
 #define GENMAP_UNSIGNED_LONG MPI_UNSIGNED_LONG_LONG
 
 typedef int GenmapInt;

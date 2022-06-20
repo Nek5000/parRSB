@@ -26,15 +26,13 @@ int GenmapFiedlerDump(const char *fname, struct rsb_element *elm, uint nelt,
   if (err != 0)
     return err;
 
-  slong out[2][1], buf[2][1];
-  slong in = nelt;
-  comm_scan(out, c, gs_long, gs_add, &nelt, 1, buf);
-  slong start = out[0][0];
-  slong nelgt = out[1][0];
+  slong out[2][1], buf[2][1], in = nelt;
+  comm_scan(out, c, gs_long, gs_add, &in, 1, buf);
+  slong start = out[0][0], nelgt = out[1][0];
 
   int ndim = (nv == 8) ? 3 : 2;
   uint write_size =
-      ((ndim + 1) * sizeof(double) + sizeof(GenmapLong) + sizeof(uint)) * nelt;
+      ((ndim + 1) * sizeof(double) + sizeof(slong) + sizeof(uint)) * nelt;
   if (rank == 0)
     write_size += sizeof(long) + sizeof(int); // for nelgt and ndim
 
@@ -144,14 +142,12 @@ int GenmapVectorDump(const char *fname, GenmapScalar *y,
   if (err != 0)
     return err;
 
-  slong out[2][1], buf[2][1];
-  slong in = nelt;
+  slong out[2][1], buf[2][1], in = nelt;
   comm_scan(out, c, gs_long, gs_add, &in, 1, buf);
-  slong start = out[0][0];
-  slong nelgt = out[1][0];
+  slong start = out[0][0], nelgt = out[1][0];
 
   int ndim = (nv == 8) ? 3 : 2;
-  uint write_size = ((ndim + 1) * sizeof(double) + sizeof(GenmapLong)) * nelt;
+  uint write_size = ((ndim + 1) * sizeof(double) + sizeof(slong)) * nelt;
   if (rank == 0)
     write_size += sizeof(long) + sizeof(int); // for nelgt and ndim
 

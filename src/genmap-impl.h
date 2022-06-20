@@ -35,7 +35,7 @@ struct rsb_element {
   GenmapInt proc, origin, seq;
   GenmapULong globalId;
   GenmapScalar coord[MAXDIM], fiedler;
-  GenmapLong vertices[MAXNV];
+  slong vertices[MAXNV];
   GenmapInt part;
 };
 
