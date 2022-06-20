@@ -21,7 +21,7 @@
 // `struct rsb_element` should be a superset of `struct rcb_element`
 struct rcb_element {
   GenmapInt proc, origin, seq;
-  GenmapULong globalId;
+  ulong globalId;
   GenmapScalar coord[MAXDIM], fiedler;
 };
 
@@ -33,7 +33,7 @@ int rib(struct array *elements, size_t unit_size, int ndim, struct comm *c,
 //
 struct rsb_element {
   GenmapInt proc, origin, seq;
-  GenmapULong globalId;
+  ulong globalId;
   GenmapScalar coord[MAXDIM], fiedler;
   slong vertices[MAXNV];
   GenmapInt part;

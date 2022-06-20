@@ -41,10 +41,10 @@ struct Mesh_private {
 typedef struct Mesh_private *Mesh;
 
 typedef struct {
-  GenmapULong sequenceId;
+  ulong sequenceId;
   int nNeighbors;
-  GenmapULong elementId;
-  GenmapULong vertexId;
+  ulong elementId;
+  ulong vertexId;
   uint workProc;
 } vertex;
 

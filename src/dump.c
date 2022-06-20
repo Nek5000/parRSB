@@ -45,7 +45,7 @@ int GenmapFiedlerDump(const char *fname, struct rsb_element *elm, uint nelt,
 
   uint i;
   for (i = 0; i < nelt; i++) {
-    write_T(pbuf0, &elm[i].globalId, GenmapULong, 1);
+    write_T(pbuf0, &elm[i].globalId, ulong, 1);
     write_T(pbuf0, elm[i].coord, double, ndim);
     write_T(pbuf0, &elm[i].fiedler, double, 1);
     write_T(pbuf0, &rank, uint, 1);
@@ -94,7 +94,7 @@ int GenmapElementDump(const char *fname, struct rsb_element *elm, uint nelt,
 
   if (c->id == 0)
     printf("nelgt = %d slong=%u int=%u ulong=%u\n", nelgt, sizeof(slong),
-           sizeof(int), sizeof(GenmapULong));
+           sizeof(int), sizeof(ulong));
 
   char *pbuf, *pbuf0;
   pbuf = pbuf0 = (char *)calloc(write_size, sizeof(char));
@@ -160,7 +160,7 @@ int GenmapVectorDump(const char *fname, GenmapScalar *y,
 
   uint i;
   for (i = 0; i < nelt; i++) {
-    write_T(pbuf0, &elm[i].globalId, GenmapULong, 1);
+    write_T(pbuf0, &elm[i].globalId, ulong, 1);
     write_T(pbuf0, &elm[i].coord[0], double, ndim);
     write_T(pbuf0, &y[i], double, 1);
   }
