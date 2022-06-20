@@ -37,44 +37,6 @@ struct fiedler {
   int part0, part1;
 };
 
-static sint converged(struct array *fdlr, GenmapScalar *fiedler, struct comm *c,
-                      slong nelg, buffer *buf) {
-  struct fiedler *ptr = fdlr->ptr;
-
-  uint i;
-  for (i = 0; i < fdlr->n; i++)
-    ptr[i].fiedler = fiedler[i];
-
-  parallel_sort(struct fiedler, fdlr, fiedler, gs_double, 0, 1, c, buf);
-
-  slong out[2][1], bfr[2][1], in = fdlr->n;
-  comm_scan(out, c, gs_long, gs_add, &in, 1, bfr);
-  slong start = out[0][0];
-
-  ptr = fdlr->ptr;
-  for (i = 0; i < fdlr->n; i++)
-    if (start + i < nelg / 2)
-      ptr[i].part1 = 0;
-    else
-      ptr[i].part1 = 1;
-
-  sint changed = 0;
-  for (i = 0; i < fdlr->n; i++) {
-    if (ptr[i].part1 != ptr[i].part0)
-      changed = 1;
-    ptr[i].part0 = ptr[i].part1;
-  }
-
-  struct crystal cr;
-  crystal_init(&cr, c);
-  sarray_transfer(struct fiedler, fdlr, proc, 0, &cr);
-  sarray_sort(struct fiedler, fdlr->ptr, fdlr->n, seq, 0, buf);
-  crystal_free(&cr);
-
-  comm_allreduce(c, gs_int, gs_add, &changed, 1, bfr);
-  return changed > 0 ? 0 : 1;
-}
-
 int power_serial(double *y, uint N, double *A, int verbose) {
   time_t t;
   srand((unsigned)time(&t));
@@ -408,7 +370,7 @@ static int tqli(scalar *eVectors, scalar *eValues, sint n, scalar *diagonal,
     eVectors[i * n + i] = 1;
   }
 
-  GenmapInt j, k, l, iter, m;
+  int j, k, l, iter, m;
   for (l = 0; l < n; l++) {
     iter = 0;
     do {
@@ -632,19 +594,17 @@ static int lanczos(scalar *fiedler, struct array *elements, int nv,
     tqli(eVectors, eValues, iter, alpha, beta, gsc->id);
 
     GenmapScalar eValMin = fabs(eValues[0]);
-    GenmapInt eValMinI = 0;
-    uint i;
-    for (i = 1; i < iter; i++) {
+    uint eValMinI = 0;
+    for (uint i = 1; i < iter; i++) {
       if (fabs(eValues[i]) < eValMin) {
         eValMin = fabs(eValues[i]);
         eValMinI = i;
       }
     }
 
-    GenmapInt j;
-    for (i = 0; i < lelt; i++) {
+    for (uint i = 0; i < lelt; i++) {
       fiedler[i] = 0.0;
-      for (j = 0; j < iter; j++)
+      for (uint j = 0; j < iter; j++)
         fiedler[i] += rr[j * lelt + i] * eVectors[eValMinI * iter + j];
     }
 

@@ -3,13 +3,6 @@
 
 #include <float.h>
 
-typedef int GenmapInt;
-typedef unsigned int GenmapUInt;
-#define GenmapIntFormat "%d"
-#define GenmapUIntFormat "%u"
-#define GENMAP_INT MPI_INT
-#define GENMAP_UNSIGNED_INT MPI_UNSIGNED_INT
-
 typedef double GenmapScalar;
 #define gs_scalar gs_double
 #define GenmapScalarFormat "%lf"

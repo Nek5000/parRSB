@@ -194,7 +194,7 @@ static int gs_weighted(GenmapScalar *v, struct laplacian *l, GenmapScalar *u,
 
   struct gs_laplacian *gl = l->data;
 
-  GenmapInt i, j;
+  uint i, j;
   for (i = 0; i < lelt; i++)
     for (j = 0; j < nv; j++)
       gl->u[nv * i + j] = u[i];

@@ -20,7 +20,7 @@
 // `struct rcb_element` is used for RCB and RIB partitioning.
 // `struct rsb_element` should be a superset of `struct rcb_element`
 struct rcb_element {
-  GenmapInt proc, origin, seq;
+  uint proc, origin, seq;
   ulong globalId;
   GenmapScalar coord[MAXDIM], fiedler;
 };
@@ -32,11 +32,10 @@ int rib(struct array *elements, size_t unit_size, int ndim, struct comm *c,
 // RSB
 //
 struct rsb_element {
-  GenmapInt proc, origin, seq;
+  uint proc, origin, seq;
   ulong globalId;
   GenmapScalar coord[MAXDIM], fiedler;
   slong vertices[MAXNV];
-  GenmapInt part;
 };
 
 //------------------------------------------------------------------------------
