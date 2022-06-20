@@ -20,26 +20,22 @@ extern "C" {
 //
 typedef struct {
   // General options
-  int partitioner;   // 0 - RSB, 1 - RCB, 2 - RIB (Default: 0)
-  int verbose_level; // 0, 1, 2, .. etc (Default: 1)
-  int profile_level; // 0, 1, 2, .. etc (Default: 1)
-
+  int partitioner;   // Partition algo: 0 - RSB, 1 - RCB, 2 - RIB (Default: 0)
+  int verbose_level; // Verbose level: 0, 1, 2, .. etc (Default: 1)
+  int profile_level; // Profile level: 0, 1, 2, .. etc (Default: 1)
+  int two_level;     // Use two level partitioning algo (Default: 0)
+  int repair; // Repair disconnected components: 0 - No, 1 - Yes (Default: 0)
   // RSB specific
-  int rsb_algo;      // 0 - Lanczos, 1 - RQI (Default: 0)
-  int rsb_pre;       // 0 - None, 1 - RCB , 2 - RIB (Default: 1)
-  int rsb_max_iter;  // Maximum iterations in Lanczos or RQI (Default: 50)
-  int rsb_two_level; // Two level RSB algorithm (Default: 0)
-  double rsb_tol;    // Tolerance for Lanczos or RQI (Default: 1e-3)
-
+  int rsb_algo; // RSB algo: 0 - Lanczos, 1 - RQI (Default: 0)
+  int rsb_pre;  // RSB pre-partition algo: 0 - None, 1 - RCB , 2 - RIB (Default:
+                // 1)
+  int rsb_max_iter; // Maximum iterations in Lanczos or RQI (Default: 50)
+  double rsb_tol;   // Tolerance for Lanczos or RQI (Default: 1e-3)
   // RSB-MG specific
-  int rsb_mg_grammian; // 0 or 1 (Default: 0)
-  int rsb_mg_factor;   // Coarsening factor for MG (>1) (Default: 2)
-
+  int rsb_mg_grammian; // MG Grammian: 0 or 1 (Default: 0)
+  int rsb_mg_factor;   // MG Coarsening factor (Default: 2, should be > 1)
   // RSB-Lanczos specific
   int rsb_lanczos_max_restarts; // Maximum restarts in Lanczos (Default: 50)
-
-  // Other
-  int repair; // 0 - No, 1 - Yes (Default: 0)
 } parrsb_options;
 
 extern parrsb_options parrsb_default_options;

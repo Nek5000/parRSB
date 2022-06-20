@@ -78,7 +78,7 @@ int rsb(struct array *elements, int nv, parrsb_options *options,
   comm_dup(&lc, gc);
 
   struct comm nc;
-  if (options->rsb_two_level) {
+  if (options->two_level) {
 #ifdef MPI
     MPI_Comm node;
     MPI_Comm_split_type(lc.c, MPI_COMM_TYPE_SHARED, lc.id, MPI_INFO_NULL,
@@ -91,7 +91,7 @@ int rsb(struct array *elements, int nv, parrsb_options *options,
   }
 
   sint np, nid;
-  get_part(&np, &nid, options->rsb_two_level, &lc, &nc);
+  get_part(&np, &nid, options->two_level, &lc, &nc);
   while (np > 1) {
     // Run RCB, RIB pre-step or just sort by global id
     metric_tic(&lc, RSB_PRE);
@@ -136,14 +136,14 @@ int rsb(struct array *elements, int nv, parrsb_options *options,
     comm_dup(&lc, &tc);
     comm_free(&tc);
 
-    get_part(&np, &nid, options->rsb_two_level, &lc, &nc);
+    get_part(&np, &nid, options->two_level, &lc, &nc);
     metric_push_level();
   }
   comm_free(&lc);
 
   // Partition within the node
-  if (options->rsb_two_level) {
-    options->rsb_two_level = 0;
+  if (options->two_level) {
+    options->two_level = 0;
     rsb(elements, nv, options, &nc, bfr);
     comm_free(&nc);
   }

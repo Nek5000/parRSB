@@ -13,20 +13,21 @@ extern int rcb(struct array *elements, size_t unit_size, int ndim,
                struct comm *ci, buffer *bfr);
 
 parrsb_options parrsb_default_options = {
-    0, // 0 - RSB, 1 - RCB, 2 -RIB
+    0, // Partition algo
     1, // Verbose level
     1, // Profile level
-    // RSB
-    0,    // 0 - Lanczos, 1 RQI
-    1,    // 0 - None, 1 - RCB, 2 - RIB
-    50,   // Maiximum Lanczos or RQI iterations
-    0,    // Two level algorithm
+    0, // Use two level partitioning algo
+    0, // Repair disconnected components
+    // RSB specific
+    0,    // RSB algo
+    1,    // RSB pre-partition algo
+    50,   // Maiximum iterations in Lanczos or RQI
     1e-5, // Tolerance for Lanczos or RQI iteration
-    0,    // MG Grammian
-    2,    // MG coarsening factor
-    50,   // Lanczos maximum restarts
-    // Other
-    0 // Repair
+    // RSB-MG specific
+    0, // MG Grammian
+    2, // MG coarsening factor
+    // RSB-Lanczos specific
+    50 // Lanczos maximum restarts
 };
 
 static char *ALGO[3] = {"RSB", "RCB", "RIB"};
@@ -46,14 +47,15 @@ static void update_options(parrsb_options *options) {
   UPDATE_OPTION(partitioner, "PARRSB_PARTITIONER", 1);
   UPDATE_OPTION(verbose_level, "PARRSB_VERBOSE_LEVEL", 1);
   UPDATE_OPTION(profile_level, "PARRSB_PROFILE_LEVEL", 1);
+  UPDATE_OPTION(two_level, "PARRSB_TWO_LEVEL", 1);
+  UPDATE_OPTION(repair, "PARRSB_REPAIR", 1);
   UPDATE_OPTION(rsb_algo, "PARRSB_RSB_ALGO", 1);
   UPDATE_OPTION(rsb_pre, "PARRSB_RSB_PRE", 1);
   UPDATE_OPTION(rsb_max_iter, "PARRSB_RSB_MAX_ITER", 1);
-  UPDATE_OPTION(rsb_two_level, "PARRSB_RSB_TWO_LEVEL", 1);
   UPDATE_OPTION(rsb_tol, "PARRSB_RSB_TOL", 0);
   UPDATE_OPTION(rsb_mg_grammian, "PARRSB_RSB_MG_GRAMMIAN", 1);
   UPDATE_OPTION(rsb_mg_factor, "PARRSB_RSB_MG_FACTOR", 1);
-  UPDATE_OPTION(repair, "PARRSB_REPAIR", 1);
+  UPDATE_OPTION(rsb_lanczos_max_restarts, "PARRSB_RSB_LANCZOS_MAX_RESTARTS", 1);
 }
 
 #undef UPDATE_OPTION
@@ -70,14 +72,15 @@ static void print_options(parrsb_options *options) {
   PRINT_OPTION(partitioner, "PARRSB_PARTITIONER", 1);
   PRINT_OPTION(verbose_level, "PARRSB_VERBOSE_LEVEL", 1);
   PRINT_OPTION(profile_level, "PARRSB_PROFILE_LEVEL", 1);
+  PRINT_OPTION(two_level, "PARRSB_TWO_LEVEL", 1);
+  PRINT_OPTION(repair, "PARRSB_REPAIR", 1);
   PRINT_OPTION(rsb_algo, "PARRSB_RSB_ALGO", 1);
   PRINT_OPTION(rsb_pre, "PARRSB_RSB_PRE", 1);
   PRINT_OPTION(rsb_max_iter, "PARRSB_RSB_MAX_ITER", 1);
-  PRINT_OPTION(rsb_two_level, "PARRSB_RSB_TWO_LEVEL", 1);
   PRINT_OPTION(rsb_tol, "PARRSB_RSB_TOL", 0);
   PRINT_OPTION(rsb_mg_grammian, "PARRSB_RSB_MG_GRAMMIAN", 1);
   PRINT_OPTION(rsb_mg_factor, "PARRSB_RSB_MG_FACTOR", 1);
-  PRINT_OPTION(repair, "PARRSB_REPAIR", 1);
+  PRINT_OPTION(rsb_lanczos_max_restarts, "PARRSB_RSB_LANCZOS_MAX_RESTARTS", 1);
 }
 
 #undef PRINT_OPTION
