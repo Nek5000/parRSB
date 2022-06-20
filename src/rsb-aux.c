@@ -63,8 +63,8 @@ static void get_part(sint *np, sint *nid, int two_lvl, struct comm *lc,
   if (two_lvl) {
     sint out[2][1], wrk[2][1], in = (nc->id == 0);
     comm_scan(out, lc, gs_int, gs_add, &in, 1, &wrk);
-    *nid = out[0][0], *np = out[0][0];
-    comm_allreduce(nc, gs_int, gs_min, nid, 1, wrk);
+    *nid = (nc->id == 0) * out[0][0], *np = out[1][0];
+    comm_allreduce(nc, gs_int, gs_max, nid, 1, wrk);
   } else {
     *np = lc->np, *nid = lc->id;
   }
