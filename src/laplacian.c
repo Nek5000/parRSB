@@ -14,7 +14,7 @@ struct laplacian {
 struct csr_laplacian {
   struct par_mat *M;
   struct gs_data *gsh;
-  GenmapScalar *buf;
+  scalar *buf;
 };
 
 static void find_nbrs_rsb(struct array *arr, const struct rsb_element *elems,
@@ -80,7 +80,7 @@ static int par_csr_init(struct laplacian *l, const struct rsb_element *elems,
   L->gsh = setup_Q(L->M, c, bfr);
 
   uint nnz = M->rn > 0 ? M->adj_off[M->rn] + M->rn : 0;
-  L->buf = tcalloc(GenmapScalar, nnz);
+  L->buf = tcalloc(scalar, nnz);
 
   crystal_free(&cr);
 
@@ -105,7 +105,7 @@ static int par_csc_init(struct laplacian *l, const struct rsb_element *elems,
   L->gsh = setup_Q(L->M, c, bfr);
 
   uint nnz = M->rn > 0 ? M->adj_off[M->rn] + M->rn : 0;
-  L->buf = tcalloc(GenmapScalar, nnz);
+  L->buf = tcalloc(scalar, nnz);
 
   crystal_free(&cr);
 
@@ -115,7 +115,7 @@ static int par_csc_init(struct laplacian *l, const struct rsb_element *elems,
   return 0;
 }
 
-static int par_csr(GenmapScalar *v, const struct laplacian *l, GenmapScalar *u,
+static int par_csr(scalar *v, const struct laplacian *l, scalar *u,
                    buffer *bfr) {
   struct csr_laplacian *L = (struct csr_laplacian *)l->data;
   if (L != NULL) {
@@ -125,7 +125,7 @@ static int par_csr(GenmapScalar *v, const struct laplacian *l, GenmapScalar *u,
   return 1;
 }
 
-static int par_csc(GenmapScalar *v, const struct laplacian *l, GenmapScalar *u,
+static int par_csc(scalar *v, const struct laplacian *l, scalar *u,
                    buffer *bfr) {
 #if 0
   struct csr_laplacian *L = (struct csr_laplacian *)l->data;
@@ -151,7 +151,7 @@ static int par_csr_free(struct laplacian *l) {
 // Laplacian - GS
 //
 struct gs_laplacian {
-  GenmapScalar *diag, *u;
+  scalar *diag, *u;
   struct gs_data *gsh;
 };
 
@@ -166,7 +166,7 @@ static int gs_weighted_init(struct laplacian *l, struct rsb_element *elems,
       vertices[i * nv + j] = elems[i].vertices[j];
 
   struct gs_laplacian *gl = l->data = tcalloc(struct gs_laplacian, 1);
-  gl->u = tcalloc(GenmapScalar, npts);
+  gl->u = tcalloc(scalar, npts);
   for (i = 0; i < lelt; i++)
     for (j = 0; j < nv; j++)
       gl->u[nv * i + j] = 1.0;
@@ -174,7 +174,7 @@ static int gs_weighted_init(struct laplacian *l, struct rsb_element *elems,
   gl->gsh = gs_setup(vertices, npts, c, 0, gs_crystal_router, 0);
   gs(gl->u, gs_double, gs_add, 0, gl->gsh, buf);
 
-  gl->diag = tcalloc(GenmapScalar, lelt);
+  gl->diag = tcalloc(scalar, lelt);
   for (i = 0; i < lelt; i++) {
     gl->diag[i] = 0.0;
     for (j = 0; j < nv; j++)
@@ -187,8 +187,7 @@ static int gs_weighted_init(struct laplacian *l, struct rsb_element *elems,
   return 0;
 }
 
-static int gs_weighted(GenmapScalar *v, struct laplacian *l, GenmapScalar *u,
-                       buffer *buf) {
+static int gs_weighted(scalar *v, struct laplacian *l, scalar *u, buffer *buf) {
   uint lelt = l->nel;
   int nv = l->nv;
 
@@ -245,8 +244,7 @@ struct laplacian *laplacian_init(struct rsb_element *elems, uint nel, int nv,
   return l;
 }
 
-int laplacian(GenmapScalar *v, struct laplacian *l, GenmapScalar *u,
-              buffer *buf) {
+int laplacian(scalar *v, struct laplacian *l, scalar *u, buffer *buf) {
   if (l->type & CSR)
     par_csr(v, l, u, buf);
   else if (l->type & CSC)

@@ -32,7 +32,7 @@ inline static void ortho(scalar *q, uint lelt, ulong n, struct comm *c) {
 }
 
 struct fiedler {
-  GenmapScalar fiedler;
+  scalar fiedler;
   uint proc, seq;
   int part0, part1;
 };
@@ -42,19 +42,19 @@ int power_serial(double *y, uint N, double *A, int verbose) {
   srand((unsigned)time(&t));
 
   int i;
-  GenmapScalar norm = 0.0;
+  scalar norm = 0.0;
   for (i = 0; i < N; i++) {
     y[i] = (rand() % 50) / 50.0;
     norm += y[i] * y[i];
   }
 
-  GenmapScalar normi = 1.0 / sqrt(norm);
+  scalar normi = 1.0 / sqrt(norm);
   for (i = 0; i < N; i++)
     y[i] *= normi;
 
   double *Ay = tcalloc(double, N);
   int j, k, l;
-  GenmapScalar err = 1.0, lambda;
+  scalar err = 1.0, lambda;
   for (i = 0; i < 100; i++) {
     norm = 0.0;
     for (j = 0; j < N; j++) {
@@ -346,8 +346,8 @@ static int inverse(scalar *y, struct array *elements, int nv, scalar *z,
   return i == miter ? i : i + 1;
 }
 
-static double sign(GenmapScalar a, GenmapScalar b) {
-  GenmapScalar m = b >= 0.0 ? 1.0 : -1.0;
+static double sign(scalar a, scalar b) {
+  scalar m = b >= 0.0 ? 1.0 : -1.0;
   return fabs(a) * m;
 }
 
@@ -391,15 +391,15 @@ static int tqli(scalar *eVectors, scalar *eValues, sint n, scalar *diagonal,
           return 1;
         }
 
-        GenmapScalar g = (d[l + 1] - d[l]) / (2.0 * e[l]);
-        GenmapScalar r = sqrt(g * g + 1.0);
+        scalar g = (d[l + 1] - d[l]) / (2.0 * e[l]);
+        scalar r = sqrt(g * g + 1.0);
 
         g = d[m] - d[l] + e[l] / (g + sign(r, g));
-        GenmapScalar s = 1.0, c = 1.0, p = 0.0;
+        scalar s = 1.0, c = 1.0, p = 0.0;
 
         for (i = m - 1; i >= l; i--) {
-          GenmapScalar f = s * e[i];
-          GenmapScalar b = c * e[i];
+          scalar f = s * e[i];
+          scalar b = c * e[i];
 
           if (fabs(f) >= fabs(g)) {
             c = g / f;
@@ -442,7 +442,7 @@ static int tqli(scalar *eVectors, scalar *eValues, sint n, scalar *diagonal,
   /* Orthnormalize eigenvectors -- Just normalize? */
   for (i = 0; i < n; i++) {
     for (j = 0; j < i; j++) {
-      GenmapScalar tmp = eVectors[i * n + j];
+      scalar tmp = eVectors[i * n + j];
       eVectors[i * n + j] = eVectors[j * n + i];
       eVectors[j * n + i] = tmp;
     }
@@ -454,7 +454,7 @@ static int tqli(scalar *eVectors, scalar *eValues, sint n, scalar *diagonal,
       e[k] += eVectors[k * n + i] * eVectors[k * n + i];
     if (e[k] > 0.0)
       e[k] = sqrt(fabs(e[k]));
-    GenmapScalar scale = 1.0 / e[k];
+    scalar scale = 1.0 / e[k];
     for (uint i = 0; i < n; i++)
       eVectors[k * n + i] *= scale;
   }
@@ -593,7 +593,7 @@ static int lanczos(scalar *fiedler, struct array *elements, int nv,
     // Use TQLI and find the minimum eigenvalue and associated vector
     tqli(eVectors, eValues, iter, alpha, beta, gsc->id);
 
-    GenmapScalar eValMin = fabs(eValues[0]);
+    scalar eValMin = fabs(eValues[0]);
     uint eValMinI = 0;
     for (uint i = 1; i < iter; i++) {
       if (fabs(eValues[i]) < eValMin) {
@@ -667,11 +667,11 @@ int fiedler(struct array *elements, int nv, parrsb_options *options,
   }
   metric_acc(RSB_FIEDLER_NITER, iter);
 
-  GenmapScalar norm = 0;
+  scalar norm = 0;
   for (uint i = 0; i < lelt; i++)
     norm += f[i] * f[i];
 
-  GenmapScalar normi;
+  scalar normi;
   comm_allreduce(gsc, gs_double, gs_add, &norm, 1, &normi);
   normi = 1.0 / sqrt(norm);
 

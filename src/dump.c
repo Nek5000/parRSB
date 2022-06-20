@@ -128,9 +128,8 @@ int GenmapElementDump(const char *fname, struct rsb_element *elm, uint nelt,
   return err;
 }
 
-int GenmapVectorDump(const char *fname, GenmapScalar *y,
-                     struct rsb_element *elm, uint nelt, int nv,
-                     struct comm *c) {
+int GenmapVectorDump(const char *fname, scalar *y, struct rsb_element *elm,
+                     uint nelt, int nv, struct comm *c) {
   MPI_File file;
   int err = MPI_File_open(c->c, fname, MPI_MODE_CREATE | MPI_MODE_WRONLY,
                           MPI_INFO_NULL, &file);

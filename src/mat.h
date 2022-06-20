@@ -3,9 +3,20 @@
 
 #include <gslib.h>
 
-#ifndef scalar
-#define scalar double
+#ifdef scalar
+#undef scalar
 #endif
+#define scalar double
+
+#ifdef SCALAR_MAX
+#undef SCALAR_MAX
+#endif
+#define SCALAR_MAX DBL_MAX
+
+#ifdef gs_scalar
+#undef gs_scalar
+#endif
+#define gs_scalar gs_double
 
 struct nbr {
   ulong r, c;

@@ -16,7 +16,7 @@
 #define GC_MAX_FACE_VERTICES 4
 
 struct point_t {
-  GenmapScalar dx, x[3];
+  scalar dx, x[3];
   uint proc, origin;
   int ifSegment;
   ulong sequenceId, elementId, globalId;
@@ -150,12 +150,12 @@ int findMinNeighborDistance(Mesh mesh) {
 
   uint i, j, k;
   int neighbor;
-  GenmapScalar d;
+  scalar d;
 
   if (nDim == 3) {
     for (i = 0; i < mesh->elements.n; i += nVertex) {
       for (j = 0; j < nVertex; j++) {
-        p[i + j].dx = GENMAP_SCALAR_MAX;
+        p[i + j].dx = SCALAR_MAX;
         for (k = 0; k < mesh->nNeighbors; k++) {
           neighbor = NEIGHBOR_MAP[j][k];
           d = distance_3d(&p[i + j], &p[i + neighbor]);
@@ -166,7 +166,7 @@ int findMinNeighborDistance(Mesh mesh) {
   } else if (nDim == 2) {
     for (i = 0; i < mesh->elements.n; i += nVertex) {
       for (j = 0; j < nVertex; j++) {
-        p[i + j].dx = GENMAP_SCALAR_MAX;
+        p[i + j].dx = SCALAR_MAX;
         for (k = 0; k < mesh->nNeighbors; k++) {
           neighbor = NEIGHBOR_MAP[j][k];
           d = distance_2d(&p[i + j], &p[i + neighbor]);
@@ -354,16 +354,15 @@ static int sendLastPoint(struct array *arr, Mesh mesh, struct comm *c) {
   return 0;
 }
 
-static int findSegments(Mesh mesh, struct comm *c, int i,
-                        GenmapScalar tolSquared) {
+static int findSegments(Mesh mesh, struct comm *c, int i, scalar tolSquared) {
   Point pts = mesh->elements.ptr;
   sint npts = mesh->elements.n;
   int nDim = mesh->nDim;
 
   sint j;
   for (j = 1; j < npts; j++) {
-    GenmapScalar d = diff_sqr(pts[j].x[i], pts[j - 1].x[i]);
-    GenmapScalar dx = min(pts[j].dx, pts[j - 1].dx) * tolSquared;
+    scalar d = diff_sqr(pts[j].x[i], pts[j - 1].x[i]);
+    scalar dx = min(pts[j].dx, pts[j - 1].dx) * tolSquared;
 
     if (d > dx)
       pts[j].ifSegment = 1;
@@ -375,8 +374,8 @@ static int findSegments(Mesh mesh, struct comm *c, int i,
 
     if (c->id > 0) {
       struct point_t *lastp = arr.ptr;
-      GenmapScalar d = diff_sqr(lastp->x[i], pts->x[i]);
-      GenmapScalar dx = min(lastp->dx, pts->dx) * tolSquared;
+      scalar d = diff_sqr(lastp->x[i], pts->x[i]);
+      scalar dx = min(lastp->dx, pts->dx) * tolSquared;
       if (d > dx)
         pts->ifSegment = 1;
     }
@@ -524,9 +523,9 @@ static int rearrangeSegments(Mesh mesh, struct comm *seg, buffer *bfr) {
   return 0;
 }
 
-static int findUniqueVertices(Mesh mesh, struct comm *c, GenmapScalar tol,
+static int findUniqueVertices(Mesh mesh, struct comm *c, scalar tol,
                               int verbose, buffer *bfr) {
-  GenmapScalar tolSquared = tol * tol;
+  scalar tolSquared = tol * tol;
   int nDim = mesh->nDim;
 
   initSegment(mesh, c);
@@ -773,10 +772,10 @@ static int findConnectedPeriodicPairs(Mesh mesh, BoundaryFace f_,
   int nDim = mesh->nDim;
 
   int i, j;
-  GenmapScalar fMax = 0.0, gMax = 0.0;
+  scalar fMax = 0.0, gMax = 0.0;
 
   for (i = 0; i < nDim; i++) {
-    GenmapScalar meanF = 0.0, meanG = 0.0;
+    scalar meanF = 0.0, meanG = 0.0;
 
     for (j = 0; j < nvf; j++) {
       fMax = max(fMax, fabs(f.face[j].x[i]));
@@ -792,7 +791,7 @@ static int findConnectedPeriodicPairs(Mesh mesh, BoundaryFace f_,
   }
 
   int shift = 0, k;
-  GenmapScalar d2Min = 1.e20, d2;
+  scalar d2Min = 1.e20, d2;
   for (i = 0; i < nvf; i++) {
     d2 = 0.0;
     for (j = 0; j < nvf; j++) {
@@ -810,8 +809,8 @@ static int findConnectedPeriodicPairs(Mesh mesh, BoundaryFace f_,
   }
   d2Min = sqrt(d2Min);
 
-  GenmapScalar fgMax = max(fMax, gMax);
-  GenmapScalar tol = (1e-3) * fgMax;
+  scalar fgMax = max(fMax, gMax);
+  scalar tol = (1e-3) * fgMax;
   if (d2Min > tol) {
     fprintf(stderr,
             "Faces did not match: (d2Min,tol,face1,face2): "

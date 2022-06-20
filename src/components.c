@@ -13,7 +13,7 @@ struct unmarked {
 struct ielem_t {
   uint index, orig;
   sint dest;
-  GenmapScalar fiedler;
+  scalar fiedler;
 };
 
 // Check the bin value
