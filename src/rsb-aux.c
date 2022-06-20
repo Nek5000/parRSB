@@ -92,6 +92,12 @@ int rsb(struct array *elements, int nv, parrsb_options *options,
 
   sint np, nid;
   get_part(&np, &nid, options->two_level, &lc, &nc);
+  if (options->two_level && options->verbose_level) {
+    if (gc->id == 0)
+      printf("Number of nodes = %d\n", np);
+    fflush(stdout);
+  }
+
   while (np > 1) {
     // Run RCB, RIB pre-step or just sort by global id
     metric_tic(&lc, RSB_PRE);
