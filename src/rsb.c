@@ -22,7 +22,7 @@ parrsb_options parrsb_default_options = {
     0,    // RSB algo
     1,    // RSB pre-partition algo
     50,   // Maiximum iterations in Lanczos or RQI
-    1e-5, // Tolerance for Lanczos or RQI iteration
+    1e-3, // Tolerance for Lanczos or RQI iteration
     // RSB-MG specific
     0, // MG Grammian
     2, // MG coarsening factor

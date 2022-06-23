@@ -235,7 +235,7 @@ static int inverse(scalar *y, struct array *elements, int nv, scalar *z,
   struct crystal cr;
   crystal_init(&cr, gsc);
   struct par_mat *L = par_csr_setup_con(lelt, eid, vtx, nv, 1, gsc, &cr, buf);
-  struct mg *d = mg_setup(L, factor, &cr, buf);
+  struct mg *d = mg_setup(L, factor, 0, &cr, buf);
   crystal_free(&cr);
 
   scalar *err = tcalloc(scalar, 2 * lelt + miter * (lelt + miter + 1));

@@ -1,6 +1,6 @@
+#include "genmap-impl.h"
+#include "sort.h"
 #include <float.h>
-#include <genmap-impl.h>
-#include <sort.h>
 
 extern int power_serial(double *y, int N, double *A, int verbose);
 

@@ -4,7 +4,7 @@
 struct mg_lvl {
   uint npres, nposts;
   scalar over;
-  struct gs_data *J; // Interpolation from level i to i + 1
+  struct gs_data *J; // Interpolation from level l to l + 1
   struct gs_data *Q; // gs handle for matrix vector product
   struct par_mat *M;
 };
@@ -52,20 +52,86 @@ static void inline set_proc(struct mij *m, uint nelt, uint nrem, uint np) {
   assert(m->p >= 0 && m->p < np);
 }
 
+extern int sparse_gemm(struct par_mat *WG, const struct par_mat *W,
+                       const struct par_mat *G, struct crystal *cr,
+                       buffer *bfr);
+
 static void mg_setup_aux(struct mg *d, const uint lvl, const int factor,
-                         const struct comm *c, struct crystal *cr,
-                         struct array *entries, buffer *bfr) {
+                         const int sagg, struct crystal *cr, struct array *mijs,
+                         buffer *bfr) {
   assert(lvl > 0);
-  struct par_mat *M = d->levels[lvl - 1]->M;
-  uint nnz = M->rn > 0 ? M->adj_off[M->rn] + M->rn : 0;
+  struct par_mat *Ml = d->levels[lvl - 1]->M;
+  uint nnz = Ml->rn > 0 ? Ml->adj_off[Ml->rn] + Ml->rn : 0;
 
-  // Reserve enough space in the array
-  array_reserve(struct mij, entries, nnz), entries->n = 0;
+  struct mij m = {.r = 0, .c = 0, .idx = 0, .p = 0, .v = 0};
+  array_reserve(struct mij, mijs, nnz), mijs->n = 0;
 
-  // Reserve enough memory for gs ids for interpolation
-  slong *ids = (slong *)tcalloc(slong, 2 * M->rn);
+  struct par_mat *M;
+  // Replace M by the following if Smoothe aggregation has to be used
+  // S = (I - sigma * D^{-1} * Ml)
+  // M = S * Ml * S'
+  if (sagg) {
+    // This is very hacky and not optimal at all. Should be rewritten.
+    // Create S' is in CSC format
+    struct par_mat S;
+    const double sigma = 0.65;
+    for (uint i = 0; i < Ml->rn; i++) {
+      m.c = m.r = Ml->rows[i], m.v = 1 - sigma;
+      array_cat(struct mij, mijs, &m, 1);
+      double di = 1.0 / Ml->diag_val[i];
+      for (uint j = Ml->adj_off[i], je = Ml->adj_off[i + 1]; j < je; j++) {
+        m.r = Ml->cols[Ml->adj_idx[j]], m.v = -sigma * di * M->adj_val[j];
+        array_cat(struct mij, mijs, &m, 1);
+      }
+    }
+    par_mat_setup(&S, mijs, 0, 0, bfr);
 
+    // Create N = M in CSR format
+    struct par_mat N;
+    mijs->n = 0;
+    for (uint i = 0; i < Ml->rn; i++) {
+      m.c = m.r = Ml->rows[i], m.v = Ml->diag_val[i];
+      array_cat(struct mij, mijs, &m, 1);
+      for (uint j = Ml->adj_off[i], je = Ml->adj_off[i + 1]; j < je; j++) {
+        m.c = Ml->cols[Ml->adj_off[j]], m.v = Ml->adj_val[j];
+        array_cat(struct mij, mijs, &m, 1);
+      }
+    }
+    par_mat_setup(&N, mijs, 1, 0, bfr);
+
+    // T = N * S'
+    struct par_mat T;
+    sparse_gemm(&T, &N, &S, cr, bfr);
+    par_mat_free(&N), par_mat_free(&S);
+
+    // Setup S
+    mijs->n = 0;
+    for (uint i = 0; i < Ml->rn; i++) {
+      m.c = m.r = Ml->rows[i], m.v = 1 - sigma;
+      array_cat(struct mij, mijs, &m, 1);
+      double di = 1.0 / Ml->diag_val[i];
+      for (uint j = Ml->adj_off[i], je = Ml->adj_off[i + 1]; j < je; j++) {
+        m.c = Ml->cols[Ml->adj_idx[j]], m.v = -sigma * di * M->adj_val[j];
+        array_cat(struct mij, mijs, &m, 1);
+      }
+    }
+    par_mat_setup(&S, mijs, 1, 0, bfr);
+
+    // Convert T to CSC format
+    par_csr_to_csc(&N, &T, cr, bfr);
+    par_mat_free(&T);
+
+    // M = S * N
+    M = tcalloc(struct par_mat, 1);
+    sparse_gemm(M, &S, &N, cr, bfr);
+    par_mat_free(&N), par_mat_free(&S);
+  } else {
+    M = Ml;
+  }
+
+  // Now we interpolate to find the coarse operator Mc = J^T M J
   // Calculate coarse level parameters: ngc, npc, nelt, nrem
+  struct comm *c = &cr->comm;
   slong out[2][1], wrk[2][1], in = M->rn;
   comm_scan(out, c, gs_long, gs_add, &in, 1, wrk);
   ulong ng = out[1][0];
@@ -81,27 +147,34 @@ static void mg_setup_aux(struct mg *d, const uint lvl, const int factor,
   comm_allreduce(c, gs_long, gs_min, &rs, 1, wrk);
   rs -= 1;
 
+  // Reserve enough memory for ids used for interpolation
+  slong *ids = (slong *)tcalloc(slong, 2 * M->rn);
+
+  mijs->n = 0;
   uint i, j, je, k = 0;
-  struct mij m;
   for (i = 0; i < M->rn; i++) {
     m.r = (M->rows[i] - rs) / factor, m.r += (m.r == 0);
     set_proc(&m, nelt, nrem, npc);
     for (j = M->adj_off[i], je = M->adj_off[i + 1]; j < je; j++) {
       m.c = (M->cols[M->adj_idx[j]] - rs) / factor, m.c += (m.c == 0);
       m.v = M->adj_val[j];
-      array_cat(struct mij, entries, &m, 1);
+      array_cat(struct mij, mijs, &m, 1);
     }
-    m.c = m.r;
-    m.v = M->diag_val[i];
+    m.c = m.r, m.v = M->diag_val[i];
     ids[k++] = -m.c;
-    array_cat(struct mij, entries, &m, 1);
+    array_cat(struct mij, mijs, &m, 1);
   }
 
-  sarray_transfer(struct mij, entries, p, 0, cr);
-  sarray_sort_2(struct mij, entries->ptr, entries->n, r, 1, c, 1, bfr);
+  if (sagg) {
+    par_mat_free(M);
+    free(M);
+  }
+
+  sarray_transfer(struct mij, mijs, p, 0, cr);
+  sarray_sort_2(struct mij, mijs->ptr, mijs->n, r, 1, c, 1, bfr);
 
   struct mg_lvl *l = d->levels[lvl] = tcalloc(struct mg_lvl, 1);
-  M = l->M = par_csr_setup_ext(entries, 1, bfr);
+  M = l->M = par_csr_setup_ext(mijs, 1, bfr);
 
   // Setup gs ids for coarse level (rhs interpolation )
   ids = (slong *)trealloc(slong, ids, k + M->rn);
@@ -113,13 +186,12 @@ static void mg_setup_aux(struct mg *d, const uint lvl, const int factor,
   d->levels[lvl]->Q = setup_Q(M, c, bfr);
 }
 
-struct mg *mg_setup(const struct par_mat *M, const int factor,
+struct mg *mg_setup(const struct par_mat *M, const int factor, const int sagg,
                     struct crystal *cr, buffer *bfr) {
   assert(IS_CSR(M));
   assert(M->rn == 0 || IS_DIAG(M));
 
   struct comm *c = &cr->comm;
-
   slong out[2][1], wrk[2][1], in = M->rn;
   comm_scan(out, c, gs_long, gs_add, &in, 1, wrk);
   slong rg = out[1][0];
@@ -154,7 +226,7 @@ struct mg *mg_setup(const struct par_mat *M, const int factor,
 
   uint l = 1;
   for (; l < d->nlevels; l++) {
-    mg_setup_aux(d, l, factor, c, cr, &mijs, bfr);
+    mg_setup_aux(d, l, factor, sagg, cr, &mijs, bfr);
     struct par_mat *Ml = d->levels[l]->M;
     if (Ml->rn > 0 && Ml->adj_off[Ml->rn] + Ml->rn > nnz)
       nnz = Ml->adj_off[Ml->rn] + Ml->rn;

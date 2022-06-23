@@ -3,8 +3,6 @@
 #include <stdlib.h>
 #include <time.h>
 
-#include <genmap-impl.h>
-
 #if defined(GENMAP_UNDERSCORE)
 #define FNAME(x) TOKEN_PASTE(x, _)
 #else

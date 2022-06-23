@@ -439,21 +439,20 @@ static int sparse_sub(struct par_mat *C, const struct par_mat *A,
   return 0;
 }
 
-static int sparse_gemm(struct par_mat *WG, const struct par_mat *W,
-                       const struct par_mat *G, struct crystal *cr,
-                       buffer *bfr) {
+int sparse_gemm(struct par_mat *WG, const struct par_mat *W,
+                const struct par_mat *G, struct crystal *cr, buffer *bfr) {
   // W is in CSR, G is in CSC; we multiply rows of W by shifting
   // the columns of G from processor to processor. This is not scalable
   // at all -- need to do a 2D partition of the matrices W and G.
-  assert(IS_CSR(W));
-  assert(IS_CSC(G));
+  assert(IS_CSR(W) && !IS_DIAG(W));
+  assert(IS_CSC(G) && !IS_DIAG(G));
 
   // Put G into an array to transfer from processor to processor
   struct array gij, sij;
   array_init(struct mij, &gij, 100);
   array_init(struct mij, &sij, 100);
 
-  struct mij m;
+  struct mij m = {.r = 0, .c = 0, .idx = 0, .p = 0, .v = 0};
   uint i, j, je;
   for (i = 0; i < G->cn; i++) {
     m.c = G->cols[i], m.p = cr->comm.id;
@@ -495,9 +494,7 @@ static int sparse_gemm(struct par_mat *WG, const struct par_mat *W,
   }
 
   par_csr_setup(WG, &sij, 0, bfr);
-
-  array_free(&gij);
-  array_free(&sij);
+  array_free(&gij), array_free(&sij);
 
   return 0;
 }
@@ -527,7 +524,7 @@ static struct mg *schur_precond_setup(const struct mat *L,
   par_mat_free(&G);
   par_mat_free(&WG);
 
-  return mg_setup(P, 2, cr, bfr);
+  return mg_setup(P, 8, 0, cr, bfr);
 }
 
 static struct gs_data *setup_Ezl_Q(struct par_mat *E, ulong s, uint n,
