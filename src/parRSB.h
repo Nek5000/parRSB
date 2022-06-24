@@ -30,7 +30,7 @@ typedef struct {
   int rsb_pre;  // RSB pre-partition algo: 0 - None, 1 - RCB , 2 - RIB (Default:
                 // 1)
   int rsb_max_iter; // Maximum iterations in Lanczos or RQI (Default: 50)
-  double rsb_tol;   // Tolerance for Lanczos or RQI (Default: 1e-3)
+  double rsb_tol;   // Tolerance for Lanczos or RQI (Default: 1e-5)
   // RSB-MG specific
   int rsb_mg_grammian; // MG Grammian: 0 or 1 (Default: 0)
   int rsb_mg_factor;   // MG Coarsening factor (Default: 2, should be > 1)
