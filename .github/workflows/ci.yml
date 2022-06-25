@@ -27,9 +27,7 @@ jobs:
         shell: bash
         run: |
           # Build gslib
-          wget --no-check-certificate -O v${GSVER}.tar.gz http://github.com/gslib/gslib/archive/v${GSVER}.tar.gz
-          mkdir gslib
-          tar -zxvf v${GSVER}.tar.gz -C ./gslib --strip-components=1
+          git clone https://github.com/thilinarmtb/gslib.git -b api_changes
           make -C gslib -j4
 
           # Build parRSB
@@ -122,9 +120,7 @@ jobs:
         shell: bash
         run: |
           # Build gslib
-          wget --no-check-certificate -O v${GSVER}.tar.gz http://github.com/gslib/gslib/archive/v${GSVER}.tar.gz
-          mkdir gslib
-          tar -zxvf v${GSVER}.tar.gz -C ./gslib --strip-components=1
+          git clone https://github.com/thilinarmtb/gslib.git -b api_changes
           make -C gslib -j4
 
           # Build parRSB
@@ -192,9 +188,7 @@ jobs:
         shell: bash
         run: |
           # Build gslib
-          wget --no-check-certificate -O v${GSVER}.tar.gz http://github.com/gslib/gslib/archive/v${GSVER}.tar.gz
-          mkdir gslib
-          tar -zxvf v${GSVER}.tar.gz -C ./gslib --strip-components=1
+          git clone https://github.com/thilinarmtb/gslib.git -b api_changes
           make -C gslib -j4
 
           # Build parRSB
