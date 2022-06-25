@@ -8,9 +8,6 @@ extern int schur_solve(scalar *x, scalar *b, scalar tol, struct coarse *crs,
                        buffer *bfr);
 extern int schur_free(struct coarse *crs);
 
-extern void comm_split(const struct comm *old, int bin, int key,
-                       struct comm *new_);
-
 struct coarse {
   int type;
   ulong ls, lg, is, ig;

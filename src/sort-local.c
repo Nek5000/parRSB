@@ -9,12 +9,9 @@ static int sort_field(struct array *arr, size_t usize, gs_dom t, uint off,
   case gs_double:
     gslib_sortp_double(buf, keep, (double *)((char *)ptr + off), nunits, usize);
     break;
-#if 0 // FIXME
-    case gs_float:
-        gslib_sortp_float (buf, keep, (float *)((char*)ptr+off), 
-            nunits, usize);
-      break;
-#endif
+  case gs_float:
+    gslib_sortp_float(buf, keep, (float *)((char *)ptr + off), nunits, usize);
+    break;
   case gs_long: // FIXME gs_ulong
     gslib_sortp_ull(buf, keep, (ulong *)((char *)ptr + off), nunits, usize);
     break;

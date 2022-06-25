@@ -4,9 +4,6 @@
 #define CSC 0
 #define CSR 1
 
-extern void comm_split(const struct comm *old, int bin, int key,
-                       struct comm *new_);
-
 //=============================================================================
 // ILU levels
 //

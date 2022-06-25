@@ -82,6 +82,5 @@ int occa_free();
 //
 int log2ll(long long n);
 void genmap_barrier(struct comm *c);
-void comm_split(const struct comm *old, int bin, int key, struct comm *new_);
 
 #endif
