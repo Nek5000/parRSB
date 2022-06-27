@@ -26,6 +26,7 @@ parrsb_options parrsb_default_options = {
     // RSB-MG specific
     0, // MG Grammian
     2, // MG coarsening factor
+    0, // MG smooth aggregation
     // RSB-Lanczos specific
     50 // Lanczos maximum restarts
 };
@@ -55,6 +56,7 @@ static void update_options(parrsb_options *options) {
   UPDATE_OPTION(rsb_tol, "PARRSB_RSB_TOL", 0);
   UPDATE_OPTION(rsb_mg_grammian, "PARRSB_RSB_MG_GRAMMIAN", 1);
   UPDATE_OPTION(rsb_mg_factor, "PARRSB_RSB_MG_FACTOR", 1);
+  UPDATE_OPTION(rsb_mg_sagg, "PARRSB_RSB_MG_SMOOTH_AGGREGATION", 1);
   UPDATE_OPTION(rsb_lanczos_max_restarts, "PARRSB_RSB_LANCZOS_MAX_RESTARTS", 1);
 }
 
@@ -80,6 +82,7 @@ static void print_options(parrsb_options *options) {
   PRINT_OPTION(rsb_tol, "PARRSB_RSB_TOL", 0);
   PRINT_OPTION(rsb_mg_grammian, "PARRSB_RSB_MG_GRAMMIAN", 1);
   PRINT_OPTION(rsb_mg_factor, "PARRSB_RSB_MG_FACTOR", 1);
+  PRINT_OPTION(rsb_mg_sagg, "PARRSB_RSB_MG_SMOOTH_AGGREGATION", 1);
   PRINT_OPTION(rsb_lanczos_max_restarts, "PARRSB_RSB_LANCZOS_MAX_RESTARTS", 1);
 }
 

@@ -209,7 +209,7 @@ static int project(scalar *x, uint n, scalar *b, struct laplacian *L,
 // inverse iteration should not change z.
 static int inverse(scalar *y, struct array *elements, int nv, scalar *z,
                    struct comm *gsc, int miter, double tol, int factor,
-                   int grammian, slong nelg, buffer *buf) {
+                   int sagg, int grammian, slong nelg, buffer *buf) {
   uint lelt = elements->n;
   struct rsb_element *elems = (struct rsb_element *)elements->ptr;
 
@@ -235,7 +235,7 @@ static int inverse(scalar *y, struct array *elements, int nv, scalar *z,
   struct crystal cr;
   crystal_init(&cr, gsc);
   struct par_mat *L = par_csr_setup_con(lelt, eid, vtx, nv, 1, gsc, &cr, buf);
-  struct mg *d = mg_setup(L, factor, 0, &cr, buf);
+  struct mg *d = mg_setup(L, factor, sagg, &cr, buf);
   crystal_free(&cr);
 
   scalar *err = tcalloc(scalar, 2 * lelt + miter * (lelt + miter + 1));
@@ -623,7 +623,7 @@ static int lanczos(scalar *fiedler, struct array *elements, int nv,
   return ipass;
 }
 
-int fiedler(struct array *elements, int nv, parrsb_options *options,
+int fiedler(struct array *elements, int nv, parrsb_options *opts,
             struct comm *gsc, buffer *buf) {
   uint lelt = elements->n;
 
@@ -651,16 +651,15 @@ int fiedler(struct array *elements, int nv, parrsb_options *options,
     initv[i] *= rni;
 
   int iter = 0;
-  switch (options->rsb_algo) {
+  switch (opts->rsb_algo) {
   case 0:
-    iter =
-        lanczos(f, elements, nv, initv, gsc, options->rsb_max_iter,
-                options->rsb_lanczos_max_restarts, options->rsb_tol, nelg, buf);
+    iter = lanczos(f, elements, nv, initv, gsc, opts->rsb_max_iter,
+                   opts->rsb_lanczos_max_restarts, opts->rsb_tol, nelg, buf);
     break;
   case 1:
-    iter = inverse(f, elements, nv, initv, gsc, options->rsb_max_iter,
-                   options->rsb_tol, options->rsb_mg_factor,
-                   options->rsb_mg_grammian, nelg, buf);
+    iter = inverse(f, elements, nv, initv, gsc, opts->rsb_max_iter,
+                   opts->rsb_tol, opts->rsb_mg_factor, opts->rsb_mg_sagg,
+                   opts->rsb_mg_grammian, nelg, buf);
     break;
   default:
     break;

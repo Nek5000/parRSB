@@ -34,6 +34,7 @@ typedef struct {
   // RSB-MG specific
   int rsb_mg_grammian; // MG Grammian: 0 or 1 (Default: 0)
   int rsb_mg_factor;   // MG Coarsening factor (Default: 2, should be > 1)
+  int rsb_mg_sagg;     // MG smooth aggregation: 0 or 1 (Default: 0)
   // RSB-Lanczos specific
   int rsb_lanczos_max_restarts; // Maximum restarts in Lanczos (Default: 50)
 } parrsb_options;
