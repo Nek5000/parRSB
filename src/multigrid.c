@@ -53,7 +53,7 @@ static void inline set_proc(struct mij *m, uint nelt, uint nrem, uint np) {
 }
 
 extern int sparse_gemm(struct par_mat *WG, const struct par_mat *W,
-                       const struct par_mat *G, struct crystal *cr,
+                       const struct par_mat *G, int diag_wg, struct crystal *cr,
                        buffer *bfr);
 
 static void mg_setup_aux(struct mg *d, const uint lvl, const int factor,
@@ -64,66 +64,73 @@ static void mg_setup_aux(struct mg *d, const uint lvl, const int factor,
   uint nnz = Ml->rn > 0 ? Ml->adj_off[Ml->rn] + Ml->rn : 0;
 
   struct mij m = {.r = 0, .c = 0, .idx = 0, .p = 0, .v = 0};
-  array_reserve(struct mij, mijs, nnz), mijs->n = 0;
+  array_reserve(struct mij, mijs, nnz);
 
+  const double sigma = 0.65;
   struct par_mat *M;
-  // Replace M by the following if Smoothe aggregation has to be used
+  // Replace M by the following if smooth aggregation is used:
   // S = (I - sigma * D^{-1} * Ml)
-  // M = S * Ml * S'
+  // M = ST * Ml * S
   if (sagg) {
     // This is very hacky and not optimal at all. Should be rewritten.
-    // Create S' is in CSC format
-    struct par_mat S;
-    const double sigma = 0.65;
+    // Create S is in CSC format, no separate diagonal.
+    struct par_mat S, T;
+    mijs->n = 0;
     for (uint i = 0; i < Ml->rn; i++) {
       m.c = m.r = Ml->rows[i], m.v = 1 - sigma;
       array_cat(struct mij, mijs, &m, 1);
       double di = 1.0 / Ml->diag_val[i];
       for (uint j = Ml->adj_off[i], je = Ml->adj_off[i + 1]; j < je; j++) {
-        m.r = Ml->cols[Ml->adj_idx[j]], m.v = -sigma * di * M->adj_val[j];
+        m.c = Ml->cols[Ml->adj_idx[j]];
+        m.v = -sigma * di * Ml->adj_val[j];
         array_cat(struct mij, mijs, &m, 1);
       }
     }
-    par_mat_setup(&S, mijs, 0, 0, bfr);
+    par_mat_setup(&T, mijs, 1, 0, bfr);
+    par_csr_to_csc(&S, &T, cr, bfr);
+    par_mat_free(&T);
 
-    // Create N = M in CSR format
+    // Create N = M in CSR format, no separate diagonal.
     struct par_mat N;
     mijs->n = 0;
     for (uint i = 0; i < Ml->rn; i++) {
       m.c = m.r = Ml->rows[i], m.v = Ml->diag_val[i];
       array_cat(struct mij, mijs, &m, 1);
       for (uint j = Ml->adj_off[i], je = Ml->adj_off[i + 1]; j < je; j++) {
-        m.c = Ml->cols[Ml->adj_off[j]], m.v = Ml->adj_val[j];
+        m.c = Ml->cols[Ml->adj_idx[j]];
+        m.v = Ml->adj_val[j];
         array_cat(struct mij, mijs, &m, 1);
       }
     }
     par_mat_setup(&N, mijs, 1, 0, bfr);
 
-    // T = N * S'
-    struct par_mat T;
-    sparse_gemm(&T, &N, &S, cr, bfr);
+    // T = N * S, CSR format, no diagonal.
+    sparse_gemm(&T, &N, &S, 0, cr, bfr);
     par_mat_free(&N), par_mat_free(&S);
 
-    // Setup S
+    // N = T, CSC format, no diagonal.
+    par_csr_to_csc(&N, &T, cr, bfr);
+    par_mat_free(&T);
+
+    // Setup ST, CSR format, no separate diagonal.
     mijs->n = 0;
     for (uint i = 0; i < Ml->rn; i++) {
       m.c = m.r = Ml->rows[i], m.v = 1 - sigma;
       array_cat(struct mij, mijs, &m, 1);
       double di = 1.0 / Ml->diag_val[i];
       for (uint j = Ml->adj_off[i], je = Ml->adj_off[i + 1]; j < je; j++) {
-        m.c = Ml->cols[Ml->adj_idx[j]], m.v = -sigma * di * M->adj_val[j];
+        m.r = Ml->cols[Ml->adj_idx[j]];
+        m.v = -sigma * di * Ml->adj_val[j];
         array_cat(struct mij, mijs, &m, 1);
       }
     }
-    par_mat_setup(&S, mijs, 1, 0, bfr);
-
-    // Convert T to CSC format
-    par_csr_to_csc(&N, &T, cr, bfr);
+    par_mat_setup(&T, mijs, 0, 0, bfr);
+    par_csc_to_csr(&S, &T, cr, bfr);
     par_mat_free(&T);
 
-    // M = S * N
+    // M = ST * N
     M = tcalloc(struct par_mat, 1);
-    sparse_gemm(M, &S, &N, cr, bfr);
+    sparse_gemm(M, &S, &N, 1, cr, bfr);
     par_mat_free(&N), par_mat_free(&S);
   } else {
     M = Ml;

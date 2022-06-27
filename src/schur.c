@@ -440,7 +440,8 @@ static int sparse_sub(struct par_mat *C, const struct par_mat *A,
 }
 
 int sparse_gemm(struct par_mat *WG, const struct par_mat *W,
-                const struct par_mat *G, struct crystal *cr, buffer *bfr) {
+                const struct par_mat *G, int diag_wg, struct crystal *cr,
+                buffer *bfr) {
   // W is in CSR, G is in CSC; we multiply rows of W by shifting
   // the columns of G from processor to processor. This is not scalable
   // at all -- need to do a 2D partition of the matrices W and G.
@@ -493,7 +494,7 @@ int sparse_gemm(struct par_mat *WG, const struct par_mat *W,
     ptr = gij.ptr;
   }
 
-  par_csr_setup(WG, &sij, 0, bfr);
+  par_csr_setup(WG, &sij, diag_wg, bfr);
   array_free(&gij), array_free(&sij);
 
   return 0;
@@ -508,7 +509,7 @@ static struct mg *schur_precond_setup(const struct mat *L,
   struct par_mat W, G, WG;
   schur_setup_G(&G, 0.1, L, F, S->rows, S->rn, cr, bfr);
   schur_setup_W(&W, 0.1, L, E, S->rows, S->rn, cr, bfr);
-  sparse_gemm(&WG, &W, &G, cr, bfr);
+  sparse_gemm(&WG, &W, &G, 0, cr, bfr);
 #ifdef DUMPWG
   par_mat_print(&WG);
 #endif
