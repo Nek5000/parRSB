@@ -61,7 +61,7 @@ static void mg_setup_aux(struct mg *d, const uint lvl, const int factor,
                          buffer *bfr) {
   assert(lvl > 0);
   struct par_mat *Ml = d->levels[lvl - 1]->M;
-  uint nnz = Ml->rn > 0 ? Ml->adj_off[Ml->rn] + Ml->rn : 0;
+  uint nnz = ((Ml->rn > 0) ? (Ml->adj_off[Ml->rn] + Ml->rn) : 0);
 
   struct mij m = {.r = 0, .c = 0, .idx = 0, .p = 0, .v = 0};
   array_reserve(struct mij, mijs, nnz);

@@ -524,22 +524,20 @@ void par_csr_to_csc(struct par_mat *N, const struct par_mat *M,
                     struct crystal *cr, buffer *bfr) {
   assert(IS_CSR(M) && !IS_DIAG(M));
 
-  slong *cols = tcalloc(slong, M->cn);
+  slong *cols = tcalloc(slong, M->cn + M->rn);
   for (uint i = 0; i < M->cn; i++)
-    cols[i] = M->cols[i];
+    cols[i] = -M->cols[i];
+  for (uint i = 0; i < M->rn; i++)
+    cols[M->cn + i] = M->rows[i];
 
   struct comm *c = &cr->comm;
-  struct gs_data *gsh = gs_setup(cols, M->cn, c, 0, gs_pairwise, 0);
+  struct gs_data *gsh = gs_setup(cols, M->cn + M->rn, c, 0, gs_pairwise, 0);
 
   sint *owner = (sint *)cols;
-  if (M->rn > 0) {
-    for (uint i = 0; i < M->cn; i++) {
-      if (M->cols[i] >= M->rows[0] || M->cols[i] <= M->rows[M->rn - 1])
-        owner[i] = c->id;
-      else
-        owner[i] = -1;
-    }
-  }
+  for (uint i = 0; i < M->cn; i++)
+    owner[i] = -1;
+  for (uint i = 0; i < M->rn; i++)
+    owner[M->cn + i] = c->id;
 
   gs(owner, gs_int, gs_max, 0, gsh, bfr);
   gs_free(gsh);
@@ -552,8 +550,9 @@ void par_csr_to_csc(struct par_mat *N, const struct par_mat *M,
   for (uint i = 0; i < M->rn; i++) {
     m.r = M->rows[i];
     for (uint j = M->adj_off[i], je = M->adj_off[i + 1]; j < je; j++) {
-      m.c = M->cols[M->adj_idx[j]], m.p = owner[M->adj_idx[j]];
-      m.v = M->adj_val[M->adj_idx[j]];
+      m.c = M->cols[M->adj_idx[j]];
+      m.p = owner[M->adj_idx[j]];
+      m.v = M->adj_val[j];
       array_cat(struct mij, &mijs, &m, 1);
     }
   }
@@ -568,22 +567,20 @@ void par_csc_to_csr(struct par_mat *N, const struct par_mat *M,
                     struct crystal *cr, buffer *bfr) {
   assert(IS_CSC(M) && !IS_DIAG(M));
 
-  slong *rows = tcalloc(slong, M->rn);
+  slong *rows = tcalloc(slong, M->rn + M->cn);
   for (uint i = 0; i < M->rn; i++)
-    rows[i] = M->rows[i];
+    rows[i] = -M->rows[i];
+  for (uint i = 0; i < M->cn; i++)
+    rows[M->rn + i] = M->cols[i];
 
   struct comm *c = &cr->comm;
-  struct gs_data *gsh = gs_setup(rows, M->rn, c, 0, gs_pairwise, 0);
+  struct gs_data *gsh = gs_setup(rows, M->rn + M->cn, c, 0, gs_pairwise, 0);
 
   sint *owner = (sint *)rows;
-  if (M->cn > 0) {
-    for (uint i = 0; i < M->rn; i++) {
-      if (M->rows[i] >= M->cols[0] || M->rows[i] <= M->cols[M->cn - 1])
-        owner[i] = c->id;
-      else
-        owner[i] = -1;
-    }
-  }
+  for (uint i = 0; i < M->rn; i++)
+    owner[i] = -1;
+  for (uint i = 0; i < M->cn; i++)
+    owner[M->rn + i] = c->id;
 
   gs(owner, gs_int, gs_max, 0, gsh, bfr);
   gs_free(gsh);
@@ -596,8 +593,9 @@ void par_csc_to_csr(struct par_mat *N, const struct par_mat *M,
   for (uint i = 0; i < M->cn; i++) {
     m.c = M->cols[i];
     for (uint j = M->adj_off[i], je = M->adj_off[i + 1]; j < je; j++) {
-      m.r = M->rows[M->adj_idx[j]], m.p = owner[M->adj_idx[j]];
-      m.v = M->adj_val[M->adj_idx[j]];
+      m.r = M->rows[M->adj_idx[j]];
+      m.p = owner[M->adj_idx[j]];
+      m.v = M->adj_val[j];
       array_cat(struct mij, &mijs, &m, 1);
     }
   }
