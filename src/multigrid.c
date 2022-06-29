@@ -5,8 +5,12 @@ struct mg_lvl {
   uint npres, nposts;
   scalar over;
   struct gs_data *J; // Interpolation from level l to l + 1
+
   struct gs_data *Q; // gs handle for matrix vector product
-  struct par_mat *M;
+  struct par_mat *M; // Operator
+
+  struct gs_data *Qs, *Qst; // gs handle for matrix vector product
+  struct par_mat *S, *St;   // Smooth aggregation
 };
 
 struct mg {
@@ -60,8 +64,10 @@ static void mg_setup_aux(struct mg *d, const uint lvl, const int factor,
                          const int sagg, struct crystal *cr, struct array *mijs,
                          buffer *bfr) {
   assert(lvl > 0);
-  struct par_mat *Ml = d->levels[lvl - 1]->M;
-  uint nnz = ((Ml->rn > 0) ? (Ml->adj_off[Ml->rn] + Ml->rn) : 0);
+  struct mg_lvl *l = d->levels[lvl - 1];
+
+  struct par_mat *Ml = l->M;
+  uint nnz = (Ml->rn > 0) ? (Ml->adj_off[Ml->rn] + Ml->rn) : 0;
 
   struct mij m = {.r = 0, .c = 0, .idx = 0, .p = 0, .v = 0};
   array_reserve(struct mij, mijs, nnz);
@@ -73,8 +79,8 @@ static void mg_setup_aux(struct mg *d, const uint lvl, const int factor,
   // M = ST * Ml * S
   if (sagg) {
     // This is very hacky and not optimal at all. Should be rewritten.
-    // Create S is in CSC format, no separate diagonal.
-    struct par_mat S, T;
+    // Create S is in CSR format, with separate diagonal. Then convert
+    // to CSC with no separate diagonal in order to do the mat-vec.
     mijs->n = 0;
     for (uint i = 0; i < Ml->rn; i++) {
       m.c = m.r = Ml->rows[i], m.v = 1 - sigma;
@@ -86,12 +92,13 @@ static void mg_setup_aux(struct mg *d, const uint lvl, const int factor,
         array_cat(struct mij, mijs, &m, 1);
       }
     }
-    par_mat_setup(&T, mijs, 1, 0, bfr);
-    par_csr_to_csc(&S, &T, cr, bfr);
-    par_mat_free(&T);
+    l->S = tcalloc(struct par_mat, 1);
+    par_mat_setup(l->S, mijs, 1, 1, bfr);
+
+    struct par_mat S;
+    par_csr_to_csc(&S, l->S, cr, bfr);
 
     // Create N = M in CSR format, no separate diagonal.
-    struct par_mat N;
     mijs->n = 0;
     for (uint i = 0; i < Ml->rn; i++) {
       m.c = m.r = Ml->rows[i], m.v = Ml->diag_val[i];
@@ -102,17 +109,19 @@ static void mg_setup_aux(struct mg *d, const uint lvl, const int factor,
         array_cat(struct mij, mijs, &m, 1);
       }
     }
+    struct par_mat N;
     par_mat_setup(&N, mijs, 1, 0, bfr);
 
-    // T = N * S, CSR format, no diagonal.
+    // T = N * S, CSR format, no separate diagonal.
+    struct par_mat T;
     sparse_gemm(&T, &N, &S, 0, cr, bfr);
     par_mat_free(&N), par_mat_free(&S);
 
-    // N = T, CSC format, no diagonal.
+    // N = T, CSC format, no separate diagonal.
     par_csr_to_csc(&N, &T, cr, bfr);
     par_mat_free(&T);
 
-    // Setup ST, CSR format, no separate diagonal.
+    // Setup S^t, CSR format, no separate diagonal.
     mijs->n = 0;
     for (uint i = 0; i < Ml->rn; i++) {
       m.c = m.r = Ml->rows[i], m.v = 1 - sigma;
@@ -125,14 +134,17 @@ static void mg_setup_aux(struct mg *d, const uint lvl, const int factor,
       }
     }
     par_mat_setup(&T, mijs, 0, 0, bfr);
-    par_csc_to_csr(&S, &T, cr, bfr);
+
+    l->St = tcalloc(struct par_mat, 1);
+    par_csc_to_csr(l->St, &T, cr, bfr);
     par_mat_free(&T);
 
     // M = ST * N
     M = tcalloc(struct par_mat, 1);
-    sparse_gemm(M, &S, &N, 1, cr, bfr);
-    par_mat_free(&N), par_mat_free(&S);
+    sparse_gemm(M, l->St, &N, 1, cr, bfr);
+    par_mat_free(&N);
   } else {
+    l->S = l->St = NULL;
     M = Ml;
   }
 
@@ -180,7 +192,7 @@ static void mg_setup_aux(struct mg *d, const uint lvl, const int factor,
   sarray_transfer(struct mij, mijs, p, 0, cr);
   sarray_sort_2(struct mij, mijs->ptr, mijs->n, r, 1, c, 1, bfr);
 
-  struct mg_lvl *l = d->levels[lvl] = tcalloc(struct mg_lvl, 1);
+  l = d->levels[lvl] = tcalloc(struct mg_lvl, 1);
   M = l->M = par_csr_setup_ext(mijs, 1, bfr);
 
   // Setup gs ids for coarse level (rhs interpolation )
@@ -304,6 +316,7 @@ void mg_vcycle(scalar *u1, scalar *rhs, struct mg *d, struct comm *c,
         r[off + j] = r[off + j] - Gs[off + j];
     }
 
+    // TODO: Apply St
     // Interpolate to coarser level
     gs(r + off, gs_double, gs_add, 1, l->J, bfr);
   }
@@ -328,6 +341,8 @@ void mg_vcycle(scalar *u1, scalar *rhs, struct mg *d, struct comm *c,
     // J*e
     gs(r + off, gs_double, gs_add, 0, l->J, bfr);
 
+    // TODO: Apply S
+
     // u = u + over*J*e
     n = lvl_off[lvl + 1] - off;
     for (j = 0; j < n; j++)
@@ -343,12 +358,16 @@ void mg_free(struct mg *d) {
   if (d != NULL) {
     struct mg_lvl **l = d->levels;
     for (uint i = 0; i < d->nlevels; i++) {
-      if (l[i]->M != NULL)
-        par_mat_free(l[i]->M), l[i]->M = NULL;
       if (l[i]->J != NULL)
         gs_free(l[i]->J), l[i]->J = NULL;
       if (l[i]->Q != NULL)
         gs_free(l[i]->Q), l[i]->Q = NULL;
+      if (l[i]->M != NULL)
+        par_mat_free(l[i]->M), l[i]->M = NULL;
+      if (l[i]->S != NULL)
+        par_mat_free(l[i]->S), l[i]->S = NULL;
+      if (l[i]->St != NULL)
+        par_mat_free(l[i]->St), l[i]->St = NULL;
       if (l[i] != NULL)
         free(l[i]), l[i] = NULL;
     }

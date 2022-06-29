@@ -522,7 +522,7 @@ int par_mat_setup(struct par_mat *M, struct array *mijs, const int type,
 
 void par_csr_to_csc(struct par_mat *N, const struct par_mat *M,
                     struct crystal *cr, buffer *bfr) {
-  assert(IS_CSR(M) && !IS_DIAG(M));
+  assert(IS_CSR(M));
 
   slong *cols = tcalloc(slong, M->cn + M->rn);
   for (uint i = 0; i < M->cn; i++)
@@ -553,6 +553,14 @@ void par_csr_to_csc(struct par_mat *N, const struct par_mat *M,
       m.c = M->cols[M->adj_idx[j]];
       m.p = owner[M->adj_idx[j]];
       m.v = M->adj_val[j];
+      array_cat(struct mij, &mijs, &m, 1);
+    }
+  }
+  if (IS_DIAG(M)) {
+    for (uint i = 0; i < M->rn; i++) {
+      m.r = m.c = M->rows[i];
+      m.v = M->diag_val[i];
+      m.p = owner[M->diag_idx[i]];
       array_cat(struct mij, &mijs, &m, 1);
     }
   }
