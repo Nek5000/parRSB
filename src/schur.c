@@ -446,28 +446,35 @@ int sparse_gemm(struct par_mat *WG, const struct par_mat *W,
   // the columns of G from processor to processor. This is not scalable
   // at all -- need to do a 2D partition of the matrices W and G.
   assert(IS_CSR(W) && !IS_DIAG(W));
-  assert(IS_CSC(G) && !IS_DIAG(G));
+  assert(IS_CSC(G));
 
   // Put G into an array to transfer from processor to processor
   struct array gij, sij;
   array_init(struct mij, &gij, 100);
   array_init(struct mij, &sij, 100);
 
-  struct mij m = {.r = 0, .c = 0, .idx = 0, .p = 0, .v = 0};
+  struct mij m = {.r = 0, .c = 0, .idx = 0, .p = cr->comm.id, .v = 0};
   uint i, j, je;
   for (i = 0; i < G->cn; i++) {
-    m.c = G->cols[i], m.p = cr->comm.id;
+    m.c = G->cols[i];
     for (j = G->adj_off[i], je = G->adj_off[i + 1]; j != je; j++) {
       m.r = G->rows[G->adj_idx[j]];
       m.v = G->adj_val[j];
       array_cat(struct mij, &gij, &m, 1);
     }
   }
+  if (IS_DIAG(G)) {
+    for (i = 0; i < G->cn; i++) {
+      m.c = m.r = G->cols[i];
+      m.v = G->diag_val[i];
+      array_cat(struct mij, &gij, &m, 1);
+    }
+  }
 
   sarray_sort_2(struct mij, gij.ptr, gij.n, r, 1, c, 1, bfr);
-  struct mij *ptr = (struct mij *)gij.ptr;
+  struct mij *pg = (struct mij *)gij.ptr;
   for (i = 0; i < gij.n; i++)
-    ptr[i].idx = i;
+    pg[i].idx = i;
 
   uint idx;
   for (uint p = 0; p < cr->comm.np; p++) {
@@ -475,11 +482,11 @@ int sparse_gemm(struct par_mat *WG, const struct par_mat *W,
       m.r = W->rows[i], idx = 0;
       for (j = W->adj_off[i], je = W->adj_off[i + 1]; j < je; j++) {
         ulong k = W->cols[W->adj_idx[j]];
-        while (idx < gij.n && ptr[idx].r < k)
+        while (idx < gij.n && pg[idx].r < k)
           idx++;
-        while (idx < gij.n && ptr[idx].r == k) {
-          m.c = ptr[idx].c;
-          m.v = W->adj_val[j] * ptr[idx].v, idx++;
+        while (idx < gij.n && pg[idx].r == k) {
+          m.c = pg[idx].c;
+          m.v = W->adj_val[j] * pg[idx].v, idx++;
           array_cat(struct mij, &sij, &m, 1);
         }
       }
@@ -487,11 +494,11 @@ int sparse_gemm(struct par_mat *WG, const struct par_mat *W,
 
     sint next = (cr->comm.id + 1) % cr->comm.np;
     for (i = 0; i < gij.n; i++)
-      ptr[i].p = next;
+      pg[i].p = next;
     sarray_transfer(struct mij, &gij, p, 0, cr);
 
     sarray_sort(struct mij, gij.ptr, gij.n, idx, 0, bfr);
-    ptr = gij.ptr;
+    pg = gij.ptr;
   }
 
   par_csr_setup(WG, &sij, diag_wg, bfr);
