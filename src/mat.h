@@ -70,20 +70,20 @@ int par_csr_setup(struct par_mat *mat, struct array *entries, int sd,
                   buffer *buf);
 struct par_mat *par_csr_setup_ext(struct array *entries, int sd, buffer *bfr);
 struct par_mat *par_csc_setup_ext(struct array *entries, int sd, buffer *bfr);
-// Create a par_mat from connectivity
-struct par_mat *par_csr_setup_con(const uint nelt, const ulong *eid,
-                                  const slong *vtx, int nv, int sep,
-                                  struct comm *c, struct crystal *cr,
-                                  buffer *bfr);
-void par_csr_to_csc(struct par_mat *B, const struct par_mat *A,
+void par_csr_to_csc(struct par_mat *B, const struct par_mat *A, int diag,
                     struct crystal *cr, buffer *bfr);
-void par_csc_to_csr(struct par_mat *B, const struct par_mat *A,
+void par_csc_to_csr(struct par_mat *B, const struct par_mat *A, int diag,
                     struct crystal *cr, buffer *bfr);
 void par_mat_print(struct par_mat *A);
 void par_mat_dump(const char *name, struct par_mat *A, struct crystal *cr,
                   buffer *bfr);
 int par_mat_free(struct par_mat *A);
 
+// Create a par_mat from connectivity
+struct par_mat *par_csr_setup_con(const uint nelt, const ulong *eid,
+                                  const slong *vtx, int nv, int sep,
+                                  struct comm *c, struct crystal *cr,
+                                  buffer *bfr);
 // Mat vec routines
 struct gs_data *setup_Q(const struct par_mat *M, const struct comm *c,
                         buffer *bfr);

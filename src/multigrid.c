@@ -14,7 +14,7 @@ struct mg_lvl {
 };
 
 struct mg {
-  uint nlevels, *level_off;
+  uint sagg, nlevels, *level_off;
   struct mg_lvl **levels;
   scalar *buf;
 };
@@ -72,6 +72,7 @@ static void mg_setup_aux(struct mg *d, const uint lvl, const int factor,
   struct mij m = {.r = 0, .c = 0, .idx = 0, .p = 0, .v = 0};
   array_reserve(struct mij, mijs, nnz);
 
+  struct comm *c = &cr->comm;
   const double sigma = 0.65;
   struct par_mat *M;
   // Replace M by the following if smooth aggregation is used:
@@ -94,9 +95,10 @@ static void mg_setup_aux(struct mg *d, const uint lvl, const int factor,
     }
     l->S = tcalloc(struct par_mat, 1);
     par_mat_setup(l->S, mijs, 1, 1, bfr);
+    l->Qs = setup_Q(l->S, c, bfr);
 
     struct par_mat S;
-    par_csr_to_csc(&S, l->S, cr, bfr);
+    par_csr_to_csc(&S, l->S, 0, cr, bfr);
 
     // Create N = M in CSR format, no separate diagonal.
     mijs->n = 0;
@@ -118,7 +120,7 @@ static void mg_setup_aux(struct mg *d, const uint lvl, const int factor,
     par_mat_free(&N), par_mat_free(&S);
 
     // N = T, CSC format, no separate diagonal.
-    par_csr_to_csc(&N, &T, cr, bfr);
+    par_csr_to_csc(&N, &T, 0, cr, bfr);
     par_mat_free(&T);
 
     // Setup S^t, CSR format, no separate diagonal.
@@ -134,23 +136,27 @@ static void mg_setup_aux(struct mg *d, const uint lvl, const int factor,
       }
     }
     par_mat_setup(&T, mijs, 0, 0, bfr);
-
-    l->St = tcalloc(struct par_mat, 1);
-    par_csc_to_csr(l->St, &T, cr, bfr);
+    par_csc_to_csr(&S, &T, 0, cr, bfr);
     par_mat_free(&T);
 
     // M = ST * N
     M = tcalloc(struct par_mat, 1);
-    sparse_gemm(M, l->St, &N, 1, cr, bfr);
-    par_mat_free(&N);
+    sparse_gemm(M, &S, &N, 1, cr, bfr);
+    par_mat_free(&S), par_mat_free(&N);
+
+    par_mat_setup(&T, mijs, 0, 0, bfr);
+    l->St = tcalloc(struct par_mat, 1);
+    par_csc_to_csr(l->St, &T, 1, cr, bfr);
+    par_mat_free(&T);
+    l->Qst = setup_Q(l->St, c, bfr);
   } else {
     l->S = l->St = NULL;
+    l->Qs = l->Qst = NULL;
     M = Ml;
   }
 
   // Now we interpolate to find the coarse operator Mc = J^T M J
   // Calculate coarse level parameters: ngc, npc, nelt, nrem
-  struct comm *c = &cr->comm;
   slong out[2][1], wrk[2][1], in = M->rn;
   comm_scan(out, c, gs_long, gs_add, &in, 1, wrk);
   ulong ng = out[1][0];
@@ -216,6 +222,7 @@ struct mg *mg_setup(const struct par_mat *M, const int factor, const int sagg,
   slong rg = out[1][0];
 
   struct mg *d = (struct mg *)tcalloc(struct mg, 1);
+  d->sagg = sagg;
   d->nlevels = logbll(rg, factor);
 
   if (d->nlevels == 0) {
@@ -316,7 +323,10 @@ void mg_vcycle(scalar *u1, scalar *rhs, struct mg *d, struct comm *c,
         r[off + j] = r[off + j] - Gs[off + j];
     }
 
-    // TODO: Apply St
+    // Apply S^T
+    if (d->sagg)
+      mat_vec_csr(r + off, r + off, l->St, l->Qst, wrk, bfr);
+
     // Interpolate to coarser level
     gs(r + off, gs_double, gs_add, 1, l->J, bfr);
   }
@@ -341,9 +351,11 @@ void mg_vcycle(scalar *u1, scalar *rhs, struct mg *d, struct comm *c,
     // J*e
     gs(r + off, gs_double, gs_add, 0, l->J, bfr);
 
-    // TODO: Apply S
+    // Apply S
+    if (d->sagg)
+      mat_vec_csr(r + off, r + off, l->S, l->Qs, wrk, bfr);
 
-    // u = u + over*J*e
+    // u = u + over*S*J*e
     n = lvl_off[lvl + 1] - off;
     for (j = 0; j < n; j++)
       r[off + j] = l->over * r[off + j] + u[off + j];
@@ -362,6 +374,10 @@ void mg_free(struct mg *d) {
         gs_free(l[i]->J), l[i]->J = NULL;
       if (l[i]->Q != NULL)
         gs_free(l[i]->Q), l[i]->Q = NULL;
+      if (l[i]->Qs != NULL)
+        gs_free(l[i]->Qs), l[i]->Qs = NULL;
+      if (l[i]->Qst != NULL)
+        gs_free(l[i]->Qst), l[i]->Qst = NULL;
       if (l[i]->M != NULL)
         par_mat_free(l[i]->M), l[i]->M = NULL;
       if (l[i]->S != NULL)

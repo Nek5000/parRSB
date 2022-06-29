@@ -520,7 +520,7 @@ int par_mat_setup(struct par_mat *M, struct array *mijs, const int type,
   return 0;
 }
 
-void par_csr_to_csc(struct par_mat *N, const struct par_mat *M,
+void par_csr_to_csc(struct par_mat *N, const struct par_mat *M, int diag,
                     struct crystal *cr, buffer *bfr) {
   assert(IS_CSR(M));
 
@@ -567,11 +567,11 @@ void par_csr_to_csc(struct par_mat *N, const struct par_mat *M,
   free(cols);
 
   sarray_transfer(struct mij, &mijs, p, 0, cr);
-  par_mat_setup(N, &mijs, 0, 0, bfr);
+  par_mat_setup(N, &mijs, 0, diag, bfr);
   array_free(&mijs);
 }
 
-void par_csc_to_csr(struct par_mat *N, const struct par_mat *M,
+void par_csc_to_csr(struct par_mat *N, const struct par_mat *M, int diag,
                     struct crystal *cr, buffer *bfr) {
   assert(IS_CSC(M) && !IS_DIAG(M));
 
@@ -610,7 +610,7 @@ void par_csc_to_csr(struct par_mat *N, const struct par_mat *M,
   free(rows);
 
   sarray_transfer(struct mij, &mijs, p, 0, cr);
-  par_mat_setup(N, &mijs, 1, 0, bfr);
+  par_mat_setup(N, &mijs, 1, diag, bfr);
   array_free(&mijs);
 }
 
