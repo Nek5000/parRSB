@@ -471,24 +471,30 @@ int sparse_gemm(struct par_mat *WG, const struct par_mat *W,
     }
   }
 
-  sarray_sort_2(struct mij, gij.ptr, gij.n, r, 1, c, 1, bfr);
+  sarray_sort_2(struct mij, gij.ptr, gij.n, c, 1, r, 1, bfr);
   struct mij *pg = (struct mij *)gij.ptr;
   for (i = 0; i < gij.n; i++)
     pg[i].idx = i;
 
-  uint idx;
   for (uint p = 0; p < cr->comm.np; p++) {
+    // Calculate dot product of each row of W with columns of G
     for (i = 0; i < W->rn; i++) {
-      m.r = W->rows[i], idx = 0;
-      for (j = W->adj_off[i], je = W->adj_off[i + 1]; j < je; j++) {
-        ulong k = W->cols[W->adj_idx[j]];
-        while (idx < gij.n && pg[idx].r < k)
-          idx++;
-        while (idx < gij.n && pg[idx].r == k) {
-          m.c = pg[idx].c;
-          m.v = W->adj_val[j] * pg[idx].v, idx++;
-          array_cat(struct mij, &sij, &m, 1);
+      m.r = W->rows[i];
+      uint s = 0, e = 0;
+      while (s < gij.n) {
+        m.c = pg[s].c, m.v = 0;
+        for (j = W->adj_off[i], je = W->adj_off[i + 1]; j < je; j++) {
+          ulong k = W->cols[W->adj_idx[j]];
+          while (e < gij.n && pg[s].c == pg[e].c && pg[e].r < k)
+            e++;
+          if (e < gij.n && pg[s].c == pg[e].c && pg[e].r == k)
+            m.v += W->adj_val[j] * pg[e].v;
         }
+        while (e < gij.n && pg[s].c == pg[e].c)
+          e++;
+        if (fabs(m.v) > 1e-10)
+          array_cat(struct mij, &sij, &m, 1);
+        s = e;
       }
     }
 
