@@ -11,13 +11,12 @@ int main(int argc, char *argv[]) {
   int err = (in == NULL);
   parrsb_check_error(err, world);
 
-  int id;
+  int id, active;
   MPI_Comm_rank(world, &id);
+  active = (id < in->nactive);
 
   MPI_Comm comm;
-  int active = (id < in->nactive);
   MPI_Comm_split(world, active, id, &comm);
-
   if (active == 1) {
     // Read the geometry from the .re2 file
     unsigned int nelt, nbcs;
@@ -44,7 +43,7 @@ int main(int argc, char *argv[]) {
         printf("Partition statistics before RSB:\n");
       parrsb_print_part_stat(vl, nelt, nv, comm);
     }
-    parrsb_get_part_stat(NULL, NULL, &nss[0], NULL, vl, nelt, nv, comm);
+    parrsb_get_part_stat(NULL, NULL, nss, NULL, vl, nelt, nv, comm);
 
     // Partition the mesh
     int *part = (int *)calloc(nelt, sizeof(int));
@@ -67,7 +66,7 @@ int main(int argc, char *argv[]) {
     parrsb_get_part_stat(NULL, NULL, &nss[3], NULL, vl, nelt, nv, comm);
 
     // Write partition to .ma2 file
-    if (in->dump == 1) {
+    if (in->dump) {
       err = parrsb_dump_map(in->mesh, nelt, nv, vl, part, comm);
       parrsb_check_error(err, comm);
     }

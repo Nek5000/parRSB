@@ -63,40 +63,40 @@ static int test_parcon(unsigned int neltp, long long *vlp, char *name,
 
 int main(int argc, char *argv[]) {
   MPI_Init(&argc, &argv);
+  MPI_Comm world = MPI_COMM_WORLD;
 
-  struct parrsb_input *in = parrsb_parse_input(argc, argv, MPI_COMM_WORLD);
+  struct parrsb_input *in = parrsb_parse_input(argc, argv, world);
   int err = (in == NULL);
-  parrsb_check_error(err, MPI_COMM_WORLD);
+  parrsb_check_error(err, world);
 
   // Read the geometry from the .re2 file
   unsigned int nelt, nbcs;
   double *coord = NULL;
   long long *bcs = NULL;
   int nv;
-  err = parrsb_read_mesh(&nelt, &nv, NULL, &coord, &nbcs, &bcs, in->mesh,
-                         MPI_COMM_WORLD, 1);
-  parrsb_check_error(err, MPI_COMM_WORLD);
+  err = parrsb_read_mesh(&nelt, &nv, NULL, &coord, &nbcs, &bcs, in->mesh, world,
+                         1);
+  parrsb_check_error(err, world);
 
   // Find connectivity
   long long *vl = (long long *)calloc(nelt * nv, sizeof(long long));
   err = (vl == NULL);
-  parrsb_check_error(err, MPI_COMM_WORLD);
+  parrsb_check_error(err, world);
 
   int ndim = (nv == 8 ? 3 : 2);
-  err = parrsb_conn_mesh(vl, coord, nelt, ndim, bcs, nbcs, in->tol,
-                         MPI_COMM_WORLD, 0);
-  parrsb_check_error(err, MPI_COMM_WORLD);
+  err = parrsb_conn_mesh(vl, coord, nelt, ndim, bcs, nbcs, in->tol, world, 0);
+  parrsb_check_error(err, world);
 
   // Write connectivity to .co2 file if dump is on
-  if (in->dump == 1) {
-    err = parrsb_dump_con(in->mesh, nelt, nv, vl, MPI_COMM_WORLD);
-    parrsb_check_error(err, MPI_COMM_WORLD);
+  if (in->dump) {
+    err = parrsb_dump_con(in->mesh, nelt, nv, vl, world);
+    parrsb_check_error(err, world);
   }
 
   // Turns on testing if test is on
-  if (in->test == 1) {
-    err = test_parcon(nelt, vl, in->mesh, MPI_COMM_WORLD);
-    parrsb_check_error(err, MPI_COMM_WORLD);
+  if (in->test) {
+    err = test_parcon(nelt, vl, in->mesh, world);
+    parrsb_check_error(err, world);
   }
 
   // Free resources
