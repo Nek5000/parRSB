@@ -1,4 +1,4 @@
-#include "coarse.h"
+#include "coarse-impl.h"
 #include "metrics.h"
 #include "multigrid.h"
 #include <math.h>
@@ -819,14 +819,6 @@ static int project(scalar *x, scalar *b, const struct schur *schur, ulong ls,
   return i == miter ? i : i + 1;
 }
 
-struct coarse {
-  int type;
-  ulong ls, lg, is, ig;
-  uint ln, in, *idx;
-  struct comm c;
-  void *solver;
-};
-
 int schur_setup(struct coarse *crs, struct array *eij, struct crystal *cr,
                 buffer *bfr) {
   struct schur *schur = crs->solver = (struct schur *)tcalloc(struct schur, 1);
@@ -840,12 +832,12 @@ int schur_setup(struct coarse *crs, struct array *eij, struct crystal *cr,
 
   struct mij *ptr = (struct mij *)eij->ptr;
   for (uint i = 0; i < eij->n; i++) {
-    if (ptr[i].r <= crs->lg) {
-      if (ptr[i].c <= crs->lg)
+    if (ptr[i].r <= crs->ng[0]) {
+      if (ptr[i].c <= crs->ng[0])
         array_cat(struct mij, &ll, &ptr[i], 1);
       else
         array_cat(struct mij, &ls, &ptr[i], 1);
-    } else if (ptr[i].c <= crs->lg)
+    } else if (ptr[i].c <= crs->ng[0])
       array_cat(struct mij, &sl, &ptr[i], 1);
     else
       array_cat(struct mij, &ss, &ptr[i], 1);
@@ -862,18 +854,18 @@ int schur_setup(struct coarse *crs, struct array *eij, struct crystal *cr,
 #endif
   mat_free(&B);
   array_free(&ll);
-  schur->A_ll.start = crs->ls;
+  schur->A_ll.start = crs->s[0];
 
   // Setup E
-  assert(schur->A_ll.n == crs->ln);
-  distribute_by_columns(&sl, crs->ls, crs->ln, cr, bfr);
+  assert(schur->A_ll.n == crs->n[0]);
+  distribute_by_columns(&sl, crs->s[0], crs->n[0], cr, bfr);
   par_csc_setup(&schur->A_sl, &sl, 0, bfr);
 #ifdef DUMP4
   par_mat_dump("E.txt", &schur->A_sl, cr, bfr);
 #endif
   array_free(&sl);
-  schur->Q_sl =
-      setup_Ezl_Q(&schur->A_sl, crs->lg + crs->is, crs->in, &cr->comm, bfr);
+  schur->Q_sl = setup_Ezl_Q(&schur->A_sl, crs->ng[0] + crs->s[1], crs->n[1],
+                            &cr->comm, bfr);
 
   // Setup S
   par_csr_setup(&schur->A_ss, &ss, 1, bfr);
@@ -890,8 +882,8 @@ int schur_setup(struct coarse *crs, struct array *eij, struct crystal *cr,
   par_mat_dump("F.txt", &schur->A_ls, cr, bfr);
 #endif
   array_free(&ls);
-  schur->Q_ls =
-      setup_Fxi_Q(&schur->A_ls, crs->lg + crs->is, crs->in, &cr->comm, bfr);
+  schur->Q_ls = setup_Fxi_Q(&schur->A_ls, crs->ng[0] + crs->s[1], crs->n[1],
+                            &cr->comm, bfr);
 
   char *val = getenv("PARRSB_DUMP_SCHUR");
   if (val != NULL && atoi(val) != 0) {
@@ -914,7 +906,7 @@ int schur_solve(scalar *x, scalar *b, scalar tol, struct coarse *crs,
   struct comm *c = &crs->c;
   struct schur *schur = crs->solver;
 
-  uint ln = crs->ln, in = crs->in, *idx = crs->idx;
+  uint ln = crs->n[0], in = crs->n[1], *idx = crs->idx;
   scalar *rhs = (scalar *)tcalloc(scalar, ln > in ? ln : in);
   scalar *zl = (scalar *)tcalloc(scalar, ln);
   scalar *xl = (scalar *)tcalloc(scalar, in + ln), *xi = xl + ln;
@@ -929,13 +921,13 @@ int schur_solve(scalar *x, scalar *b, scalar tol, struct coarse *crs,
 
   metric_tic(c, SCHUR_SOLVE_SETRHS1);
   // Solve: A_ss x_i = fi where fi = r_i - E zl
-  Ezl(rhs, &schur->A_sl, schur->Q_sl, zl, crs->ls, in, bfr);
+  Ezl(rhs, &schur->A_sl, schur->Q_sl, zl, crs->s[0], in, bfr);
   for (uint i = 0; i < in; i++)
     rhs[i] = b[idx[ln + i]] - rhs[i];
   metric_toc(c, SCHUR_SOLVE_SETRHS1);
 
   metric_tic(c, SCHUR_SOLVE_PROJECT);
-  int iter = project(xi, rhs, schur, crs->ls, c, 100, tol, 1, 0, bfr);
+  int iter = project(xi, rhs, schur, crs->s[0], c, 100, tol, 1, 0, bfr);
   metric_toc(c, SCHUR_SOLVE_PROJECT);
   metric_acc(SCHUR_PROJECT_NITER, iter);
 
@@ -943,7 +935,7 @@ int schur_solve(scalar *x, scalar *b, scalar tol, struct coarse *crs,
   metric_tic(c, SCHUR_SOLVE_SETRHS2);
   for (uint i = 0; i < ln; i++)
     rhs[i] = 0;
-  Fxi(rhs, &schur->A_ls, schur->Q_ls, xi, crs->ls, in, bfr);
+  Fxi(rhs, &schur->A_ls, schur->Q_ls, xi, crs->s[0], in, bfr);
   for (uint i = 0; i < ln; i++)
     rhs[i] = b[idx[i]] - rhs[i];
   metric_toc(c, SCHUR_SOLVE_SETRHS2);
@@ -955,9 +947,7 @@ int schur_solve(scalar *x, scalar *b, scalar tol, struct coarse *crs,
   for (uint i = 0; i < ln + in; i++)
     x[idx[i]] = xl[i];
 
-  free(rhs);
-  free(zl);
-  free(xl);
+  free(rhs), free(zl), free(xl);
 
   return 0;
 }
