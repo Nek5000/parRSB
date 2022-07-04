@@ -88,7 +88,7 @@ jobs:
           export PARRSB_RSB_PRE=0
           export PARRSB_RSB_ALGO=1
           export PARRSB_RSB_MG_FACTOR=2
-          export PARRSB_RSB_MG_SMOOTH_AGGREGATION=1
+          export PARRSB_RSB_MG_SMOOTH_AGGREGATION=0
 
           cp hostfile build/examples/genmap parRSB-tests/${{ matrix.test }}
 
@@ -121,7 +121,7 @@ jobs:
           export PARRSB_RSB_PRE=0
           export PARRSB_RSB_ALGO=1
           export PARRSB_RSB_MG_FACTOR=4
-          export PARRSB_RSB_MG_SMOOTH_AGGREGATION=1
+          export PARRSB_RSB_MG_SMOOTH_AGGREGATION=0
 
           cp hostfile build/examples/genmap parRSB-tests/${{ matrix.test }}
 
