@@ -7,8 +7,8 @@
 #include <math.h>
 #include <time.h>
 
-static double check_err(double *b, double *x, uint nelt, int nv, slong *vtx,
-                        MPI_Comm comm, buffer *bfr) {
+static double check_err(double *b, double *x, uint nelt, uint nv,
+                        const slong *vtx, MPI_Comm comm, buffer *bfr) {
   struct comm c;
   comm_init(&c, comm);
 
@@ -77,6 +77,46 @@ static void setup_rhs(double *b, const unsigned int nelt, MPI_Comm comm) {
     b[i] /= norm;
 }
 
+static void setup_and_solve(unsigned nelt, unsigned nv, const long long *vl,
+                            const scalar *centroids,
+                            const struct parrsb_input *in, MPI_Comm comm) {
+  // Setup the coarse solve with schur complement solver
+  struct comm c;
+  comm_init(&c, comm);
+  buffer bfr;
+  buffer_init(&bfr, 1024);
+
+  comm_barrier(&c);
+  double t = comm_time();
+  struct coarse *crs =
+      coarse_setup(nelt, nv, vl, centroids, 1, in->crs_type, &c);
+  double tsetup = comm_time() - t;
+
+  scalar *b = tcalloc(scalar, 2 * nelt);
+  setup_rhs(b, nelt, comm);
+
+  comm_barrier(&c);
+  t = comm_time();
+  scalar *x = b + nelt;
+  coarse_solve(x, b, in->crs_tol, crs, &bfr);
+  double tsolve = MPI_Wtime() - t;
+
+  double enorm = check_err(b, x, nelt, nv, vl, comm, &bfr);
+  if (c.id == 0) {
+    printf("MPI Ranks = %d\ncoarse_setup: %lf\ncoarse_solve = %lf\nerr = %lf\n",
+           c.np, tsetup, tsolve, enorm);
+    fflush(stdout);
+  }
+  int err = (enorm > 10 * in->crs_tol);
+  parrsb_check_error(err, comm);
+
+  // Free resources
+  buffer_free(&bfr);
+  coarse_free(crs);
+  free(b);
+  comm_free(&c);
+}
+
 int main(int argc, char *argv[]) {
   MPI_Init(&argc, &argv);
   MPI_Comm comm = MPI_COMM_WORLD;
@@ -87,8 +127,7 @@ int main(int argc, char *argv[]) {
 
   // Read the geometry from the .re2 file, find connectiviy, partition and then
   // distribute the mesh.
-  unsigned int nelt;
-  int nv;
+  unsigned nelt, nv;
   long long *vl = NULL;
   double *coord = NULL;
   parrsb_setup_mesh(&nelt, &nv, &vl, &coord, in, comm);
@@ -104,41 +143,9 @@ int main(int argc, char *argv[]) {
       centroids[i * ndim + d] /= nv;
   }
 
-  // Setup the coarse solve with schur complement solver
-  int id, np;
-  MPI_Comm_rank(comm, &id);
-  MPI_Comm_size(comm, &np);
+  setup_and_solve(nelt, nv, vl, centroids, in, comm);
 
-  MPI_Barrier(comm);
-  double t = MPI_Wtime();
-  struct coarse *crs =
-      coarse_setup(nelt, nv, vl, centroids, in->crs_type, comm);
-  double tsetup = MPI_Wtime() - t;
-
-  double *b = tcalloc(double, nelt);
-  double *x = tcalloc(double, nelt);
-  setup_rhs(b, nelt, comm);
-
-  buffer bfr;
-  buffer_init(&bfr, 1024);
-  MPI_Barrier(comm);
-  t = MPI_Wtime();
-  coarse_solve(x, b, in->crs_tol, crs, &bfr);
-  double tsolve = MPI_Wtime() - t;
-
-  double enorm = check_err(b, x, nelt, nv, vl, comm, &bfr);
-  if (id == 0) {
-    printf("MPI Ranks = %d\ncoarse_setup: %lf\ncoarse_solve = %lf\nerr = %lf\n",
-           np, tsetup, tsolve, enorm);
-    fflush(stdout);
-  }
-  err = (enorm > 10 * in->crs_tol);
-  parrsb_check_error(err, comm);
-
-  // Free resources
-  buffer_free(&bfr);
-  coarse_free(crs);
-  free(b), free(x), free(vl), free(coord), free(centroids);
+  free(vl), free(coord), free(centroids);
   free(in);
   MPI_Finalize();
 

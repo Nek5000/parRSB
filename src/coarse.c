@@ -14,9 +14,9 @@ struct rcb_t {
   slong vtx[8];
 };
 
-static void nmbr_local_dofs(struct array *a, uint s, uint e, const unsigned nc,
-                            const unsigned ndim, const unsigned level,
-                            struct comm *c, buffer *bfr) {
+static void nmbr_local_rcb(struct array *a, uint s, uint e, const unsigned nc,
+                           const unsigned ndim, const unsigned level,
+                           struct comm *c, buffer *bfr) {
   sint size = e - s;
   if (size <= 1)
     return;
@@ -94,8 +94,8 @@ static void nmbr_local_dofs(struct array *a, uint s, uint e, const unsigned nc,
   gs_free(gsh);
   free(dof), free(vtx);
 
-  nmbr_local_dofs(a, s, mid, nc, ndim, level + 1, c, bfr);
-  nmbr_local_dofs(a, mid, e, nc, ndim, level + 1, c, bfr);
+  nmbr_local_rcb(a, s, mid, nc, ndim, level + 1, c, bfr);
+  nmbr_local_rcb(a, mid, e, nc, ndim, level + 1, c, bfr);
 }
 
 // Number the DOFs internal first, faces second and all the rest (wire basket)
@@ -180,7 +180,7 @@ static void number_dual_graph_dofs(ulong *dofs, struct coarse *crs, uint n,
   }
 
   if (local.n > 0) {
-    nmbr_local_dofs(&local, 0, local.n, nc, ndim, 1, &c, bfr);
+    nmbr_local_rcb(&local, 0, local.n, nc, ndim, 1, &c, bfr);
     sarray_sort(struct rcb_t, local.ptr, local.n, s, 0, bfr);
     struct rcb_t *pl = (struct rcb_t *)local.ptr;
     for (sint i = local.n - 1, ln = 0; i >= 0; i--)
@@ -191,21 +191,20 @@ static void number_dual_graph_dofs(ulong *dofs, struct coarse *crs, uint n,
   array_free(&local);
 }
 
-struct coarse *coarse_setup(const unsigned n, const unsigned nc,
-                            const long long *llvtx, const scalar *coord,
-                            int type, MPI_Comm comm) {
+struct coarse *coarse_setup(unsigned n, unsigned nc, const long long *llvtx,
+                            const scalar *coord, unsigned null_space,
+                            unsigned type, struct comm *c) {
+  struct coarse *crs = tcalloc(struct coarse, 1);
+  crs->type = type;
+
   buffer bfr;
   buffer_init(&bfr, 1024);
+  comm_dup(&crs->c, c);
 
   uint size = n * nc;
   slong *vtx = tcalloc(slong, size);
   for (uint i = 0; i < size; i++)
     vtx[i] = llvtx[i];
-
-  struct coarse *crs = tcalloc(struct coarse, 1);
-  crs->type = type;
-
-  comm_init(&crs->c, comm);
 
   ulong *dofs = tcalloc(ulong, n);
   unsigned ndim = (nc == 8) ? 3 : 2;
@@ -316,6 +315,16 @@ static uint unique_ids(sint *perm, ulong *uid, uint n, const ulong *ids,
   array_free(&arr);
   return un;
 }
+
+// Number rows, local first then interface. Returns global number of local
+// elements.
+struct rsb_t {
+  uint i, s;
+  slong vtx[8];
+};
+
+static void nmbr_local_rsb(struct array *a, uint s, uint e, const unsigned nc,
+                           const unsigned level, struct comm *c, buffer *bfr) {}
 
 static void number_dofs(ulong *dofs, struct coarse *crs, uint n,
                         const slong *ids, buffer *bfr) {
