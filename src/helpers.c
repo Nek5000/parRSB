@@ -66,7 +66,7 @@ int parrsb_dist_mesh(unsigned int *nelt_, long long **vl_, double **coord_,
   return 0;
 }
 
-int parrsb_setup_mesh(unsigned int *nelt, int *nv, long long **vl,
+int parrsb_setup_mesh(unsigned *nelt, unsigned *nv, long long **vl,
                       double **coord, struct parrsb_input *in, MPI_Comm comm) {
   int id, err;
   MPI_Comm_rank(comm, &id);
@@ -203,7 +203,8 @@ void parrsb_get_part_stat(int *nc, int *ns, int *nss, int *nel, long long *vtx,
   }
 }
 
-void parrsb_print_part_stat(long long *vtx, int nelt, int nv, MPI_Comm ce) {
+void parrsb_print_part_stat(long long *vtx, unsigned nelt, unsigned nv,
+                            MPI_Comm ce) {
   int id, np;
   MPI_Comm_rank(ce, &id);
   MPI_Comm_size(ce, &np);

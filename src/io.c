@@ -19,8 +19,8 @@
 #define GC_CO2_HEADER_LEN 132
 #define HEADER_LEN 132
 
-static int re2_header(uint *nelt_, int *nv_, ulong *nelgt_, ulong *nelgv_,
-                      MPI_File file, struct comm *c) {
+static int re2_header(unsigned *nelt_, unsigned *nv_, ulong *nelgt_,
+                      ulong *nelgv_, MPI_File file, struct comm *c) {
   int rank = c->id;
   int size = c->np;
   MPI_Comm comm = c->c;
@@ -230,8 +230,8 @@ static int re2_boundary(unsigned int *nbcs_, long long **bcs_,
   return 0;
 }
 
-static int read_geometry(unsigned int *nelt, int *nv, double **coord,
-                         unsigned int *nbcs, long long **bcs, char *fname,
+static int read_geometry(unsigned *nelt, unsigned *nv, double **coord,
+                         unsigned *nbcs, long long **bcs, char *fname,
                          struct comm *c) {
   int errs = 0;
   uint rank = c->id;
@@ -337,9 +337,9 @@ static int read_connectivity(unsigned int *nelt_, int *nv_, long long **vl_,
   return 0;
 }
 
-int parrsb_read_mesh(unsigned int *nel, int *nv, long long **vl, double **coord,
-                     unsigned int *nbcs, long long **bcs, char *name,
-                     MPI_Comm comm, int read) {
+int parrsb_read_mesh(unsigned *nel, unsigned *nv, long long **vl,
+                     double **coord, unsigned *nbcs, long long **bcs,
+                     char *name, MPI_Comm comm, int read) {
   struct comm c;
   comm_init(&c, comm);
 
@@ -367,7 +367,7 @@ int parrsb_read_mesh(unsigned int *nel, int *nv, long long **vl, double **coord,
   return 0;
 }
 
-int parrsb_dump_con(char *name, unsigned int nelt, int nv, long long *vl,
+int parrsb_dump_con(char *name, unsigned nelt, unsigned nv, long long *vl,
                     MPI_Comm comm) {
   const char version[6] = "#v001";
   const float test = 6.54321;
@@ -392,11 +392,9 @@ int parrsb_dump_con(char *name, unsigned int nelt, int nv, long long *vl,
     return err;
   }
 
-  slong out[2][1], bfr[2][1];
-  slong in = nelt;
+  slong out[2][1], bfr[2][1], in = nelt;
   comm_scan(out, &c, gs_long, gs_add, &in, 1, bfr);
-  slong start = out[0][0];
-  slong nelgt = out[1][0];
+  slong start = out[0][0], nelgt = out[1][0];
   slong nelgv = nelgt;
 
   int write_size = nelt * (nv + 1) * sizeof(int);
@@ -440,7 +438,7 @@ int parrsb_dump_con(char *name, unsigned int nelt, int nv, long long *vl,
   return err;
 }
 
-int parrsb_dump_map(char *name, unsigned int nelt, int nv, long long *vtx,
+int parrsb_dump_map(char *name, unsigned nelt, unsigned nv, long long *vtx,
                     int *pmap, MPI_Comm comm) {
   char version[6] = "#v001";
   float test = 6.54321;
@@ -521,7 +519,7 @@ int parrsb_dump_map(char *name, unsigned int nelt, int nv, long long *vtx,
   return errs;
 }
 
-int parrsb_dump_part(char *name, unsigned int nel, int nv, double *coord,
+int parrsb_dump_part(char *name, unsigned nel, unsigned nv, double *coord,
                      int gid, MPI_Comm comm) {
   struct comm c;
   comm_init(&c, comm);
@@ -533,19 +531,17 @@ int parrsb_dump_part(char *name, unsigned int nel, int nv, double *coord,
                           MPI_INFO_NULL, &file);
   parrsb_check_error(err, comm);
 
-  slong nelt = nel;
-  slong out[2][1], buf[2][1];
+  slong out[2][1], buf[2][1], nelt = nel;
   comm_scan(out, &c, gs_long, gs_add, &nelt, 1, buf);
-  slong start = out[0][0];
-  slong nelgt = out[1][0];
+  slong start = out[0][0], nelgt = out[1][0];
 
-  int ndim = nv == 8 ? 3 : 2;
-  uint write_size = (ndim * sizeof(double) + sizeof(int)) * nelt;
+  int ndim = (nv == 8) ? 3 : 2;
+  uint wsize = (ndim * sizeof(double) + sizeof(int)) * nelt;
   if (rank == 0)
-    write_size += sizeof(slong) + sizeof(int); // for nelgt and ndim
+    wsize += sizeof(slong) + sizeof(int); // for nelgt and ndim
 
   char *pbuf, *pbuf0;
-  pbuf = pbuf0 = (char *)tcalloc(char, write_size);
+  pbuf = pbuf0 = (char *)tcalloc(char, wsize);
   if (rank == 0) {
     WRITE_T(pbuf0, &nelgt, slong, 1);
     WRITE_T(pbuf0, &ndim, int, 1);
@@ -558,15 +554,13 @@ int parrsb_dump_part(char *name, unsigned int nel, int nv, double *coord,
     for (j = 0; j < nv; j++)
       for (k = 0; k < ndim; k++)
         tcoord[k] += coord[i * nv * ndim + j * ndim + k];
-    tcoord[0] /= nv;
-    tcoord[1] /= nv;
-    tcoord[2] /= nv;
+    tcoord[0] /= nv, tcoord[1] /= nv, tcoord[2] /= nv;
     WRITE_T(pbuf0, tcoord, double, ndim);
     WRITE_T(pbuf0, &gid, int, 1);
   }
 
   MPI_Status st;
-  err = MPI_File_write_ordered(file, pbuf, write_size, MPI_BYTE, &st);
+  err = MPI_File_write_ordered(file, pbuf, wsize, MPI_BYTE, &st);
   parrsb_check_error(err, comm);
 
   err += MPI_File_close(&file);

@@ -19,10 +19,9 @@ int main(int argc, char *argv[]) {
   MPI_Comm_split(world, active, id, &comm);
   if (active == 1) {
     // Read the geometry from the .re2 file
-    unsigned int nelt, nbcs;
+    unsigned int nelt, nbcs, nv;
     double *coord = NULL;
     long long *bcs = NULL;
-    int nv;
     err = parrsb_read_mesh(&nelt, &nv, NULL, &coord, &nbcs, &bcs, in->mesh,
                            comm, 1);
     parrsb_check_error(err, comm);
@@ -32,7 +31,7 @@ int main(int argc, char *argv[]) {
     err = (vl == NULL);
     parrsb_check_error(err, comm);
 
-    int ndim = (nv == 8 ? 3 : 2);
+    unsigned ndim = (nv == 8 ? 3 : 2);
     err = parrsb_conn_mesh(vl, coord, nelt, ndim, bcs, nbcs, in->tol, comm, 0);
     parrsb_check_error(err, comm);
 

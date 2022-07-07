@@ -14,8 +14,7 @@ int main(int argc, char *argv[]) {
 
   // Read the geometry from the .re2 file, find connectiviy, partition and then
   // distribute the mesh.
-  unsigned int nelt;
-  int nv;
+  unsigned int nelt, nv;
   long long *vl = NULL;
   double *coord = NULL;
   parrsb_setup_mesh(&nelt, &nv, &vl, &coord, in, comm);

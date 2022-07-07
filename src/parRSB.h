@@ -64,17 +64,17 @@ void fparrsb_conn_mesh(long long *vtx, double *coord, int *nel, int *nDim,
 //==============================================================================
 // I/O routines
 //
-int parrsb_read_mesh(unsigned int *nel, int *nv, long long **vl, double **coord,
-                     unsigned int *nbcs, long long **bcs, char *name,
-                     MPI_Comm comm, int read);
+int parrsb_read_mesh(unsigned *nel, unsigned *nv, long long **vl,
+                     double **coord, unsigned *nbcs, long long **bcs,
+                     char *name, MPI_Comm comm, int read);
 
-int parrsb_dump_con(char *name, unsigned int nelt, int nv, long long *vl,
+int parrsb_dump_con(char *name, unsigned nelt, unsigned nv, long long *vl,
                     MPI_Comm comm);
 
-int parrsb_dump_map(char *name, unsigned int nelt, int nv, long long *vtx,
+int parrsb_dump_map(char *name, unsigned nelt, unsigned nv, long long *vl,
                     int *pmap, MPI_Comm comm);
 
-int parrsb_dump_part(char *name, unsigned int nelt, int nv, double *coord,
+int parrsb_dump_part(char *name, unsigned nelt, unsigned nv, double *coord,
                      int gid, MPI_Comm comm);
 
 //==============================================================================
@@ -96,13 +96,14 @@ struct parrsb_input {
   double crs_tol; // Coarse tolerance, default: 1e-3
 };
 
-int parrsb_dist_mesh(unsigned int *nelt, long long **vl, double **coord,
-                     int *part, int nv, MPI_Comm comm);
+int parrsb_dist_mesh(unsigned *nelt, long long **vl, double **coord, int *part,
+                     int nv, MPI_Comm comm);
 
-int parrsb_setup_mesh(unsigned int *nelt, int *nv, long long **vl,
+int parrsb_setup_mesh(unsigned *nelt, unsigned *nv, long long **vl,
                       double **coord, struct parrsb_input *in, MPI_Comm comm);
 
-void parrsb_print_part_stat(long long *vtx, int nelt, int nv, MPI_Comm comm);
+void parrsb_print_part_stat(long long *vtx, unsigned nelt, unsigned nv,
+                            MPI_Comm comm);
 
 void parrsb_get_part_stat(int *nc, int *ns, int *nss, int *nel, long long *vtx,
                           int nelt, int nv, MPI_Comm comm);
