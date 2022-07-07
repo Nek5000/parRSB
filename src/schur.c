@@ -906,14 +906,14 @@ int schur_solve(scalar *x, scalar *b, scalar tol, struct coarse *crs,
   struct comm *c = &crs->c;
   struct schur *schur = crs->solver;
 
-  uint ln = crs->n[0], in = crs->n[1], *idx = crs->idx;
+  uint ln = crs->n[0], in = crs->n[1];
   scalar *rhs = (scalar *)tcalloc(scalar, ln > in ? ln : in);
   scalar *zl = (scalar *)tcalloc(scalar, ln);
   scalar *xl = (scalar *)tcalloc(scalar, in + ln), *xi = xl + ln;
 
   // Solve: A_ll z_l = r_l
   for (uint i = 0; i < ln; i++)
-    rhs[i] = b[idx[i]];
+    rhs[i] = b[i];
 
   metric_tic(c, SCHUR_SOLVE_CHOL1);
   cholesky_solve(zl, &schur->A_ll, rhs);
@@ -923,7 +923,7 @@ int schur_solve(scalar *x, scalar *b, scalar tol, struct coarse *crs,
   // Solve: A_ss x_i = fi where fi = r_i - E zl
   Ezl(rhs, &schur->A_sl, schur->Q_sl, zl, crs->s[0], in, bfr);
   for (uint i = 0; i < in; i++)
-    rhs[i] = b[idx[ln + i]] - rhs[i];
+    rhs[i] = b[ln + i] - rhs[i];
   metric_toc(c, SCHUR_SOLVE_SETRHS1);
 
   metric_tic(c, SCHUR_SOLVE_PROJECT);
@@ -937,7 +937,7 @@ int schur_solve(scalar *x, scalar *b, scalar tol, struct coarse *crs,
     rhs[i] = 0;
   Fxi(rhs, &schur->A_ls, schur->Q_ls, xi, crs->s[0], in, bfr);
   for (uint i = 0; i < ln; i++)
-    rhs[i] = b[idx[i]] - rhs[i];
+    rhs[i] = b[i] - rhs[i];
   metric_toc(c, SCHUR_SOLVE_SETRHS2);
 
   metric_tic(c, SCHUR_SOLVE_CHOL2);
@@ -945,7 +945,7 @@ int schur_solve(scalar *x, scalar *b, scalar tol, struct coarse *crs,
   metric_toc(c, SCHUR_SOLVE_CHOL2);
 
   for (uint i = 0; i < ln + in; i++)
-    x[idx[i]] = xl[i];
+    x[i] = xl[i];
 
   free(rhs), free(zl), free(xl);
 

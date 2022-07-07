@@ -3,6 +3,10 @@
 #include <float.h>
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
+
+static uint unique_ids(sint *perm, ulong *uid, uint n, const ulong *ids,
+                       buffer *bfr);
+
 //------------------------------------------------------------------------------
 // Setup coarse grid system. Initial dumb API.
 //
@@ -167,10 +171,10 @@ static void number_dual_graph_dofs(ulong *dofs, struct coarse *crs, uint n,
   array_init(struct rcb_t, &local, crs->n[0]);
 
   struct rcb_t t = {.s = INT_MAX};
-  crs->idx = tcalloc(uint, nelt);
-  for (uint i = 0, ln = 0, in = 0; i < nelt; i++) {
+  ulong s = crs->ng[0] + crs->s[1];
+  for (uint i = 0; i < nelt; i++) {
     if (dofs[i] > 0)
-      dofs[i] = crs->ng[0] + crs->s[1] + in, crs->idx[crs->n[0] + in++] = i;
+      dofs[i] = s++;
     else {
       t.i = i;
       memcpy(t.coord, &coord[i * ndim], ndim * sizeof(scalar));
@@ -183,42 +187,51 @@ static void number_dual_graph_dofs(ulong *dofs, struct coarse *crs, uint n,
     nmbr_local_rcb(&local, 0, local.n, nc, ndim, 1, &c, bfr);
     sarray_sort(struct rcb_t, local.ptr, local.n, s, 0, bfr);
     struct rcb_t *pl = (struct rcb_t *)local.ptr;
-    for (sint i = local.n - 1, ln = 0; i >= 0; i--)
-      dofs[pl[i].i] = crs->s[0] + ln, crs->idx[ln++] = pl[i].i;
+    ulong s = crs->s[0];
+    for (sint i = local.n - 1; i >= 0; i--)
+      dofs[pl[i].i] = s++;
   }
 
   comm_free(&c);
   array_free(&local);
 }
 
-struct coarse *coarse_setup(unsigned n, unsigned nc, const long long *llvtx,
+struct coarse *coarse_setup(unsigned n, unsigned nc, const long long *vl,
                             const scalar *coord, unsigned null_space,
                             unsigned type, struct comm *c) {
   struct coarse *crs = tcalloc(struct coarse, 1);
-  crs->type = type;
+  crs->type = type, crs->null_space = null_space, crs->un = n;
 
+  // Setup the buffer and duplicate the communicator.
   buffer bfr;
   buffer_init(&bfr, 1024);
   comm_dup(&crs->c, c);
 
   uint size = n * nc;
-  slong *vtx = tcalloc(slong, size);
+  slong *tid = tcalloc(slong, size);
   for (uint i = 0; i < size; i++)
-    vtx[i] = llvtx[i];
+    tid[i] = vl[i];
 
-  ulong *dofs = tcalloc(ulong, n);
+  ulong *nid = tcalloc(ulong, n);
   unsigned ndim = (nc == 8) ? 3 : 2;
-  number_dual_graph_dofs(dofs, crs, size, vtx, n, ndim, coord, &bfr);
+  number_dual_graph_dofs(nid, crs, size, tid, n, ndim, coord, &bfr);
+
+  // Find unique ids and user vector to compressed vector mapping.
+  // In the case of dual-graph Laplacian, all the ids are unique.
+  // But here we arrange them in the sorted order.
+  ulong *uid = tcalloc(ulong, n);
+  crs->u2c = tcalloc(sint, n);
+  crs->cn = unique_ids(crs->u2c, uid, n, nid, &bfr);
+  assert(crs->cn == crs->un);
+  crs->an = crs->cn;
 
   struct crystal cr;
   crystal_init(&cr, &crs->c);
 
   struct array nbrs, eij;
-  find_nbrs(&nbrs, dofs, vtx, n, nc, &cr, &bfr);
-  free(vtx), free(dofs);
-  // Convert `struct nbr` -> `struct mij` and compress
-  // entries which share the same (r, c) values. Set the
-  // diagonal element to have zero row sum
+  find_nbrs(&nbrs, nid, tid, n, nc, &cr, &bfr);
+  // Convert `struct nbr` -> `struct mij` and compress entries which share the
+  // same (r, c) values. Set the diagonal element to have zero row sum
   compress_nbrs(&eij, &nbrs, &bfr);
   array_free(&nbrs);
 
@@ -230,9 +243,8 @@ struct coarse *coarse_setup(unsigned n, unsigned nc, const long long *llvtx,
     break;
   }
 
-  array_free(&eij);
-  crystal_free(&cr);
-  buffer_free(&bfr);
+  array_free(&eij), crystal_free(&cr), buffer_free(&bfr);
+  free(tid), free(nid), free(uid);
 
   return crs;
 }
@@ -241,13 +253,25 @@ int coarse_solve(scalar *x, scalar *b, scalar tol, struct coarse *crs,
                  buffer *bfr) {
   metric_init();
 
+  scalar *rhs = tcalloc(scalar, 2 * crs->an), *xx = rhs + crs->an;
+  for (uint i = 0; i < crs->un; i++) {
+    if (crs->u2c[i] >= 0)
+      rhs[crs->u2c[i]] += b[i];
+  }
+
   switch (crs->type) {
   case 0:
-    schur_solve(x, b, tol, crs, bfr);
+    schur_solve(xx, rhs, tol, crs, bfr);
     break;
   default:
     break;
   }
+
+  for (uint i = 0; i < crs->un; i++) {
+    if (crs->u2c[i] >= 0)
+      x[i] = xx[crs->u2c[i]];
+  }
+  free(rhs);
 
   metric_push_level();
   metric_crs_print(&crs->c, 1);
@@ -264,8 +288,6 @@ int coarse_free(struct coarse *crs) {
     default:
       break;
     }
-    if (crs->idx != NULL)
-      free(crs->idx);
     comm_free(&crs->c);
     free(crs), crs = NULL;
   }
@@ -421,7 +443,6 @@ struct coarse *crs_setup(uint n, const ulong *id, uint nz, const uint *Ai,
   number_dofs(nid, crs, n, tid, &bfr);
 
   // Find unique ids and user vector to compressed vector mapping.
-  // This may not be necessary and get rid of this if not necessary.
   ulong *uid = tcalloc(ulong, n);
   crs->u2c = tcalloc(sint, n);
   crs->cn = unique_ids(crs->u2c, uid, n, nid, &bfr);

@@ -15,8 +15,6 @@ struct coarse {
 
   ulong s[3], ng[3];
   uint n[3];
-  // Get rid of `idx` map -- we don't need it anymore.
-  uint *idx;
   struct comm c;
   void *solver;
 };
