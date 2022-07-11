@@ -144,6 +144,13 @@ static void mg_setup_aux(struct mg *d, const uint lvl, const int factor,
     sparse_gemm(M, &S, &N, 1, cr, bfr);
     par_mat_free(&S), par_mat_free(&N);
 
+    // Scale diagonally
+    for (uint i = 0; i < M->rn; i++) {
+      for (uint j = M->adj_off[i], je = M->adj_off[i + 1]; j < je; j++)
+        M->adj_val[j] /= M->diag_val[i];
+      M->diag_val[i] = 1.0;
+    }
+
     par_mat_setup(&T, mijs, 0, 0, bfr);
     l->St = tcalloc(struct par_mat, 1);
     par_csc_to_csr(l->St, &T, 1, cr, bfr);

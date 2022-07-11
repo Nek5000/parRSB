@@ -235,6 +235,14 @@ static int inverse(scalar *y, struct array *elements, int nv, scalar *z,
   struct crystal cr;
   crystal_init(&cr, gsc);
   struct par_mat *L = par_csr_setup_con(lelt, eid, vtx, nv, 1, gsc, &cr, buf);
+
+  // Scale diagonally
+  for (uint i = 0; i < L->rn; i++) {
+    for (uint j = L->adj_off[i], je = L->adj_off[i + 1]; j < je; j++)
+      L->adj_val[j] /= L->diag_val[i];
+    L->diag_val[i] = 1.0;
+  }
+
   struct mg *d = mg_setup(L, factor, sagg, &cr, buf);
   crystal_free(&cr);
 
