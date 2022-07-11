@@ -49,38 +49,23 @@ static void get_extrema(void *extrema_, struct sort *data, uint field,
 }
 
 static int set_dest(uint *proc, uint size, sint np, slong start, slong nelem) {
-  uint i;
-  if (nelem < np) {
-    for (i = 0; i < size; i++)
-      proc[i] = start + i;
-    return 0;
-  }
+  if (nelem == 0)
+    return 1;
 
-  uint psize = nelem / np;
-  uint nrem = nelem - np * psize;
-  slong lower = nrem * (psize + 1);
-
-  uint id1, id2;
-  if (start < lower)
-    id1 = start / (psize + 1);
-  else
-    id1 = nrem + (start - lower) / psize;
-
-  if (start + size < lower)
-    id2 = (start + size) / (psize + 1);
-  else
-    id2 = nrem + (start + size - lower) / psize;
-
-  i = 0;
-  while (id1 <= id2 && i < size) {
-    ulong s = id1 * psize + min(id1, nrem);
-    ulong e = (id1 + 1) * psize + min(id1 + 1, nrem);
-    e = min(e, nelem);
-    assert(id1 < np && "Ooops ! id1 is larger than np");
-    assert(id1 >= 0 && "Ooops ! id1 is smaller than 0");
-    while (s <= start + i && start + i < e && i < size)
-      proc[i++] = id1;
-    id1++;
+  uint nelt = nelem / np, nrem = nelem - np * nelt;
+  if (nrem == 0) {
+    for (uint i = 0; i < size; i++) {
+      proc[i] = (start + i) / nelt;
+    }
+  } else {
+    uint s = np - nrem;
+    slong t = nelt * s;
+    for (uint i = 0; i < size; i++) {
+      if (start + i < t)
+        proc[i] = (start + i) / nelt;
+      else
+        proc[i] = s + (start + i - t) / (nelt + 1);
+    }
   }
 
   return 0;
@@ -219,15 +204,12 @@ static int update_probes(slong nelem, double *probes, ulong *probe_cnt,
 
 static int transfer_elem(struct hypercube *data, struct comm *c) {
   struct sort *input = data->data;
-  uint usize = input->unit_size;
-  uint offset = input->offset[0];
+  uint usize = input->unit_size, offset = input->offset[0];
   gs_dom t = input->t[0];
-
   struct array *a = input->a;
-  uint size = a->n;
 
-  uint e, lown = 0, uppern = 0;
-  for (e = 0; e < size; e++) {
+  uint size = a->n, lown = 0, uppern = 0;
+  for (uint e = 0; e < size; e++) {
     double val = get_scalar(a, e, offset, usize, t);
     if (val < data->probes[1])
       lown++;
@@ -235,19 +217,17 @@ static int transfer_elem(struct hypercube *data, struct comm *c) {
       uppern++;
   }
 
-  slong out[2][2], in[2], buf[2][2];
-  in[0] = lown, in[1] = uppern;
+  slong out[2][2], in[2] = {lown, uppern}, buf[2][2];
   comm_scan(out, c, gs_long, gs_add, in, 2, buf);
+  slong lstart = out[0][0], ustart = out[0][1];
+  slong lelem = out[1][0], uelem = out[1][1];
 
-  ulong lstart = out[0][0], ustart = out[0][1];
-  ulong lelem = out[1][0], uelem = out[1][1];
-  uint np = c->np, lnp = np / 2, unp = np - lnp;
-
+  uint np = c->np, lnp = np / 2;
   uint *proc = tcalloc(uint, size);
   set_dest(proc, lnp, lstart, lown, lelem);
-  set_dest(proc + lown, unp, ustart, uppern, uelem);
+  set_dest(proc + lown, np - lnp, ustart, uppern, uelem);
 
-  for (e = lown; e < size; e++)
+  for (uint e = lown; e < size; e++)
     proc[e] += lnp;
 
   struct crystal cr;
@@ -316,11 +296,9 @@ static int parallel_hypercube_sort(struct hypercube *data, struct comm *c) {
 
 static int load_balance(struct array *a, size_t size, struct comm *c,
                         struct crystal *cr) {
-  slong out[2][1], buf[2][1];
-  slong in = a->n;
+  slong out[2][1], buf[2][1], in = a->n;
   comm_scan(out, c, gs_long, gs_add, &in, 1, buf);
-  slong start = out[0][0];
-  slong nelem = out[1][0];
+  slong start = out[0][0], nelem = out[1][0];
 
   uint *proc = tcalloc(uint, a->n);
   set_dest(proc, a->n, c->np, start, nelem);
