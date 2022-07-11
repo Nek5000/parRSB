@@ -24,7 +24,7 @@ static int logbll(slong n, int a) {
 
   int k = (n > 0);
   while (n > 1)
-    n /= a, k++;
+    n = (n + a - 1) / a, k++;
 
   return k;
 }
@@ -161,27 +161,31 @@ static void mg_setup_aux(struct mg *d, const uint lvl, const int factor,
   comm_scan(out, c, gs_long, gs_add, &in, 1, wrk);
   ulong ng = out[1][0];
 
-  ulong ngc = ng / factor;
+  ulong ngc = (ng + factor - 1) / factor;
   ngc += (ngc == 0) * (ng > 1);
-
   const uint npc = (ngc < c->np ? ngc : c->np);
-  const uint nelt = ngc / npc, nrem = ngc % npc;
+  const uint nelt = ngc / npc, nrem = ngc - nelt * npc;
+
+  printf("c->id = %u c->np = %u, M->rn = %u ng = %llu ngc = %llu npc = %u nelt "
+         "= %u\n",
+         c->id, c->np, M->rn, ng, ngc, npc, nelt);
 
   // Calculate the minimum row id
   slong rs = (M->rn > 0 ? M->rows[0] : LLONG_MAX);
   comm_allreduce(c, gs_long, gs_min, &rs, 1, wrk);
+  assert(rs > 0);
   rs -= 1;
 
   // Reserve enough memory for ids used for interpolation
   slong *ids = (slong *)tcalloc(slong, 2 * M->rn);
 
   mijs->n = 0;
-  uint i, j, je, k = 0;
-  for (i = 0; i < M->rn; i++) {
-    m.r = (M->rows[i] - rs) / factor, m.r += (m.r == 0);
+  uint i, k;
+  for (i = 0, k = 0; i < M->rn; i++) {
+    m.r = (M->rows[i] - rs + factor - 1) / factor;
     set_proc(&m, nelt, nrem, npc);
-    for (j = M->adj_off[i], je = M->adj_off[i + 1]; j < je; j++) {
-      m.c = (M->cols[M->adj_idx[j]] - rs) / factor, m.c += (m.c == 0);
+    for (uint j = M->adj_off[i], je = M->adj_off[i + 1]; j < je; j++) {
+      m.c = (M->cols[M->adj_idx[j]] - rs + factor - 1) / factor;
       m.v = M->adj_val[j];
       array_cat(struct mij, mijs, &m, 1);
     }
