@@ -173,10 +173,6 @@ static void mg_setup_aux(struct mg *d, const uint lvl, const int factor,
   const uint npc = (ngc < c->np ? ngc : c->np);
   const uint nelt = ngc / npc, nrem = ngc - nelt * npc;
 
-  printf("c->id = %u c->np = %u, M->rn = %u ng = %llu ngc = %llu npc = %u nelt "
-         "= %u\n",
-         c->id, c->np, M->rn, ng, ngc, npc, nelt);
-
   // Calculate the minimum row id
   slong rs = (M->rn > 0 ? M->rows[0] : LLONG_MAX);
   comm_allreduce(c, gs_long, gs_min, &rs, 1, wrk);
