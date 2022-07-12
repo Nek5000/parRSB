@@ -407,6 +407,7 @@ static void number_dofs(ulong *dofs, struct coarse *crs, uint n,
   crs->s[0] = out[0][0] + 1, crs->ng[0] = out[1][0];
   crs->s[1] = out[0][1] + 1, crs->ng[1] = out[1][1];
 
+  // TODO: We need to do a RSB or RCB based numbering on this
   for (uint i = 0, ln = 0, in = 0; i < n; i++) {
     // Interface DOF
     if (dofs[i] > 0)
@@ -421,10 +422,10 @@ static void number_dofs(ulong *dofs, struct coarse *crs, uint n,
 
 // n  = ncr * nelt
 // nz = ncr * ncr * nelt
-struct coarse *crs_setup(uint n, const ulong *id, uint nz, const uint *Ai,
-                         const uint *Aj, const scalar *A, unsigned ndim,
-                         scalar *coord, unsigned null_space, unsigned type,
-                         const struct comm *c) {
+struct coarse *crs_schur_setup(uint n, const ulong *id, uint nz, const uint *Ai,
+                               const uint *Aj, const scalar *A,
+                               unsigned null_space, unsigned type,
+                               const struct comm *c) {
   struct coarse *crs = tcalloc(struct coarse, 1);
   crs->null_space = null_space, crs->type = type, crs->un = n;
 
@@ -549,11 +550,13 @@ struct coarse *crs_setup(uint n, const ulong *id, uint nz, const uint *Ai,
   return crs;
 }
 
-void crs_solve(scalar *x, struct coarse *crs, scalar *b, scalar tol) { return; }
+void crs_schur_solve(scalar *x, struct coarse *crs, scalar *b, scalar tol) {
+  return;
+}
 
-void crs_stats(struct coarse *crs) { return; }
+void crs_schur_stats(struct coarse *crs) { return; }
 
-void crs_free(struct coarse *crs) {
+void crs_schur_free(struct coarse *crs) {
   if (crs != NULL) {
     if (crs->u2c)
       free(crs->u2c);
