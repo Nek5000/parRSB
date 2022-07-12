@@ -90,8 +90,6 @@ void metric_rsb_print(struct comm *c, int profile_level) {
              SUMMARY(i, RSB_FIEDLER_NITER));
       printf("  RSB_PROJECT_NITER          : %g/%g/%g\n",
              SUMMARY(i, RSB_PROJECT_NITER));
-      printf("    RSB_LAPLACIAN            : %g/%g/%g\n",
-             SUMMARY(i, RSB_LAPLACIAN));
       printf("  RSB_FIEDLER_SORT           : %g/%g/%g\n",
              SUMMARY(i, RSB_FIEDLER_SORT));
       printf("  RSB_REPAIR_BALANCE         : %g/%g/%g\n",

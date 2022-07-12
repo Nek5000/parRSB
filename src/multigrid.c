@@ -19,16 +19,6 @@ struct mg {
   scalar *buf;
 };
 
-static int logbll(slong n, int a) {
-  assert(a > 0);
-
-  int k = (n > 0);
-  while (n > 1)
-    n = (n + a - 1) / a, k++;
-
-  return k;
-}
-
 //=============================================================================
 // MG setup
 //
@@ -60,14 +50,13 @@ extern int sparse_gemm(struct par_mat *WG, const struct par_mat *W,
                        const struct par_mat *G, int diag_wg, struct crystal *cr,
                        buffer *bfr);
 
-static void mg_setup_aux(struct mg *d, const uint lvl, const int factor,
-                         const int sagg, struct crystal *cr, struct array *mijs,
-                         buffer *bfr) {
-  assert(lvl > 0);
+static uint mg_setup_aux(struct mg *d, const int factor, const int sagg,
+                         struct crystal *cr, struct array *mijs, buffer *bfr) {
+  uint lvl = d->nlevels;
   struct mg_lvl *l = d->levels[lvl - 1];
 
   struct par_mat *Ml = l->M;
-  uint nnz = (Ml->rn > 0) ? (Ml->adj_off[Ml->rn] + Ml->rn) : 0;
+  uint nnz = ((Ml->rn > 0) ? (Ml->adj_off[Ml->rn] + Ml->rn) : 0);
 
   struct mij m = {.r = 0, .c = 0, .idx = 0, .p = 0, .v = 0};
   array_reserve(struct mij, mijs, nnz);
@@ -144,11 +133,22 @@ static void mg_setup_aux(struct mg *d, const uint lvl, const int factor,
     sparse_gemm(M, &S, &N, 1, cr, bfr);
     par_mat_free(&S), par_mat_free(&N);
 
-    // Scale diagonally
+    // Normalize M by the largest value
+    double max = 0;
     for (uint i = 0; i < M->rn; i++) {
       for (uint j = M->adj_off[i], je = M->adj_off[i + 1]; j < je; j++)
-        M->adj_val[j] /= M->diag_val[i];
-      M->diag_val[i] = 1.0;
+        if (fabs(M->adj_val[j]) > max)
+          max = fabs(M->adj_val[j]);
+      if (fabs(M->diag_val[i]) > max)
+        max = fabs(M->diag_val[i]);
+    }
+    double wrk[2];
+    comm_allreduce(c, gs_double, gs_max, &max, 1, wrk);
+
+    for (uint i = 0; i < M->rn; i++) {
+      for (uint j = M->adj_off[i], je = M->adj_off[i + 1]; j < je; j++)
+        M->adj_val[j] /= max;
+      M->diag_val[i] /= max;
     }
 
     par_mat_setup(&T, mijs, 0, 0, bfr);
@@ -164,12 +164,12 @@ static void mg_setup_aux(struct mg *d, const uint lvl, const int factor,
 
   // Now we interpolate to find the coarse operator Mc = J^T M J
   // Calculate coarse level parameters: ngc, npc, nelt, nrem
-  slong out[2][1], wrk[2][1], in = M->rn;
-  comm_scan(out, c, gs_long, gs_add, &in, 1, wrk);
-  ulong ng = out[1][0];
+  uint size = (M->rn > 0 ? (M->rows[M->rn - 1] - M->rows[0] + 1) : 0);
+  slong ng = size, wrk[2][1];
+  comm_allreduce(c, gs_long, gs_add, &ng, 1, wrk);
 
+  // ng > 1 based on while condition in mg_setup(). so ngc >= 1
   ulong ngc = (ng + factor - 1) / factor;
-  ngc += (ngc == 0) * (ng > 1);
   const uint npc = (ngc < c->np ? ngc : c->np);
   const uint nelt = ngc / npc, nrem = ngc - nelt * npc;
 
@@ -205,6 +205,8 @@ static void mg_setup_aux(struct mg *d, const uint lvl, const int factor,
   sarray_transfer(struct mij, mijs, p, 0, cr);
   sarray_sort_2(struct mij, mijs->ptr, mijs->n, r, 1, c, 1, bfr);
 
+  d->nlevels++;
+  d->levels = trealloc(struct mg_lvl *, d->levels, d->nlevels);
   l = d->levels[lvl] = tcalloc(struct mg_lvl, 1);
   M = l->M = par_csr_setup_ext(mijs, 1, bfr);
 
@@ -216,6 +218,7 @@ static void mg_setup_aux(struct mg *d, const uint lvl, const int factor,
   free(ids);
 
   d->levels[lvl]->Q = setup_Q(M, c, bfr);
+  return lvl;
 }
 
 struct mg *mg_setup(const struct par_mat *M, const int factor, const int sagg,
@@ -224,25 +227,15 @@ struct mg *mg_setup(const struct par_mat *M, const int factor, const int sagg,
   assert(M->rn == 0 || IS_DIAG(M));
 
   struct comm *c = &cr->comm;
-  slong out[2][1], wrk[2][1], in = M->rn;
-  comm_scan(out, c, gs_long, gs_add, &in, 1, wrk);
-  slong rg = out[1][0];
 
   struct mg *d = (struct mg *)tcalloc(struct mg, 1);
   d->sagg = sagg;
-  d->nlevels = logbll(rg, factor);
 
-  if (d->nlevels == 0) {
-    d->levels = NULL;
-    d->level_off = NULL;
-    d->buf = NULL;
-    return d;
-  }
-
+  // Setup Level 1, keeps a pointer to input matrix
+  d->nlevels = 1;
   d->levels = (struct mg_lvl **)tcalloc(struct mg_lvl *, d->nlevels);
   d->level_off = tcalloc(uint, d->nlevels + 1);
 
-  // Setup Level 1, keeps a pointer to input matrix
   d->levels[0] = (struct mg_lvl *)tcalloc(struct mg_lvl, 1);
   d->levels[0]->npres = 3;
   d->levels[0]->nposts = 0;
@@ -251,25 +244,33 @@ struct mg *mg_setup(const struct par_mat *M, const int factor, const int sagg,
   d->levels[0]->Q = setup_Q(M, c, bfr);
 
   d->level_off[0] = 0;
-  d->level_off[1] = M->rn;
+  uint size = (M->rn > 0 ? (M->rows[M->rn - 1] - M->rows[0] + 1) : 0);
+  d->level_off[1] = size;
 
-  uint nnz = M->rn > 0 ? M->adj_off[M->rn] + M->rn : 0;
+  uint nnz = (M->rn > 0 ? M->adj_off[M->rn] + M->rn : 0);
   struct array mijs;
   array_init(struct mij, &mijs, nnz);
 
-  uint l = 1;
-  for (; l < d->nlevels; l++) {
-    mg_setup_aux(d, l, factor, sagg, cr, &mijs, bfr);
+  slong ng = size, wrk[2];
+  comm_allreduce(c, gs_long, gs_add, &ng, 1, wrk);
+  while (ng > 1) {
+    uint l = mg_setup_aux(d, factor, sagg, cr, &mijs, bfr);
     struct par_mat *Ml = d->levels[l]->M;
     if (Ml->rn > 0 && Ml->adj_off[Ml->rn] + Ml->rn > nnz)
       nnz = Ml->adj_off[Ml->rn] + Ml->rn;
-    d->level_off[l + 1] = d->level_off[l] + Ml->rn;
     d->levels[l]->npres = 3;
     d->levels[l]->nposts = 0;
     d->levels[l]->over = 1.5;
+
+    d->level_off = trealloc(uint, d->level_off, d->nlevels + 1);
+    size = (Ml->rn > 0 ? (Ml->rows[Ml->rn - 1] - Ml->rows[0] + 1) : 0);
+    d->level_off[l + 1] = d->level_off[l] + size;
+
+    ng = size;
+    comm_allreduce(c, gs_long, gs_add, &ng, 1, wrk);
   }
 
-  d->levels[l - 1]->J = NULL;
+  d->levels[d->nlevels - 1]->J = NULL;
   d->buf = tcalloc(scalar, 5 * d->level_off[d->nlevels] + nnz);
 
   array_free(&mijs);
