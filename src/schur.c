@@ -901,7 +901,7 @@ int schur_setup(struct coarse *crs, struct array *eij, struct crystal *cr,
   return 0;
 }
 
-int schur_solve(scalar *x, scalar *b, scalar tol, struct coarse *crs,
+int schur_solve(scalar *x, struct coarse *crs, scalar *b, scalar tol,
                 buffer *bfr) {
   struct comm *c = &crs->c;
   struct schur *schur = crs->solver;
@@ -927,7 +927,9 @@ int schur_solve(scalar *x, scalar *b, scalar tol, struct coarse *crs,
   metric_toc(c, SCHUR_SOLVE_SETRHS1);
 
   metric_tic(c, SCHUR_SOLVE_PROJECT);
-  int iter = project(xi, rhs, schur, crs->s[0], c, 100, tol, 1, 0, bfr);
+  unsigned miter = (tol < 0 ? abs(tol) : 100);
+  scalar mtol = (tol > 0 ? tol : 1e-10);
+  int iter = project(xi, rhs, schur, crs->s[0], c, miter, mtol, 1, 0, bfr);
   metric_toc(c, SCHUR_SOLVE_PROJECT);
   metric_acc(SCHUR_PROJECT_NITER, iter);
 

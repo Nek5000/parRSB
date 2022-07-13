@@ -8,12 +8,9 @@
 #include <time.h>
 
 static double check_err(double *b, double *x, uint nelt, uint nv,
-                        const slong *vtx, MPI_Comm comm, buffer *bfr) {
+                        const slong *vtx, MPI_Comm comm) {
   struct comm c;
   comm_init(&c, comm);
-
-  struct crystal cr;
-  crystal_init(&cr, &c);
 
   slong out[2][1], buf[2][1], in = nelt;
   comm_scan(out, &c, gs_long, gs_add, &in, 1, buf);
@@ -23,20 +20,26 @@ static double check_err(double *b, double *x, uint nelt, uint nv,
   for (uint i = 0; i < nelt; i++)
     eid[i] = start + i;
 
+  struct crystal cr;
+  crystal_init(&cr, &c);
+
+  buffer bfr;
+  buffer_init(&bfr, 1024);
+
   struct array nbrs, eij;
-  find_nbrs(&nbrs, eid, vtx, nelt, nv, &cr, bfr);
-  compress_nbrs(&eij, &nbrs, bfr);
+  find_nbrs(&nbrs, eid, vtx, nelt, nv, &cr, &bfr);
+  compress_nbrs(&eij, &nbrs, &bfr);
 
   struct par_mat M;
-  par_csr_setup(&M, &eij, 1, bfr);
+  par_csr_setup(&M, &eij, 1, &bfr);
   assert(M.rn > 0);
 
   free(eid), array_free(&nbrs), array_free(&eij);
 
-  struct gs_data *gsh = setup_Q(&M, &c, bfr);
+  struct gs_data *gsh = setup_Q(&M, &c, &bfr);
   double *bl = tcalloc(double, nelt);
   double *wrk = tcalloc(double, M.rn + M.adj_off[M.rn]);
-  mat_vec_csr(bl, x, &M, gsh, wrk, bfr);
+  mat_vec_csr(bl, x, &M, gsh, wrk, &bfr);
 
   crystal_free(&cr), comm_free(&c);
   gs_free(gsh), par_mat_free(&M);
@@ -47,6 +50,7 @@ static double check_err(double *b, double *x, uint nelt, uint nv,
   MPI_Allreduce(MPI_IN_PLACE, &norm, 1, MPI_DOUBLE, MPI_SUM, comm);
 
   free(wrk), free(bl);
+  buffer_free(&bfr);
 
   return sqrt(norm);
 }
@@ -83,8 +87,6 @@ static void setup_and_solve(unsigned nelt, unsigned nv, const long long *vl,
   // Setup the coarse solve with schur complement solver
   struct comm c;
   comm_init(&c, comm);
-  buffer bfr;
-  buffer_init(&bfr, 1024);
 
   comm_barrier(&c);
   double t = comm_time();
@@ -98,10 +100,10 @@ static void setup_and_solve(unsigned nelt, unsigned nv, const long long *vl,
   comm_barrier(&c);
   t = comm_time();
   scalar *x = b + nelt;
-  coarse_solve(x, b, in->crs_tol, crs, &bfr);
+  coarse_solve(x, crs, b, in->crs_tol);
   double tsolve = MPI_Wtime() - t;
 
-  double enorm = check_err(b, x, nelt, nv, vl, comm, &bfr);
+  double enorm = check_err(b, x, nelt, nv, vl, comm);
   if (c.id == 0) {
     printf("MPI Ranks = %d\ncoarse_setup: %lf\ncoarse_solve = %lf\nerr = %lf\n",
            c.np, tsetup, tsolve, enorm);
@@ -111,9 +113,7 @@ static void setup_and_solve(unsigned nelt, unsigned nv, const long long *vl,
   parrsb_check_error(err, comm);
 
   // Free resources
-  buffer_free(&bfr);
-  coarse_free(crs);
-  free(b);
+  coarse_free(crs), free(b);
   comm_free(&c);
 }
 

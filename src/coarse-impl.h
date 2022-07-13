@@ -12,6 +12,7 @@ struct coarse {
              // matrix
   sint *u2c; // Mapping from user vector to compress vector
   struct gs_data *c2a; // Mapping from compressed vector to assmbled vector
+  buffer bfr;
 
   ulong s[3], ng[3];
   uint n[3];
@@ -21,7 +22,7 @@ struct coarse {
 
 int schur_setup(struct coarse *crs, struct array *eij, struct crystal *cr,
                 buffer *bfr);
-int schur_solve(scalar *x, scalar *b, scalar tol, struct coarse *crs,
+int schur_solve(scalar *x, struct coarse *crs, scalar *b, scalar tol,
                 buffer *bfr);
 int schur_free(struct coarse *crs);
 

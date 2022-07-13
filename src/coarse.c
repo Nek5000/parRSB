@@ -203,8 +203,7 @@ struct coarse *coarse_setup(unsigned n, unsigned nc, const long long *vl,
   crs->type = type, crs->null_space = null_space, crs->un = n;
 
   // Setup the buffer and duplicate the communicator.
-  buffer bfr;
-  buffer_init(&bfr, 1024);
+  buffer_init(&crs->bfr, 1024);
   comm_dup(&crs->c, c);
 
   uint size = n * nc;
@@ -214,14 +213,14 @@ struct coarse *coarse_setup(unsigned n, unsigned nc, const long long *vl,
 
   ulong *nid = tcalloc(ulong, n);
   unsigned ndim = (nc == 8) ? 3 : 2;
-  number_dual_graph_dofs(nid, crs, size, tid, n, ndim, coord, &bfr);
+  number_dual_graph_dofs(nid, crs, size, tid, n, ndim, coord, &crs->bfr);
 
   // Find unique ids and user vector to compressed vector mapping.
   // In the case of dual-graph Laplacian, all the ids are unique.
   // But here we arrange them in the sorted order.
   ulong *uid = tcalloc(ulong, n);
   crs->u2c = tcalloc(sint, n);
-  crs->cn = unique_ids(crs->u2c, uid, n, nid, &bfr);
+  crs->cn = unique_ids(crs->u2c, uid, n, nid, &crs->bfr);
   assert(crs->cn == crs->un);
   crs->an = crs->cn;
 
@@ -229,28 +228,27 @@ struct coarse *coarse_setup(unsigned n, unsigned nc, const long long *vl,
   crystal_init(&cr, &crs->c);
 
   struct array nbrs, eij;
-  find_nbrs(&nbrs, nid, tid, n, nc, &cr, &bfr);
+  find_nbrs(&nbrs, nid, tid, n, nc, &cr, &crs->bfr);
   // Convert `struct nbr` -> `struct mij` and compress entries which share the
   // same (r, c) values. Set the diagonal element to have zero row sum
-  compress_nbrs(&eij, &nbrs, &bfr);
+  compress_nbrs(&eij, &nbrs, &crs->bfr);
   array_free(&nbrs);
 
   switch (type) {
   case 0:
-    schur_setup(crs, &eij, &cr, &bfr);
+    schur_setup(crs, &eij, &cr, &crs->bfr);
     break;
   default:
     break;
   }
 
-  array_free(&eij), crystal_free(&cr), buffer_free(&bfr);
+  array_free(&eij), crystal_free(&cr);
   free(tid), free(nid), free(uid);
 
   return crs;
 }
 
-int coarse_solve(scalar *x, scalar *b, scalar tol, struct coarse *crs,
-                 buffer *bfr) {
+void coarse_solve(scalar *x, struct coarse *crs, scalar *b, scalar tol) {
   metric_init();
 
   scalar *rhs = tcalloc(scalar, 2 * crs->an), *xx = rhs + crs->an;
@@ -261,7 +259,7 @@ int coarse_solve(scalar *x, scalar *b, scalar tol, struct coarse *crs,
 
   switch (crs->type) {
   case 0:
-    schur_solve(xx, rhs, tol, crs, bfr);
+    schur_solve(xx, crs, rhs, tol, &crs->bfr);
     break;
   default:
     break;
@@ -275,11 +273,9 @@ int coarse_solve(scalar *x, scalar *b, scalar tol, struct coarse *crs,
 
   metric_push_level();
   metric_crs_print(&crs->c, 1);
-
-  return 0;
 }
 
-int coarse_free(struct coarse *crs) {
+void coarse_free(struct coarse *crs) {
   if (crs != NULL) {
     switch (crs->type) {
     case 0:
@@ -288,10 +284,11 @@ int coarse_free(struct coarse *crs) {
     default:
       break;
     }
-    comm_free(&crs->c);
+    if (crs->u2c)
+      free(crs->u2c);
+    comm_free(&crs->c), buffer_free(&crs->bfr);
     free(crs), crs = NULL;
   }
-  return 0;
 }
 
 //------------------------------------------------------------------------------
@@ -551,19 +548,47 @@ struct coarse *crs_schur_setup(uint n, const ulong *id, uint nz, const uint *Ai,
 }
 
 void crs_schur_solve(scalar *x, struct coarse *crs, scalar *b, scalar tol) {
-  return;
-}
+  metric_init();
 
-void crs_schur_stats(struct coarse *crs) { return; }
+  scalar *rhs = tcalloc(scalar, 2 * crs->an), *xx = rhs + crs->an;
+  for (uint i = 0; i < crs->un; i++) {
+    if (crs->u2c[i] >= 0)
+      rhs[crs->u2c[i]] += b[i];
+  }
+
+  switch (crs->type) {
+  case 0:
+    schur_solve(xx, crs, rhs, tol, &crs->bfr);
+    break;
+  default:
+    break;
+  }
+
+  for (uint i = 0; i < crs->un; i++) {
+    if (crs->u2c[i] >= 0)
+      x[i] = xx[crs->u2c[i]];
+  }
+  free(rhs);
+
+  metric_push_level();
+  metric_crs_print(&crs->c, 1);
+}
 
 void crs_schur_free(struct coarse *crs) {
   if (crs != NULL) {
+    switch (crs->type) {
+    case 0:
+      schur_free(crs);
+      break;
+    default:
+      break;
+    }
     if (crs->u2c)
       free(crs->u2c);
     gs_free(crs->c2a);
+    comm_free(&crs->c), buffer_free(&crs->bfr);
     free(crs), crs = NULL;
   }
-  return;
 }
 
 #undef MIN
