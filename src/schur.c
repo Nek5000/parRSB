@@ -842,8 +842,6 @@ int schur_setup(struct coarse *crs, struct array *eij, struct crystal *cr,
     else
       array_cat(struct mij, &ss, &ptr[i], 1);
   }
-  // For symmetric matrices
-  assert(ls.n == sl.n);
 
   // Setup local block diagonal (B)
   struct mat B;
