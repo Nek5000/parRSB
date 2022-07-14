@@ -538,6 +538,9 @@ struct coarse *crs_schur_setup(uint n, const ulong *id, uint nz, const uint *Ai,
   sarray_transfer(struct mij, &mijs, p, 1, &cr);
 
   nid = trealloc(slong, nid, crs->cn + crs->n[0] + nr + 1);
+  for (uint i = 0; i < crs->cn; i++)
+    nid[i] = -nid[i];
+
   crs->an = 0;
   if (mijs.n > 0) {
     sarray_sort_2(struct mij, mijs.ptr, mijs.n, r, 1, c, 1, &crs->bfr);
@@ -546,11 +549,11 @@ struct coarse *crs_schur_setup(uint n, const ulong *id, uint nz, const uint *Ai,
     while (i < mijs.n) {
       for (j = i + 1; j < mijs.n && pm[j].r == pm[i].r; j++)
         ;
-      nid[crs->cn + crs->an] = -pm[i].r, crs->an++, i = j;
+      nid[crs->cn + crs->an] = pm[i].r, crs->an++, i = j;
     }
   }
   crs->n[1] = crs->an - crs->n[0];
-  crs->s[1] = -nid[crs->cn + crs->n[0]];
+  crs->s[1] = nid[crs->cn + crs->n[0]];
   crs->c2a = gs_setup(nid, crs->cn + crs->an, c, 0, gs_pairwise, 0);
   // printf("id = %u an = %u n[1] = %u nr = %u\n", c->id, crs->an, crs->n[1],
   // nr);
@@ -571,23 +574,22 @@ struct coarse *crs_schur_setup(uint n, const ulong *id, uint nz, const uint *Ai,
 void crs_schur_solve(scalar *x, struct coarse *crs, scalar *b, scalar tol) {
   metric_init();
 
-  scalar *rhs = tcalloc(scalar, crs->cn + crs->an), *xx = rhs + crs->cn;
+  scalar *rhs = tcalloc(scalar, crs->cn + crs->an);
   for (uint i = 0; i < crs->un; i++) {
     if (crs->u2c[i] >= 0)
       rhs[crs->u2c[i]] += b[i];
   }
-  // TODO: call gs
+  gs(rhs, gs_double, gs_add, 1, crs->c2a, &crs->bfr);
 
   switch (crs->type) {
   case 0:
-    schur_solve(xx, crs, rhs, tol, &crs->bfr);
+    schur_solve(rhs + crs->cn, crs, rhs + crs->cn, tol, &crs->bfr);
     break;
   default:
     break;
   }
 
-  // TODO: call gs
-
+  gs(rhs, gs_double, gs_add, 0, crs->c2a, &crs->bfr);
   for (uint i = 0; i < crs->un; i++) {
     if (crs->u2c[i] >= 0)
       x[i] = rhs[crs->u2c[i]];
@@ -595,7 +597,7 @@ void crs_schur_solve(scalar *x, struct coarse *crs, scalar *b, scalar tol) {
   free(rhs);
 
   metric_push_level();
-  metric_crs_print(&crs->c, 1);
+  // metric_crs_print(&crs->c, 1);
 }
 
 void crs_schur_free(struct coarse *crs) {
