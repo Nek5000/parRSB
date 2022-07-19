@@ -336,7 +336,7 @@ static int schur_setup_W(struct par_mat *W, scalar tol, const struct mat *L,
   sint *owners = (sint *)tcalloc(sint, size);
   for (uint i = k = 0; i < E->rn; i++) {
     for (uint j = 0; j < L->n; j++) {
-      if (fabs(v[i * L->n + j]) > tol) {
+      if (fabs(v[i * L->n + j]) >= tol) {
         m.r = E->rows[i], m.c = L->start + j, m.v = v[i * L->n + j];
         if (k == size) {
           size += size / 2 + 1;
@@ -520,8 +520,8 @@ static struct mg *schur_precond_setup(const struct mat *L,
                                       struct crystal *cr, buffer *bfr) {
   // TODO: Sparsify W and G when they are built
   struct par_mat W, G, WG;
-  schur_setup_G(&G, 0.1, L, F, S->rows, S->rn, cr, bfr);
-  schur_setup_W(&W, 0.1, L, E, S->rows, S->rn, cr, bfr);
+  schur_setup_G(&G, 0.0, L, F, S->rows, S->rn, cr, bfr);
+  schur_setup_W(&W, 0.0, L, E, S->rows, S->rn, cr, bfr);
   sparse_gemm(&WG, &W, &G, 0, cr, bfr);
 #ifdef DUMPWG
   par_mat_print(&WG);
@@ -732,7 +732,7 @@ static int project(scalar *x, scalar *b, const struct schur *schur, ulong ls,
   if (null_space)
     ortho(z, n, ng, c);
 
-  scalar rz1 = dot(z, z, n);
+  scalar rz1 = dot(r, z, n);
   comm_allreduce(c, gs_double, gs_add, &rz1, 1, buf);
 
   for (i = 0; i < n; i++)
@@ -752,7 +752,7 @@ static int project(scalar *x, scalar *b, const struct schur *schur, ulong ls,
     comm_allreduce(c, gs_double, gs_add, &pw, 1, buf);
     alpha = rz1 / pw;
 
-    pw = 1 / sqrt(pw);
+    pw = 1.0 / sqrt(pw);
     for (j = 0; j < n; j++) {
       W[i * n + j] = pw * w[j];
       P[i * n + j] = pw * p[j];
@@ -775,15 +775,15 @@ static int project(scalar *x, scalar *b, const struct schur *schur, ulong ls,
     t = comm_time();
     mg_vcycle(z, r, d, c, bfr);
     metric_acc(SCHUR_PROJECT_PRECOND, comm_time() - t);
-
-    rzt = rz1;
     if (null_space)
       ortho(z, n, ng, c);
-    rz1 = dot(r, z, n);
-    comm_allreduce(c, gs_double, gs_add, &rz1, 1, buf);
-
     for (j = 0; j < n; j++)
       dz[j] = z[j] - z0[j];
+
+    // Do the following two reductions together
+    rzt = rz1;
+    rz1 = dot(r, z, n);
+    comm_allreduce(c, gs_double, gs_add, &rz1, 1, buf);
     rz2 = dot(r, dz, n);
     comm_allreduce(c, gs_double, gs_add, &rz2, 1, buf);
 
@@ -927,7 +927,7 @@ int schur_solve(scalar *x, struct coarse *crs, scalar *b, scalar tol,
   metric_tic(c, SCHUR_SOLVE_PROJECT);
   unsigned miter = (tol <= 0 ? abs(tol) : 100);
   scalar mtol = (tol > 0 ? tol : 1e-10);
-  int iter = project(xi, rhs, schur, crs->s[0], c, miter, mtol, 0, 0, bfr);
+  int iter = project(xi, rhs, schur, crs->s[0], c, miter, mtol, 0, 1, bfr);
   metric_toc(c, SCHUR_SOLVE_PROJECT);
   metric_acc(SCHUR_PROJECT_NITER, iter);
 
