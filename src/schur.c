@@ -228,6 +228,8 @@ static int schur_setup_G(struct par_mat *G, scalar tol, const struct mat *L,
   for (uint i = 0; i < L->n * F->cn; i++)
     v[i] = 0;
 
+  // Do L_B^{-1} x F now. Columns of L_B^{-1} are found one by one and
+  // then they are multplied by F. Is the above description correct?
   scalar *b = tcalloc(scalar, 2 * L->n);
   scalar *x = b + L->n;
   for (uint i = 0; i < F->rn; i++) {
@@ -246,48 +248,60 @@ static int schur_setup_G(struct par_mat *G, scalar tol, const struct mat *L,
       x[j] = 0;
   }
 
-  uint size = L->n * 20 + 1, k;
+  uint size = L->n * 20 + 1;
   struct array unique;
   array_init(struct mij, &unique, size);
 
-  struct mij m;
-  slong *cols = tcalloc(slong, size);
-  sint *owners = tcalloc(sint, size);
-  for (uint i = k = 0; i < L->n; i++) {
+  struct comm *c = &cr->comm;
+  struct mij m = {.r = 0, .c = 0, .idx = 1, .p = 0, .v = 0};
+  for (uint i = 0; i < L->n; i++) {
     for (uint j = 0; j < F->cn; j++) {
       if (fabs(v[i * F->cn + j]) >= tol) {
-        m.r = L->start + i, m.c = F->cols[j], m.v = v[i * F->cn + j];
-        if (k == size) {
-          size += size / 2 + 1;
-          cols = (slong *)trealloc(slong, cols, size);
-          owners = (sint *)trealloc(sint, owners, size);
-        }
-        owners[k] = S_owns_row(m.c, srows, srn) < srn ? cr->comm.id : -1;
-        cols[k++] = m.c;
+        m.r = L->start + i, m.c = F->cols[j], m.p = m.c % c->np;
+        m.v = v[i * F->cn + j];
         array_cat(struct mij, &unique, &m, 1);
       }
     }
   }
 
-  // Set the destination processor for elements in unique. Since W will be in
-  // CSR and share the same row distribution as S, we use gslib and row
-  // distribution of S to find the destination processor.
-  struct gs_data *gsh = gs_setup(cols, k, &cr->comm, 0, gs_pairwise, 0);
-  gs(owners, gs_int, gs_max, 0, gsh, bfr);
-  free(gsh);
+  m.r = 0, m.idx = 0, m.v = 0;
+  for (uint i = 0; i < srn; i++) {
+    m.c = srows[i], m.p = m.c % c->np;
+    array_cat(struct mij, &unique, &m, 1);
+  }
 
-  struct mij *ptr = unique.ptr;
-  for (uint i = 0; i < unique.n; i++)
-    ptr[i].p = owners[i];
-  free(owners), free(cols);
+  sarray_transfer(struct mij, &unique, p, 1, cr);
 
-  sarray_transfer(struct mij, &unique, p, 0, cr);
+  struct array mijs;
+  array_init(struct mij, &mijs, unique.n);
+  if (unique.n > 0) {
+    sarray_sort_2(struct mij, unique.ptr, unique.n, c, 1, idx, 0, bfr);
+    struct mij *pu = (struct mij *)unique.ptr;
+    uint i = 0, j = 1;
+    for (; j < unique.n; j++) {
+      if (pu[j].c != pu[i].c) {
+        assert(pu[i].idx == 0);
+        for (uint k = i + 1; k < j; k++) {
+          pu[k].p = pu[i].p;
+          array_cat(struct mij, &mijs, &pu[k], 1);
+        }
+        i = j;
+      }
+    }
+    assert(pu[i].idx == 0);
+    for (uint k = i + 1; k < unique.n; k++) {
+      pu[k].p = pu[i].p;
+      array_cat(struct mij, &mijs, &pu[k], 1);
+    }
+  }
+  array_free(&unique);
 
-  par_csc_setup(G, &unique, 0, bfr);
+  sarray_transfer(struct mij, &mijs, p, 0, cr);
+  par_csc_setup(G, &mijs, 0, bfr);
+  array_free(&mijs);
 #ifdef DUMPG
   par_mat_print(G);
 #endif
-  array_free(&unique);
 
   return 0;
 }
@@ -325,49 +339,60 @@ static int schur_setup_W(struct par_mat *W, scalar tol, const struct mat *L,
       x[j] = 0;
   }
 
-  uint size = E->rn * 20 + 1, k;
-  struct mij m;
-
+  uint size = E->rn * 20 + 1;
   struct array unique;
   array_init(struct mij, &unique, size);
 
-  slong *rows = (slong *)tcalloc(slong, size);
-  sint *owners = (sint *)tcalloc(sint, size);
-  for (uint i = k = 0; i < E->rn; i++) {
+  struct comm *c = &cr->comm;
+  struct mij m = {.r = 0, .c = 0, .idx = 1, .p = 0, .v = 0};
+  for (uint i = 0; i < E->rn; i++) {
     for (uint j = 0; j < L->n; j++) {
       if (fabs(v[i * L->n + j]) >= tol) {
-        m.r = E->rows[i], m.c = L->start + j, m.v = v[i * L->n + j];
-        if (k == size) {
-          size += size / 2 + 1;
-          rows = (slong *)trealloc(slong, rows, size);
-          owners = (sint *)trealloc(sint, owners, size);
-        }
-        owners[k] = S_owns_row(m.r, srows, srn) < srn ? cr->comm.id : -1;
-        rows[k++] = m.r;
+        m.r = E->rows[i], m.c = L->start + j, m.p = m.r % c->np;
+        m.v = v[i * L->n + j];
         array_cat(struct mij, &unique, &m, 1);
       }
     }
   }
 
-  // Set the destination processor for elements in unique. Since W will be in
-  // CSR and share the same row distribution as S, we use gslib and row
-  // distribution of S to find the destination processor.
-  struct gs_data *gsh = gs_setup(rows, k, &cr->comm, 0, gs_pairwise, 0);
-  gs(owners, gs_int, gs_max, 0, gsh, bfr);
-  free(gsh);
+  m.c = 0, m.idx = 0, m.v = 0;
+  for (uint i = 0; i < srn; i++) {
+    m.r = srows[i], m.p = m.r % c->np;
+    array_cat(struct mij, &unique, &m, 1);
+  }
 
-  struct mij *ptr = unique.ptr;
-  for (uint i = 0; i < unique.n; i++)
-    ptr[i].p = owners[i];
-  free(owners), free(rows);
+  sarray_transfer(struct mij, &unique, p, 1, cr);
 
-  sarray_transfer(struct mij, &unique, p, 0, cr);
+  struct array mijs;
+  array_init(struct mij, &mijs, unique.n);
+  if (unique.n > 0) {
+    sarray_sort_2(struct mij, unique.ptr, unique.n, r, 1, idx, 0, bfr);
+    struct mij *pu = (struct mij *)unique.ptr;
+    uint i = 0, j = 1;
+    for (; j < unique.n; j++) {
+      if (pu[j].r != pu[i].r) {
+        assert(pu[i].idx == 0);
+        for (uint k = i + 1; k < j; k++) {
+          pu[k].p = pu[i].p;
+          array_cat(struct mij, &mijs, &pu[k], 1);
+        }
+        i = j;
+      }
+    }
+    assert(pu[i].idx == 0);
+    for (uint k = i + 1; k < unique.n; k++) {
+      pu[k].p = pu[i].p;
+      array_cat(struct mij, &mijs, &pu[k], 1);
+    }
+  }
+  array_free(&unique);
 
-  par_csr_setup(W, &unique, 0, bfr);
+  sarray_transfer(struct mij, &mijs, p, 0, cr);
+  par_csr_setup(W, &mijs, 0, bfr);
+  array_free(&mijs);
 #ifdef DUMPW
   par_mat_print(W);
 #endif
-  array_free(&unique);
 
   return 0;
 }
@@ -384,6 +409,20 @@ static int sparse_sub(struct par_mat *C, const struct par_mat *A,
 
   struct mij m;
   uint r, j, je;
+  for (r = 0; r < B->rn; r++) {
+    m.r = B->rows[r];
+    for (j = B->adj_off[r], je = B->adj_off[r + 1]; j != je; j++) {
+      m.c = B->cols[B->adj_idx[j]], m.v = -B->adj_val[j];
+      array_cat(struct mij, &cij, &m, 1);
+    }
+  }
+  if (IS_DIAG(B)) {
+    for (r = 0; r < B->rn; r++) {
+      m.r = m.c = B->rows[r], m.v = -B->diag_val[r];
+      array_cat(struct mij, &cij, &m, 1);
+    }
+  }
+
   for (r = 0; r < A->rn; r++) {
     m.r = A->rows[r];
     for (j = A->adj_off[r], je = A->adj_off[r + 1]; j != je; j++) {
@@ -398,27 +437,11 @@ static int sparse_sub(struct par_mat *C, const struct par_mat *A,
     }
   }
 
-  for (r = 0; r < B->rn; r++) {
-    m.r = B->rows[r];
-    for (j = B->adj_off[r], je = B->adj_off[r + 1]; j != je; j++) {
-      m.c = B->cols[B->adj_idx[j]], m.v = -B->adj_val[j];
-      array_cat(struct mij, &cij, &m, 1);
-    }
-  }
-  if (IS_DIAG(B)) {
-    for (r = 0; r < B->rn; r++) {
-      m.r = B->rows[r], m.c = B->rows[r], m.v = -B->diag_val[r];
-      array_cat(struct mij, &cij, &m, 1);
-    }
-  }
-
-  sarray_sort_2(struct mij, cij.ptr, cij.n, r, 1, c, 1, bfr);
-  struct mij *ptr = (struct mij *)cij.ptr;
-
   struct array unique;
   array_init(struct mij, &unique, 100);
-
   if (cij.n > 0) {
+    sarray_sort_2(struct mij, cij.ptr, cij.n, r, 1, c, 1, bfr);
+    struct mij *ptr = (struct mij *)cij.ptr;
     uint i = 0;
     while (i < cij.n) {
       scalar s = 0;
@@ -528,6 +551,7 @@ schur_precond_setup(const struct mat *L, const struct par_mat *F,
   // P is CSR
   struct par_mat *P = tcalloc(struct par_mat, 1);
   sparse_sub(P, S, &WG, bfr);
+
 #ifdef DUMPP
   par_mat_print(P);
 #endif

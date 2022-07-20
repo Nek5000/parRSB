@@ -250,10 +250,9 @@ struct mg *mg_setup(const struct par_mat *M, const int factor, const int sagg,
   d->levels[0]->Q = setup_Q(M, c, bfr);
 
   uint size = (M->rn > 0 ? (M->rows[M->rn - 1] - M->rows[0] + 1) : 0);
-  uint nnz = (M->rn > 0 ? M->adj_off[M->rn] + M->rn : 0);
-
   d->level_off[0] = 0, d->level_off[1] = size;
 
+  uint nnz = (M->rn > 0 ? M->adj_off[M->rn] + M->rn : 0);
   struct array mijs;
   array_init(struct mij, &mijs, nnz);
 

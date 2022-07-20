@@ -497,8 +497,7 @@ struct coarse *crs_schur_setup(uint n, const ulong *id, uint nz, const uint *Ai,
   crs->cn = unique_ids(crs->u2c, uid, crs->un, tid, &crs->bfr);
   // printf("id = %u un = %u cn = %u\n", c->id, crs->un, crs->cn);
 
-  // Now renumber these unique ids based on whether they are internal or in
-  // the interface.
+  // Now renumber unique ids based on whether they are internal or on interface.
   slong *nid = tcalloc(slong, crs->cn);
   number_dofs(nid, crs, tid, uid);
   free(tid), free(uid);
