@@ -247,11 +247,10 @@ static int schur_setup_G(struct par_mat *G, scalar tol, const struct mat *L,
   }
 
   uint size = L->n * 20 + 1, k;
-  struct mij m;
-
   struct array unique;
   array_init(struct mij, &unique, size);
 
+  struct mij m;
   slong *cols = tcalloc(slong, size);
   sint *owners = tcalloc(sint, size);
   for (uint i = k = 0; i < L->n; i++) {
@@ -273,7 +272,7 @@ static int schur_setup_G(struct par_mat *G, scalar tol, const struct mat *L,
   // Set the destination processor for elements in unique. Since W will be in
   // CSR and share the same row distribution as S, we use gslib and row
   // distribution of S to find the destination processor.
-  struct gs_data *gsh = gs_setup(cols, k, &cr->comm, 0, gs_pairwise, 1);
+  struct gs_data *gsh = gs_setup(cols, k, &cr->comm, 0, gs_pairwise, 0);
   gs(owners, gs_int, gs_max, 0, gsh, bfr);
   free(gsh);
 
@@ -492,7 +491,7 @@ int sparse_gemm(struct par_mat *WG, const struct par_mat *W,
         }
         while (e < gij.n && pg[s].c == pg[e].c)
           e++;
-        if (fabs(m.v) > 1e-10)
+        if (fabs(m.v) > 1e-12)
           array_cat(struct mij, &sij, &m, 1);
         s = e;
       }
@@ -513,15 +512,14 @@ int sparse_gemm(struct par_mat *WG, const struct par_mat *W,
   return 0;
 }
 
-static struct mg *schur_precond_setup(const struct mat *L,
-                                      const struct par_mat *F,
-                                      const struct par_mat *S,
-                                      const struct par_mat *E,
-                                      struct crystal *cr, buffer *bfr) {
+static struct mg *
+schur_precond_setup(const struct mat *L, const struct par_mat *F,
+                    const struct par_mat *S, const struct par_mat *E, ulong si,
+                    uint ni, struct crystal *cr, buffer *bfr) {
   // TODO: Sparsify W and G when they are built
   struct par_mat W, G, WG;
-  schur_setup_G(&G, 0.0, L, F, S->rows, S->rn, cr, bfr);
-  schur_setup_W(&W, 0.0, L, E, S->rows, S->rn, cr, bfr);
+  schur_setup_G(&G, 1e-12, L, F, S->rows, S->rn, cr, bfr);
+  schur_setup_W(&W, 1e-12, L, E, S->rows, S->rn, cr, bfr);
   sparse_gemm(&WG, &W, &G, 0, cr, bfr);
 #ifdef DUMPWG
   par_mat_print(&WG);
@@ -538,7 +536,7 @@ static struct mg *schur_precond_setup(const struct mat *L,
   par_mat_free(&G);
   par_mat_free(&WG);
 
-  return mg_setup(P, 8, 0, cr, bfr);
+  return mg_setup(P, 2, 0, cr, bfr);
 }
 
 static struct gs_data *setup_Ezl_Q(struct par_mat *E, ulong s, uint n,
@@ -631,7 +629,7 @@ static int distribute_by_columns(struct array *aij, ulong s, uint n,
   struct mij *ptr = aij->ptr;
   for (i = 0; i < aij->n; i++) {
     cols[i] = ptr[i].c;
-    if (ptr[i].c >= s && ptr[i].c < s + n)
+    if (cols[i] >= s && cols[i] < s + n)
       owner[i] = cr->comm.id;
     else
       owner[i] = -1;
@@ -843,7 +841,8 @@ int schur_setup(struct coarse *crs, struct array *eij, struct crystal *cr,
       array_cat(struct mij, &ss, &ptr[i], 1);
   }
 
-  // Setup local block diagonal (B)
+  // Setup local block diagonal (B). This is distributed by rows based on the
+  // partitioning.
   struct mat B;
   csr_setup(&B, &ll, 0, bfr);
   cholesky_factor(&schur->A_ll, &B, bfr);
@@ -854,7 +853,28 @@ int schur_setup(struct coarse *crs, struct array *eij, struct crystal *cr,
   array_free(&ll);
   schur->A_ll.start = crs->s[0];
 
-  // Setup E
+  // Setup S: Setup interface nodes. This is distributed by rows in a load
+  // balanced manner.
+  par_csr_setup(&schur->A_ss, &ss, 1, bfr);
+#ifdef DUMP4
+  par_mat_dump("S.txt", &schur->A_ss, cr, bfr);
+#endif
+  array_free(&ss);
+  schur->Q_ss = setup_Q(&schur->A_ss, &cr->comm, bfr);
+
+  // Setup F: Setup local interface connectivity. This is distributed by rows
+  // similar to S.
+  par_csr_setup(&schur->A_ls, &ls, 0, bfr);
+#ifdef DUMP4
+  par_mat_dump("F.txt", &schur->A_ls, cr, bfr);
+#endif
+  array_free(&ls);
+  schur->Q_ls = setup_Fxi_Q(&schur->A_ls, crs->ng[0] + crs->s[1], crs->n[1],
+                            &cr->comm, bfr);
+
+  // Setup E: E is distributed by columns in the same manner as columns (or
+  // rows) of B.
+  printf("ng[0] = %llu ng[1] = %llu\n", crs->ng[0], crs->ng[1]);
   assert(schur->A_ll.n == crs->n[0]);
   distribute_by_columns(&sl, crs->s[0], crs->n[0], cr, bfr);
   par_csc_setup(&schur->A_sl, &sl, 0, bfr);
@@ -865,36 +885,9 @@ int schur_setup(struct coarse *crs, struct array *eij, struct crystal *cr,
   schur->Q_sl = setup_Ezl_Q(&schur->A_sl, crs->ng[0] + crs->s[1], crs->n[1],
                             &cr->comm, bfr);
 
-  // Setup S
-  par_csr_setup(&schur->A_ss, &ss, 1, bfr);
-#ifdef DUMP4
-  par_mat_print(&schur->A_ss);
-  par_mat_dump("S.txt", &schur->A_ss, cr, bfr);
-#endif
-  array_free(&ss);
-  schur->Q_ss = setup_Q(&schur->A_ss, &cr->comm, bfr);
-
-  // Setup F
-  par_csr_setup(&schur->A_ls, &ls, 0, bfr);
-#ifdef DUMP4
-  par_mat_dump("F.txt", &schur->A_ls, cr, bfr);
-#endif
-  array_free(&ls);
-  schur->Q_ls = setup_Fxi_Q(&schur->A_ls, crs->ng[0] + crs->s[1], crs->n[1],
-                            &cr->comm, bfr);
-
-  char *val = getenv("PARRSB_DUMP_SCHUR");
-  if (val != NULL && atoi(val) != 0) {
-    slong nl = schur->A_ll.n, wrk[2];
-    comm_allreduce(&cr->comm, gs_long, gs_add, &nl, 1, wrk);
-    char name[BUFSIZ];
-    snprintf(name, BUFSIZ, "A_nl_%lld.txt", nl);
-    par_arr_dump(name, eij, cr, bfr);
-  }
-
   // Setup the preconditioner for the Schur complement matrix
   schur->M = schur_precond_setup(&schur->A_ll, &schur->A_ls, &schur->A_ss,
-                                 &schur->A_sl, cr, bfr);
+                                 &schur->A_sl, crs->s[1], crs->n[1], cr, bfr);
 
   return 0;
 }

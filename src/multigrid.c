@@ -231,8 +231,7 @@ struct mg *mg_setup(const struct par_mat *M, const int factor, const int sagg,
   assert(IS_CSR(M));
   assert(M->rn == 0 || IS_DIAG(M));
 
-  struct comm *c = &cr->comm;
-
+  // Allocate memory for struct mg
   struct mg *d = (struct mg *)tcalloc(struct mg, 1);
   d->sagg = sagg;
 
@@ -244,19 +243,21 @@ struct mg *mg_setup(const struct par_mat *M, const int factor, const int sagg,
   d->levels[0] = (struct mg_lvl *)tcalloc(struct mg_lvl, 1);
   d->levels[0]->npres = 3;
   d->levels[0]->nposts = 0;
-  d->levels[0]->over = 1.5;
+  d->levels[0]->over = 1.33333;
   d->levels[0]->M = (struct par_mat *)M;
+
+  struct comm *c = &cr->comm;
   d->levels[0]->Q = setup_Q(M, c, bfr);
 
-  d->level_off[0] = 0;
   uint size = (M->rn > 0 ? (M->rows[M->rn - 1] - M->rows[0] + 1) : 0);
-  d->level_off[1] = size;
-
   uint nnz = (M->rn > 0 ? M->adj_off[M->rn] + M->rn : 0);
+
+  d->level_off[0] = 0, d->level_off[1] = size;
+
   struct array mijs;
   array_init(struct mij, &mijs, nnz);
 
-  slong ng = size, wrk[2];
+  slong wrk[2], ng = size;
   comm_allreduce(c, gs_long, gs_add, &ng, 1, wrk);
   while (ng > 1) {
     uint l = mg_setup_aux(d, factor, sagg, cr, &mijs, bfr);
@@ -320,7 +321,7 @@ void mg_vcycle(scalar *u1, scalar *rhs, struct mg *d, struct comm *c,
     for (j = 0; j < n; j++)
       r[off + j] = r[off + j] - Gs[off + j];
 
-    for (i = 1; i <= l->npres; i++) {
+    for (i = 1; i <= l->npres - 1; i++) {
       sigma = sigma_cheb(i + 1, l->npres + 1, 1, 2);
 
       // s = sigma * inv(D) * r
