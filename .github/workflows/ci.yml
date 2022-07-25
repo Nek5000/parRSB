@@ -2,6 +2,7 @@ name: parRSB CI Tests
 on: [push, pull_request]
 env:
   GITHUB.TOKEN: ${{ secrets.token }}
+  PARRSB_CI: parRSB-github-ci
 jobs:
   main:
     runs-on: ubuntu-latest
@@ -35,16 +36,16 @@ jobs:
           make -j1
 
           # Clone tests
-          git clone https://github.com/thilinarmtb/parRSB-tests.git
+          git clone https://github.com/thilinarmtb/${PARRSB_CI}.git
 
           # For MPI
           echo "localhost:4" > hostfile
       - name: gencon
         shell: bash
         run: |
-          cp hostfile build/examples/gencon parRSB-tests/${{ matrix.test }}
+          cp hostfile build/examples/gencon ${PARRSB_CI}/${{ matrix.test }}
 
-          cd parRSB-tests/${{ matrix.test }}
+          cd ${PARRSB_CI}/${{ matrix.test }}
 
           tol=(`cat test.txt | grep tol`); tol=${tol[2]}
 
@@ -57,9 +58,9 @@ jobs:
           export PARRSB_RSB_PRE=0
           export PARRSB_RSB_ALGO=0
 
-          cp hostfile build/examples/genmap parRSB-tests/${{ matrix.test }}
+          cp hostfile build/examples/genmap ${PARRSB_CI}/${{ matrix.test }}
 
-          cd parRSB-tests/${{ matrix.test }}
+          cd ${PARRSB_CI}/${{ matrix.test }}
 
           tol=(`cat test.txt | grep tol`); tol=${tol[2]}
 
@@ -73,9 +74,9 @@ jobs:
           export PARRSB_RSB_ALGO=1
           export PARRSB_RSB_MG_FACTOR=2
 
-          cp hostfile build/examples/genmap parRSB-tests/${{ matrix.test }}
+          cp hostfile build/examples/genmap ${PARRSB_CI}/${{ matrix.test }}
 
-          cd parRSB-tests/${{ matrix.test }}
+          cd ${PARRSB_CI}/${{ matrix.test }}
 
           tol=(`cat test.txt | grep tol`); tol=${tol[2]}
 
@@ -89,9 +90,9 @@ jobs:
           export PARRSB_RSB_ALGO=1
           export PARRSB_RSB_MG_FACTOR=4
 
-          cp hostfile build/examples/genmap parRSB-tests/${{ matrix.test }}
+          cp hostfile build/examples/genmap ${PARRSB_CI}/${{ matrix.test }}
 
-          cd parRSB-tests/${{ matrix.test }}
+          cd ${PARRSB_CI}/${{ matrix.test }}
 
           tol=(`cat test.txt | grep tol`); tol=${tol[2]}
 
@@ -106,9 +107,9 @@ jobs:
           export PARRSB_RSB_MG_FACTOR=4
           export PARRSB_RSB_MG_SMOOTH_AGGREGATION=1
 
-          cp hostfile build/examples/genmap parRSB-tests/${{ matrix.test }}
+          cp hostfile build/examples/genmap ${PARRSB_CI}/${{ matrix.test }}
 
-          cd parRSB-tests/${{ matrix.test }}
+          cd ${PARRSB_CI}/${{ matrix.test }}
 
           tol=(`cat test.txt | grep tol`); tol=${tol[2]}
 
@@ -146,7 +147,7 @@ jobs:
           make -j1
 
           # Clone tests
-          git clone https://github.com/thilinarmtb/parRSB-tests.git
+          git clone https://github.com/thilinarmtb/${PARRSB_CI}.git
 
           # For MPI
           echo "localhost:4" > hostfile
@@ -156,9 +157,9 @@ jobs:
         run: |
           export PARRSB_DUMP_ILU=1
 
-          cp hostfile build/examples/ilu .github/workflows/ilu0.m parRSB-tests/${{ matrix.test }}
+          cp hostfile build/examples/ilu .github/workflows/ilu0.m ${PARRSB_CI}/${{ matrix.test }}
 
-          cd parRSB-tests/${{ matrix.test }}
+          cd ${PARRSB_CI}/${{ matrix.test }}
 
           tol=(`cat test.txt | grep tol`); tol=${tol[2]}
 
@@ -172,9 +173,9 @@ jobs:
         run: |
           export PARRSB_DUMP_ILU=1
 
-          cp hostfile build/examples/ilu .github/workflows/iluc.m parRSB-tests/${{ matrix.test }}
+          cp hostfile build/examples/ilu .github/workflows/iluc.m ${PARRSB_CI}/${{ matrix.test }}
 
-          cd parRSB-tests/${{ matrix.test }}
+          cd ${PARRSB_CI}/${{ matrix.test }}
 
           tol=(`cat test.txt | grep tol`); tol=${tol[2]}
 
@@ -214,7 +215,7 @@ jobs:
           make -j1
 
           # Clone tests
-          git clone https://github.com/thilinarmtb/parRSB-tests.git
+          git clone https://github.com/thilinarmtb/${PARRSB_CI}.git
 
           # For MPI
           echo "localhost:4" > hostfile
@@ -222,9 +223,9 @@ jobs:
         if: always()
         shell: bash
         run: |
-          cp hostfile build/examples/coarse .github/workflows/ilu0.m parRSB-tests/${{ matrix.test }}
+          cp hostfile build/examples/coarse .github/workflows/ilu0.m ${PARRSB_CI}/${{ matrix.test }}
 
-          cd parRSB-tests/${{ matrix.test }}
+          cd ${PARRSB_CI}/${{ matrix.test }}
 
           tol=(`cat test.txt | grep tol`); tol=${tol[2]}
 
