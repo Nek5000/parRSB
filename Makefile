@@ -29,6 +29,7 @@ SRCROOT = $(realpath $(SRCROOT_))
 SRCDIR = $(SRCROOT)/src
 BUILDDIR = $(SRCROOT)/build
 EXAMPLEDIR = $(SRCROOT)/examples
+INSTALLDIR=$(SRCDIR)/build
 
 INCFLAGS = -I$(SRCDIR) -I$(GSLIBPATH)/include
 LDFLAGS = -L$(BUILDDIR)/lib -lparRSB -L$(GSLIBPATH)/lib -lgs -lm
@@ -73,25 +74,21 @@ ifneq ($(OCCA),0)
   SRCS += $(wildcard $(SRCDIR)/occa/*.c)
 endif
 
-INSTALLDIR=
 ifneq (,$(strip $(DESTDIR)))
   INSTALLDIR = $(realpath $(DESTDIR))
 endif
 
-.PHONY: all
-all: lib examples install
+.PHONY: all install lib examples clean format
 
-.PHONY: install
+all: examples
+
 install: lib
-ifneq ($(INSTALLDIR),)
 	@mkdir -p $(INSTALLDIR)/lib 2>/dev/null
 	@cp -v $(LIB) $(INSTALLDIR)/lib 2>/dev/null
 	@mkdir -p $(INSTALLDIR)/include 2>/dev/null
 	@cp $(SRCDIR)/*.h $(INSTALLDIR)/include 2>/dev/null
 	@cp -r $(SRCDIR)/occa/*.okl $(INSTALLDIR)/ 2>/dev/null
-endif
 
-.PHONY: lib
 lib: $(SRCOBJS)
 	@mkdir -p $(BUILDDIR)/lib
 	@$(AR) cr $(LIB) $(SRCOBJS)
@@ -100,17 +97,14 @@ lib: $(SRCOBJS)
 $(BUILDDIR)/%.o: $(SRCROOT)/src/%.c
 	$(CC) $(CFLAGS) $(PP) $(INCFLAGS) -c $< -o $@
 
-.PHONY: examples
 examples: install $(EXAMPLEOBJS)
 
 $(BUILDDIR)/examples/%: $(SRCROOT)/examples/%.c
 	$(CC) $(CFLAGS) $(PP) $(INCFLAGS) $< -o $@ $(LDFLAGS)
 
-.PHONY: clean
 clean:
 	@rm -rf $(BUILDDIR)
 
-.PHONY: format
 format:
 	find . -iname *.h -o -iname *.c -o -iname *.okl | xargs clang-format -i
 
