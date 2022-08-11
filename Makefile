@@ -29,7 +29,7 @@ SRCROOT = $(realpath $(SRCROOT_))
 SRCDIR = $(SRCROOT)/src
 BUILDDIR = $(SRCROOT)/build
 EXAMPLEDIR = $(SRCROOT)/examples
-INSTALLDIR=$(SRCDIR)/build
+INSTALLDIR=$(SRCROOT)
 
 INCFLAGS = -I$(SRCDIR) -I$(GSLIBPATH)/include
 LDFLAGS = -L$(BUILDDIR)/lib -lparRSB -L$(GSLIBPATH)/lib -lgs -lm
