@@ -23,6 +23,7 @@
 #undef gs_scalar
 #endif
 #define gs_scalar gs_double
+#define gs_scalar_T 3
 
 #define GENMAP_ALIGN 32
 #define GENMAP_TOL 1e-12
