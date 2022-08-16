@@ -123,10 +123,10 @@ int rsb(struct array *elements, int nv, parrsb_options *options,
     metric_toc(&lc, RSB_FIEDLER);
 
     // Sort by Fiedler vector
-    metric_tic(&lc, RSB_FIEDLER_SORT);
+    metric_tic(&lc, RSB_SORT);
     parallel_sort_2(struct rsb_element, elements, fiedler, gs_double, globalId,
                     gs_long, 0, 1, &lc, bfr);
-    metric_toc(&lc, RSB_FIEDLER_SORT);
+    metric_toc(&lc, RSB_SORT);
 
     // Bisect, repair and balance
     int bin = (nid >= (np + 1) / 2);
