@@ -81,27 +81,27 @@ void metric_rsb_print(struct comm *c, int profile_level) {
   for (i = 0; i < stack_size; i++) {
     if (c->id == 0 && profile_level > 0) {
       printf("level=%02d\n", i);
-      printf("  RSB_PRE                    : %g/%g/%g\n", SUMMARY(i, RSB_PRE));
-      printf("  RSB_FIEDLER                : %g/%g/%g\n",
+      printf("  RSB_PRE                    : %e/%e/%e\n", SUMMARY(i, RSB_PRE));
+      printf("  RSB_FIEDLER                : %e/%e/%e\n",
              SUMMARY(i, RSB_FIEDLER));
-      printf("    RSB_LANCZOS_SETUP        : %g/%g/%g\n",
-             SUMMARY(i, RSB_LANCZOS_SETUP));
-      printf("    RSB_LANCZOS              : %g/%g/%g\n",
-             SUMMARY(i, RSB_LANCZOS));
-      printf("    RSB_LANCZOS_TQLI         : %g/%g/%g\n",
-             SUMMARY(i, RSB_LANCZOS_TQLI));
-      printf("    RSB_INVERSE_SETUP        : %g/%g/%g\n",
-             SUMMARY(i, RSB_INVERSE_SETUP));
-      printf("    RSB_INVERSE              : %g/%g/%g\n",
-             SUMMARY(i, RSB_LANCZOS));
-      printf("  RSB_FIEDLER_SETUP          : %g/%g/%g\n",
+      printf("  RSB_FIEDLER_SETUP          : %e/%e/%e\n",
              SUMMARY(i, RSB_FIEDLER_SETUP));
-      printf("  RSB_FIEDLER_INNER          : %g/%g/%g\n",
+      printf("  RSB_FIEDLER_INNER          : %e/%e/%e\n",
              SUMMARY(i, RSB_FIEDLER_INNER));
-      printf("  RSB_FIEDLER_INNER_NITER    : %g/%g/%g\n",
+      printf("    RSB_LANCZOS_SETUP        : %e/%e/%e\n",
+             SUMMARY(i, RSB_LANCZOS_SETUP));
+      printf("    RSB_LANCZOS              : %e/%e/%e\n",
+             SUMMARY(i, RSB_LANCZOS));
+      printf("    RSB_LANCZOS_TQLI         : %e/%e/%e\n",
+             SUMMARY(i, RSB_LANCZOS_TQLI));
+      printf("    RSB_INVERSE_SETUP        : %e/%e/%e\n",
+             SUMMARY(i, RSB_INVERSE_SETUP));
+      printf("    RSB_INVERSE              : %e/%e/%e\n",
+             SUMMARY(i, RSB_INVERSE));
+      printf("  RSB_FIEDLER_INNER_NITER    : %e/%e/%e\n",
              SUMMARY(i, RSB_FIEDLER_INNER_NITER));
-      printf("  RSB_SORT           : %g/%g/%g\n", SUMMARY(i, RSB_SORT));
-      printf("  RSB_REPAIR_BALANCE         : %g/%g/%g\n",
+      printf("  RSB_SORT                   : %e/%e/%e\n", SUMMARY(i, RSB_SORT));
+      printf("  RSB_REPAIR_BALANCE         : %e/%e/%e\n",
              SUMMARY(i, RSB_REPAIR_BALANCE));
     }
   }
@@ -119,21 +119,21 @@ void metric_crs_print(struct comm *c, int profile_level) {
   for (i = 0; i < stack_size; i++) {
     if (c->id == 0 && profile_level > 0) {
       printf("level=%02d\n", i);
-      printf("  SCHUR_SOLVE_CHOL1  : %g/%g/%g\n",
+      printf("  SCHUR_SOLVE_CHOL1  : %e/%e/%e\n",
              SUMMARY(i, SCHUR_SOLVE_CHOL1));
-      printf("  SCHUR_SOLVE_SETRHS1: %g/%g/%g\n",
+      printf("  SCHUR_SOLVE_SETRHS1: %e/%e/%e\n",
              SUMMARY(i, SCHUR_SOLVE_SETRHS1));
-      printf("  SCHUR_SOLVE_PROJECT: %g/%g/%g\n",
+      printf("  SCHUR_SOLVE_PROJECT: %e/%e/%e\n",
              SUMMARY(i, SCHUR_SOLVE_PROJECT));
-      printf("\tSCHUR_PROJECT_NITER: %g/%g/%g\n",
+      printf("\tSCHUR_PROJECT_NITER: %e/%e/%e\n",
              SUMMARY(i, SCHUR_PROJECT_NITER));
-      printf("\tSCHUR_PROJECT_OPERATOR: %g/%g/%g\n",
+      printf("\tSCHUR_PROJECT_OPERATOR: %e/%e/%e\n",
              SUMMARY(i, SCHUR_PROJECT_OPERATOR));
-      printf("\tSCHUR_PROJECT_PRECOND : %g/%g/%g\n",
+      printf("\tSCHUR_PROJECT_PRECOND : %e/%e/%e\n",
              SUMMARY(i, SCHUR_PROJECT_PRECOND));
-      printf("  SCHUR_SOLVE_SETRHS2: %g/%g/%g\n",
+      printf("  SCHUR_SOLVE_SETRHS2: %e/%e/%e\n",
              SUMMARY(i, SCHUR_SOLVE_SETRHS2));
-      printf("  SCHUR_SOLVE_CHOL2  : %g/%g/%g\n",
+      printf("  SCHUR_SOLVE_CHOL2  : %e/%e/%e\n",
              SUMMARY(i, SCHUR_SOLVE_CHOL2));
     }
   }

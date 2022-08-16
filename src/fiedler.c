@@ -614,9 +614,9 @@ static int lanczos(scalar *fiedler, struct array *elements, int nv,
         fiedler[i] += rr[j * lelt + i] * eVectors[eValMinI * iter + j];
     }
     ortho(fiedler, lelt, nelg, gsc);
-
     metric_acc(RSB_LANCZOS_TQLI, comm_time() - t);
-  } while (iter == miter && ipass++ < mpass);
+    ipass++;
+  } while (iter == miter && ipass < mpass);
 
   free(alpha), free(rr), free(eVectors), free(eValues);
 #if defined(GENMAP_OCCA)
@@ -624,7 +624,7 @@ static int lanczos(scalar *fiedler, struct array *elements, int nv,
 #endif
   laplacian_free(wl);
 
-  return ipass;
+  return (ipass - 1) * miter + iter;
 }
 
 int fiedler(struct array *elements, int nv, parrsb_options *opts,
@@ -642,15 +642,11 @@ int fiedler(struct array *elements, int nv, parrsb_options *opts,
     //  initv->data[i] += 1000 * nelg;
   }
 
-  // vec_ortho(gsc, initv, nelg);
   ortho(initv, lelt, nelg, gsc);
-
-  // double rtr = vec_dot(initv, initv);
   scalar rtr = dot(initv, initv, lelt), rni;
   comm_allreduce(gsc, gs_double, gs_add, &rtr, 1, &rni);
 
   rni = 1.0 / sqrt(rtr);
-  // vec_scale(initv, initv, rni);
   for (uint i = 0; i < lelt; i++)
     initv[i] *= rni;
   metric_toc(gsc, RSB_FIEDLER_SETUP);

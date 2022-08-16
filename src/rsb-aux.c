@@ -134,10 +134,9 @@ int rsb(struct array *elements, int nv, parrsb_options *options,
     metric_toc(&lc, RSB_SORT);
 
     // Bisect, repair and balance
+    metric_tic(&lc, RSB_REPAIR_BALANCE);
     int bin = (nid >= (np + 1) / 2);
     comm_split(&lc, bin, lc.id, &tc);
-
-    metric_tic(&lc, RSB_REPAIR_BALANCE);
     if (options->repair > 0)
       repair_partitions(elements, nv, &tc, &lc, bin, gc, bfr);
     balance_partitions(elements, nv, &tc, &lc, bin, bfr);
