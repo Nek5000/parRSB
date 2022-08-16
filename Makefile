@@ -1,7 +1,7 @@
 ## General build parameters ##
 CC ?= mpicc
-CFLAGS ?=
-DEBUG ?= 1
+CFLAGS ?= -g
+DEBUG ?= 0
 MPI ?= 1
 UNDERSCORE ?= 1
 SYNC_BY_REDUCTION ?= 1
@@ -44,7 +44,6 @@ EXAMPLEOBJS = $(patsubst $(SRCROOT)/%.c,$(BUILDDIR)/%,$(EXAMPLES))
 PP =
 
 ifneq ($(DEBUG),0)
-  CFLAGS += -g -O0
   PP += -DGENMAP_DEBUG
 else
   CFLAGS += -O2

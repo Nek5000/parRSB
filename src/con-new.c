@@ -1,7 +1,20 @@
-#include "genmap-impl.h"
 #include "gslib.h"
-#include "sort.h"
 #include <float.h>
+
+#ifdef scalar
+#undef scalar
+#endif
+#define scalar double
+
+#ifdef SCALAR_MAX
+#undef SCALAR_MAX
+#endif
+#define SCALAR_MAX DBL_MAX
+
+#ifdef gs_scalar
+#undef gs_scalar
+#endif
+#define gs_scalar gs_double
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
@@ -108,7 +121,7 @@ static int match_faces(struct array *elems, ulong s, unsigned nv, unsigned nf,
   uint n = 0;
   for (uint e = 0; e < elems->n / nv; e++) {
     for (unsigned f = 0; f < nf; f++) {
-      pf[n].dx = DBL_MAX;
+      pf[n].dx = SCALAR_MAX;
       pf[n].p = c->id;
       pf[n].eid = pe[e * nv].eid;
       pf[n].sid = nf * pe[e * nv].eid + f;
@@ -124,8 +137,8 @@ static int match_faces(struct array *elems, ulong s, unsigned nv, unsigned nf,
 #undef SET_FACE
 
   // Sort by centroid and match locally first
-  sarray_sort_3(struct face_t, faces.ptr, faces.n, y[0], gs_scalar_T, y[1],
-                gs_scalar_T, y[2], gs_scalar_T, bfr);
+  sarray_sort_3(struct face_t, faces.ptr, faces.n, y[0], 3, y[1], 3, y[2], 3,
+                bfr);
 
   if (faces.n > 0) {
     pf = (struct face_t *)faces.ptr;
@@ -159,7 +172,7 @@ static int find_min_nbr_distance(struct array *elems, unsigned ndim,
       for (uint i = 0; i < elems->n / nv; i++) {
         for (unsigned j = 0; j < nv; j++) {
           struct point_t *p = &pe[i * nv + j];
-          p->dx = DBL_MAX;
+          p->dx = SCALAR_MAX;
           for (unsigned k = 0; k < nbrs; k++) {
             unsigned nbr = NEIGHBOR_MAP[j][k];
             p->dx = MIN(p->dx, D3d(p->x, pe[i * nv + nbr].x));
@@ -170,7 +183,7 @@ static int find_min_nbr_distance(struct array *elems, unsigned ndim,
       for (uint i = 0; i < elems->n / nv; i++) {
         for (unsigned j = 0; j < nv; j++) {
           struct point_t *p = &pe[i * nv + j];
-          p->dx = DBL_MAX;
+          p->dx = SCALAR_MAX;
           for (unsigned k = 0; k < nbrs; k++) {
             unsigned nbr = NEIGHBOR_MAP[j][k];
             p->dx = MIN(p->dx, D2d(p->x, pe[i * nv + nbr].x));
@@ -272,6 +285,10 @@ int parrsb_conn_new(long long *vtx, double *coord, int nelt, int ndim,
 
   return 0;
 }
+
+#undef scalar
+#undef SCALAR_MAX
+#undef gs_scalar
 
 #undef MIN
 #undef CHK_ERR
