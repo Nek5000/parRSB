@@ -16,15 +16,20 @@ extern int repair_partitions(struct array *elements, int nv, struct comm *tc,
 extern int balance_partitions(struct array *elements, int nv, struct comm *lc,
                               struct comm *gc, int bin, buffer *bfr);
 
-static void check_rsb_partition(struct comm *gc, parrsb_options *options) {
+static void check_rsb_partition(struct comm *gc, parrsb_options *opts) {
   int max_levels = log2ll(gc->np);
-  int miter = options->rsb_max_iter, mpass = options->rsb_lanczos_max_restarts;
+  int miter = opts->rsb_max_iter, mpass = opts->rsb_lanczos_max_restarts;
 
   for (int i = 0; i < max_levels; i++) {
     sint converged = 1;
-    int val = (int)metric_get_value(i, RSB_FIEDLER_NITER);
-    if (val >= mpass * miter)
-      converged = 0;
+    int val = (int)metric_get_value(i, RSB_FIEDLER_INNER_NITER);
+    if (opts->rsb_algo == 0) {
+      if (val >= miter * mpass)
+        converged = 0;
+    } else if (opts->rsb_algo == 1) {
+      if (val >= miter)
+        converged = 0;
+    }
 
     sint ibfr;
     comm_allreduce(gc, gs_int, gs_min, &converged, 1, &ibfr);
