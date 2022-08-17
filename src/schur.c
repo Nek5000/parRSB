@@ -898,7 +898,6 @@ int schur_setup(struct coarse *crs, struct array *eij, struct crystal *cr,
 
   // Setup E: E is distributed by columns in the same manner as columns (or
   // rows) of B.
-  printf("ng[0] = %llu ng[1] = %llu\n", crs->ng[0], crs->ng[1]);
   assert(schur->A_ll.n == crs->n[0]);
   distribute_by_columns(&sl, crs->s[0], crs->n[0], cr, bfr);
   par_csc_setup(&schur->A_sl, &sl, 0, bfr);

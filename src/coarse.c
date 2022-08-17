@@ -472,7 +472,7 @@ static void number_dofs(slong *nid, struct coarse *crs, const slong *ids,
 
 // n  = ncr * nelt
 // nz = ncr * ncr * nelt
-struct coarse *crs_schur_setup(uint n, const ulong *id, uint nz, const uint *Ai,
+struct coarse *crs_parrsb_setup(uint n, const ulong *id, uint nz, const uint *Ai,
                                const uint *Aj, const scalar *A,
                                unsigned null_space, unsigned type,
                                const struct comm *c) {
@@ -570,7 +570,7 @@ struct coarse *crs_schur_setup(uint n, const ulong *id, uint nz, const uint *Ai,
   return crs;
 }
 
-void crs_schur_solve(scalar *x, struct coarse *crs, scalar *b, scalar tol) {
+void crs_parrsb_solve(scalar *x, struct coarse *crs, scalar *b, scalar tol) {
   metric_init();
 
   scalar *rhs = tcalloc(scalar, crs->cn + crs->an);
@@ -599,7 +599,7 @@ void crs_schur_solve(scalar *x, struct coarse *crs, scalar *b, scalar tol) {
   // metric_crs_print(&crs->c, 1);
 }
 
-void crs_schur_free(struct coarse *crs) {
+void crs_parrsb_free(struct coarse *crs) {
   if (crs != NULL) {
     switch (crs->type) {
     case 0:

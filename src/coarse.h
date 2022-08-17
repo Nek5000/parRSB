@@ -14,15 +14,15 @@ void coarse_solve(scalar *x, struct coarse *crs, scalar *b, scalar tol);
 void coarse_free(struct coarse *crs);
 
 // Alternative API for a general matrix
-#define crs_schur_setup PREFIXED_NAME(crs_schur_setup)
-#define crs_schur_solve PREFIXED_NAME(crs_schur_solve)
-#define crs_schur_free PREFIXED_NAME(crs_schur_free)
+#define crs_parrsb_setup PREFIXED_NAME(crs_parrsb_setup)
+#define crs_parrsb_solve PREFIXED_NAME(crs_parrsb_solve)
+#define crs_parrsb_free PREFIXED_NAME(crs_parrsb_free)
 
-struct coarse *crs_schur_setup(uint n, const ulong *id, uint nz, const uint *Ai,
+struct coarse *crs_parrsb_setup(uint n, const ulong *id, uint nz, const uint *Ai,
                                const uint *Aj, const scalar *A,
                                unsigned null_space, unsigned type,
                                const struct comm *comm);
-void crs_schur_solve(scalar *x, struct coarse *crs, scalar *b, scalar tol);
-void crs_schur_free(struct coarse *crs);
+void crs_parrsb_solve(scalar *x, struct coarse *crs, scalar *b, scalar tol);
+void crs_parrsb_free(struct coarse *crs);
 
 #endif
