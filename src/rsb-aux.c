@@ -24,10 +24,10 @@ static void check_rsb_partition(struct comm *gc, parrsb_options *opts) {
     sint converged = 1;
     int val = (int)metric_get_value(i, RSB_FIEDLER_INNER_NITER);
     if (opts->rsb_algo == 0) {
-      if (val >= miter * mpass)
+      if (val == miter * mpass)
         converged = 0;
     } else if (opts->rsb_algo == 1) {
-      if (val >= miter)
+      if (val == mpass)
         converged = 0;
     }
 
@@ -35,17 +35,26 @@ static void check_rsb_partition(struct comm *gc, parrsb_options *opts) {
     comm_allreduce(gc, gs_int, gs_min, &converged, 1, &ibfr);
 
     if (converged == 0) {
-      double final = (double)metric_get_value(i, TOL_FNL), dbfr;
-      comm_allreduce(gc, gs_double, gs_min, &final, 1, &dbfr);
+      if (opts->rsb_algo == 0) {
+        double final = (double)metric_get_value(i, TOL_FNL), dbfr;
+        comm_allreduce(gc, gs_double, gs_min, &final, 1, &dbfr);
 
-      double target = (double)metric_get_value(i, TOL_TGT);
-      comm_allreduce(gc, gs_double, gs_min, &target, 1, &dbfr);
+        double target = (double)metric_get_value(i, TOL_TGT);
+        comm_allreduce(gc, gs_double, gs_min, &target, 1, &dbfr);
 
-      if (gc->id == 0) {
-        printf("Warning: Partitioner only reached a tolerance of %lf given %lf "
-               "after %d x %d iterations in Level=%d!\n",
-               final, target, mpass, miter, i);
-        fflush(stdout);
+        if (gc->id == 0) {
+          printf("Warning: Lanczos only reached a tolerance of %lf given %lf "
+                 "after %d x %d iterations in Level=%d!\n",
+                 final, target, mpass, miter, i);
+          fflush(stdout);
+        }
+      } else if (opts->rsb_algo == 1) {
+        if (gc->id == 0) {
+          printf("Warning: Inverse iteration didn't converge after %d "
+                 "iterations in Level = %d\n",
+                 mpass, i);
+          fflush(stdout);
+        }
       }
     }
 
@@ -75,7 +84,7 @@ static void get_part(sint *np, sint *nid, int two_lvl, struct comm *lc,
   }
 }
 
-int rsb(struct array *elements, int nv, parrsb_options *options,
+int rsb(struct array *elements, int nv, int check, parrsb_options *options,
         struct comm *gc, buffer *bfr) {
   int ndim = (nv == 8) ? 3 : 2;
 
@@ -154,11 +163,12 @@ int rsb(struct array *elements, int nv, parrsb_options *options,
   // Partition within the node
   if (options->two_level) {
     options->two_level = 0;
-    rsb(elements, nv, options, &nc, bfr);
+    rsb(elements, nv, 0, options, &nc, bfr);
     comm_free(&nc);
   }
 
-  check_rsb_partition(gc, options);
+  if (check)
+    check_rsb_partition(gc, options);
 
   return 0;
 }

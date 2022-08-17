@@ -175,9 +175,11 @@ static int project(scalar *x, uint n, scalar *b, struct laplacian *L,
     rz2 = dot(r, dz, n);
     comm_allreduce(c, gs_double, gs_add, &rz2, 1, buf);
 
-    if (c->id == 0 && verbose > 0)
+    if (c->id == 0 && verbose > 0) {
       printf("rr = %lf rtol = %lf rz0 = %lf rz1 = %lf rz2 = %lf\n", rr, rtol,
              rzt, rz1, rz2);
+      fflush(stdout);
+    }
 
     beta = rz2 / rzt;
     for (j = 0; j < n; j++)
@@ -208,12 +210,12 @@ static int project(scalar *x, uint n, scalar *b, struct laplacian *L,
 // Input z should be orthogonal to 1-vector, have unit norm.
 // inverse iteration should not change z.
 static int inverse(scalar *y, struct array *elements, int nv, scalar *z,
-                   struct comm *gsc, int miter, double tol, int factor,
-                   int sagg, int grammian, slong nelg, buffer *buf) {
+                   struct comm *gsc, int miter, int mpass, double tol,
+                   int factor, int sagg, int grammian, slong nelg,
+                   buffer *buf) {
   metric_tic(gsc, RSB_INVERSE_SETUP);
   uint lelt = elements->n;
   struct rsb_element *elems = (struct rsb_element *)elements->ptr;
-
   struct laplacian *wl = laplacian_init(elems, lelt, nv, GS, gsc, buf);
 
   // Reserve enough memory in buffer
@@ -251,8 +253,8 @@ static int inverse(scalar *y, struct array *elements, int nv, scalar *z,
   scalar *rhs = GZ + miter * miter, *v = rhs + miter;
 
   metric_tic(gsc, RSB_INVERSE);
-  for (i = 0; i < miter; i++) {
-    int ppfi = project(y, lelt, z, wl, d, gsc, 100, tol, 1, 0, buf);
+  for (i = 0; i < mpass; i++) {
+    int ppfi = project(y, lelt, z, wl, d, gsc, miter, tol, 1, 0, buf);
 
     ortho(y, lelt, nelg, gsc);
 
@@ -350,7 +352,7 @@ static int inverse(scalar *y, struct array *elements, int nv, scalar *z,
   mg_free(d);
   free(err);
 
-  return i == miter ? i : i + 1;
+  return i;
 }
 
 static double sign(scalar a, scalar b) {
@@ -584,8 +586,8 @@ static int lanczos(scalar *fiedler, struct array *elements, int nv,
   scalar *rr = tcalloc(scalar, (miter + 1) * lelt);
   scalar *eVectors = tcalloc(scalar, miter * miter);
   scalar *eValues = tcalloc(scalar, miter);
-  int iter, ipass = 0;
-  do {
+  int iter = miter, ipass;
+  for (ipass = 0; iter == miter && ipass < mpass; ipass++) {
     double t = comm_time();
 #if defined(GENMAP_OCCA)
     iter = occa_lanczos_aux(alpha, beta, rr, lelt, nelg, miter, initv, wl, gsc,
@@ -615,8 +617,7 @@ static int lanczos(scalar *fiedler, struct array *elements, int nv,
     }
     ortho(fiedler, lelt, nelg, gsc);
     metric_acc(RSB_LANCZOS_TQLI, comm_time() - t);
-    ipass++;
-  } while (iter == miter && ipass < mpass);
+  }
 
   free(alpha), free(rr), free(eVectors), free(eValues);
 #if defined(GENMAP_OCCA)
@@ -660,7 +661,8 @@ int fiedler(struct array *elements, int nv, parrsb_options *opts,
     break;
   case 1:
     iter = inverse(f, elements, nv, initv, gsc, opts->rsb_max_iter,
-                   opts->rsb_tol, opts->rsb_mg_factor, opts->rsb_mg_sagg,
+                   opts->rsb_lanczos_max_restarts, opts->rsb_tol,
+                   opts->rsb_mg_factor, opts->rsb_mg_sagg,
                    opts->rsb_mg_grammian, nelg, buf);
     break;
   default:
