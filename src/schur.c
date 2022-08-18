@@ -852,7 +852,6 @@ struct mij_t {
 
 static int append_par_mat(struct array *mijs, struct par_mat *A) {
   struct mij_t t = {.r = 0, .c = 0, .v = 0, .p = 0};
-
   if (IS_CSR(A)) {
     for (uint i = 0; i < A->rn; i++) {
       t.r = A->rows[i];
@@ -880,7 +879,7 @@ static int append_par_mat(struct array *mijs, struct par_mat *A) {
   }
 }
 
-int schur_dump(const char *name, struct coarse *crs) {
+int schur_dump(const char *name, struct coarse *crs, struct crystal *cr) {
   struct comm *c = &crs->c;
   struct schur *schur = (struct schur *)crs->solver;
 
@@ -889,36 +888,30 @@ int schur_dump(const char *name, struct coarse *crs) {
 
   struct mij_t m = {.r = 0, .c = 0, .v = 0, .p = 0};
   struct mat *B = &schur->A_ll;
-  for (uint i = 0; i < B->n; B++) {
+  for (uint i = 0; i < B->n; i++) {
     m.r = B->start + i;
     for (uint j = B->Lp[i]; j < B->Lp[i + 1]; j++) {
       m.c = B->start + B->Li[j], m.v = B->L[j];
-      array_cat(struct mij, &mijs, &m, 1);
+      array_cat(struct mij_t, &mijs, &m, 1);
     }
     if (B->D != NULL) {
       m.c = m.r, m.v = B->D[i];
-      array_cat(struct mij, &mijs, &m, 1);
+      array_cat(struct mij_t, &mijs, &m, 1);
     }
   }
+  printf("mijs.n = %u\n", mijs.n);
 
   append_par_mat(&mijs, &schur->A_ss);
   append_par_mat(&mijs, &schur->A_ls);
   append_par_mat(&mijs, &schur->A_sl);
 
-  struct crystal cr;
-  crystal_init(&cr, c);
-  sarray_transfer(struct mij_t, &mijs, p, 0, &cr);
-  crystal_free(&cr);
-
-  buffer bfr;
-  buffer_init(&bfr, 1024);
-  sarray_sort_2(struct mij_t, mijs.ptr, mijs.n, r, 1, c, 1, &bfr);
-  buffer_free(&bfr);
+  sarray_transfer(struct mij_t, &mijs, p, 0, cr);
+  sarray_sort_2(struct mij_t, mijs.ptr, mijs.n, r, 1, c, 1, &crs->bfr);
 
   if (c->id == 0) {
     FILE *fp = fopen(name, "w+");
     if (fp != NULL) {
-      struct mij *pm = (struct mij *)mijs.ptr;
+      struct mij_t *pm = (struct mij_t *)mijs.ptr;
       for (uint i = 0; i < mijs.n; i++)
         fprintf(fp, "%llu %llu %.15lf\n", pm[i].r, pm[i].c, pm[i].v);
       fclose(fp);
@@ -962,9 +955,8 @@ int schur_setup(struct coarse *crs, struct array *eij, struct crystal *cr,
   struct mat B;
   csr_setup(&B, &ll, 0, bfr);
   cholesky_factor(&schur->A_ll, &B, bfr);
-  mat_free(&B);
-  array_free(&ll);
   schur->A_ll.start = crs->s[0];
+  mat_free(&B), array_free(&ll);
 
   // Setup S: Setup interface nodes. This is distributed by rows in a load
   // balanced manner.

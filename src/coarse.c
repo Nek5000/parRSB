@@ -418,8 +418,6 @@ static void number_dofs(slong *nid, struct coarse *crs, const slong *ids,
   slong cnt[1] = {ln}, out[2][1], wrk[2][1];
   comm_scan(out, ci, gs_long, gs_add, cnt, 1, wrk);
   crs->s[0] = out[0][0] + 1, crs->ng[0] = out[1][0];
-  // printf("id = %u n[0] = %u s[0] = %llu ng[0] = %llu\n", ci->id, crs->n[0],
-  //        crs->s[0], crs->ng[0]);
 
   for (i = 0, ln = 0; i < crs->cn; i++) {
     if (!nid[i])
@@ -441,8 +439,6 @@ static void number_dofs(slong *nid, struct coarse *crs, const slong *ids,
   comm_scan(out, ci, gs_long, gs_add, cnt, 1, wrk);
   crs->ng[1] = out[1][0];
   slong s = crs->ng[0] + out[0][0] + 1;
-  // printf("id = %u n[1] = %u s[1] = %llu ng[1] = %llu\n", ci->id, in, s,
-  //        crs->ng[1]);
 
   if (in) {
     struct dof_t *pa = (struct dof_t *)arr.ptr;
@@ -476,8 +472,8 @@ struct coarse *crs_parrsb_setup(uint n, const ulong *id, uint nz,
                                 const uint *Ai, const uint *Aj, const scalar *A,
                                 unsigned null_space, unsigned type,
                                 const struct comm *c) {
-  struct coarse *crs = tcalloc(struct coarse, 1);
   // crs->un is the user vector size.
+  struct coarse *crs = tcalloc(struct coarse, 1);
   crs->null_space = null_space, crs->type = type, crs->un = n;
 
   // Setup the buffer and duplicate the communicator.
@@ -554,9 +550,6 @@ struct coarse *crs_parrsb_setup(uint n, const ulong *id, uint nz,
   crs->n[1] = crs->an - crs->n[0];
   crs->s[1] = nid[crs->cn + crs->n[0]];
   crs->c2a = gs_setup(nid, crs->cn + crs->an, c, 0, gs_pairwise, 0);
-  // printf("id = %u an = %u n[1] = %u nr = %u\n", c->id, crs->an, crs->n[1],
-  // nr);
-
   switch (type) {
   case 0:
     schur_setup(crs, &mijs, &cr, &crs->bfr);
