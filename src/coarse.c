@@ -475,6 +475,8 @@ struct coarse *crs_parrsb_setup(uint n, const ulong *id, uint nz,
   // crs->un is the user vector size.
   struct coarse *crs = tcalloc(struct coarse, 1);
   crs->null_space = null_space, crs->type = type, crs->un = n;
+  for (unsigned i = 0; i < 3; i++)
+    crs->ng[i] = crs->s[i] = crs->n[i] = 0;
 
   // Setup the buffer and duplicate the communicator.
   buffer_init(&crs->bfr, 1024);
@@ -502,11 +504,9 @@ struct coarse *crs_parrsb_setup(uint n, const ulong *id, uint nz,
   // them into schur setup. Which processor owns the dof? All the local dofs
   // are owned by those specific preocessors -- interface dofs are owned in
   // a load balanced manner.
-  uint nr = crs->ng[1] / c->np;
-  ulong s0 = nr * c->np;
-  uint nrem = crs->ng[1] - s0;
+  uint nr = crs->ng[1] / c->np, nrem = crs->ng[1] - nr * c->np;
   uint p0 = c->np - nrem;
-  s0 = p0 * nr;
+  ulong s0 = p0 * nr;
 
   struct array mijs;
   array_init(struct mij, &mijs, n);

@@ -119,12 +119,13 @@ static void cholesky_numeric(struct mat *chol, const uint n, const uint *Ap,
   }
 }
 
-static void cholesky_factor(struct mat *L, struct mat *A, buffer *buf) {
+static void cholesky_factor(struct mat *L, struct mat *A, uint null_space,
+                            buffer *buf) {
   L->start = A->start;
   const uint uints_as_dbls =
       (A->n * sizeof(uint) + sizeof(double) - 1) / sizeof(double);
-  buffer_reserve(buf, (uints_as_dbls + A->n) * sizeof(double));
-  cholesky_symbolic(L, A->n, A->Lp, A->Li, buf);
+  buffer_reserve(buf, (uints_as_dbls + A->n - null_space) * sizeof(double));
+  cholesky_symbolic(L, A->n - null_space, A->Lp, A->Li, buf);
   cholesky_numeric(L, L->n, A->Lp, A->Li, A->L, buf->ptr,
                    uints_as_dbls + (double *)buf->ptr);
 }
@@ -899,7 +900,6 @@ int schur_dump(const char *name, struct coarse *crs, struct crystal *cr) {
       array_cat(struct mij_t, &mijs, &m, 1);
     }
   }
-  printf("mijs.n = %u\n", mijs.n);
 
   append_par_mat(&mijs, &schur->A_ss);
   append_par_mat(&mijs, &schur->A_ls);
@@ -954,7 +954,10 @@ int schur_setup(struct coarse *crs, struct array *eij, struct crystal *cr,
   // partitioning.
   struct mat B;
   csr_setup(&B, &ll, 0, bfr);
-  cholesky_factor(&schur->A_ll, &B, bfr);
+  if (!crs->null_space || (crs->n[1] + crs->n[2] != 0))
+    cholesky_factor(&schur->A_ll, &B, 0, bfr);
+  else
+    cholesky_factor(&schur->A_ll, &B, 1, bfr);
   schur->A_ll.start = crs->s[0];
   mat_free(&B), array_free(&ll);
 
@@ -973,7 +976,6 @@ int schur_setup(struct coarse *crs, struct array *eij, struct crystal *cr,
 
   // Setup E: E is distributed by columns in the same manner as columns (or
   // rows) of B.
-  assert(schur->A_ll.n == crs->n[0]);
   distribute_by_columns(&sl, crs->s[0], crs->n[0], cr, bfr);
   par_csc_setup(&schur->A_sl, &sl, 0, bfr);
   array_free(&sl);
@@ -983,6 +985,11 @@ int schur_setup(struct coarse *crs, struct array *eij, struct crystal *cr,
   // Setup the preconditioner for the Schur complement matrix
   schur->M = schur_precond_setup(&schur->A_ll, &schur->A_ls, &schur->A_ss,
                                  &schur->A_sl, crs->s[1], crs->n[1], cr, bfr);
+
+  // char name[BUFSIZ];
+  // snprintf(name, BUFSIZ, "coarse_np_%d_nl_%lld_ni_%lld.txt", cr->comm.np,
+  //          crs->ng[0], crs->ng[1]);
+  // schur_dump(name, crs, cr);
 
   return 0;
 }
@@ -1003,6 +1010,8 @@ int schur_solve(scalar *x, struct coarse *crs, scalar *b, scalar tol,
 
   metric_tic(c, SCHUR_SOLVE_CHOL1);
   cholesky_solve(zl, &schur->A_ll, rhs);
+  if (crs->null_space && (crs->n[1] + crs->n[2]) == 0)
+    zl[ln - 1] = 0;
   metric_toc(c, SCHUR_SOLVE_CHOL1);
 
   metric_tic(c, SCHUR_SOLVE_SETRHS1);
@@ -1030,12 +1039,14 @@ int schur_solve(scalar *x, struct coarse *crs, scalar *b, scalar tol,
 
   metric_tic(c, SCHUR_SOLVE_CHOL2);
   cholesky_solve(xl, &schur->A_ll, rhs);
+  if (crs->null_space && (crs->n[1] + crs->n[2]) == 0)
+    zl[ln - 1] = 0;
   metric_toc(c, SCHUR_SOLVE_CHOL2);
 
   for (uint i = 0; i < ln + in; i++)
     x[i] = xl[i];
 
-  if (crs->null_space) {
+  if (crs->null_space && (crs->n[1] + crs->n[2])) {
     scalar sum = 0, wrk;
     for (uint i = 0; i < ln + in; i++)
       sum += x[i];
