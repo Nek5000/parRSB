@@ -4,7 +4,7 @@
 #include <math.h>
 
 //------------------------------------------------------------------------------
-// Cholesky factorization of a mat
+// Cholesky factorization of a matrix
 //
 /*
 symbolic factorization: finds the sparsity structure of L
@@ -841,6 +841,98 @@ static int project(scalar *x, scalar *b, const struct schur *schur, ulong ls,
   return i == miter ? i : i + 1;
 }
 
+//==============================================================================
+// Dump matrix for debug purposes
+//
+struct mij_t {
+  ulong r, c;
+  scalar v;
+  uint p;
+};
+
+static int append_par_mat(struct array *mijs, struct par_mat *A) {
+  struct mij_t t = {.r = 0, .c = 0, .v = 0, .p = 0};
+
+  if (IS_CSR(A)) {
+    for (uint i = 0; i < A->rn; i++) {
+      t.r = A->rows[i];
+      for (uint j = A->adj_off[i]; j < A->adj_off[i + 1]; j++) {
+        t.c = A->cols[A->adj_idx[j]], t.v = A->adj_val[j];
+        array_cat(struct mij_t, mijs, &t, 1);
+      }
+      if (IS_DIAG(A)) {
+        t.c = t.r, t.v = A->diag_val[i];
+        array_cat(struct mij_t, mijs, &t, 1);
+      }
+    }
+  } else if (IS_CSC(A)) {
+    for (uint i = 0; i < A->cn; i++) {
+      t.c = A->cols[i];
+      for (uint j = A->adj_off[i]; j < A->adj_off[i + 1]; j++) {
+        t.r = A->rows[A->adj_idx[j]], t.v = A->adj_val[j];
+        array_cat(struct mij_t, mijs, &t, 1);
+      }
+      if (IS_DIAG(A)) {
+        t.r = t.c, t.v = A->diag_val[i];
+        array_cat(struct mij_t, mijs, &t, 1);
+      }
+    }
+  }
+}
+
+int schur_dump(const char *name, struct coarse *crs) {
+  struct comm *c = &crs->c;
+  struct schur *schur = (struct schur *)crs->solver;
+
+  struct array mijs;
+  array_init(struct mij_t, &mijs, 1000);
+
+  struct mij_t m = {.r = 0, .c = 0, .v = 0, .p = 0};
+  struct mat *B = &schur->A_ll;
+  for (uint i = 0; i < B->n; B++) {
+    m.r = B->start + i;
+    for (uint j = B->Lp[i]; j < B->Lp[i + 1]; j++) {
+      m.c = B->start + B->Li[j], m.v = B->L[j];
+      array_cat(struct mij, &mijs, &m, 1);
+    }
+    if (B->D != NULL) {
+      m.c = m.r, m.v = B->D[i];
+      array_cat(struct mij, &mijs, &m, 1);
+    }
+  }
+
+  append_par_mat(&mijs, &schur->A_ss);
+  append_par_mat(&mijs, &schur->A_ls);
+  append_par_mat(&mijs, &schur->A_sl);
+
+  struct crystal cr;
+  crystal_init(&cr, c);
+  sarray_transfer(struct mij_t, &mijs, p, 0, &cr);
+  crystal_free(&cr);
+
+  buffer bfr;
+  buffer_init(&bfr, 1024);
+  sarray_sort_2(struct mij_t, mijs.ptr, mijs.n, r, 1, c, 1, &bfr);
+  buffer_free(&bfr);
+
+  if (c->id == 0) {
+    FILE *fp = fopen(name, "w+");
+    if (fp != NULL) {
+      struct mij *pm = (struct mij *)mijs.ptr;
+      for (uint i = 0; i < mijs.n; i++)
+        fprintf(fp, "%llu %llu %.15lf\n", pm[i].r, pm[i].c, pm[i].v);
+      fclose(fp);
+    }
+  }
+
+  array_free(&mijs);
+
+  return 0;
+}
+
+//==============================================================================
+// Schur setup
+//
 int schur_setup(struct coarse *crs, struct array *eij, struct crystal *cr,
                 buffer *bfr) {
   struct schur *schur = crs->solver = (struct schur *)tcalloc(struct schur, 1);
@@ -870,9 +962,6 @@ int schur_setup(struct coarse *crs, struct array *eij, struct crystal *cr,
   struct mat B;
   csr_setup(&B, &ll, 0, bfr);
   cholesky_factor(&schur->A_ll, &B, bfr);
-#ifdef DUMP4
-  mat_dump("B.txt", &B, cr, bfr);
-#endif
   mat_free(&B);
   array_free(&ll);
   schur->A_ll.start = crs->s[0];
@@ -880,18 +969,12 @@ int schur_setup(struct coarse *crs, struct array *eij, struct crystal *cr,
   // Setup S: Setup interface nodes. This is distributed by rows in a load
   // balanced manner.
   par_csr_setup(&schur->A_ss, &ss, 1, bfr);
-#ifdef DUMP4
-  par_mat_dump("S.txt", &schur->A_ss, cr, bfr);
-#endif
   array_free(&ss);
   schur->Q_ss = setup_Q(&schur->A_ss, &cr->comm, bfr);
 
   // Setup F: Setup local interface connectivity. This is distributed by rows
   // similar to S.
   par_csr_setup(&schur->A_ls, &ls, 0, bfr);
-#ifdef DUMP4
-  par_mat_dump("F.txt", &schur->A_ls, cr, bfr);
-#endif
   array_free(&ls);
   schur->Q_ls = setup_Fxi_Q(&schur->A_ls, crs->ng[0] + crs->s[1], crs->n[1],
                             &cr->comm, bfr);
@@ -901,9 +984,6 @@ int schur_setup(struct coarse *crs, struct array *eij, struct crystal *cr,
   assert(schur->A_ll.n == crs->n[0]);
   distribute_by_columns(&sl, crs->s[0], crs->n[0], cr, bfr);
   par_csc_setup(&schur->A_sl, &sl, 0, bfr);
-#ifdef DUMP4
-  par_mat_dump("E.txt", &schur->A_sl, cr, bfr);
-#endif
   array_free(&sl);
   schur->Q_sl = setup_Ezl_Q(&schur->A_sl, crs->ng[0] + crs->s[1], crs->n[1],
                             &cr->comm, bfr);

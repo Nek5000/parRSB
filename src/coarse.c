@@ -472,10 +472,10 @@ static void number_dofs(slong *nid, struct coarse *crs, const slong *ids,
 
 // n  = ncr * nelt
 // nz = ncr * ncr * nelt
-struct coarse *crs_parrsb_setup(uint n, const ulong *id, uint nz, const uint *Ai,
-                               const uint *Aj, const scalar *A,
-                               unsigned null_space, unsigned type,
-                               const struct comm *c) {
+struct coarse *crs_parrsb_setup(uint n, const ulong *id, uint nz,
+                                const uint *Ai, const uint *Aj, const scalar *A,
+                                unsigned null_space, unsigned type,
+                                const struct comm *c) {
   struct coarse *crs = tcalloc(struct coarse, 1);
   // crs->un is the user vector size.
   crs->null_space = null_space, crs->type = type, crs->un = n;

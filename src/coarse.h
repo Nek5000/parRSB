@@ -18,10 +18,10 @@ void coarse_free(struct coarse *crs);
 #define crs_parrsb_solve PREFIXED_NAME(crs_parrsb_solve)
 #define crs_parrsb_free PREFIXED_NAME(crs_parrsb_free)
 
-struct coarse *crs_parrsb_setup(uint n, const ulong *id, uint nz, const uint *Ai,
-                               const uint *Aj, const scalar *A,
-                               unsigned null_space, unsigned type,
-                               const struct comm *comm);
+struct coarse *crs_parrsb_setup(uint n, const ulong *id, uint nz,
+                                const uint *Ai, const uint *Aj, const scalar *A,
+                                unsigned null_space, unsigned type,
+                                const struct comm *comm);
 void crs_parrsb_solve(scalar *x, struct coarse *crs, scalar *b, scalar tol);
 void crs_parrsb_free(struct coarse *crs);
 
