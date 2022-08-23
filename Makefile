@@ -99,7 +99,7 @@ lib: $(SRCOBJS)
 $(BUILDDIR)/%.o: $(SRCROOT)/src/%.c
 	$(CC) $(CFLAGS) $(PP) $(INCFLAGS) -c $< -o $@
 
-examples: install $(EXAMPLEOBJS)
+examples: install $(EXAMPLEOBJS) $(SRCOBJS)
 
 $(BUILDDIR)/examples/%: $(SRCROOT)/examples/%.c
 	$(CC) $(CFLAGS) $(PP) $(INCFLAGS) $< -o $@ $(LDFLAGS)
