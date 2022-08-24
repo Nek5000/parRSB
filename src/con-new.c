@@ -30,7 +30,9 @@
   }
 
 // Various mappings
-static int PRE_TO_SYM_VERTEX[8] = {0, 1, 3, 2, 4, 5, 7, 6};
+static int PRE_TO_SYM_VTX[8] = {0, 1, 3, 2, 4, 5, 7, 6};
+
+static int SYM_TO_PRE_VTX[8] = {0, 1, 3, 2, 4, 5, 7, 6};
 
 static int PRE_TO_SYM_FACE[6] = {2, 1, 3, 0, 4, 5};
 
@@ -164,10 +166,9 @@ static int match_faces(struct array *points, ulong s, unsigned nv, unsigned nf,
 
 #undef SET_FACE
 
-  ulong *initial = tcalloc(ulong, points->n);
   ulong *updated = tcalloc(ulong, points->n);
   for (uint i = 0; i < points->n; i++)
-    initial[i] = updated[i] = pp[i].sid;
+    updated[i] = pp[i].sid;
 
   int changed;
   do {
@@ -208,13 +209,10 @@ static int match_faces(struct array *points, ulong s, unsigned nv, unsigned nf,
       printf("AFTER eid = %lld sid = %lld\n", pp[i].eid, pp[i].sid);
   }
 
-  // If, updated == initialized, the connectivity never changed. This could be a
-  // cornor vertex or two elements only connected by vertex or an edge without
-  // any neighnors (or in other words, no other path to reach each other without
-  // that edge or vertex).
+  // Now find all the faces that are not matched. These are boundary faces.
+  // There may be points on these faces that are not matched. We will find
+  // the edges of these faces and then match the edges now.
 
-  if (initial)
-    free(initial);
   if (updated)
     free(updated);
   array_free(&faces);
@@ -274,6 +272,145 @@ static int transfer_bc_faces(struct array *bcs, ulong nelgt,
   return 0;
 }
 
+static void parrsb_dump_vtk(const char *fname, uint ne, unsigned nd,
+                            double *coord, unsigned nv, long long *vtx,
+                            struct comm *c) {
+  if (nd != 3) {
+    fprintf(stderr, "Only 3D meshes are supported.\n");
+    exit(1);
+  }
+
+  FILE *fp = fopen(fname, "w");
+  if (fp) {
+    fprintf(fp, "<VTKFile type\"UnstructuredGrid\" version=\"0.1\" "
+                "byte_order=\"LittleEndian\">\n");
+    fprintf(fp, "<UnstructuredGrid>\n");
+    fprintf(fp, "  <Piece NumberOfPoints=\"%d\" NumberOfCells=\"%d\">\n",
+            ne * nd, ne);
+    // Points
+    fprintf(fp, "  <Points>\n");
+    fprintf(fp, "    <DataArray type=\"Float64\", NumberOfComponents=\"3\" "
+                "Format=\"ascii\">\n");
+    for (uint e = 0; e < ne; e++) {
+      for (unsigned v = 0; v < nv; v++) {
+        fprintf(fp, "      %g %g %g\n", coord[e * nd * nv + v * nd + 0],
+                coord[e * nd * nv + v * nd + 1],
+                coord[e * nd * nv + v * nd + 2]);
+      }
+    }
+    fprintf(fp, "    </DataArray>");
+
+    fprintf(fp, "    <Cells>");
+    // Connectivity
+    fprintf(fp, "      <DataArray type=\"Int32\" Name=\"connectivity\" "
+                "Format=\"ascii\">\n");
+    for (uint e = 0; e < ne; e++) {
+      fprintf(fp, "        ");
+      for (unsigned v = 0; v < nv; v++)
+        fprintf(fp, "%lld ", vtx[e * nv + v]);
+      fprintf(fp, "\n");
+    }
+    fprintf(fp, "      </DataArray>");
+
+    // Offsets
+    fprintf(fp, "      <DataArray type=\"Int32\" Name=\"offsets\" "
+                "Format=\"ascii\">\n");
+    unsigned offset = 0;
+    for (uint e = 0; e < ne; e++) {
+      offset += nv;
+      fprintf(fp, "        %u\n", offset);
+    }
+    fprintf(fp, "      </DataArray>");
+
+    // Types (All hexes)
+    fprintf(fp, "      <DataArray type=\"Int32\" Name=\"types\" "
+                "Format=\"ascii\">\n");
+    for (uint e = 0; e < ne; e++)
+      fprintf(fp, "        5\n");
+    fprintf(fp, "      </DataArray>");
+
+    fprintf(fp, "    </Cells>");
+
+    fclose(fp);
+  }
+}
+
+// Based on here: http://www.manpagez.com/info/gmsh/gmsh-2.2.6/gmsh_63.php
+// which is a legacy format. New format is here:
+// https://gmsh.info/doc/texinfo/gmsh.html#MSH-file-format
+// Probably should update to the newer version.
+static void parrsb_dump_gmsh(const char *fname, uint ne, unsigned nd,
+                             double *coord, unsigned nv, long long *vl,
+                             struct crystal *cr) {
+  if (nd != 3 || nv != 8) {
+    fprintf(stderr, "Only 3D hex meshes supported.\n");
+    exit(1);
+  }
+
+  slong out[2][1], wrk[2], in = ne;
+  comm_scan(out, &cr->comm, gs_long, gs_add, &in, 1, wrk);
+  slong s = out[0][0] + 1;
+
+  struct point_t {
+    ulong id;
+    uint p;
+    double x, y, z;
+  };
+  struct array points;
+  array_init(struct point_t, &points, ne * nv);
+
+  struct element_t {
+    ulong id, vl[8];
+    uint p;
+  };
+  struct array elems;
+  array_init(struct element_t, &elems, ne);
+
+  struct point_t tp = {.id = 0, .x = 0, .y = 0, .z = 0, .p = 0};
+  struct element_t te = {.id = 0, .p = 0};
+  for (uint e = 0; e < ne; e++) {
+    te.id = s + e;
+    for (unsigned v = 0; v < nv; v++) {
+      te.vl[v] = tp.id = vl[e * nv + v];
+      tp.x = coord[e * nv * nd + v * nd + 0];
+      tp.y = coord[e * nv * nd + v * nd + 1];
+      tp.z = coord[e * nv * nd + v * nd + 2];
+      array_cat(struct point_t, &points, &tp, 1);
+    }
+    array_cat(struct element_t, &elems, &te, 1);
+  }
+
+  FILE *fp = fopen(fname, "w");
+  if (fp) {
+    fprintf(fp, "$MeshFormat\n");
+    fprintf(fp, "2.0 0 %zu\n", sizeof(double));
+    fprintf(fp, "$EndMeshFormat\n");
+
+    struct point_t *pp = (struct point_t *)points.ptr;
+    fprintf(fp, "$Nodes\n");
+    fprintf(fp, "%zu\n", points.n);
+    for (ulong p = 0; p < points.n; p++)
+      fprintf(fp, "%llu %g %g %g\n", pp[p].id, pp[p].x, pp[p].y, pp[p].z);
+    fprintf(fp, "$EndNodes\n");
+
+    struct element_t *pe = (struct element_t *)elems.ptr;
+    fprintf(fp, "$Elements\n");
+    fprintf(fp, "%zu\n", elems.n);
+    // elem-number, elem-type, number-of-tags, [tag1, ... tagn,]
+    // node-number-list
+    for (ulong e = 0; e < elems.n; e++) {
+      fprintf(fp, "%llu 5 3 0 0 0 ", pe[e].id);
+      for (unsigned v = 0; v < nv; v++)
+        fprintf(fp, "%llu ", pe[e].vl[SYM_TO_PRE_VTX[v]]);
+      fprintf(fp, "\n");
+    }
+    fprintf(fp, "$EndElements\n");
+  }
+
+  array_free(&elems);
+  array_free(&points);
+}
+
 // Input:
 //   nelt: Number of elements, nv: Number of vertices in an element
 //   coord [nelt, nv, ndim]: Coordinates of elements vertices in preprocessor
@@ -306,7 +443,7 @@ int parrsb_conn_new(long long *vtx, double *coord, int nelt, int ndim,
   for (uint i = 0; i < nelt; i++) {
     pnt.eid = s + i;
     for (unsigned v = 0; v < nv; v++) {
-      unsigned j = PRE_TO_SYM_VERTEX[v];
+      unsigned j = PRE_TO_SYM_VTX[v];
       for (unsigned k = 0; k < ndim; k++)
         pnt.x[k] = coord[i * nv * ndim + j * ndim + k];
       pnt.sid = nv * pnt.eid + v;
