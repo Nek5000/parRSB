@@ -573,12 +573,32 @@ void crs_parrsb_solve(scalar *x, struct coarse *crs, scalar *b, scalar tol) {
   }
   gs(rhs, gs_double, gs_add, 1, crs->c2a, &crs->bfr);
 
+  char name[BUFSIZ];
+  snprintf(name, BUFSIZ, "b_np_%d_id_%d_nl_%lld_ni_%lld.txt", crs->c.np,
+           crs->c.id, crs->n[0], crs->n[1]);
+  FILE *fp = fopen(name, "w");
+  if (fp) {
+    for (uint i = 0; i < crs->an; i++)
+      fprintf(fp, "%lf\n", rhs[crs->cn + i]);
+    fclose(fp);
+  }
+
   switch (crs->type) {
   case 0:
     schur_solve(rhs + crs->cn, crs, rhs + crs->cn, tol, &crs->bfr);
     break;
   default:
     break;
+  }
+
+  snprintf(name, BUFSIZ, "x_np_%d_id_%d_nl_%lld_ni_%lld.txt", crs->c.np,
+           crs->c.id, crs->n[0], crs->n[1]);
+
+  fp = fopen(name, "w");
+  if (fp) {
+    for (uint i = 0; i < crs->an; i++)
+      fprintf(fp, "%lf\n", rhs[crs->cn + i]);
+    fclose(fp);
   }
 
   gs(rhs, gs_double, gs_add, 0, crs->c2a, &crs->bfr);
@@ -588,8 +608,8 @@ void crs_parrsb_solve(scalar *x, struct coarse *crs, scalar *b, scalar tol) {
   }
   free(rhs);
 
+  exit(1);
   metric_push_level();
-  // metric_crs_print(&crs->c, 1);
 }
 
 void crs_parrsb_free(struct coarse *crs) {

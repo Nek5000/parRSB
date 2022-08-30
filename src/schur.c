@@ -908,8 +908,8 @@ int schur_dump(const char *name, struct coarse *crs, struct crystal *cr) {
   sarray_transfer(struct mij_t, &mijs, p, 0, cr);
   sarray_sort_2(struct mij_t, mijs.ptr, mijs.n, r, 1, c, 1, &crs->bfr);
 
-  if (c->id == 0) {
-    FILE *fp = fopen(name, "w+");
+  if (c->id == 0 && mijs.n > 0) {
+    FILE *fp = fopen(name, "w");
     if (fp != NULL) {
       struct mij_t *pm = (struct mij_t *)mijs.ptr;
       for (uint i = 0; i < mijs.n; i++)
@@ -986,10 +986,10 @@ int schur_setup(struct coarse *crs, struct array *eij, struct crystal *cr,
   schur->M = schur_precond_setup(&schur->A_ll, &schur->A_ls, &schur->A_ss,
                                  &schur->A_sl, crs->s[1], crs->n[1], cr, bfr);
 
-  // char name[BUFSIZ];
-  // snprintf(name, BUFSIZ, "coarse_np_%d_nl_%lld_ni_%lld.txt", cr->comm.np,
-  //          crs->ng[0], crs->ng[1]);
-  // schur_dump(name, crs, cr);
+  char name[BUFSIZ];
+  snprintf(name, BUFSIZ, "schur_np_%d_nl_%lld_ni_%lld.txt", cr->comm.np,
+           crs->ng[0], crs->ng[1]);
+  schur_dump(name, crs, cr);
 
   return 0;
 }
@@ -1022,7 +1022,7 @@ int schur_solve(scalar *x, struct coarse *crs, scalar *b, scalar tol,
   metric_toc(c, SCHUR_SOLVE_SETRHS1);
 
   metric_tic(c, SCHUR_SOLVE_PROJECT);
-  unsigned miter = (tol <= 0 ? abs(tol) : 100);
+  unsigned miter = (tol < 0 ? abs(tol) : 100);
   scalar mtol = (tol > 0 ? tol : 1e-10);
   int iter = project(xi, rhs, schur, crs->s[0], c, miter, mtol, 0, 1, bfr);
   metric_toc(c, SCHUR_SOLVE_PROJECT);
@@ -1040,18 +1040,18 @@ int schur_solve(scalar *x, struct coarse *crs, scalar *b, scalar tol,
   metric_tic(c, SCHUR_SOLVE_CHOL2);
   cholesky_solve(xl, &schur->A_ll, rhs);
   if (crs->null_space && (crs->n[1] + crs->n[2]) == 0)
-    zl[ln - 1] = 0;
+    xl[ln - 1] = 0;
   metric_toc(c, SCHUR_SOLVE_CHOL2);
 
   for (uint i = 0; i < ln + in; i++)
     x[i] = xl[i];
 
-  if (crs->null_space && (crs->n[1] + crs->n[2])) {
+  if (crs->null_space && (crs->ng[1] + crs->ng[2])) {
     scalar sum = 0, wrk;
     for (uint i = 0; i < ln + in; i++)
       sum += x[i];
     comm_allreduce(c, gs_double, gs_add, &sum, 1, &wrk);
-    sum = sum / (crs->ng[0] + crs->ng[1]);
+    sum = sum / (crs->ng[0] + crs->ng[1] + crs->ng[2]);
     for (uint i = 0; i < ln + in; i++)
       x[i] -= sum;
   }
