@@ -584,7 +584,7 @@ static struct gs_data *setup_Ezl_Q(struct par_mat *E, ulong s, uint n,
   comm_barrier(c);
   for (uint p = 0; p < c->np; p++) {
     if (c->id == p) {
-      printf("p = %d, ids = ", p);
+      printf("\np = %d, s = %u ids = ", p, n + E->rn);
       for (uint i = 0; i < n + E->rn; i++) {
         printf("%lld ", ids[i]);
         fflush(stdout);
@@ -611,6 +611,14 @@ static int Ezl(scalar *y, const struct par_mat *E, struct gs_data *gsh,
     for (uint j = E->adj_off[i], je = E->adj_off[i + 1]; j < je; j++)
       ye[E->adj_idx[j]] += zlk * E->adj_val[j];
   }
+
+#if 0
+  for (uint i = 0; i < n + E->rn; i++) {
+    printf("wrk in = %u, E->rn = %u, E->cn = %u, i = %u, %lf\n", n, E->rn,
+           E->cn, i, wrk[i]);
+    fflush(stdout);
+  }
+#endif
 
   gs(wrk, gs_double, gs_add, 1, gsh, bfr);
 
@@ -662,28 +670,34 @@ static int Fxi(scalar *y, const struct par_mat *F, struct gs_data *gsh,
   }
 }
 
-static int distribute_by_columns(struct array *aij, ulong s, uint n,
+static int distribute_by_columns(struct array *aij, ulong s, uint n, ulong ng,
                                  struct crystal *cr, buffer *bfr) {
-  buffer_reserve(bfr, sizeof(slong) * aij->n);
-  slong *cols = (slong *)bfr->ptr;
-  sint *owner = (sint *)tcalloc(sint, aij->n);
+  slong *cols = (slong *)tcalloc(slong, n + aij->n);
+  sint *owner = (sint *)tcalloc(sint, n + aij->n);
 
-  uint i;
-  struct mij *ptr = aij->ptr;
-  for (i = 0; i < aij->n; i++) {
+  struct mij *ptr = (struct mij *)aij->ptr;
+  for (uint i = 0; i < aij->n; i++) {
     cols[i] = ptr[i].c;
-    if (cols[i] >= s && cols[i] < s + n)
-      owner[i] = cr->comm.id;
-    else
-      owner[i] = -1;
+    owner[i] = -1;
   }
 
-  struct gs_data *gsh = gs_setup(cols, aij->n, &cr->comm, 0, gs_pairwise, 0);
-  gs(owner, gs_int, gs_max, 0, gsh, bfr);
+  struct comm *c = &cr->comm;
+  for (uint i = 0; i < n; i++) {
+    cols[aij->n + i] = s + i;
+    owner[aij->n + i] = c->id;
+  }
 
-  for (i = 0; i < aij->n; i++)
+  struct gs_data *gsh = gs_setup(cols, aij->n + n, c, 0, gs_auto, 0);
+  gs(owner, gs_int, gs_max, 0, gsh, bfr);
+  gs_free(gsh);
+
+  for (uint i = 0; i < aij->n; i++) {
+    assert(owner[i] >= 0 && owner[i] < c->np);
     ptr[i].p = owner[i];
+  }
+
   free(owner);
+  free(cols);
 
   sarray_transfer(struct mij, aij, p, 1, cr);
 
@@ -962,10 +976,11 @@ int schur_setup(struct coarse *crs, struct array *eij, struct crystal *cr,
         array_cat(struct mij, &ll, &ptr[i], 1);
       else
         array_cat(struct mij, &ls, &ptr[i], 1);
-    } else if (ptr[i].c <= crs->ng[0])
+    } else if (ptr[i].c <= crs->ng[0]) {
       array_cat(struct mij, &sl, &ptr[i], 1);
-    else
+    } else {
       array_cat(struct mij, &ss, &ptr[i], 1);
+    }
   }
 
   // Setup local block diagonal (B). This is distributed by rows based on the
@@ -993,7 +1008,8 @@ int schur_setup(struct coarse *crs, struct array *eij, struct crystal *cr,
 
   // Setup E: E is distributed by columns in the same manner as columns (or
   // rows) of B.
-  distribute_by_columns(&sl, crs->s[0], crs->n[0], cr, bfr);
+  // printf("s = %llu n = %u ng = %llu\n", crs->s[0], crs->n[0], crs->ng[0]);
+  distribute_by_columns(&sl, crs->s[0], crs->n[0], crs->ng[0], cr, bfr);
   par_csc_setup(&schur->A_sl, &sl, 0, bfr);
   array_free(&sl);
   schur->Q_sl = setup_Ezl_Q(&schur->A_sl, crs->s[1], crs->n[1], &cr->comm, bfr);
@@ -1032,9 +1048,40 @@ int schur_solve(scalar *x, struct coarse *crs, scalar *b, scalar tol,
     zl[ln - 1] = 0;
   metric_toc(c, SCHUR_SOLVE_CHOL1);
 
+#if 0
+  comm_barrier(c);
+  for (uint p = 0; p < c->np; p++) {
+    if (p == c->id) {
+      printf("\np = %u zl = ", p);
+      for (uint i = 0; i < ln; i++) {
+        printf("%lf ", zl[i]);
+        fflush(stdout);
+      }
+      printf("\n");
+    }
+    comm_barrier(c);
+  }
+#endif
+
   metric_tic(c, SCHUR_SOLVE_SETRHS1);
   // Solve: A_ss x_i = fi where fi = r_i - E zl
   Ezl(rhs, &schur->A_sl, schur->Q_sl, zl, crs->s[0], in, bfr);
+
+#if 0
+  comm_barrier(c);
+  for (uint p = 0; p < c->np; p++) {
+    if (p == c->id) {
+      printf("\np = %u Ezl = ", p);
+      for (uint i = 0; i < in; i++) {
+        printf("%lf ", rhs[i]);
+        fflush(stdout);
+      }
+      printf("\n");
+    }
+    comm_barrier(c);
+  }
+#endif
+
   for (uint i = 0; i < in; i++)
     rhs[i] = b[ln + i] - rhs[i];
   metric_toc(c, SCHUR_SOLVE_SETRHS1);

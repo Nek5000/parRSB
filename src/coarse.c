@@ -490,7 +490,12 @@ struct coarse *crs_parrsb_setup(uint n, const ulong *id, uint nz,
   ulong *uid = tcalloc(ulong, crs->un);
   crs->u2c = tcalloc(sint, crs->un);
   crs->cn = unique_ids(crs->u2c, uid, crs->un, tid, &crs->bfr);
-  // printf("id = %u un = %u cn = %u\n", c->id, crs->un, crs->cn);
+#if 0
+  for (uint i = 0; i < crs->un; i++) {
+    printf("p = %d i = %u perm[i] = %d\n", c->id, i, crs->u2c[i]);
+    fflush(stdout);
+  }
+#endif
 
   // Now renumber unique ids based on whether they are internal or on interface.
   slong *nid = tcalloc(slong, crs->cn);
@@ -568,6 +573,14 @@ void crs_parrsb_solve(scalar *x, struct coarse *crs, scalar *b, scalar tol) {
     if (crs->u2c[i] >= 0)
       rhs[crs->u2c[i]] += b[i];
   }
+
+#if 0
+  for (uint i = 0; i < crs->cn; i++) {
+    printf("p = %d i = %u before b[i] = %lf\n", crs->c.id, i, rhs[i]);
+    fflush(stdout);
+  }
+#endif
+
   gs(rhs, gs_double, gs_add, 1, crs->c2a, &crs->bfr);
 
 #if 0
