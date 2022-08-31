@@ -3,6 +3,8 @@
 #include "multigrid.h"
 #include <math.h>
 
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+
 //------------------------------------------------------------------------------
 // Cholesky factorization of a matrix
 //
@@ -128,6 +130,7 @@ static void cholesky_factor(struct mat *L, struct mat *A, uint null_space,
   cholesky_symbolic(L, A->n - null_space, A->Lp, A->Li, buf);
   cholesky_numeric(L, L->n, A->Lp, A->Li, A->L, buf->ptr,
                    uints_as_dbls + (double *)buf->ptr);
+  A->n = A->n - null_space;
 }
 
 static void cholesky_solve(scalar *x, const struct mat *A, scalar *b) {
@@ -577,6 +580,7 @@ static struct gs_data *setup_Ezl_Q(struct par_mat *E, ulong s, uint n,
   for (j = 0; j < E->rn; j++, i++)
     ids[i] = -E->rows[j];
 
+#if 0
   comm_barrier(c);
   for (uint p = 0; p < c->np; p++) {
     if (c->id == p) {
@@ -589,6 +593,7 @@ static struct gs_data *setup_Ezl_Q(struct par_mat *E, ulong s, uint n,
     }
     comm_barrier(c);
   }
+#endif
 
   return gs_setup(ids, n + E->rn, c, 0, gs_auto, 0);
 }
@@ -761,7 +766,7 @@ static int project(scalar *x, scalar *b, const struct schur *schur, ulong ls,
 
   scalar rr = dot(r, r, n);
   comm_allreduce(c, gs_double, gs_add, &rr, 1, buf);
-  scalar rtol = rr * tol * tol;
+  scalar rtol = MAX(rr * tol * tol, tol * tol);
 
   for (i = 0; i < n; i++)
     z[i] = r[i];
@@ -824,8 +829,8 @@ static int project(scalar *x, scalar *b, const struct schur *schur, ulong ls,
     comm_allreduce(c, gs_double, gs_add, &rz2, 1, buf);
 
     if (c->id == 0 && verbose > 0) {
-      printf("rr = %e rtol = %e rz0 = %e rz1 = %e rz2 = %e\n", rr, rtol, rzt,
-             rz1, rz2);
+      printf("i = %u rr = %e rtol = %e rz0 = %e rz1 = %e rz2 = %e\n", i, rr,
+             rtol, rzt, rz1, rz2);
       fflush(stdout);
     }
 
@@ -997,10 +1002,12 @@ int schur_setup(struct coarse *crs, struct array *eij, struct crystal *cr,
   schur->M = schur_precond_setup(&schur->A_ll, &schur->A_ls, &schur->A_ss,
                                  &schur->A_sl, crs->s[1], crs->n[1], cr, bfr);
 
+#if 0
   char name[BUFSIZ];
   snprintf(name, BUFSIZ, "schur_np_%d_nl_%lld_ni_%lld.txt", cr->comm.np,
            crs->ng[0], crs->ng[1]);
   schur_dump(name, &B, &schur->A_ls, &schur->A_sl, &schur->A_ss, cr, &crs->bfr);
+#endif
 
   return 0;
 }
@@ -1034,7 +1041,7 @@ int schur_solve(scalar *x, struct coarse *crs, scalar *b, scalar tol,
 
   metric_tic(c, SCHUR_SOLVE_PROJECT);
   unsigned miter = (tol < 0 ? abs(tol) : 100);
-  scalar mtol = (tol > 0 ? tol : 1e-10);
+  scalar mtol = (tol > 0 ? tol : 1e-7);
   int iter = project(xi, rhs, schur, crs->s[0], c, miter, mtol, 0, 1, bfr);
   metric_toc(c, SCHUR_SOLVE_PROJECT);
   metric_acc(SCHUR_PROJECT_NITER, iter);
@@ -1092,3 +1099,5 @@ int schur_free(struct coarse *crs) {
 
   return 0;
 }
+
+#undef MAX

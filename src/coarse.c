@@ -570,8 +570,9 @@ void crs_parrsb_solve(scalar *x, struct coarse *crs, scalar *b, scalar tol) {
   }
   gs(rhs, gs_double, gs_add, 1, crs->c2a, &crs->bfr);
 
+#if 0
   char name[BUFSIZ];
-  snprintf(name, BUFSIZ, "b_np_%d_id_%d_nl_%lld_ni_%lld.txt", crs->c.np,
+  snprintf(name, BUFSIZ, "rsb_b_np_%d_id_%d_nl_%lld_ni_%lld.txt", crs->c.np,
            crs->c.id, crs->n[0], crs->n[1]);
   FILE *fp = fopen(name, "w");
   if (fp) {
@@ -579,6 +580,7 @@ void crs_parrsb_solve(scalar *x, struct coarse *crs, scalar *b, scalar tol) {
       fprintf(fp, "%lf\n", rhs[crs->cn + i]);
     fclose(fp);
   }
+#endif
 
 #if 0
   for (uint i = 0; i < crs->an; i++) {
@@ -612,6 +614,7 @@ void crs_parrsb_solve(scalar *x, struct coarse *crs, scalar *b, scalar tol) {
   }
   free(rhs);
 
+#if 0
   snprintf(name, BUFSIZ, "rsb_x_np_%d_id_%d_un_%u.txt", crs->c.np, crs->c.id,
            crs->un);
   fp = fopen(name, "w");
@@ -620,9 +623,9 @@ void crs_parrsb_solve(scalar *x, struct coarse *crs, scalar *b, scalar tol) {
       fprintf(fp, "%lf\n", x[i]);
     fclose(fp);
   }
+#endif
 
   metric_push_level();
-  exit(0);
 }
 
 void crs_parrsb_free(struct coarse *crs) {
