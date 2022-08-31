@@ -317,12 +317,9 @@ static uint unique_ids(sint *perm, ulong *uid, uint n, const ulong *ids,
   struct id_t *pa = (struct id_t *)arr.ptr;
 
   // Ignore the ids numbered zero
-  for (i = 0; i < arr.n && pa[i].id == 0; i++)
-    ;
-
-  uint un = 0;
+  sint un = 0;
   ulong last = 0;
-  for (; i < arr.n; i++) {
+  for (uint i = 0; i < arr.n; i++) {
     ulong v = pa[i].id;
     if (v != last)
       last = uid[un] = v, un++;
@@ -583,6 +580,13 @@ void crs_parrsb_solve(scalar *x, struct coarse *crs, scalar *b, scalar tol) {
     fclose(fp);
   }
 
+#if 0
+  for (uint i = 0; i < crs->an; i++) {
+    printf("p = %d i = %u after b[i] = %lf\n", crs->c.id, i, rhs[crs->cn + i]);
+    fflush(stdout);
+  }
+#endif
+
   switch (crs->type) {
   case 0:
     schur_solve(rhs + crs->cn, crs, rhs + crs->cn, tol, &crs->bfr);
@@ -591,25 +595,34 @@ void crs_parrsb_solve(scalar *x, struct coarse *crs, scalar *b, scalar tol) {
     break;
   }
 
-  snprintf(name, BUFSIZ, "x_np_%d_id_%d_nl_%lld_ni_%lld.txt", crs->c.np,
-           crs->c.id, crs->n[0], crs->n[1]);
-
-  fp = fopen(name, "w");
-  if (fp) {
-    for (uint i = 0; i < crs->an; i++)
-      fprintf(fp, "%lf\n", rhs[crs->cn + i]);
-    fclose(fp);
+#if 0
+  for (uint i = 0; i < crs->an; i++) {
+    printf("p = %d i = %u x[i] = %lf w[i] = %lf\n", crs->c.id, i,
+           rhs[crs->cn + i], weights[crs->cn + i]);
+    fflush(stdout);
   }
+#endif
 
   gs(rhs, gs_double, gs_add, 0, crs->c2a, &crs->bfr);
   for (uint i = 0; i < crs->un; i++) {
     if (crs->u2c[i] >= 0)
       x[i] = rhs[crs->u2c[i]];
+    else
+      x[i] = 0;
   }
   free(rhs);
 
-  exit(1);
+  snprintf(name, BUFSIZ, "rsb_x_np_%d_id_%d_un_%u.txt", crs->c.np, crs->c.id,
+           crs->un);
+  fp = fopen(name, "w");
+  if (fp) {
+    for (uint i = 0; i < crs->un; i++)
+      fprintf(fp, "%lf\n", x[i]);
+    fclose(fp);
+  }
+
   metric_push_level();
+  exit(0);
 }
 
 void crs_parrsb_free(struct coarse *crs) {

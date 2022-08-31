@@ -577,11 +577,24 @@ static struct gs_data *setup_Ezl_Q(struct par_mat *E, ulong s, uint n,
   for (j = 0; j < E->rn; j++, i++)
     ids[i] = -E->rows[j];
 
-  return gs_setup(ids, i, c, 0, gs_pairwise, 0);
+  comm_barrier(c);
+  for (uint p = 0; p < c->np; p++) {
+    if (c->id == p) {
+      printf("p = %d, ids = ", p);
+      for (uint i = 0; i < n + E->rn; i++) {
+        printf("%lld ", ids[i]);
+        fflush(stdout);
+      }
+      printf("\n");
+    }
+    comm_barrier(c);
+  }
+
+  return gs_setup(ids, n + E->rn, c, 0, gs_auto, 0);
 }
 
 static int Ezl(scalar *y, const struct par_mat *E, struct gs_data *gsh,
-               scalar *zl, const ulong s, const uint n, buffer *bfr) {
+               const scalar *zl, const ulong s, const uint n, buffer *bfr) {
   assert(IS_CSC(E));
   assert(!IS_DIAG(E));
 
@@ -851,7 +864,7 @@ struct mij_t {
   uint p;
 };
 
-static int append_par_mat(struct array *mijs, struct par_mat *A) {
+static int append_par_mat(struct array *mijs, const struct par_mat *A) {
   struct mij_t t = {.r = 0, .c = 0, .v = 0, .p = 0};
   if (IS_CSR(A)) {
     for (uint i = 0; i < A->rn; i++) {
@@ -880,15 +893,15 @@ static int append_par_mat(struct array *mijs, struct par_mat *A) {
   }
 }
 
-int schur_dump(const char *name, struct coarse *crs, struct crystal *cr) {
-  struct comm *c = &crs->c;
-  struct schur *schur = (struct schur *)crs->solver;
+int schur_dump(const char *name, const struct mat *B,
+               const struct par_mat *A_ls, const struct par_mat *A_sl,
+               const struct par_mat *A_ss, struct crystal *cr, buffer *bfr) {
+  struct comm *c = &cr->comm;
 
   struct array mijs;
   array_init(struct mij_t, &mijs, 1000);
 
   struct mij_t m = {.r = 0, .c = 0, .v = 0, .p = 0};
-  struct mat *B = &schur->A_ll;
   for (uint i = 0; i < B->n; i++) {
     m.r = B->start + i;
     for (uint j = B->Lp[i]; j < B->Lp[i + 1]; j++) {
@@ -901,12 +914,12 @@ int schur_dump(const char *name, struct coarse *crs, struct crystal *cr) {
     }
   }
 
-  append_par_mat(&mijs, &schur->A_ss);
-  append_par_mat(&mijs, &schur->A_ls);
-  append_par_mat(&mijs, &schur->A_sl);
+  append_par_mat(&mijs, A_ls);
+  append_par_mat(&mijs, A_sl);
+  append_par_mat(&mijs, A_ss);
 
   sarray_transfer(struct mij_t, &mijs, p, 0, cr);
-  sarray_sort_2(struct mij_t, mijs.ptr, mijs.n, r, 1, c, 1, &crs->bfr);
+  sarray_sort_2(struct mij_t, mijs.ptr, mijs.n, r, 1, c, 1, bfr);
 
   if (c->id == 0 && mijs.n > 0) {
     FILE *fp = fopen(name, "w");
@@ -959,7 +972,7 @@ int schur_setup(struct coarse *crs, struct array *eij, struct crystal *cr,
   else
     cholesky_factor(&schur->A_ll, &B, 1, bfr);
   schur->A_ll.start = crs->s[0];
-  mat_free(&B), array_free(&ll);
+  array_free(&ll);
 
   // Setup S: Setup interface nodes. This is distributed by rows in a load
   // balanced manner.
@@ -968,19 +981,17 @@ int schur_setup(struct coarse *crs, struct array *eij, struct crystal *cr,
   schur->Q_ss = setup_Q(&schur->A_ss, &cr->comm, bfr);
 
   // Setup F: Setup local interface connectivity. This is distributed by rows
-  // similar to S.
+  // similar to B.
   par_csr_setup(&schur->A_ls, &ls, 0, bfr);
   array_free(&ls);
-  schur->Q_ls = setup_Fxi_Q(&schur->A_ls, crs->ng[0] + crs->s[1], crs->n[1],
-                            &cr->comm, bfr);
+  schur->Q_ls = setup_Fxi_Q(&schur->A_ls, crs->s[1], crs->n[1], &cr->comm, bfr);
 
   // Setup E: E is distributed by columns in the same manner as columns (or
   // rows) of B.
   distribute_by_columns(&sl, crs->s[0], crs->n[0], cr, bfr);
   par_csc_setup(&schur->A_sl, &sl, 0, bfr);
   array_free(&sl);
-  schur->Q_sl = setup_Ezl_Q(&schur->A_sl, crs->ng[0] + crs->s[1], crs->n[1],
-                            &cr->comm, bfr);
+  schur->Q_sl = setup_Ezl_Q(&schur->A_sl, crs->s[1], crs->n[1], &cr->comm, bfr);
 
   // Setup the preconditioner for the Schur complement matrix
   schur->M = schur_precond_setup(&schur->A_ll, &schur->A_ls, &schur->A_ss,
@@ -989,7 +1000,7 @@ int schur_setup(struct coarse *crs, struct array *eij, struct crystal *cr,
   char name[BUFSIZ];
   snprintf(name, BUFSIZ, "schur_np_%d_nl_%lld_ni_%lld.txt", cr->comm.np,
            crs->ng[0], crs->ng[1]);
-  schur_dump(name, crs, cr);
+  schur_dump(name, &B, &schur->A_ls, &schur->A_sl, &schur->A_ss, cr, &crs->bfr);
 
   return 0;
 }
@@ -1046,7 +1057,7 @@ int schur_solve(scalar *x, struct coarse *crs, scalar *b, scalar tol,
   for (uint i = 0; i < ln + in; i++)
     x[i] = xl[i];
 
-  if (crs->null_space && (crs->ng[1] + crs->ng[2])) {
+  if (crs->null_space) {
     scalar sum = 0, wrk;
     for (uint i = 0; i < ln + in; i++)
       sum += x[i];
