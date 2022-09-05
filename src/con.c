@@ -1292,17 +1292,21 @@ static int elementCheck(Mesh mesh, struct comm *c, buffer *bfr) {
 //==============================================================================
 // C interface to find_conn
 //
-#define check_error(id, err, msg)                                              \
-  {                                                                            \
-    if (err > 0) {                                                             \
-      if (id == 0)                                                             \
+#define check_error(err, msg)                                                  \
+  do {                                                                         \
+    sint buf;                                                                  \
+    comm_allreduce(&c, gs_int, gs_max, &err, 1, &buf);                         \
+    if (err) {                                                                 \
+      if (c.id == 0) {                                                         \
         printf("\n Error: %s\n", msg);                                         \
+        fflush(stdout);                                                        \
+      }                                                                        \
       buffer_free(&bfr);                                                       \
       mesh_free(mesh);                                                         \
       comm_free(&c);                                                           \
       return err;                                                              \
     }                                                                          \
-  }
+  } while (0)
 
 static int transferBoundaryFaces(Mesh mesh, struct comm *c) {
   uint size = c->np;
@@ -1346,12 +1350,16 @@ int parrsb_conn_mesh(long long *vtx, double *coord, int nelt, int ndim,
   struct comm c;
   comm_init(&c, comm);
 
-  int rank = c.id, size = c.np;
-
-  if (rank == 0 && verbose) {
-    printf("Running parCon ... (tol=%g)\n", tol);
+  if (c.id == 0 && verbose) {
+    printf("Running parCon ... (tol = %e)\n", tol);
     fflush(stdout);
   }
+
+  double duration[8] = {0};
+  const char *name[8] = {"transferBoundaryFaces", "findMinNbrDistance",
+                         "findSegments         ", "setGlobalId       ",
+                         "elementCheck         ", "faceCheck         ",
+                         "matchPeriodicFaces   "};
 
   genmap_barrier(&c);
   double tcon = comm_time();
@@ -1359,21 +1367,13 @@ int parrsb_conn_mesh(long long *vtx, double *coord, int nelt, int ndim,
   Mesh mesh;
   mesh_init(&mesh, nelt, ndim);
 
-  slong out[2][1], buff[2][1], in = nelt;
-  comm_scan(out, &c, gs_long, gs_add, &in, 1, buff);
+  slong out[2][1], wrk[2][1], in = nelt;
+  comm_scan(out, &c, gs_long, gs_add, &in, 1, wrk);
   ulong start = out[0][0], nelgt = out[1][0];
   mesh->nelgt = mesh->nelgv = nelgt;
 
-  int nelt_ = nelgt / size;
-  int nrem = nelgt - nelt_ * size;
-  if (rank >= (size - nrem))
-    nelt_++;
-  assert(nelt == nelt_);
-
   int nvertex = mesh->nVertex;
-  uint nunits = nvertex * nelt;
-
-  struct point_t p;
+  struct point_t p = {.origin = c.id};
   uint i, j, k, l;
   for (i = 0; i < nelt; i++) {
     for (k = 0; k < nvertex; k++) {
@@ -1382,12 +1382,9 @@ int parrsb_conn_mesh(long long *vtx, double *coord, int nelt, int ndim,
         p.x[l] = coord[i * nvertex * ndim + j * ndim + l];
       p.elementId = start + i;
       p.sequenceId = nvertex * (start + i) + k;
-      p.origin = rank;
-
       array_cat(struct point_t, &mesh->elements, &p, 1);
     }
   }
-  assert(mesh->elements.n == nunits);
 
   struct Boundary_private b;
   for (i = 0; i < nPeriodicFaces; i++) {
@@ -1397,38 +1394,51 @@ int parrsb_conn_mesh(long long *vtx, double *coord, int nelt, int ndim,
     b.bc[1] = PRE_TO_SYM_FACE[periodicInfo[4 * i + 3] - 1];
     array_cat(struct Boundary_private, &mesh->boundary, &b, 1);
   }
-  assert(mesh->boundary.n == nPeriodicFaces);
 
   buffer bfr;
   buffer_init(&bfr, 1024);
 
-  sint err, buf;
-  err = transferBoundaryFaces(mesh, &c);
-  comm_allreduce(&c, gs_int, gs_max, &err, 1, &buf);
-  check_error(rank, err, "transferBoundaryFaces");
+  genmap_barrier(&c);
+  double t = comm_time();
+  sint err = transferBoundaryFaces(mesh, &c);
+  check_error(err, "transferBoundaryFaces");
+  duration[0] = comm_time() - t;
 
+  genmap_barrier(&c);
+  t = comm_time();
   err = findMinNeighborDistance(mesh);
-  comm_allreduce(&c, gs_int, gs_max, &err, 1, &buf);
-  check_error(rank, err, "findMinNeighborDistance");
+  check_error(err, "findMinNeighborDistance");
+  duration[1] = comm_time() - t;
 
+  genmap_barrier(&c);
+  t = comm_time();
   err = findUniqueVertices(mesh, &c, tol, verbose, &bfr);
-  comm_allreduce(&c, gs_int, gs_max, &err, 1, &buf);
-  check_error(rank, err, "findSegments");
+  check_error(err, "findSegments");
+  duration[2] = comm_time() - t;
 
+  genmap_barrier(&c);
+  t = comm_time();
   setGlobalID(mesh, &c);
   sendBack(mesh, &c, &bfr);
+  duration[3] = comm_time() - t;
 
+  genmap_barrier(&c);
+  t = comm_time();
   err = elementCheck(mesh, &c, &bfr);
-  comm_allreduce(&c, gs_int, gs_max, &err, 1, &buf);
-  check_error(rank, err, "elementCheck");
+  check_error(err, "elementCheck");
+  duration[4] = comm_time() - t;
 
+  genmap_barrier(&c);
+  t = comm_time();
   err = faceCheck(mesh, &c, &bfr);
-  comm_allreduce(&c, gs_int, gs_max, &err, 1, &buf);
-  check_error(rank, err, "faceCheck");
+  check_error(err, "faceCheck");
+  duration[5] = comm_time() - t;
 
+  genmap_barrier(&c);
+  t = comm_time();
   err = matchPeriodicFaces(mesh, &c, &bfr);
-  comm_allreduce(&c, gs_int, gs_max, &err, 1, &buf);
-  check_error(rank, err, "matchPeriodicFaces");
+  check_error(err, "matchPeriodicFaces");
+  duration[6] = comm_time() - t;
 
   // Copy output
   Point ptr = mesh->elements.ptr;
@@ -1437,11 +1447,23 @@ int parrsb_conn_mesh(long long *vtx, double *coord, int nelt, int ndim,
       vtx[i * nvertex + j] = ptr[i * nvertex + j].globalId + 1;
   }
 
-  // Report time and finish
+  // Report timing info and finish
   genmap_barrier(&c);
   tcon = comm_time() - tcon;
-  if (rank == 0 && verbose > 0) {
+  if (c.id == 0 && verbose > 0) {
     printf("parCon finished in %g s\n", tcon);
+    fflush(stdout);
+  }
+
+  double gmin[8], gmax[8], buf[8];
+  for (unsigned i = 0; i < 8; i++)
+    gmax[i] = gmin[i] = duration[i];
+  comm_allreduce(&c, gs_double, gs_min, gmin, 8, buf);
+  comm_allreduce(&c, gs_double, gs_max, gmax, 8, buf);
+
+  if (c.id == 0 && verbose > 0) {
+    for (unsigned i = 0; i < 7; i++)
+      printf("%s: %e %e (min max)\n", name[i], gmin[i], gmax[i]);
     fflush(stdout);
   }
 
