@@ -3,6 +3,8 @@
 #include "multigrid.h"
 #include <math.h>
 
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+
 //------------------------------------------------------------------------------
 // Cholesky factorization of a matrix
 //
@@ -128,6 +130,7 @@ static void cholesky_factor(struct mat *L, struct mat *A, uint null_space,
   cholesky_symbolic(L, A->n - null_space, A->Lp, A->Li, buf);
   cholesky_numeric(L, L->n, A->Lp, A->Li, A->L, buf->ptr,
                    uints_as_dbls + (double *)buf->ptr);
+  A->n = A->n - null_space;
 }
 
 static void cholesky_solve(scalar *x, const struct mat *A, scalar *b) {
@@ -577,11 +580,26 @@ static struct gs_data *setup_Ezl_Q(struct par_mat *E, ulong s, uint n,
   for (j = 0; j < E->rn; j++, i++)
     ids[i] = -E->rows[j];
 
-  return gs_setup(ids, i, c, 0, gs_pairwise, 0);
+#if 0
+  comm_barrier(c);
+  for (uint p = 0; p < c->np; p++) {
+    if (c->id == p) {
+      printf("\np = %d, s = %u ids = ", p, n + E->rn);
+      for (uint i = 0; i < n + E->rn; i++) {
+        printf("%lld ", ids[i]);
+        fflush(stdout);
+      }
+      printf("\n");
+    }
+    comm_barrier(c);
+  }
+#endif
+
+  return gs_setup(ids, n + E->rn, c, 0, gs_auto, 0);
 }
 
 static int Ezl(scalar *y, const struct par_mat *E, struct gs_data *gsh,
-               scalar *zl, const ulong s, const uint n, buffer *bfr) {
+               const scalar *zl, const ulong s, const uint n, buffer *bfr) {
   assert(IS_CSC(E));
   assert(!IS_DIAG(E));
 
@@ -593,6 +611,14 @@ static int Ezl(scalar *y, const struct par_mat *E, struct gs_data *gsh,
     for (uint j = E->adj_off[i], je = E->adj_off[i + 1]; j < je; j++)
       ye[E->adj_idx[j]] += zlk * E->adj_val[j];
   }
+
+#if 0
+  for (uint i = 0; i < n + E->rn; i++) {
+    printf("wrk in = %u, E->rn = %u, E->cn = %u, i = %u, %lf\n", n, E->rn,
+           E->cn, i, wrk[i]);
+    fflush(stdout);
+  }
+#endif
 
   gs(wrk, gs_double, gs_add, 1, gsh, bfr);
 
@@ -644,28 +670,34 @@ static int Fxi(scalar *y, const struct par_mat *F, struct gs_data *gsh,
   }
 }
 
-static int distribute_by_columns(struct array *aij, ulong s, uint n,
+static int distribute_by_columns(struct array *aij, ulong s, uint n, ulong ng,
                                  struct crystal *cr, buffer *bfr) {
-  buffer_reserve(bfr, sizeof(slong) * aij->n);
-  slong *cols = (slong *)bfr->ptr;
-  sint *owner = (sint *)tcalloc(sint, aij->n);
+  slong *cols = (slong *)tcalloc(slong, n + aij->n);
+  sint *owner = (sint *)tcalloc(sint, n + aij->n);
 
-  uint i;
-  struct mij *ptr = aij->ptr;
-  for (i = 0; i < aij->n; i++) {
+  struct mij *ptr = (struct mij *)aij->ptr;
+  for (uint i = 0; i < aij->n; i++) {
     cols[i] = ptr[i].c;
-    if (cols[i] >= s && cols[i] < s + n)
-      owner[i] = cr->comm.id;
-    else
-      owner[i] = -1;
+    owner[i] = -1;
   }
 
-  struct gs_data *gsh = gs_setup(cols, aij->n, &cr->comm, 0, gs_pairwise, 0);
-  gs(owner, gs_int, gs_max, 0, gsh, bfr);
+  struct comm *c = &cr->comm;
+  for (uint i = 0; i < n; i++) {
+    cols[aij->n + i] = s + i;
+    owner[aij->n + i] = c->id;
+  }
 
-  for (i = 0; i < aij->n; i++)
+  struct gs_data *gsh = gs_setup(cols, aij->n + n, c, 0, gs_auto, 0);
+  gs(owner, gs_int, gs_max, 0, gsh, bfr);
+  gs_free(gsh);
+
+  for (uint i = 0; i < aij->n; i++) {
+    assert(owner[i] >= 0 && owner[i] < c->np);
     ptr[i].p = owner[i];
+  }
+
   free(owner);
+  free(cols);
 
   sarray_transfer(struct mij, aij, p, 1, cr);
 
@@ -748,7 +780,7 @@ static int project(scalar *x, scalar *b, const struct schur *schur, ulong ls,
 
   scalar rr = dot(r, r, n);
   comm_allreduce(c, gs_double, gs_add, &rr, 1, buf);
-  scalar rtol = rr * tol * tol;
+  scalar rtol = MAX(rr * tol * tol, tol * tol);
 
   for (i = 0; i < n; i++)
     z[i] = r[i];
@@ -811,8 +843,8 @@ static int project(scalar *x, scalar *b, const struct schur *schur, ulong ls,
     comm_allreduce(c, gs_double, gs_add, &rz2, 1, buf);
 
     if (c->id == 0 && verbose > 0) {
-      printf("rr = %e rtol = %e rz0 = %e rz1 = %e rz2 = %e\n", rr, rtol, rzt,
-             rz1, rz2);
+      printf("i = %u rr = %e rtol = %e rz0 = %e rz1 = %e rz2 = %e\n", i, rr,
+             rtol, rzt, rz1, rz2);
       fflush(stdout);
     }
 
@@ -851,7 +883,7 @@ struct mij_t {
   uint p;
 };
 
-static int append_par_mat(struct array *mijs, struct par_mat *A) {
+static int append_par_mat(struct array *mijs, const struct par_mat *A) {
   struct mij_t t = {.r = 0, .c = 0, .v = 0, .p = 0};
   if (IS_CSR(A)) {
     for (uint i = 0; i < A->rn; i++) {
@@ -880,15 +912,15 @@ static int append_par_mat(struct array *mijs, struct par_mat *A) {
   }
 }
 
-int schur_dump(const char *name, struct coarse *crs, struct crystal *cr) {
-  struct comm *c = &crs->c;
-  struct schur *schur = (struct schur *)crs->solver;
+int schur_dump(const char *name, const struct mat *B,
+               const struct par_mat *A_ls, const struct par_mat *A_sl,
+               const struct par_mat *A_ss, struct crystal *cr, buffer *bfr) {
+  struct comm *c = &cr->comm;
 
   struct array mijs;
   array_init(struct mij_t, &mijs, 1000);
 
   struct mij_t m = {.r = 0, .c = 0, .v = 0, .p = 0};
-  struct mat *B = &schur->A_ll;
   for (uint i = 0; i < B->n; i++) {
     m.r = B->start + i;
     for (uint j = B->Lp[i]; j < B->Lp[i + 1]; j++) {
@@ -901,15 +933,15 @@ int schur_dump(const char *name, struct coarse *crs, struct crystal *cr) {
     }
   }
 
-  append_par_mat(&mijs, &schur->A_ss);
-  append_par_mat(&mijs, &schur->A_ls);
-  append_par_mat(&mijs, &schur->A_sl);
+  append_par_mat(&mijs, A_ls);
+  append_par_mat(&mijs, A_sl);
+  append_par_mat(&mijs, A_ss);
 
   sarray_transfer(struct mij_t, &mijs, p, 0, cr);
-  sarray_sort_2(struct mij_t, mijs.ptr, mijs.n, r, 1, c, 1, &crs->bfr);
+  sarray_sort_2(struct mij_t, mijs.ptr, mijs.n, r, 1, c, 1, bfr);
 
-  if (c->id == 0) {
-    FILE *fp = fopen(name, "w+");
+  if (c->id == 0 && mijs.n > 0) {
+    FILE *fp = fopen(name, "w");
     if (fp != NULL) {
       struct mij_t *pm = (struct mij_t *)mijs.ptr;
       for (uint i = 0; i < mijs.n; i++)
@@ -944,10 +976,11 @@ int schur_setup(struct coarse *crs, struct array *eij, struct crystal *cr,
         array_cat(struct mij, &ll, &ptr[i], 1);
       else
         array_cat(struct mij, &ls, &ptr[i], 1);
-    } else if (ptr[i].c <= crs->ng[0])
+    } else if (ptr[i].c <= crs->ng[0]) {
       array_cat(struct mij, &sl, &ptr[i], 1);
-    else
+    } else {
       array_cat(struct mij, &ss, &ptr[i], 1);
+    }
   }
 
   // Setup local block diagonal (B). This is distributed by rows based on the
@@ -959,7 +992,7 @@ int schur_setup(struct coarse *crs, struct array *eij, struct crystal *cr,
   else
     cholesky_factor(&schur->A_ll, &B, 1, bfr);
   schur->A_ll.start = crs->s[0];
-  mat_free(&B), array_free(&ll);
+  array_free(&ll);
 
   // Setup S: Setup interface nodes. This is distributed by rows in a load
   // balanced manner.
@@ -968,28 +1001,29 @@ int schur_setup(struct coarse *crs, struct array *eij, struct crystal *cr,
   schur->Q_ss = setup_Q(&schur->A_ss, &cr->comm, bfr);
 
   // Setup F: Setup local interface connectivity. This is distributed by rows
-  // similar to S.
+  // similar to B.
   par_csr_setup(&schur->A_ls, &ls, 0, bfr);
   array_free(&ls);
-  schur->Q_ls = setup_Fxi_Q(&schur->A_ls, crs->ng[0] + crs->s[1], crs->n[1],
-                            &cr->comm, bfr);
+  schur->Q_ls = setup_Fxi_Q(&schur->A_ls, crs->s[1], crs->n[1], &cr->comm, bfr);
 
   // Setup E: E is distributed by columns in the same manner as columns (or
   // rows) of B.
-  distribute_by_columns(&sl, crs->s[0], crs->n[0], cr, bfr);
+  // printf("s = %llu n = %u ng = %llu\n", crs->s[0], crs->n[0], crs->ng[0]);
+  distribute_by_columns(&sl, crs->s[0], crs->n[0], crs->ng[0], cr, bfr);
   par_csc_setup(&schur->A_sl, &sl, 0, bfr);
   array_free(&sl);
-  schur->Q_sl = setup_Ezl_Q(&schur->A_sl, crs->ng[0] + crs->s[1], crs->n[1],
-                            &cr->comm, bfr);
+  schur->Q_sl = setup_Ezl_Q(&schur->A_sl, crs->s[1], crs->n[1], &cr->comm, bfr);
 
   // Setup the preconditioner for the Schur complement matrix
   schur->M = schur_precond_setup(&schur->A_ll, &schur->A_ls, &schur->A_ss,
                                  &schur->A_sl, crs->s[1], crs->n[1], cr, bfr);
 
-  // char name[BUFSIZ];
-  // snprintf(name, BUFSIZ, "coarse_np_%d_nl_%lld_ni_%lld.txt", cr->comm.np,
-  //          crs->ng[0], crs->ng[1]);
-  // schur_dump(name, crs, cr);
+#if 0
+  char name[BUFSIZ];
+  snprintf(name, BUFSIZ, "schur_np_%d_nl_%lld_ni_%lld.txt", cr->comm.np,
+           crs->ng[0], crs->ng[1]);
+  schur_dump(name, &B, &schur->A_ls, &schur->A_sl, &schur->A_ss, cr, &crs->bfr);
+#endif
 
   return 0;
 }
@@ -1014,16 +1048,47 @@ int schur_solve(scalar *x, struct coarse *crs, scalar *b, scalar tol,
     zl[ln - 1] = 0;
   metric_toc(c, SCHUR_SOLVE_CHOL1);
 
+#if 0
+  comm_barrier(c);
+  for (uint p = 0; p < c->np; p++) {
+    if (p == c->id) {
+      printf("\np = %u zl = ", p);
+      for (uint i = 0; i < ln; i++) {
+        printf("%lf ", zl[i]);
+        fflush(stdout);
+      }
+      printf("\n");
+    }
+    comm_barrier(c);
+  }
+#endif
+
   metric_tic(c, SCHUR_SOLVE_SETRHS1);
   // Solve: A_ss x_i = fi where fi = r_i - E zl
   Ezl(rhs, &schur->A_sl, schur->Q_sl, zl, crs->s[0], in, bfr);
+
+#if 0
+  comm_barrier(c);
+  for (uint p = 0; p < c->np; p++) {
+    if (p == c->id) {
+      printf("\np = %u Ezl = ", p);
+      for (uint i = 0; i < in; i++) {
+        printf("%lf ", rhs[i]);
+        fflush(stdout);
+      }
+      printf("\n");
+    }
+    comm_barrier(c);
+  }
+#endif
+
   for (uint i = 0; i < in; i++)
     rhs[i] = b[ln + i] - rhs[i];
   metric_toc(c, SCHUR_SOLVE_SETRHS1);
 
   metric_tic(c, SCHUR_SOLVE_PROJECT);
-  unsigned miter = (tol <= 0 ? abs(tol) : 100);
-  scalar mtol = (tol > 0 ? tol : 1e-10);
+  unsigned miter = (tol < 0 ? abs(tol) : 100);
+  scalar mtol = (tol > 0 ? tol : 1e-7);
   int iter = project(xi, rhs, schur, crs->s[0], c, miter, mtol, 0, 1, bfr);
   metric_toc(c, SCHUR_SOLVE_PROJECT);
   metric_acc(SCHUR_PROJECT_NITER, iter);
@@ -1040,18 +1105,18 @@ int schur_solve(scalar *x, struct coarse *crs, scalar *b, scalar tol,
   metric_tic(c, SCHUR_SOLVE_CHOL2);
   cholesky_solve(xl, &schur->A_ll, rhs);
   if (crs->null_space && (crs->n[1] + crs->n[2]) == 0)
-    zl[ln - 1] = 0;
+    xl[ln - 1] = 0;
   metric_toc(c, SCHUR_SOLVE_CHOL2);
 
   for (uint i = 0; i < ln + in; i++)
     x[i] = xl[i];
 
-  if (crs->null_space && (crs->n[1] + crs->n[2])) {
+  if (crs->null_space) {
     scalar sum = 0, wrk;
     for (uint i = 0; i < ln + in; i++)
       sum += x[i];
     comm_allreduce(c, gs_double, gs_add, &sum, 1, &wrk);
-    sum = sum / (crs->ng[0] + crs->ng[1]);
+    sum = sum / (crs->ng[0] + crs->ng[1] + crs->ng[2]);
     for (uint i = 0; i < ln + in; i++)
       x[i] -= sum;
   }
@@ -1081,3 +1146,5 @@ int schur_free(struct coarse *crs) {
 
   return 0;
 }
+
+#undef MAX

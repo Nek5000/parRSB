@@ -317,12 +317,9 @@ static uint unique_ids(sint *perm, ulong *uid, uint n, const ulong *ids,
   struct id_t *pa = (struct id_t *)arr.ptr;
 
   // Ignore the ids numbered zero
-  for (i = 0; i < arr.n && pa[i].id == 0; i++)
-    ;
-
-  uint un = 0;
+  sint un = 0;
   ulong last = 0;
-  for (; i < arr.n; i++) {
+  for (uint i = 0; i < arr.n; i++) {
     ulong v = pa[i].id;
     if (v != last)
       last = uid[un] = v, un++;
@@ -493,7 +490,12 @@ struct coarse *crs_parrsb_setup(uint n, const ulong *id, uint nz,
   ulong *uid = tcalloc(ulong, crs->un);
   crs->u2c = tcalloc(sint, crs->un);
   crs->cn = unique_ids(crs->u2c, uid, crs->un, tid, &crs->bfr);
-  // printf("id = %u un = %u cn = %u\n", c->id, crs->un, crs->cn);
+#if 0
+  for (uint i = 0; i < crs->un; i++) {
+    printf("p = %d i = %u perm[i] = %d\n", c->id, i, crs->u2c[i]);
+    fflush(stdout);
+  }
+#endif
 
   // Now renumber unique ids based on whether they are internal or on interface.
   slong *nid = tcalloc(slong, crs->cn);
@@ -571,7 +573,34 @@ void crs_parrsb_solve(scalar *x, struct coarse *crs, scalar *b, scalar tol) {
     if (crs->u2c[i] >= 0)
       rhs[crs->u2c[i]] += b[i];
   }
+
+#if 0
+  for (uint i = 0; i < crs->cn; i++) {
+    printf("p = %d i = %u before b[i] = %lf\n", crs->c.id, i, rhs[i]);
+    fflush(stdout);
+  }
+#endif
+
   gs(rhs, gs_double, gs_add, 1, crs->c2a, &crs->bfr);
+
+#if 0
+  char name[BUFSIZ];
+  snprintf(name, BUFSIZ, "rsb_b_np_%d_id_%d_nl_%lld_ni_%lld.txt", crs->c.np,
+           crs->c.id, crs->n[0], crs->n[1]);
+  FILE *fp = fopen(name, "w");
+  if (fp) {
+    for (uint i = 0; i < crs->an; i++)
+      fprintf(fp, "%lf\n", rhs[crs->cn + i]);
+    fclose(fp);
+  }
+#endif
+
+#if 0
+  for (uint i = 0; i < crs->an; i++) {
+    printf("p = %d i = %u after b[i] = %lf\n", crs->c.id, i, rhs[crs->cn + i]);
+    fflush(stdout);
+  }
+#endif
 
   switch (crs->type) {
   case 0:
@@ -581,15 +610,35 @@ void crs_parrsb_solve(scalar *x, struct coarse *crs, scalar *b, scalar tol) {
     break;
   }
 
+#if 0
+  for (uint i = 0; i < crs->an; i++) {
+    printf("p = %d i = %u x[i] = %lf w[i] = %lf\n", crs->c.id, i,
+           rhs[crs->cn + i], weights[crs->cn + i]);
+    fflush(stdout);
+  }
+#endif
+
   gs(rhs, gs_double, gs_add, 0, crs->c2a, &crs->bfr);
   for (uint i = 0; i < crs->un; i++) {
     if (crs->u2c[i] >= 0)
       x[i] = rhs[crs->u2c[i]];
+    else
+      x[i] = 0;
   }
   free(rhs);
 
+#if 0
+  snprintf(name, BUFSIZ, "rsb_x_np_%d_id_%d_un_%u.txt", crs->c.np, crs->c.id,
+           crs->un);
+  fp = fopen(name, "w");
+  if (fp) {
+    for (uint i = 0; i < crs->un; i++)
+      fprintf(fp, "%lf\n", x[i]);
+    fclose(fp);
+  }
+#endif
+
   metric_push_level();
-  // metric_crs_print(&crs->c, 1);
 }
 
 void crs_parrsb_free(struct coarse *crs) {
