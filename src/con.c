@@ -83,8 +83,8 @@ as arguments:
 
 */
 
-#define min(a, b) ((a) < (b) ? (a) : (b))
-#define max(a, b) ((a) > (b) ? (a) : (b))
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 // Upper bounds for elements and face quantities
 #define GC_MAX_FACES 6
@@ -100,22 +100,22 @@ struct point_t {
 };
 typedef struct point_t *Point;
 
-struct Boundary_private {
+struct boundary_t {
   ulong elementId, faceId;
   struct point_t face[4];
   uint proc;
   long bc[2];
 };
-typedef struct Boundary_private *BoundaryFace;
+typedef struct boundary_t *BoundaryFace;
 
-struct Mesh_private {
+struct mesh_t {
   ulong nelgt, nelgv;
   uint nelt;
   int nDim, nVertex, nNeighbors;
   struct array elements;
   struct array boundary;
 };
-typedef struct Mesh_private *Mesh;
+typedef struct mesh_t *Mesh;
 
 typedef struct {
   ulong sequenceId;
@@ -129,12 +129,12 @@ typedef struct {
 // Mesh struct
 //
 int mesh_init(Mesh *m_, int nel, int ndim) {
-  Mesh m = *m_ = tcalloc(struct Mesh_private, 1);
+  Mesh m = *m_ = tcalloc(struct mesh_t, 1);
   m->nelt = nel, m->nDim = ndim, m->nNeighbors = ndim;
   m->nVertex = (ndim == 2) ? 4 : 8;
 
   array_init(struct point_t, &m->elements, 10);
-  array_init(struct Boundary_private, &m->boundary, 10);
+  array_init(struct boundary_t, &m->boundary, 10);
 
   return 0;
 }
@@ -185,7 +185,7 @@ int get_bcs(unsigned int *nbcs_, long long **bcs_, Mesh m) {
   unsigned int nbcs = *nbcs_ = m->boundary.n;
   long long *bcs = *bcs_ = tcalloc(long long, 4 * nbcs);
 
-  struct Boundary_private *ptr = m->boundary.ptr;
+  struct boundary_t *ptr = m->boundary.ptr;
   uint i;
   for (i = 0; i < nbcs; i++) {
     bcs[4 * i + 0] = ptr[i].elementId;
@@ -236,7 +236,7 @@ int findMinNeighborDistance(Mesh mesh) {
         for (k = 0; k < mesh->nNeighbors; k++) {
           neighbor = NEIGHBOR_MAP[j][k];
           d = distance_3d(&p[i + j], &p[i + neighbor]);
-          p[i + j].dx = min(p[i + j].dx, d);
+          p[i + j].dx = MIN(p[i + j].dx, d);
         }
       }
     }
@@ -247,7 +247,7 @@ int findMinNeighborDistance(Mesh mesh) {
         for (k = 0; k < mesh->nNeighbors; k++) {
           neighbor = NEIGHBOR_MAP[j][k];
           d = distance_2d(&p[i + j], &p[i + neighbor]);
-          p[i + j].dx = min(p[i + j].dx, d);
+          p[i + j].dx = MIN(p[i + j].dx, d);
         }
       }
     }
@@ -439,7 +439,7 @@ static int findSegments(Mesh mesh, struct comm *c, int i, scalar tolSquared) {
   sint j;
   for (j = 1; j < npts; j++) {
     scalar d = diff_sqr(pts[j].x[i], pts[j - 1].x[i]);
-    scalar dx = min(pts[j].dx, pts[j - 1].dx) * tolSquared;
+    scalar dx = MIN(pts[j].dx, pts[j - 1].dx) * tolSquared;
 
     if (d > dx)
       pts[j].ifSegment = 1;
@@ -452,7 +452,7 @@ static int findSegments(Mesh mesh, struct comm *c, int i, scalar tolSquared) {
     if (c->id > 0) {
       struct point_t *lastp = arr.ptr;
       scalar d = diff_sqr(lastp->x[i], pts->x[i]);
-      scalar dx = min(lastp->dx, pts->dx) * tolSquared;
+      scalar dx = MIN(lastp->dx, pts->dx) * tolSquared;
       if (d > dx)
         pts->ifSegment = 1;
     }
@@ -712,11 +712,10 @@ int faces2D[GC_MAX_FACES][GC_MAX_FACE_VERTICES] = {{3, 1, 0, 0}, {2, 4, 0, 0},
 #define distance2D(a, b) (diff_sqr(a.x[0], b.x[0]) + diff_sqr(a.x[1], b.x[1]))
 #define distance3D(a, b) (distance2D(a, b) + diff_sqr(a.x[2], b.x[2]))
 
-struct minPair_private {
+struct mpair_t {
   uint proc;
   ulong orig, min;
 };
-typedef struct minPair_private *minPair;
 
 static int compressPeriodicVertices(Mesh mesh, struct comm *c, buffer *bfr) {
   parallel_sort(struct point_t, &mesh->elements, globalId, gs_long, 0, 0, c,
@@ -753,97 +752,68 @@ static int compressPeriodicVertices(Mesh mesh, struct comm *c, buffer *bfr) {
 }
 
 static ulong findMinBelowI(ulong min, uint I, struct array *arr) {
-  minPair ptr = arr->ptr;
-
-  uint i;
-  for (i = 0; i < I; i++)
+  struct mpair_t *ptr = (struct mpair_t *)arr->ptr;
+  for (uint i = 0; i < I; i++)
     if (ptr[i].orig == min)
       return ptr[i].min;
   return min;
 }
 
 static int renumberPeriodicVertices(Mesh mesh, struct comm *c,
-                                    struct array *matched, buffer *buf) {
-  uint size = matched->n;
-  slong *ids = tcalloc(slong, size);
+                                    struct array *matched, buffer *bfr) {
+  uint size1 = mesh->elements.n, size2 = matched->n;
+  slong *mids = tcalloc(slong, size1 + 2 * size2),
+        *mnew = tcalloc(slong, size1 + 2 * size2),
+        *mcur = tcalloc(slong, size1);
 
-  minPair ptr = matched->ptr;
-  uint i;
-  for (i = 0; i < size; i++)
-    ids[i] = ptr[i].orig;
+  struct point_t *pe = (struct point_t *)mesh->elements.ptr;
+  for (uint i = 0; i < size1; i++)
+    mids[i] = pe[i].globalId;
+  struct mpair_t *pm = (struct mpair_t *)matched->ptr;
+  for (uint i = 0; i < size2; i++)
+    mids[size1 + i] = pm[i].orig;
+  struct gs_data *gsh = gs_setup(mids, size1 + size2, c, 0, gs_pairwise, 0);
 
-  struct gs_data *t = gs_setup(ids, size, c, 0, gs_pairwise, 0);
+  for (uint i = 0; i < size1; i++)
+    mnew[i] = pe[i].globalId;
+  for (uint i = 0; i < size2; i++)
+    mnew[size1 + i] = pm[i].min;
+  gs(mnew, gs_long, gs_min, 0, gsh, bfr);
 
-  for (i = 0; i < size; i++)
-    ids[i] = ptr[i].min;
+  sint changed, wrk;
+  do {
+    for (uint i = 0; i < size1; i++)
+      mcur[i] = mnew[i];
+    for (uint i = 0; i < size2; i++)
+      mids[size1 + size2 + i] = -mnew[size1 + i];
+    struct gs_data *gsh1 =
+        gs_setup(mids, size1 + 2 * size2, c, 0, gs_pairwise, 0);
 
-  gs(ids, gs_long, gs_min, 0, t, buf);
-  gs_free(t);
+    gs(mnew, gs_long, gs_min, 0, gsh1, bfr);
+    free(gsh1);
 
-  for (i = 0; i < size; i++)
-    ptr[i].min = ids[i];
-  free(ids);
+    for (uint i = 0; i < size2; i++)
+      mnew[size1 + i] = mnew[size1 + size2 + i];
+    gs(mnew, gs_long, gs_min, 0, gsh, bfr);
 
-  sarray_sort_2(struct minPair_private, ptr, size, orig, 1, min, 1, buf);
+    changed = 0;
+    for (uint i = 0; i < size1; i++)
+      changed += (mnew[i] != mcur[i]);
+    comm_allreduce(c, gs_int, gs_max, &changed, 1, &wrk);
+  } while (changed);
 
-  struct array compressed;
-  array_init(struct minPair_private, &compressed, 10);
-  if (size > 0)
-    array_cat(struct minPair_private, &compressed, ptr, 1);
+  for (uint i = 0; i < size1; i++)
+    pe[i].globalId = mcur[i];
 
-  for (i = 1; i < size; i++)
-    if (ptr[i].orig != ptr[i - 1].orig)
-      array_cat(struct minPair_private, &compressed, &ptr[i], 1);
+  free(gsh);
+  free(mids), free(mnew), free(mcur);
 
-  ptr = compressed.ptr;
-  size = compressed.n;
-  for (i = 0; i < size; i++)
-    ptr[i].proc = 0;
-
-  struct crystal cr;
-  crystal_init(&cr, c);
-  sarray_transfer(struct minPair_private, &compressed, proc, 1, &cr);
-  crystal_free(&cr);
-
-  sint rank = c->id;
-  ptr = compressed.ptr;
-  size = compressed.n;
-  if (rank == 0) {
-    sarray_sort_2(struct minPair_private, ptr, size, orig, 1, min, 1, buf);
-    for (i = 0; i < size; i++)
-      ptr[i].min = findMinBelowI(ptr[i].min, i, &compressed);
-  }
-
-  uint sizec = (rank == 0) * size;
-  size = mesh->elements.n;
-
-  ids = tcalloc(slong, size + sizec);
-  Point pnt = mesh->elements.ptr;
-  for (i = 0; i < size; i++)
-    ids[i] = pnt[i].globalId;
-  for (i = 0; i < sizec; i++)
-    ids[size + i] = ptr[i].orig;
-
-  t = gs_setup(ids, size + sizec, c, 0, gs_pairwise, 0);
-
-  for (i = 0; i < size; i++)
-    ids[i] = pnt[i].globalId;
-  for (i = 0; i < sizec; i++)
-    ids[size + i] = ptr[i].min;
-
-  gs(ids, gs_long, gs_min, 0, t, buf);
-  gs_free(t);
-
-  for (i = 0; i < size; i++)
-    pnt[i].globalId = ids[i];
-  free(ids);
-
-  array_free(&compressed);
+  return 0;
 }
 
 static int findConnectedPeriodicPairs(Mesh mesh, BoundaryFace f_,
                                       BoundaryFace g_, struct array *matched) {
-  struct Boundary_private f = *f_, g = *g_;
+  struct boundary_t f = *f_, g = *g_;
 
   int nvf = mesh->nVertex / 2;
   int nDim = mesh->nDim;
@@ -855,8 +825,8 @@ static int findConnectedPeriodicPairs(Mesh mesh, BoundaryFace f_,
     scalar meanF = 0.0, meanG = 0.0;
 
     for (j = 0; j < nvf; j++) {
-      fMax = max(fMax, fabs(f.face[j].x[i]));
-      gMax = max(gMax, fabs(g.face[j].x[i]));
+      fMax = MAX(fMax, fabs(f.face[j].x[i]));
+      gMax = MAX(gMax, fabs(g.face[j].x[i]));
       meanF += f.face[j].x[i];
       meanG += g.face[j].x[i];
     }
@@ -886,7 +856,7 @@ static int findConnectedPeriodicPairs(Mesh mesh, BoundaryFace f_,
   }
   d2Min = sqrt(d2Min);
 
-  scalar fgMax = max(fMax, gMax);
+  scalar fgMax = MAX(fMax, gMax);
   scalar tol = (1e-3) * fgMax;
   if (d2Min > tol) {
     fprintf(stderr,
@@ -896,13 +866,13 @@ static int findConnectedPeriodicPairs(Mesh mesh, BoundaryFace f_,
     exit(1);
   }
 
-  struct minPair_private m;
+  struct mpair_t m;
   for (i = 0; i < nvf; i++) {
     k = (i + shift) % nvf;
     k = nvf - 1 - k;
-    m.min = min(f.face[i].globalId, g.face[k].globalId);
-    m.orig = max(f.face[i].globalId, g.face[k].globalId);
-    array_cat(struct minPair_private, matched, &m, 1);
+    m.min = MIN(f.face[i].globalId, g.face[k].globalId);
+    m.orig = MAX(f.face[i].globalId, g.face[k].globalId);
+    array_cat(struct mpair_t, matched, &m, 1);
   }
 }
 
@@ -911,11 +881,12 @@ static int findConnectedPeriodicFaces(Mesh mesh, struct array *matched) {
   BoundaryFace ptr = mesh->boundary.ptr;
   sint i, j;
 
-  for (i = 0; i < bSize - 1; i++)
+  for (i = 0; i < bSize - 1; i++) {
     for (j = i + 1; j < bSize; j++)
       if (ptr[j].bc[0] == ptr[i].elementId && ptr[j].bc[1] == ptr[i].faceId) {
         findConnectedPeriodicPairs(mesh, &ptr[i], &ptr[j], matched);
       }
+  }
 }
 
 static int gatherMatchingPeriodicFaces(Mesh mesh, struct comm *c) {
@@ -932,7 +903,7 @@ static int gatherMatchingPeriodicFaces(Mesh mesh, struct comm *c) {
   sint i;
   slong eid;
   for (i = 0; i < nFaces; i++) {
-    eid = max(bPtr[i].bc[0], bPtr[i].elementId);
+    eid = MAX(bPtr[i].bc[0], bPtr[i].elementId);
     if (eid < N)
       bPtr[i].proc = eid / nelt;
     else
@@ -941,7 +912,7 @@ static int gatherMatchingPeriodicFaces(Mesh mesh, struct comm *c) {
 
   struct crystal cr;
   crystal_init(&cr, c);
-  sarray_transfer(struct Boundary_private, &mesh->boundary, proc, 1, &cr);
+  sarray_transfer(struct boundary_t, &mesh->boundary, proc, 1, &cr);
   crystal_free(&cr);
 }
 
@@ -957,7 +928,7 @@ static int setPeriodicFaceCoordinates(Mesh mesh, struct comm *c, buffer *buf) {
     return 0;
 
   /* Need boundary array to be sorted by elementId */
-  sarray_sort(struct Boundary_private, bPtr, bSize, elementId, 1, buf);
+  sarray_sort(struct boundary_t, bPtr, bSize, elementId, 1, buf);
 
   /* Need element array to be sorted by sequenceId */
   sarray_sort(struct point_t, ePtr, eSize, sequenceId, 1, buf);
@@ -988,7 +959,7 @@ static int matchPeriodicFaces(Mesh mesh, struct comm *c, buffer *bfr) {
   gatherMatchingPeriodicFaces(mesh, c);
 
   struct array matched;
-  array_init(struct minPair_private, &matched, 10);
+  array_init(struct mpair_t, &matched, 10);
   matched.n = 0;
 
   findConnectedPeriodicFaces(mesh, &matched);
@@ -1106,7 +1077,7 @@ static VToEMap *getVToEMap(Mesh m, struct comm *c, buffer *bfr) {
     }
 
     ProcID *pPtr = procs.ptr;
-    e = min(e, vtcsCmpct.n);
+    e = MIN(e, vtcsCmpct.n);
     for (i = 0; i < procs.n; i++) {
       t.workProc = pPtr[i].procId;
       for (j = s; j < e; j++) {
@@ -1332,7 +1303,7 @@ static int transferBoundaryFaces(Mesh mesh, struct comm *c) {
 
   struct crystal cr;
   crystal_init(&cr, c);
-  sarray_transfer(struct Boundary_private, boundary, proc, 1, &cr);
+  sarray_transfer(struct boundary_t, boundary, proc, 1, &cr);
   crystal_free(&cr);
 
   return 0;
@@ -1386,13 +1357,13 @@ int parrsb_conn_mesh(long long *vtx, double *coord, int nelt, int ndim,
     }
   }
 
-  struct Boundary_private b;
+  struct boundary_t b;
   for (i = 0; i < nPeriodicFaces; i++) {
     b.elementId = periodicInfo[4 * i + 0] - 1;
     b.faceId = PRE_TO_SYM_FACE[periodicInfo[4 * i + 1] - 1];
     b.bc[0] = periodicInfo[4 * i + 2] - 1;
     b.bc[1] = PRE_TO_SYM_FACE[periodicInfo[4 * i + 3] - 1];
-    array_cat(struct Boundary_private, &mesh->boundary, &b, 1);
+    array_cat(struct boundary_t, &mesh->boundary, &b, 1);
   }
 
   buffer bfr;
@@ -1490,6 +1461,5 @@ void fparrsb_conn_mesh(long long *vtx, double *coord, int *nelt, int *ndim,
 #undef GC_MAX_VERTICES
 #undef GC_MAX_NEIGHBORS
 #undef GC_MAX_FACE_VERTICES
-
-#undef min
-#undef max
+#undef MIN
+#undef MAX

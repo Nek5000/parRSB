@@ -639,8 +639,8 @@ int fiedler(struct array *elements, int nv, parrsb_options *opts,
   scalar *initv = tcalloc(scalar, 2 * lelt), *f = initv + lelt;
   for (uint i = 0; i < lelt; i++) {
     initv[i] = start + i + 1.0;
-    // if (start + i < nelg / 2)
-    //  initv->data[i] += 1000 * nelg;
+    if (start + i < nelg / 2)
+      initv[i] += 1000 * nelg;
   }
 
   ortho(initv, lelt, nelg, gsc);
