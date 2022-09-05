@@ -629,7 +629,7 @@ static int lanczos(scalar *fiedler, struct array *elements, int nv,
 }
 
 int fiedler(struct array *elements, int nv, parrsb_options *opts,
-            struct comm *gsc, buffer *buf) {
+            struct comm *gsc, buffer *buf, int verbose) {
   metric_tic(gsc, RSB_FIEDLER_SETUP);
   uint lelt = elements->n;
   slong out[2][1], wrk[2][1], in = lelt;

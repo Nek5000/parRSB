@@ -1356,9 +1356,9 @@ int parrsb_conn_mesh(long long *vtx, double *coord, int nelt, int ndim,
   }
 
   double duration[8] = {0};
-  const char *name[8] = {"transferBoundaryFaces", "findMinNbrDistance",
-                         "findSegments         ", "setGlobalId       ",
-                         "elementCheck         ", "faceCheck         ",
+  const char *name[8] = {"transferBoundaryFaces", "findMinNbrDistance   ",
+                         "findSegments         ", "setGlobalId          ",
+                         "elementCheck         ", "faceCheck            ",
                          "matchPeriodicFaces   "};
 
   genmap_barrier(&c);

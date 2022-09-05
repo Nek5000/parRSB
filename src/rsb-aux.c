@@ -9,7 +9,7 @@
 extern int rcb(struct array *elements, size_t unit_size, int ndim,
                struct comm *c, buffer *bfr);
 extern int fiedler(struct array *elements, int nv, parrsb_options *options,
-                   struct comm *gsc, buffer *buf);
+                   struct comm *gsc, buffer *buf, int verbose);
 extern int repair_partitions(struct array *elements, int nv, struct comm *tc,
                              struct comm *lc, int bin, struct comm *gc,
                              buffer *bfr);
@@ -86,8 +86,6 @@ static void get_part(sint *np, sint *nid, int two_lvl, struct comm *lc,
 
 int rsb(struct array *elements, int nv, int check, parrsb_options *options,
         struct comm *gc, buffer *bfr) {
-  int ndim = (nv == 8) ? 3 : 2;
-
   struct comm lc, tc;
   comm_dup(&lc, gc);
 
@@ -112,6 +110,7 @@ int rsb(struct array *elements, int nv, int check, parrsb_options *options,
     fflush(stdout);
   }
 
+  unsigned ndim = (nv == 8) ? 3 : 2;
   while (np > 1) {
     // Run RCB, RIB pre-step or just sort by global id
     metric_tic(&lc, RSB_PRE);
@@ -133,7 +132,7 @@ int rsb(struct array *elements, int nv, int check, parrsb_options *options,
 
     // Run fiedler
     metric_tic(&lc, RSB_FIEDLER);
-    fiedler(elements, nv, options, &lc, bfr);
+    fiedler(elements, nv, options, &lc, bfr, gc->id == 0);
     metric_toc(&lc, RSB_FIEDLER);
 
     // Sort by Fiedler vector
