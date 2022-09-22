@@ -274,6 +274,7 @@ void coarse_solve(scalar *x, struct coarse *crs, scalar *b, scalar tol) {
 
   metric_push_level();
   metric_crs_print(&crs->c, 1);
+  metric_finalize();
 }
 
 void coarse_free(struct coarse *crs) {
@@ -469,6 +470,9 @@ struct coarse *crs_parrsb_setup(uint n, const ulong *id, uint nz,
                                 const uint *Ai, const uint *Aj, const scalar *A,
                                 unsigned null_space, unsigned type,
                                 const struct comm *c) {
+  comm_barrier(c);
+  double tcrs = comm_time();
+
   // crs->un is the user vector size.
   struct coarse *crs = tcalloc(struct coarse, 1);
   crs->null_space = null_space, crs->type = type, crs->un = n;
@@ -552,12 +556,33 @@ struct coarse *crs_parrsb_setup(uint n, const ulong *id, uint nz,
   crs->n[1] = crs->an - crs->n[0];
   crs->s[1] = nid[crs->cn + crs->n[0]];
   crs->c2a = gs_setup(nid, crs->cn + crs->an, c, 0, gs_pairwise, 0);
+
+  tcrs = comm_time() - tcrs;
+  double wrk, min = tcrs, max = tcrs;
+  comm_allreduce(c, gs_double, gs_max, &max, 1, &wrk);
+  comm_allreduce(c, gs_double, gs_min, &min, 1, &wrk);
+  if (c->id == 0) {
+    printf("parrsb_crs_setup: %g %g (min max)\n", min, max);
+    fflush(stdout);
+  }
+
+  comm_barrier(c);
+  tcrs = comm_time();
+
   switch (type) {
   case 0:
     schur_setup(crs, &mijs, &cr, &crs->bfr);
     break;
   default:
     break;
+  }
+
+  min = max = comm_time() - tcrs;
+  comm_allreduce(c, gs_double, gs_max, &max, 1, &wrk);
+  comm_allreduce(c, gs_double, gs_min, &min, 1, &wrk);
+  if (c->id == 0) {
+    printf("schur_setup: %g %g (min max)\n", min, max);
+    fflush(stdout);
   }
 
   array_free(&mijs), crystal_free(&cr);
@@ -639,6 +664,8 @@ void crs_parrsb_solve(scalar *x, struct coarse *crs, scalar *b, scalar tol) {
 #endif
 
   metric_push_level();
+  metric_crs_print(&crs->c, 1);
+  metric_finalize();
 }
 
 void crs_parrsb_free(struct coarse *crs) {

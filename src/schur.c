@@ -545,26 +545,87 @@ schur_precond_setup(const struct mat *L, const struct par_mat *F,
                     uint ni, struct crystal *cr, buffer *bfr) {
   // TODO: Sparsify W and G when they are built
   struct par_mat W, G, WG;
+
+  struct comm *c = &cr->comm;
+  comm_barrier(c);
+  double t = comm_time();
+
   schur_setup_G(&G, 1e-12, L, F, S->rows, S->rn, cr, bfr);
+
+  t = comm_time() - t;
+  double wrk, min = t, max = t;
+  comm_allreduce(c, gs_double, gs_min, &min, 1, &wrk);
+  comm_allreduce(c, gs_double, gs_max, &max, 1, &wrk);
+  if (c->id == 0) {
+    printf("\tSetup G          : %g %g (min max)\n", min, max);
+    fflush(stdout);
+  }
+
+  comm_barrier(c);
+  t = comm_time();
+
   schur_setup_W(&W, 1e-12, L, E, S->rows, S->rn, cr, bfr);
+
+  min = max = comm_time() - t;
+  comm_allreduce(c, gs_double, gs_min, &min, 1, &wrk);
+  comm_allreduce(c, gs_double, gs_max, &max, 1, &wrk);
+  if (c->id == 0) {
+    printf("\tSetup W          : %g %g (min max)\n", min, max);
+    fflush(stdout);
+  }
+
+  comm_barrier(c);
+  t = comm_time();
+
   sparse_gemm(&WG, &W, &G, 0, cr, bfr);
+
+  min = max = comm_time() - t;
+  comm_allreduce(c, gs_double, gs_min, &min, 1, &wrk);
+  comm_allreduce(c, gs_double, gs_max, &max, 1, &wrk);
+  if (c->id == 0) {
+    printf("\tSparse gemm      : %g %g (min max)\n", min, max);
+    fflush(stdout);
+  }
+
 #ifdef DUMPWG
   par_mat_print(&WG);
 #endif
+
+  comm_barrier(c);
+  t = comm_time();
 
   // P is CSR
   struct par_mat *P = tcalloc(struct par_mat, 1);
   sparse_sub(P, S, &WG, bfr);
 
+  min = max = comm_time() - t;
+  comm_allreduce(c, gs_double, gs_min, &min, 1, &wrk);
+  comm_allreduce(c, gs_double, gs_max, &max, 1, &wrk);
+  if (c->id == 0) {
+    printf("\tSparse sub       : %g %g (min max)\n", min, max);
+    fflush(stdout);
+  }
+
 #ifdef DUMPP
   par_mat_print(P);
 #endif
 
-  par_mat_free(&W);
-  par_mat_free(&G);
-  par_mat_free(&WG);
+  par_mat_free(&W), par_mat_free(&G), par_mat_free(&WG);
 
-  return mg_setup(P, 2, 0, cr, bfr);
+  comm_barrier(c);
+  t = comm_time();
+
+  struct mg *precond = mg_setup(P, 2, 0, cr, bfr);
+
+  min = max = comm_time() - t;
+  comm_allreduce(c, gs_double, gs_min, &min, 1, &wrk);
+  comm_allreduce(c, gs_double, gs_max, &max, 1, &wrk);
+  if (c->id == 0) {
+    printf("\tMG precond       : %g %g (min max)\n", min, max);
+    fflush(stdout);
+  }
+
+  return precond;
 }
 
 static struct gs_data *setup_Ezl_Q(struct par_mat *E, ulong s, uint n,
@@ -960,7 +1021,9 @@ int schur_dump(const char *name, const struct mat *B,
 //
 int schur_setup(struct coarse *crs, struct array *eij, struct crystal *cr,
                 buffer *bfr) {
-  struct schur *schur = crs->solver = (struct schur *)tcalloc(struct schur, 1);
+  struct comm *c = &cr->comm;
+  comm_barrier(c);
+  double t = comm_time();
 
   // Setup A_ll
   struct array ll, ls, sl, ss;
@@ -983,6 +1046,20 @@ int schur_setup(struct coarse *crs, struct array *eij, struct crystal *cr,
     }
   }
 
+  t = comm_time() - t;
+  double wrk, min = t, max = t;
+  comm_allreduce(c, gs_double, gs_min, &min, 1, &wrk);
+  comm_allreduce(c, gs_double, gs_max, &max, 1, &wrk);
+  if (c->id == 0) {
+    printf("\tSeparate matrices: %g %g (min max)\n", min, max);
+    fflush(stdout);
+  }
+
+  comm_barrier(c);
+  t = comm_time();
+
+  struct schur *schur = crs->solver = (struct schur *)tcalloc(struct schur, 1);
+
   // Setup local block diagonal (B). This is distributed by rows based on the
   // partitioning.
   struct mat B;
@@ -994,11 +1071,33 @@ int schur_setup(struct coarse *crs, struct array *eij, struct crystal *cr,
   schur->A_ll.start = crs->s[0];
   array_free(&ll);
 
+  min = max = comm_time() - t;
+  comm_allreduce(c, gs_double, gs_min, &min, 1, &wrk);
+  comm_allreduce(c, gs_double, gs_max, &max, 1, &wrk);
+  if (c->id == 0) {
+    printf("\tSetup B          : %g %g (min max)\n", min, max);
+    fflush(stdout);
+  }
+
+  comm_barrier(c);
+  t = comm_time();
+
   // Setup S: Setup interface nodes. This is distributed by rows in a load
   // balanced manner.
   par_csr_setup(&schur->A_ss, &ss, 1, bfr);
   array_free(&ss);
   schur->Q_ss = setup_Q(&schur->A_ss, &cr->comm, bfr);
+
+  min = max = comm_time() - t;
+  comm_allreduce(c, gs_double, gs_min, &min, 1, &wrk);
+  comm_allreduce(c, gs_double, gs_max, &max, 1, &wrk);
+  if (c->id == 0) {
+    printf("\tSetup S          : %g %g (min max)\n", min, max);
+    fflush(stdout);
+  }
+
+  comm_barrier(c);
+  t = comm_time();
 
   // Setup F: Setup local interface connectivity. This is distributed by rows
   // similar to B.
@@ -1006,24 +1105,46 @@ int schur_setup(struct coarse *crs, struct array *eij, struct crystal *cr,
   array_free(&ls);
   schur->Q_ls = setup_Fxi_Q(&schur->A_ls, crs->s[1], crs->n[1], &cr->comm, bfr);
 
+  min = max = comm_time() - t;
+  comm_allreduce(c, gs_double, gs_min, &min, 1, &wrk);
+  comm_allreduce(c, gs_double, gs_max, &max, 1, &wrk);
+  if (c->id == 0) {
+    printf("\tSetup F          : %g %g (min max)\n", min, max);
+    fflush(stdout);
+  }
+
+  comm_barrier(c);
+  t = comm_time();
+
   // Setup E: E is distributed by columns in the same manner as columns (or
   // rows) of B.
-  // printf("s = %llu n = %u ng = %llu\n", crs->s[0], crs->n[0], crs->ng[0]);
   distribute_by_columns(&sl, crs->s[0], crs->n[0], crs->ng[0], cr, bfr);
   par_csc_setup(&schur->A_sl, &sl, 0, bfr);
   array_free(&sl);
   schur->Q_sl = setup_Ezl_Q(&schur->A_sl, crs->s[1], crs->n[1], &cr->comm, bfr);
 
+  min = max = comm_time() - t;
+  comm_allreduce(c, gs_double, gs_min, &min, 1, &wrk);
+  comm_allreduce(c, gs_double, gs_max, &max, 1, &wrk);
+  if (c->id == 0) {
+    printf("\tSetup E          : %g %g (min max)\n", min, max);
+    fflush(stdout);
+  }
+
+  comm_barrier(c);
+  t = comm_time();
+
   // Setup the preconditioner for the Schur complement matrix
   schur->M = schur_precond_setup(&schur->A_ll, &schur->A_ls, &schur->A_ss,
                                  &schur->A_sl, crs->s[1], crs->n[1], cr, bfr);
 
-#if 0
-  char name[BUFSIZ];
-  snprintf(name, BUFSIZ, "schur_np_%d_nl_%lld_ni_%lld.txt", cr->comm.np,
-           crs->ng[0], crs->ng[1]);
-  schur_dump(name, &B, &schur->A_ls, &schur->A_sl, &schur->A_ss, cr, &crs->bfr);
-#endif
+  min = max = comm_time() - t;
+  comm_allreduce(c, gs_double, gs_min, &min, 1, &wrk);
+  comm_allreduce(c, gs_double, gs_max, &max, 1, &wrk);
+  if (c->id == 0) {
+    printf("\tSetup MG Precond : %g %g (min max)\n", min, max);
+    fflush(stdout);
+  }
 
   return 0;
 }
