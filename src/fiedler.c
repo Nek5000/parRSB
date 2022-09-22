@@ -616,6 +616,8 @@ static int lanczos(scalar *fiedler, struct array *elements, int nv,
         fiedler[i] += rr[j * lelt + i] * eVectors[eValMinI * iter + j];
     }
     ortho(fiedler, lelt, nelg, gsc);
+    for (uint i = 0; i < lelt; i++)
+      initv[i] = fiedler[i];
     metric_acc(RSB_LANCZOS_TQLI, comm_time() - t);
   }
 
