@@ -84,22 +84,22 @@ void metric_rsb_print(struct comm *c, int profile_level) {
       printf("  RSB_PRE                    : %e/%e/%e\n", SUMMARY(i, RSB_PRE));
       printf("  RSB_FIEDLER                : %e/%e/%e\n",
              SUMMARY(i, RSB_FIEDLER));
-      printf("  RSB_FIEDLER_SETUP          : %e/%e/%e\n",
+      printf("    RSB_FIEDLER_SETUP        : %e/%e/%e\n",
              SUMMARY(i, RSB_FIEDLER_SETUP));
-      printf("  RSB_FIEDLER_INNER          : %e/%e/%e\n",
-             SUMMARY(i, RSB_FIEDLER_INNER));
-      printf("    RSB_LANCZOS_SETUP        : %e/%e/%e\n",
+      printf("    RSB_FIEDLER_CALC         : %e/%e/%e\n",
+             SUMMARY(i, RSB_FIEDLER_CALC));
+      printf("      RSB_LANCZOS_SETUP      : %e/%e/%e\n",
              SUMMARY(i, RSB_LANCZOS_SETUP));
-      printf("    RSB_LANCZOS              : %e/%e/%e\n",
+      printf("      RSB_LANCZOS            : %e/%e/%e\n",
              SUMMARY(i, RSB_LANCZOS));
-      printf("    RSB_LANCZOS_TQLI         : %e/%e/%e\n",
+      printf("      RSB_LANCZOS_TQLI       : %e/%e/%e\n",
              SUMMARY(i, RSB_LANCZOS_TQLI));
-      printf("    RSB_INVERSE_SETUP        : %e/%e/%e\n",
+      printf("      RSB_INVERSE_SETUP      : %e/%e/%e\n",
              SUMMARY(i, RSB_INVERSE_SETUP));
-      printf("    RSB_INVERSE              : %e/%e/%e\n",
+      printf("      RSB_INVERSE            : %e/%e/%e\n",
              SUMMARY(i, RSB_INVERSE));
-      printf("  RSB_FIEDLER_INNER_NITER    : %e/%e/%e\n",
-             SUMMARY(i, RSB_FIEDLER_INNER_NITER));
+      printf("    RSB_FIEDLER_CALC_NITER   : %e/%e/%e\n",
+             SUMMARY(i, RSB_FIEDLER_CALC_NITER));
       printf("  RSB_SORT                   : %e/%e/%e\n", SUMMARY(i, RSB_SORT));
       printf("  RSB_REPAIR_BALANCE         : %e/%e/%e\n",
              SUMMARY(i, RSB_REPAIR_BALANCE));

@@ -6,16 +6,6 @@
 #include <stdio.h>
 #include <time.h>
 
-struct unmarked {
-  uint index;
-};
-
-struct ielem_t {
-  uint index, orig;
-  sint dest;
-  scalar fiedler;
-};
-
 // Check the bin value
 static int check_bin_val(int bin, struct comm *gc) {
   if (bin < 0 || bin > 1) {
@@ -31,6 +21,10 @@ static int check_bin_val(int bin, struct comm *gc) {
 // Find the number of disconnected components
 static uint get_components(sint *component, struct rsb_element *elements,
                            struct comm *c, buffer *buf, uint nelt, uint nv) {
+  struct unmarked {
+    uint index;
+  };
+
   slong out[2][1], wrk[2][1], in = nelt;
   comm_scan(out, c, gs_long, gs_add, &in, 1, wrk);
   ulong nelg = out[1][0], start = out[0][0];
@@ -134,6 +128,12 @@ int balance_partitions(struct array *elements, int nv, struct comm *lc,
                        struct comm *gc, int bin, buffer *bfr) {
   assert(check_bin_val(bin, gc) == 0);
 
+  struct ielem_t {
+    uint index, orig;
+    sint dest;
+    scalar fiedler;
+  };
+
   // Calculate expected # of elements per processor
   uint nelt = elements->n;
   slong nelgt = nelt, nglob = nelt, buf;
@@ -233,9 +233,11 @@ int balance_partitions(struct array *elements, int nv, struct comm *lc,
                   bfr);
   }
 
+#if 0
   nelt = elements->n;
   sint ncomp = get_components(NULL, elements->ptr, lc, bfr, nelt, nv);
   metric_acc(RSB_COMPONENTS, ncomp);
+#endif
 
   free(ids);
   gs_free(gsh);

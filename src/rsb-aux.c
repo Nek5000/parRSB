@@ -22,7 +22,7 @@ static void check_rsb_partition(struct comm *gc, parrsb_options *opts) {
 
   for (int i = 0; i < max_levels; i++) {
     sint converged = 1;
-    int val = (int)metric_get_value(i, RSB_FIEDLER_INNER_NITER);
+    int val = (int)metric_get_value(i, RSB_FIEDLER_CALC_NITER);
     if (opts->rsb_algo == 0) {
       if (val == miter * mpass)
         converged = 0;

@@ -654,7 +654,7 @@ int fiedler(struct array *elements, int nv, parrsb_options *opts,
     initv[i] *= rni;
   metric_toc(gsc, RSB_FIEDLER_SETUP);
 
-  metric_tic(gsc, RSB_FIEDLER_INNER);
+  metric_tic(gsc, RSB_FIEDLER_CALC);
   int iter = 0;
   switch (opts->rsb_algo) {
   case 0:
@@ -670,8 +670,8 @@ int fiedler(struct array *elements, int nv, parrsb_options *opts,
   default:
     break;
   }
-  metric_toc(gsc, RSB_FIEDLER_INNER);
-  metric_acc(RSB_FIEDLER_INNER_NITER, iter);
+  metric_toc(gsc, RSB_FIEDLER_CALC);
+  metric_acc(RSB_FIEDLER_CALC_NITER, iter);
 
   scalar norm = 0;
   for (uint i = 0; i < lelt; i++)
