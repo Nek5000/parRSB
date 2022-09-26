@@ -435,9 +435,6 @@ int balance_partitions(struct array *elements, int nv, struct comm *lc,
                   bfr);
   }
 
-  nelt = elements->n;
-  sint ncomp = get_components_v2(NULL, nelt, nv, elements->ptr, gc, bfr);
-
   free(ids);
   gs_free(gsh);
 }
