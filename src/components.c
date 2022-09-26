@@ -144,7 +144,7 @@ static sint find_or_insert(struct array *cids, struct cmp_t *t) {
       return pc[mid].uid;
     else if (t->c < pc[mid].c)
       e = mid - 1;
-    else // c > pc[mid].c
+    else // t->c > pc[mid].c
       s = mid + 1;
   }
 
@@ -152,7 +152,7 @@ static sint find_or_insert(struct array *cids, struct cmp_t *t) {
   uint max = cids->max;
   if (max == cids->n) {
     max += max / 2 + 1;
-    array_reserve(struct cmp_t, cids, max);
+    pc = (struct cmp_t *)array_reserve(struct cmp_t, cids, max);
   }
 
   uint n = mid;
@@ -181,9 +181,9 @@ static uint get_components_v2(sint *component, uint nelt, unsigned nv,
     return 0;
 
   uint nev = nelt * nv;
-  uint *inds = tcalloc(uint, nev);
   sint *p = tcalloc(sint, nev);
   slong *ids = tcalloc(slong, nev);
+  uint *inds = tcalloc(uint, nev);
 
   int null_input = (component == NULL);
   if (null_input)
@@ -199,12 +199,14 @@ static uint get_components_v2(sint *component, uint nelt, unsigned nv,
     uint unmkd = 0;
     for (uint e = 0; e < nelt; e++) {
       if (component[e] == -1) {
+        assert(unmkd >= 0 && unmkd < nelt);
         inds[unmkd] = e;
         for (uint v = 0; v < nv; v++)
           ids[unmkd * nv + v] = elements[e].vertices[v];
         unmkd++;
       }
     }
+    assert(unmkd <= nelt);
 
     int bin = (unmkd > 0);
     comm_split(ci, bin, ci->id, &c);
@@ -239,7 +241,7 @@ static uint get_components_v2(sint *component, uint nelt, unsigned nv,
 
           // There was one non-zero vertex in the element
           if (v < nv) {
-            uint c = p[e * nv + v];
+            sint c = p[e * nv + v];
             for (v = 0; v < nv; v++)
               p[e * nv + v] = c;
           }
@@ -261,6 +263,7 @@ static uint get_components_v2(sint *component, uint nelt, unsigned nv,
           find_or_insert(&cids, &t);
         }
       }
+      assert(cids.n <= c.np);
 
       struct crystal cr;
       crystal_init(&cr, &c);
@@ -302,7 +305,7 @@ static uint get_components_v2(sint *component, uint nelt, unsigned nv,
           t.c = p[e * nv + 0];
           sint uid = find_or_insert(&cids, &t);
           assert(uid > -1);
-          component[inds[e]] = uid;
+          component[inds[e]] = nc + uid;
         }
       }
 
