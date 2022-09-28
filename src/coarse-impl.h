@@ -3,6 +3,8 @@
 
 #include "coarse.h"
 
+uint unique_ids(sint *perm, ulong *uid, uint n, const ulong *ids, buffer *bfr);
+
 struct coarse {
   unsigned type;       // type = schur-2-lvl, schur-3-lvl
   unsigned null_space; // Is there a null space or not
