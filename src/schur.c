@@ -550,7 +550,11 @@ schur_precond_setup(const struct mat *L, const struct par_mat *F,
   comm_barrier(c);
   double t = comm_time();
 
-  schur_setup_G(&G, 1e-12, L, F, S->rows, S->rn, cr, bfr);
+  double tol = 1e-12;
+  char *val = getenv("PARRSB_SCHUR_TOL");
+  if (val)
+    tol = atof(val);
+  schur_setup_G(&G, tol, L, F, S->rows, S->rn, cr, bfr);
 
   t = comm_time() - t;
   double wrk, min = t, max = t;
@@ -564,7 +568,7 @@ schur_precond_setup(const struct mat *L, const struct par_mat *F,
   comm_barrier(c);
   t = comm_time();
 
-  schur_setup_W(&W, 1e-12, L, E, S->rows, S->rn, cr, bfr);
+  schur_setup_W(&W, tol, L, E, S->rows, S->rn, cr, bfr);
 
   min = max = comm_time() - t;
   comm_allreduce(c, gs_double, gs_min, &min, 1, &wrk);
@@ -615,7 +619,11 @@ schur_precond_setup(const struct mat *L, const struct par_mat *F,
   comm_barrier(c);
   t = comm_time();
 
-  struct mg *precond = mg_setup(P, 2, 0, cr, bfr);
+  int factor = 2;
+  val = getenv("PARRSB_SCHUR_MG_FACTOR");
+  if (val)
+    factor = atoi(val);
+  struct mg *precond = mg_setup(P, factor, 0, cr, bfr);
 
   min = max = comm_time() - t;
   comm_allreduce(c, gs_double, gs_min, &min, 1, &wrk);
@@ -785,7 +793,7 @@ static inline void ortho(scalar *q, uint n, ulong ng, struct comm *c) {
 }
 
 static int schur_action(scalar *y, const struct schur *schur, scalar *x,
-                        ulong ls, scalar *wrk, buffer *bfr) {
+                        ulong ls, scalar *wrk, buffer *bfr, struct comm *c) {
   const struct par_mat *S = &schur->A_ss;
   assert(IS_CSR(S));
   assert(S->rn == 0 || IS_DIAG(S));
@@ -794,16 +802,26 @@ static int schur_action(scalar *y, const struct schur *schur, scalar *x,
   uint mn = ln > in ? ln : in;
   scalar *xl = (scalar *)tcalloc(scalar, 2 * mn), *exl = xl + mn;
 
+  metric_tic(c, SCHUR_PROJECT_OPERATOR_FXI);
   // Calculate (E (B^-1) F) x
   // Fx: x has size in, Fx has size ln. So wrk has to be at least ln
   Fxi(exl, &schur->A_ls, schur->Q_ls, x, ls, in, bfr);
+  metric_toc(c, SCHUR_PROJECT_OPERATOR_FXI);
+
+  metric_tic(c, SCHUR_PROJECT_OPERATOR_CHOL);
   // Multiply Fx by B^-1 or (LU)^-1
   cholesky_solve(xl, &schur->A_ll, exl);
+  metric_toc(c, SCHUR_PROJECT_OPERATOR_CHOL);
+
+  metric_tic(c, SCHUR_PROJECT_OPERATOR_EZL);
   // Multuply (B^-1)Fx by E
   Ezl(exl, &schur->A_sl, schur->Q_sl, xl, ls, in, bfr);
+  metric_toc(c, SCHUR_PROJECT_OPERATOR_EZL);
 
+  metric_tic(c, SCHUR_PROJECT_OPERATOR_MATVEC);
   // Separately calculate Sx
   mat_vec_csr(y, x, S, schur->Q_ss, wrk, bfr);
+  metric_toc(c, SCHUR_PROJECT_OPERATOR_MATVEC);
 
   for (uint i = 0; i < in; i++)
     y[i] -= exl[i];
@@ -854,15 +872,13 @@ static int project(scalar *x, scalar *b, const struct schur *schur, ulong ls,
   for (i = 0; i < n; i++)
     p[i] = z[i];
 
-  double t;
   scalar alpha, beta, rzt, rz2;
   uint j, k;
   for (i = 0; i < miter; i++) {
     // Action of S - E (LU)^-1 F
-    comm_barrier(c);
-    t = comm_time();
-    schur_action(w, schur, p, ls, wrk, bfr);
-    metric_acc(SCHUR_PROJECT_OPERATOR, comm_time() - t);
+    metric_tic(c, SCHUR_PROJECT_OPERATOR);
+    schur_action(w, schur, p, ls, wrk, bfr, c);
+    metric_toc(c, SCHUR_PROJECT_OPERATOR);
 
     scalar pw = dot(p, w, n);
     comm_allreduce(c, gs_double, gs_add, &pw, 1, buf);
@@ -887,10 +903,15 @@ static int project(scalar *x, scalar *b, const struct schur *schur, ulong ls,
     for (j = 0; j < n; j++)
       z0[j] = z[j];
 
-    comm_barrier(c);
-    t = comm_time();
+    metric_tic(c, SCHUR_PROJECT_PRECOND);
+#if 1
     mg_vcycle(z, r, d, c, bfr);
-    metric_acc(SCHUR_PROJECT_PRECOND, comm_time() - t);
+#else
+    for (j = 0; j < n; j++)
+      z[j] = r[j];
+#endif
+    metric_toc(c, SCHUR_PROJECT_PRECOND);
+
     if (null_space)
       ortho(z, n, ng, c);
     for (j = 0; j < n; j++)
@@ -1169,40 +1190,9 @@ int schur_solve(scalar *x, struct coarse *crs, scalar *b, scalar tol,
     zl[ln - 1] = 0;
   metric_toc(c, SCHUR_SOLVE_CHOL1);
 
-#if 0
-  comm_barrier(c);
-  for (uint p = 0; p < c->np; p++) {
-    if (p == c->id) {
-      printf("\np = %u zl = ", p);
-      for (uint i = 0; i < ln; i++) {
-        printf("%lf ", zl[i]);
-        fflush(stdout);
-      }
-      printf("\n");
-    }
-    comm_barrier(c);
-  }
-#endif
-
   metric_tic(c, SCHUR_SOLVE_SETRHS1);
   // Solve: A_ss x_i = fi where fi = r_i - E zl
   Ezl(rhs, &schur->A_sl, schur->Q_sl, zl, crs->s[0], in, bfr);
-
-#if 0
-  comm_barrier(c);
-  for (uint p = 0; p < c->np; p++) {
-    if (p == c->id) {
-      printf("\np = %u Ezl = ", p);
-      for (uint i = 0; i < in; i++) {
-        printf("%lf ", rhs[i]);
-        fflush(stdout);
-      }
-      printf("\n");
-    }
-    comm_barrier(c);
-  }
-#endif
-
   for (uint i = 0; i < in; i++)
     rhs[i] = b[ln + i] - rhs[i];
   metric_toc(c, SCHUR_SOLVE_SETRHS1);
