@@ -359,7 +359,7 @@ static void resolve_interface_ids(struct array *points, struct comm *c) {
   for (unsigned i = 0; i < nlvls; i++) {
     // find the bounding box
     // find the interface nodes
-    comm_init(&t, c);
+    comm_dup(&t, c);
     // resolve interface nodes
     comm_free(&t);
     part /= 2;
