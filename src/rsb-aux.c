@@ -263,14 +263,14 @@ static void check_rsb_partition(struct comm *gc, parrsb_options *opts) {
     }
 
     sint ibfr;
+    double dbfr;
     comm_allreduce(gc, gs_int, gs_min, &converged, 1, &ibfr);
-
     if (converged == 0) {
       if (opts->rsb_algo == 0) {
-        double final = (double)metric_get_value(i, TOL_FNL), dbfr;
+        double final = metric_get_value(i, TOL_FNL);
         comm_allreduce(gc, gs_double, gs_min, &final, 1, &dbfr);
 
-        double target = (double)metric_get_value(i, TOL_TGT);
+        double target = metric_get_value(i, TOL_TGT);
         comm_allreduce(gc, gs_double, gs_min, &target, 1, &dbfr);
 
         if (gc->id == 0) {
@@ -289,8 +289,8 @@ static void check_rsb_partition(struct comm *gc, parrsb_options *opts) {
       }
     }
 
-    sint ncomps, minc, maxc;
-    ncomps = minc = maxc = (sint)metric_get_value(i, RSB_COMPONENTS);
+    sint minc, maxc;
+    minc = maxc = (sint)metric_get_value(i, RSB_COMPONENTS);
     comm_allreduce(gc, gs_int, gs_min, &minc, 1, &ibfr);
     comm_allreduce(gc, gs_int, gs_max, &maxc, 1, &ibfr);
 
