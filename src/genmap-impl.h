@@ -40,6 +40,8 @@ struct rcb_element {
   scalar coord[MAXDIM], fiedler;
 };
 
+int rcb(struct array *elements, size_t unit_size, int ndim, struct comm *c,
+        buffer *bfr);
 int rib(struct array *elements, size_t unit_size, int ndim, struct comm *c,
         buffer *bfr);
 

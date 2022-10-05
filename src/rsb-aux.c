@@ -4,21 +4,75 @@
 #include <limits.h>
 #include <time.h>
 
-extern int rcb(struct array *elements, size_t unit_size, int ndim,
-               struct comm *c, buffer *bfr);
+static unsigned disconnected = 0;
+
 extern int fiedler(struct array *elements, int nv, parrsb_options *options,
                    struct comm *gsc, buffer *buf, int verbose);
-
 extern uint get_components(sint *component, struct rsb_element *elements,
                            struct comm *c, buffer *buf, uint nelt, uint nv);
 extern uint get_components_v2(sint *component, uint nelt, unsigned nv,
                               struct rsb_element *elements,
                               const struct comm *ci, buffer *bfr);
 
-// Check the bin value
-static int check_bin_val(int bin, struct comm *gc) {
+static void check_rsb_partition(struct comm *gc, parrsb_options *opts) {
+  int max_levels = log2ll(gc->np);
+  int miter = opts->rsb_max_iter, mpass = opts->rsb_lanczos_max_restarts;
+
+  for (int i = 0; i < max_levels; i++) {
+    sint converged = 1;
+    int val = (int)metric_get_value(i, RSB_FIEDLER_CALC_NITER);
+    if (opts->rsb_algo == 0) {
+      if (val == miter * mpass)
+        converged = 0;
+    } else if (opts->rsb_algo == 1) {
+      if (val == mpass)
+        converged = 0;
+    }
+
+    sint ibfr;
+    double dbfr;
+    comm_allreduce(gc, gs_int, gs_min, &converged, 1, &ibfr);
+    if (converged == 0) {
+      if (opts->rsb_algo == 0) {
+        double final = metric_get_value(i, TOL_FNL);
+        comm_allreduce(gc, gs_double, gs_min, &final, 1, &dbfr);
+
+        double target = metric_get_value(i, TOL_TGT);
+        comm_allreduce(gc, gs_double, gs_min, &target, 1, &dbfr);
+
+        if (gc->id == 0) {
+          printf("Warning: Lanczos only reached a tolerance of %lf given %lf "
+                 "after %d x %d iterations in Level=%d!\n",
+                 final, target, mpass, miter, i);
+          fflush(stdout);
+        }
+      } else if (opts->rsb_algo == 1) {
+        if (gc->id == 0) {
+          printf("Warning: Inverse iteration didn't converge after %d "
+                 "iterations in Level = %d\n",
+                 mpass, i);
+          fflush(stdout);
+        }
+      }
+    }
+
+    sint minc, maxc;
+    minc = maxc = (sint)metric_get_value(i, RSB_COMPONENTS);
+    comm_allreduce(gc, gs_int, gs_min, &minc, 1, &ibfr);
+    comm_allreduce(gc, gs_int, gs_max, &maxc, 1, &ibfr);
+
+    if (maxc > 1 && gc->id == 0) {
+      printf("Warning: Partition created %d/%d (min/max) disconnected "
+             "components in Level=%d!\n",
+             minc, maxc, i);
+      fflush(stdout);
+    }
+  }
+}
+
+static int check_bin_val(int bin, struct comm *c) {
   if (bin < 0 || bin > 1) {
-    if (gc->id == 0) {
+    if (c->id == 0) {
       printf("%s:%d bin value out of range: %d\n", __FILE__, __LINE__, bin);
       fflush(stdout);
     }
@@ -140,167 +194,35 @@ int balance_partitions(struct array *elements, int nv, struct comm *lc,
   gs_free(gsh);
 }
 
-int repair_partitions(struct array *elements, int nv, struct comm *tc,
-                      struct comm *lc, int bin, struct comm *gc, buffer *bfr) {
-  assert(check_bin_val(bin, gc) == 0);
+int repair_partitions_v2(struct array *elements, int nv, struct comm *tc,
+                         struct comm *lc, int bin, unsigned algo, buffer *bfr) {
+  assert(check_bin_val(bin, lc) == 0);
 
-  uint nelt = elements->n;
+  uint ne = elements->n;
+  struct rsb_element *pe = (struct rsb_element *)elements->ptr;
 
-  struct rsb_element *e = elements->ptr;
-  sint *cmpids = tcalloc(sint, nelt);
+  sint ncomp = get_components_v2(NULL, ne, nv, pe, tc, bfr), ibuf;
+  comm_allreduce(lc, gs_int, gs_add, &ncomp, 1, &ibuf);
 
-  int old_repair = 0;
-  sint ncomp;
-  if (old_repair)
-    ncomp = get_components(cmpids, e, tc, bfr, nelt, nv);
-  else
-    ncomp = get_components_v2(cmpids, nelt, nv, e, tc, bfr);
-
-  slong ncompg = ncomp, buf;
-  comm_allreduce(lc, gs_long, gs_max, &ncompg, 1, &buf);
-
-  sint root = (lc->id == 0) * gc->id;
-  comm_allreduce(lc, gs_int, gs_max, &root, 1, &buf);
-
-  int attempt = 0;
-  int nattempts = 1;
-
-  while (ncompg > 1 && attempt < nattempts) {
-    slong *cmpcnt = tcalloc(slong, 3 * ncomp);
-
-    uint i;
-    for (i = 0; i < nelt; i++)
-      cmpcnt[cmpids[i]]++;
-
-    for (i = 0; i < ncomp; i++)
-      cmpcnt[ncomp + i] = cmpcnt[i];
-
-    comm_allreduce(tc, gs_long, gs_add, &cmpcnt[ncomp], ncomp,
-                   &cmpcnt[2 * ncomp]);
-
-    slong mincnt = LONG_MAX;
-    sint minid = -1;
-    for (i = 0; i < ncomp; i++) {
-      if (cmpcnt[ncomp + i] < mincnt) {
-        mincnt = cmpcnt[ncomp + i];
-        minid = i;
-      }
-    }
-
-    slong mincntg = mincnt;
-    comm_allreduce(lc, gs_long, gs_min, &mincntg, 1, &buf);
-
-    /* bin is the tie breaker */
-    sint min_bin = (mincntg == mincnt) ? bin : INT_MAX;
-    comm_allreduce(lc, gs_int, gs_min, &min_bin, 1, &buf);
-
-    e = elements->ptr;
-    for (i = 0; i < nelt; i++)
-      e[i].proc = lc->id;
-
-    sint low_np = (lc->np + 1) / 2;
-    sint high_np = lc->np - low_np;
-    sint start = (1 - bin) * low_np;
-    sint P = bin * low_np + (1 - bin) * high_np;
-    slong size = (mincntg + P - 1) / P;
-
-    if (mincntg == mincnt && min_bin == bin) {
-      slong in = cmpcnt[minid];
-      slong out[2][1], buff[2][1];
-      comm_scan(out, tc, gs_long, gs_add, &in, 1, buff);
-      slong off = out[0][0];
-
-      for (i = 0; i < nelt; i++) {
-        if (cmpids[i] == minid) {
-          e[i].proc = start + off / size;
-          off++;
-        }
-      }
-    }
-
+  if (ncomp > 1) {
+    // If ncomp > 1, send elements back and do RCBx, RCBy and RCBz
     struct crystal cr;
     crystal_init(&cr, lc);
     sarray_transfer(struct rsb_element, elements, proc, 0, &cr);
     crystal_free(&cr);
 
-    attempt++;
+    // do rcb or rib
 
-    /* Do a load balanced sort in each partition */
-    parallel_sort(struct rsb_element, elements, fiedler, gs_double, 0, 1, tc,
-                  bfr);
-
-    nelt = elements->n;
-    cmpids = trealloc(sint, cmpids, nelt);
-
-    if (old_repair)
-      ncomp = get_components(cmpids, elements->ptr, tc, bfr, nelt, nv);
-    else
-      ncomp = get_components_v2(cmpids, nelt, nv, elements->ptr, tc, bfr);
-
-    ncompg = ncomp;
-    comm_allreduce(lc, gs_long, gs_max, &ncompg, 1, &buf);
-
-    free(cmpcnt);
+    pe = (struct rsb_element *)elements->ptr;
+    ncomp = get_components_v2(NULL, ne, nv, pe, tc, bfr);
+    comm_allreduce(lc, gs_int, gs_add, &ncomp, 1, &ibuf);
+    if (ncomp > 1) {
+      // if ncomp > 1 still, set disconnected = 1
+      disconnected = 1;
+    }
   }
-
-  free(cmpids);
 
   return 0;
-}
-static void check_rsb_partition(struct comm *gc, parrsb_options *opts) {
-  int max_levels = log2ll(gc->np);
-  int miter = opts->rsb_max_iter, mpass = opts->rsb_lanczos_max_restarts;
-
-  for (int i = 0; i < max_levels; i++) {
-    sint converged = 1;
-    int val = (int)metric_get_value(i, RSB_FIEDLER_CALC_NITER);
-    if (opts->rsb_algo == 0) {
-      if (val == miter * mpass)
-        converged = 0;
-    } else if (opts->rsb_algo == 1) {
-      if (val == mpass)
-        converged = 0;
-    }
-
-    sint ibfr;
-    double dbfr;
-    comm_allreduce(gc, gs_int, gs_min, &converged, 1, &ibfr);
-    if (converged == 0) {
-      if (opts->rsb_algo == 0) {
-        double final = metric_get_value(i, TOL_FNL);
-        comm_allreduce(gc, gs_double, gs_min, &final, 1, &dbfr);
-
-        double target = metric_get_value(i, TOL_TGT);
-        comm_allreduce(gc, gs_double, gs_min, &target, 1, &dbfr);
-
-        if (gc->id == 0) {
-          printf("Warning: Lanczos only reached a tolerance of %lf given %lf "
-                 "after %d x %d iterations in Level=%d!\n",
-                 final, target, mpass, miter, i);
-          fflush(stdout);
-        }
-      } else if (opts->rsb_algo == 1) {
-        if (gc->id == 0) {
-          printf("Warning: Inverse iteration didn't converge after %d "
-                 "iterations in Level = %d\n",
-                 mpass, i);
-          fflush(stdout);
-        }
-      }
-    }
-
-    sint minc, maxc;
-    minc = maxc = (sint)metric_get_value(i, RSB_COMPONENTS);
-    comm_allreduce(gc, gs_int, gs_min, &minc, 1, &ibfr);
-    comm_allreduce(gc, gs_int, gs_max, &maxc, 1, &ibfr);
-
-    if (maxc > 1 && gc->id == 0) {
-      printf("Warning: Partition created %d/%d (min/max) disconnected "
-             "components in Level=%d!\n",
-             minc, maxc, i);
-      fflush(stdout);
-    }
-  }
 }
 
 static void get_part(sint *np, sint *nid, int two_lvl, struct comm *lc,
@@ -317,10 +239,13 @@ static void get_part(sint *np, sint *nid, int two_lvl, struct comm *lc,
 
 int rsb(struct array *elements, int nv, int check, parrsb_options *options,
         struct comm *gc, buffer *bfr) {
-  struct comm lc, tc;
-  comm_dup(&lc, gc);
+  // `gc` is the global communicator. We make a duplicate of it in `lc` and
+  // keep splitting it. `nc` is the communicator for the two level partitioning.
+  struct comm lc, nc;
 
-  struct comm nc;
+  // Duplicate the global communicator to `lc`
+  comm_dup(&lc, gc);
+  // Initialize `nc` based on `lc`
   if (options->two_level) {
 #ifdef MPI
     MPI_Comm node;
@@ -333,6 +258,7 @@ int rsb(struct array *elements, int nv, int check, parrsb_options *options,
 #endif
   }
 
+  // Get number of partitions we are going to perform RSB on first level
   sint np, nid;
   get_part(&np, &nid, options->two_level, &lc, &nc);
   if (options->two_level && options->verbose_level) {
@@ -343,7 +269,7 @@ int rsb(struct array *elements, int nv, int check, parrsb_options *options,
 
   unsigned ndim = (nv == 8) ? 3 : 2;
   while (np > 1) {
-    // Run RCB, RIB pre-step or just sort by global id
+    // Run RCB, RIB or just sort by global id
     metric_tic(&lc, RSB_PRE);
     switch (options->rsb_pre) {
     case 0: // Sort by global id

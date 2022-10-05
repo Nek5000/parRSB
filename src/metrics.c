@@ -101,8 +101,10 @@ void metric_rsb_print(struct comm *c, int profile_level) {
       printf("    RSB_FIEDLER_CALC_NITER   : %e/%e/%e\n",
              SUMMARY(i, RSB_FIEDLER_CALC_NITER));
       printf("  RSB_SORT                   : %e/%e/%e\n", SUMMARY(i, RSB_SORT));
-      printf("  RSB_REPAIR_BALANCE         : %e/%e/%e\n",
-             SUMMARY(i, RSB_REPAIR_BALANCE));
+      printf("  RSB_REPAIR                 : %e/%e/%e\n",
+             SUMMARY(i, RSB_REPAIR));
+      printf("  RSB_BALANCE                : %e/%e/%e\n",
+             SUMMARY(i, RSB_BALANCE));
     }
   }
 

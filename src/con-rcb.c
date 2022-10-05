@@ -172,8 +172,8 @@ static void rcb_local(struct array *points, uint s, uint e, unsigned nd,
   }
 }
 
-static void rcb(struct array *points, unsigned nd, struct crystal *cr,
-                buffer *bfr) {
+static void rcb1(struct array *points, unsigned nd, struct crystal *cr,
+                 buffer *bfr) {
   struct comm *ci = &cr->comm;
   struct comm c, t;
 
@@ -477,7 +477,7 @@ int parrsb_conn_rcb_mesh(long long *vtx, double *xyz, int nelt, int ndim,
 
   genmap_barrier(&c);
   t = comm_time();
-  rcb(&points, ndim, &cr, &bfr);
+  rcb1(&points, ndim, &cr, &bfr);
   duration[2] = comm_time() - t;
 
   genmap_barrier(&c);
