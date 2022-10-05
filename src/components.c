@@ -7,8 +7,11 @@
 #include <time.h>
 
 // Find the number of disconnected components
-uint get_components(sint *component, struct rsb_element *elements,
-                    struct comm *c, buffer *buf, uint nelt, uint nv) {
+uint get_components(sint *component, struct array *elems, unsigned nv,
+                    struct comm *c, buffer *buf) {
+  uint nelt = elems->n;
+  struct rsb_element *pe = (struct rsb_element *)elems->ptr;
+
   struct unmarked {
     uint index;
   };
@@ -39,7 +42,7 @@ uint get_components(sint *component, struct rsb_element *elements,
   uint d, count = 0;
   slong nnz1, nnzg, nnzg0, nnzb, nmarked = 0;
   do {
-    // count unmarked elements
+    // Count unmarked elements
     arr.n = 0;
     for (e = 0; e < nelt; e++) {
       if (component[e] == -1) {
@@ -71,7 +74,7 @@ uint get_components(sint *component, struct rsb_element *elements,
       // Setup gs
       for (e = 0; e < arr.n; e++)
         for (d = 0; d < nv; d++)
-          ids[e * nv + d] = elements[ptr[e].index].vertices[d];
+          ids[e * nv + d] = pe[ptr[e].index].vertices[d];
 
       struct gs_data *gsh = gs_setup(ids, arr.n * nv, &cc, 0, gs_pairwise, 0);
 
@@ -158,9 +161,11 @@ static sint find_or_insert(struct array *cids, struct cmp_t *t) {
   return -1;
 }
 
-uint get_components_v2(sint *component, uint nelt, unsigned nv,
-                       struct rsb_element *elements, const struct comm *ci,
-                       buffer *bfr) {
+uint get_components_v2(sint *component, struct array *elems, unsigned nv,
+                       const struct comm *ci, buffer *bfr) {
+  uint nelt = elems->n;
+  struct rsb_element *pe = (struct rsb_element *)elems->ptr;
+
   slong out[2][1], wrk[2][1], in = nelt;
   comm_scan(out, ci, gs_long, gs_add, &in, 1, wrk);
   ulong nelg = out[1][0], start = out[0][0];
@@ -169,7 +174,7 @@ uint get_components_v2(sint *component, uint nelt, unsigned nv,
     return 0;
 
   uint nev = nelt * nv;
-  sint *p = tcalloc(sint, nev);
+  sint *p0 = tcalloc(sint, 2 * nev), *p = p0 + nev;
   slong *ids = tcalloc(slong, nev);
   uint *inds = tcalloc(uint, nev);
 
@@ -187,14 +192,12 @@ uint get_components_v2(sint *component, uint nelt, unsigned nv,
     uint unmkd = 0;
     for (uint e = 0; e < nelt; e++) {
       if (component[e] == -1) {
-        assert(unmkd >= 0 && unmkd < nelt);
         inds[unmkd] = e;
         for (uint v = 0; v < nv; v++)
-          ids[unmkd * nv + v] = elements[e].vertices[v];
+          ids[unmkd * nv + v] = pe[e].vertices[v];
         unmkd++;
       }
     }
-    assert(unmkd <= nelt);
 
     int bin = (unmkd > 0);
     comm_split(ci, bin, ci->id, &c);
@@ -213,30 +216,41 @@ uint get_components_v2(sint *component, uint nelt, unsigned nv,
         for (uint v = 0; v < nv; v++)
           p[e * nv + v] = -1;
 
+      sint changed;
       do {
-        nnzg0 = nnzg, nnzg = 0;
+        for (uint i = 0; i < unmkd * nv; i++)
+          p0[i] = p[i];
 
         gs(p, gs_int, gs_max, 0, gsh, bfr);
 
+        sint nnz = 0;
+        changed = 0;
         for (uint e = 0; e < unmkd; e++) {
-          uint v = 0;
-          for (; v < nv; v++) {
+          sint v0 = -1;
+          for (uint v = 0; v < nv; v++) {
+            if (p[e * nv + v] != p0[e * nv + v])
+              changed = 1;
             if (p[e * nv + v] > -1) {
-              nnzg++;
-              break;
+              nnz++;
+              if (v0 == -1)
+                v0 = v;
+              else if (p[e * nv + v0] < p[e * nv + v])
+                v0 = v;
             }
           }
 
           // There was one non-zero vertex in the element
-          if (v < nv) {
-            sint c = p[e * nv + v];
-            for (v = 0; v < nv; v++)
+          if (v0 > -1) {
+            sint c = p[e * nv + v0];
+            for (uint v = 0; v < nv; v++)
               p[e * nv + v] = c;
           }
         }
 
+        nnzg0 = nnzg, nnzg = nnz;
         comm_allreduce(&c, gs_long, gs_add, &nnzg, 1, wrk);
-      } while (nnzg0 < nnzg);
+        comm_allreduce(&c, gs_int, gs_add, &changed, 1, wrk);
+      } while (changed);
       gs_free(gsh);
 
       // Find unique local components and then use them to find unique
@@ -307,7 +321,7 @@ uint get_components_v2(sint *component, uint nelt, unsigned nv,
     nc += ncg;
   } while (nmkd < nelg);
 
-  free(p), free(ids), free(inds);
+  free(p0), free(ids), free(inds);
   if (null_input == 1)
     free(component);
 

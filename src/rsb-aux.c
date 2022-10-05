@@ -8,8 +8,9 @@ static unsigned disconnected = 0;
 
 extern int fiedler(struct array *elements, int nv, parrsb_options *options,
                    struct comm *gsc, buffer *buf, int verbose);
-extern uint get_components_v2(sint *component, uint nelt, unsigned nv,
-                              struct rsb_element *elements,
+extern uint get_components(sint *component, struct array *elems, unsigned nv,
+                           struct comm *c, buffer *buf);
+extern uint get_components_v2(sint *component, struct array *elems, unsigned nv,
                               const struct comm *ci, buffer *bfr);
 
 static void check_rsb_partition(struct comm *gc, parrsb_options *opts) {
@@ -102,7 +103,7 @@ int balance_partitions(struct array *elements, int nv, struct comm *lc,
   // Setup gather-scatter
   uint size = ne * nv, e, v;
   slong *ids = tcalloc(slong, size);
-  struct rsb_element *elems = (struct rsb_elment *)elements->ptr;
+  struct rsb_element *elems = (struct rsb_element *)elements->ptr;
   for (e = 0; e < ne; e++) {
     for (v = 0; v < nv; v++)
       ids[e * nv + v] = elems[e].vertices[v];
@@ -199,9 +200,8 @@ int repair_partitions_v2(struct array *elems, unsigned nv, struct comm *tc,
   assert(check_bin_val(bin, lc) == 0);
 
   sint ibuf;
-  sint nc = get_components_v2(NULL, elems->n, nv,
-                              (struct rsb_element *)elems->ptr, tc, bfr);
-  comm_allreduce(lc, gs_int, gs_add, &nc, 1, &ibuf);
+  sint nc = get_components_v2(NULL, elems, nv, tc, bfr);
+  comm_allreduce(lc, gs_int, gs_max, &nc, 1, &ibuf);
   if (nc > 1) {
     // If nc > 1, send elements back and do RCBx, RCBy and RCBz
     struct crystal cr;
@@ -228,9 +228,8 @@ int repair_partitions_v2(struct array *elems, unsigned nv, struct comm *tc,
 
     // And count number of components again. If nc > 1 still, set
     // isconnected = 1
-    nc = get_components_v2(NULL, elems->n, nv, (struct rsb_element *)elems->ptr,
-                           tc, bfr);
-    comm_allreduce(lc, gs_int, gs_add, &nc, 1, &ibuf);
+    nc = get_components_v2(NULL, elems, nv, tc, bfr);
+    comm_allreduce(lc, gs_int, gs_max, &nc, 1, &ibuf);
     if (nc > 1)
       disconnected = 1;
   }
@@ -324,7 +323,7 @@ int rsb(struct array *elements, int nv, int check, parrsb_options *options,
       if (options->repair)
         repair_partitions_v2(elements, nv, &tc, &lc, bin, options->rsb_pre,
                              bfr);
-      metric_tic(&lc, RSB_REPAIR);
+      metric_toc(&lc, RSB_REPAIR);
     }
 
     // Bisect and balance
