@@ -92,22 +92,23 @@ int balance_partitions(struct array *elements, int nv, struct comm *lc,
   };
 
   // Calculate expected # of elements per processor
-  uint nelt = elements->n;
-  slong nelgt = nelt, nglob = nelt, buf;
-  comm_allreduce(lc, gs_long, gs_add, &nelgt, 1, &buf);
-  comm_allreduce(gc, gs_long, gs_add, &nglob, 1, &buf);
+  uint ne = elements->n;
+  slong nelgt = ne, nglob = ne, wrk;
+  comm_allreduce(lc, gs_long, gs_add, &nelgt, 1, &wrk);
+  comm_allreduce(gc, gs_long, gs_add, &nglob, 1, &wrk);
 
-  sint nelt_ = nglob / gc->np, nrem = nglob - nelt_ * gc->np;
-  slong nelgt_exp = nelt_ * lc->np + nrem / 2 + (nrem % 2) * (1 - bin);
+  sint ne_ = nglob / gc->np, nrem = nglob - ne_ * gc->np;
+  slong nelgt_exp = ne_ * lc->np + nrem / 2 + (nrem % 2) * (1 - bin);
   slong send_cnt = nelgt - nelgt_exp > 0 ? nelgt - nelgt_exp : 0;
 
   // Setup gather-scatter
-  uint size = nelt * nv, e, v;
+  uint size = ne * nv, e, v;
   slong *ids = tcalloc(slong, size);
-  struct rsb_element *elems = elements->ptr;
-  for (e = 0; e < nelt; e++)
+  struct rsb_element *elems = (struct rsb_elment *)elements->ptr;
+  for (e = 0; e < ne; e++) {
     for (v = 0; v < nv; v++)
       ids[e * nv + v] = elems[e].vertices[v];
+  }
   struct gs_data *gsh = gs_setup(ids, size, gc, 0, gs_pairwise, 0);
 
   sint *input = (sint *)ids;
@@ -120,11 +121,11 @@ int balance_partitions(struct array *elements, int nv, struct comm *lc,
 
   gs(input, gs_int, gs_add, 0, gsh, bfr);
 
-  for (e = 0; e < nelt; e++)
+  for (e = 0; e < ne; e++)
     elems[e].proc = gc->id;
 
   sint sid = (send_cnt == 0) ? gc->id : INT_MAX, balanced = 0;
-  comm_allreduce(gc, gs_int, gs_min, &sid, 1, &buf);
+  comm_allreduce(gc, gs_int, gs_min, &sid, 1, &wrk);
 
   struct crystal cr;
 
@@ -134,8 +135,8 @@ int balance_partitions(struct array *elements, int nv, struct comm *lc,
 
     struct ielem_t ielem = {
         .index = 0, .orig = lc->id, .dest = -1, .fiedler = 0};
-    int mul = sid == 0 ? 1 : -1;
-    for (e = 0; e < nelt; e++) {
+    int mul = (sid == 0) ? 1 : -1;
+    for (e = 0; e < ne; e++) {
       for (v = 0; v < nv; v++) {
         if (input[e * nv + v] > 0) {
           ielem.index = e, ielem.fiedler = mul * elems[e].fiedler;
@@ -174,7 +175,7 @@ int balance_partitions(struct array *elements, int nv, struct comm *lc,
     array_free(&ielems);
   }
 
-  comm_allreduce(gc, gs_int, gs_max, &balanced, 1, &buf);
+  comm_allreduce(gc, gs_int, gs_max, &balanced, 1, &wrk);
   if (balanced == 1) {
     crystal_init(&cr, gc);
     sarray_transfer(struct rsb_element, elements, proc, 0, &cr);
@@ -184,7 +185,7 @@ int balance_partitions(struct array *elements, int nv, struct comm *lc,
     parallel_sort(struct rsb_element, elements, fiedler, gs_double, 0, 1, lc,
                   bfr);
   } else {
-    // Forget repair, just do a load balanced partition
+    // Forget about disconnected components, just do a load balanced partition
     // TODO: Need to change how parallel_sort load balance
     parallel_sort(struct rsb_element, elements, fiedler, gs_double, 0, 1, gc,
                   bfr);
