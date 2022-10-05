@@ -8,8 +8,6 @@ static unsigned disconnected = 0;
 
 extern int fiedler(struct array *elements, int nv, parrsb_options *options,
                    struct comm *gsc, buffer *buf, int verbose);
-extern uint get_components(sint *component, struct rsb_element *elements,
-                           struct comm *c, buffer *buf, uint nelt, uint nv);
 extern uint get_components_v2(sint *component, uint nelt, unsigned nv,
                               struct rsb_element *elements,
                               const struct comm *ci, buffer *bfr);
@@ -195,32 +193,46 @@ int balance_partitions(struct array *elements, int nv, struct comm *lc,
   gs_free(gsh);
 }
 
-int repair_partitions_v2(struct array *elements, int nv, struct comm *tc,
-                         struct comm *lc, int bin, unsigned algo, buffer *bfr) {
+int repair_partitions_v2(struct array *elems, unsigned nv, struct comm *tc,
+                         struct comm *lc, unsigned bin, unsigned algo,
+                         buffer *bfr) {
   assert(check_bin_val(bin, lc) == 0);
 
-  uint ne = elements->n;
-  struct rsb_element *pe = (struct rsb_element *)elements->ptr;
-
-  sint ncomp = get_components_v2(NULL, ne, nv, pe, tc, bfr), ibuf;
-  comm_allreduce(lc, gs_int, gs_add, &ncomp, 1, &ibuf);
-
-  if (ncomp > 1) {
-    // If ncomp > 1, send elements back and do RCBx, RCBy and RCBz
+  sint ibuf;
+  sint nc = get_components_v2(NULL, elems->n, nv,
+                              (struct rsb_element *)elems->ptr, tc, bfr);
+  comm_allreduce(lc, gs_int, gs_add, &nc, 1, &ibuf);
+  if (nc > 1) {
+    // If nc > 1, send elements back and do RCBx, RCBy and RCBz
     struct crystal cr;
     crystal_init(&cr, lc);
-    sarray_transfer(struct rsb_element, elements, proc, 0, &cr);
+    sarray_transfer(struct rsb_element, elems, proc, 0, &cr);
     crystal_free(&cr);
 
-    // do rcb or rib
-
-    pe = (struct rsb_element *)elements->ptr;
-    ncomp = get_components_v2(NULL, ne, nv, pe, tc, bfr);
-    comm_allreduce(lc, gs_int, gs_add, &ncomp, 1, &ibuf);
-    if (ncomp > 1) {
-      // if ncomp > 1 still, set disconnected = 1
-      disconnected = 1;
+    // Do rcb or rib
+    unsigned ndim = (nv == 8) ? 3 : 2;
+    switch (algo) {
+    case 0:
+      parallel_sort(struct rsb_element, elems, globalId, gs_long, 0, 1, lc,
+                    bfr);
+      break;
+    case 1:
+      rcb(elems, sizeof(struct rsb_element), ndim, lc, bfr);
+      break;
+    case 2:
+      rib(elems, sizeof(struct rsb_element), ndim, lc, bfr);
+      break;
+    default:
+      break;
     }
+
+    // And count number of components again. If nc > 1 still, set
+    // isconnected = 1
+    nc = get_components_v2(NULL, elems->n, nv, (struct rsb_element *)elems->ptr,
+                           tc, bfr);
+    comm_allreduce(lc, gs_int, gs_add, &nc, 1, &ibuf);
+    if (nc > 1)
+      disconnected = 1;
   }
 
   return 0;
@@ -288,29 +300,40 @@ int rsb(struct array *elements, int nv, int check, parrsb_options *options,
     }
     metric_toc(&lc, RSB_PRE);
 
-    // Run fiedler
-    metric_tic(&lc, RSB_FIEDLER);
-    fiedler(elements, nv, options, &lc, bfr, gc->id == 0);
-    metric_toc(&lc, RSB_FIEDLER);
-
-    // Sort by Fiedler vector
-    metric_tic(&lc, RSB_SORT);
-    parallel_sort_2(struct rsb_element, elements, fiedler, gs_double, globalId,
-                    gs_long, 0, 1, &lc, bfr);
-    metric_toc(&lc, RSB_SORT);
-
-    // Bisect, repair and balance
-    metric_tic(&lc, RSB_REPAIR_BALANCE);
-    int bin = (nid >= (np + 1) / 2);
+    // Run fiedler if there are no disconnected components
+    unsigned bin = (nid >= (np + 1) / 2);
+    struct comm tc;
     comm_split(&lc, bin, lc.id, &tc);
-    if (options->repair > 0)
-      repair_partitions(elements, nv, &tc, &lc, bin, gc, bfr);
-    balance_partitions(elements, nv, &tc, &lc, bin, bfr);
-    metric_toc(&lc, RSB_REPAIR_BALANCE);
 
+    if (!disconnected) {
+      struct rsb_element *pe = (struct rsb_element *)elements->ptr;
+      for (unsigned i = 0; i < elements->n; i++)
+        pe[i].proc = lc.id;
+
+      metric_tic(&lc, RSB_FIEDLER);
+      fiedler(elements, nv, options, &lc, bfr, gc->id == 0);
+      metric_toc(&lc, RSB_FIEDLER);
+
+      // Sort by Fiedler vector
+      metric_tic(&lc, RSB_SORT);
+      parallel_sort_2(struct rsb_element, elements, fiedler, gs_double,
+                      globalId, gs_long, 0, 1, &lc, bfr);
+      metric_toc(&lc, RSB_SORT);
+
+      metric_tic(&lc, RSB_REPAIR);
+      if (options->repair)
+        repair_partitions_v2(elements, nv, &tc, &lc, bin, options->rsb_pre,
+                             bfr);
+      metric_tic(&lc, RSB_REPAIR);
+    }
+
+    // Bisect and balance
+    metric_tic(&lc, RSB_BALANCE);
+    balance_partitions(elements, nv, &tc, &lc, bin, bfr);
     comm_free(&lc);
     comm_dup(&lc, &tc);
     comm_free(&tc);
+    metric_toc(&lc, RSB_BALANCE);
 
     get_part(&np, &nid, options->two_level, &lc, &nc);
     metric_push_level();
