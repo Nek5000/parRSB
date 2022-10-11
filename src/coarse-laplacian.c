@@ -194,8 +194,14 @@ static void number_dual_graph_dofs(ulong *dofs, struct coarse *crs, uint n,
 struct coarse *coarse_setup(unsigned n, unsigned nc, const long long *vl,
                             const scalar *coord, unsigned null_space,
                             unsigned type, struct comm *c) {
+  comm_barrier(c);
+  double tcrs = comm_time();
+
+  // crs->un is the user vector size.
   struct coarse *crs = tcalloc(struct coarse, 1);
-  crs->type = type, crs->null_space = null_space, crs->un = n;
+  crs->null_space = null_space, crs->type = type, crs->un = n;
+  for (unsigned i = 0; i < 3; i++)
+    crs->ng[i] = crs->s[i] = crs->n[i] = 0;
 
   // Setup the buffer and duplicate the communicator.
   buffer_init(&crs->bfr, 1024);
@@ -208,15 +214,14 @@ struct coarse *coarse_setup(unsigned n, unsigned nc, const long long *vl,
 
   ulong *nid = tcalloc(ulong, n);
   unsigned ndim = (nc == 8) ? 3 : 2;
-  number_dual_graph_dofs(nid, crs, size, tid, n, ndim, coord, &crs->bfr);
+  number_dual_graph_dofs(nid, crs, size, tid, crs->un, ndim, coord, &crs->bfr);
 
   // Find unique ids and user vector to compressed vector mapping.
   // In the case of dual-graph Laplacian, all the ids are unique.
   // But here we arrange them in the sorted order.
   ulong *uid = tcalloc(ulong, n);
   crs->u2c = tcalloc(sint, n);
-  crs->cn = unique_ids(crs->u2c, uid, n, nid, &crs->bfr);
-  assert(crs->cn == crs->un);
+  crs->cn = unique_ids(crs->u2c, uid, crs->un, nid, &crs->bfr);
   crs->an = crs->cn;
 
   struct crystal cr;
