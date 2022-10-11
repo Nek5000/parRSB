@@ -9,9 +9,48 @@ static unsigned disconnected = 0;
 extern int fiedler(struct array *elements, int nv, parrsb_options *options,
                    struct comm *gsc, buffer *buf, int verbose);
 extern uint get_components(sint *component, struct array *elems, unsigned nv,
-                           struct comm *c, buffer *buf);
+                           struct comm *c, buffer *buf, int verbose);
 extern uint get_components_v2(sint *component, struct array *elems, unsigned nv,
-                              const struct comm *ci, buffer *bfr);
+                              const struct comm *ci, buffer *bfr, int verbose);
+
+static void test_component_versions(struct array *elements, struct comm *lc,
+                                    unsigned nv, unsigned lvl, buffer *bfr) {
+  // Send elements to % P processor to test disconnected components
+  struct crystal cr;
+  crystal_init(&cr, lc);
+
+  struct rsb_element *pe = (struct rsb_element *)elements->ptr;
+  for (unsigned e = 0; e < elements->n; e++)
+    pe[e].proc = pe[e].globalId % lc->np;
+
+  sarray_transfer(struct rsb_element, elements, proc, 1, &cr);
+
+  MPI_Comm tmp;
+  int color = (lc->id < lc->np / 2);
+  MPI_Comm_split(lc->c, color, lc->id, &tmp);
+
+  struct comm tc0;
+  comm_init(&tc0, tmp);
+
+  sint nc1 = get_components(NULL, elements, nv, &tc0, bfr, 0);
+  sint nc2 = get_components_v2(NULL, elements, nv, &tc0, bfr, 0);
+  if (nc1 != nc2) {
+    if (tc0.id == 0)
+      printf("lvl = %u SS-BFS != MS-BFS: %d %d\n", lvl, nc1, nc2);
+    fflush(stdout);
+  }
+  if (nc1 > 1) {
+    if (tc0.id == 0)
+      printf("lvl = %u: %d disconnected componets were present.\n", lvl, nc1);
+    fflush(stdout);
+  }
+
+  comm_free(&tc0);
+  MPI_Comm_free(&tmp);
+
+  sarray_transfer(struct rsb_element, elements, proc, 0, &cr);
+  crystal_free(&cr);
+}
 
 static void check_rsb_partition(struct comm *gc, parrsb_options *opts) {
   int max_levels = log2ll(gc->np);
@@ -200,7 +239,7 @@ int repair_partitions_v2(struct array *elems, unsigned nv, struct comm *tc,
   assert(check_bin_val(bin, lc) == 0);
 
   sint ibuf;
-  sint nc = get_components_v2(NULL, elems, nv, tc, bfr);
+  sint nc = get_components_v2(NULL, elems, nv, tc, bfr, 0);
   comm_allreduce(lc, gs_int, gs_max, &nc, 1, &ibuf);
   if (nc > 1) {
     // If nc > 1, send elements back and do RCBx, RCBy and RCBz
@@ -228,7 +267,7 @@ int repair_partitions_v2(struct array *elems, unsigned nv, struct comm *tc,
 
     // And count number of components again. If nc > 1 still, set
     // isconnected = 1
-    nc = get_components_v2(NULL, elems, nv, tc, bfr);
+    nc = get_components_v2(NULL, elems, nv, tc, bfr, 0);
     comm_allreduce(lc, gs_int, gs_max, &nc, 1, &ibuf);
     if (nc > 1)
       disconnected = 1;
@@ -257,6 +296,7 @@ int rsb(struct array *elements, int nv, int check, parrsb_options *options,
 
   // Duplicate the global communicator to `lc`
   comm_dup(&lc, gc);
+
   // Initialize `nc` based on `lc`
   if (options->two_level) {
 #ifdef MPI

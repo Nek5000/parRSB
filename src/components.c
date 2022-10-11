@@ -8,13 +8,9 @@
 
 // Find the number of disconnected components
 uint get_components(sint *component, struct array *elems, unsigned nv,
-                    struct comm *c, buffer *buf) {
+                    struct comm *c, buffer *buf, int verbose) {
   uint nelt = elems->n;
   struct rsb_element *pe = (struct rsb_element *)elems->ptr;
-
-  struct unmarked {
-    uint index;
-  };
 
   slong out[2][1], wrk[2][1], in = nelt;
   comm_scan(out, c, gs_long, gs_add, &in, 1, wrk);
@@ -23,28 +19,32 @@ uint get_components(sint *component, struct array *elems, unsigned nv,
   if (nelg == 0)
     return 0;
 
-  slong *p = tcalloc(slong, nelt * nv);
-  slong *ids = tcalloc(slong, nelt * nv);
+  uint nev = nelt * nv;
+  slong *p = tcalloc(slong, nev);
+  slong *ids = tcalloc(slong, nev);
 
-  int null_input = 0;
-  if (null_input = (component == NULL))
+  int null_input = (component == NULL);
+  if (null_input)
     component = tcalloc(sint, nelt);
 
-  uint e;
-  for (e = 0; e < nelt; e++)
+  for (uint e = 0; e < nelt; e++)
     component[e] = -1;
+
+  struct unmarked {
+    uint index;
+  };
+  struct unmarked u;
 
   struct array arr;
   array_init(struct unmarked, &arr, nelt);
 
   struct comm cc;
-  struct unmarked u;
-  uint d, count = 0;
+  uint count = 0;
   slong nnz1, nnzg, nnzg0, nnzb, nmarked = 0;
   do {
     // Count unmarked elements
     arr.n = 0;
-    for (e = 0; e < nelt; e++) {
+    for (uint e = 0; e < nelt; e++) {
       if (component[e] == -1) {
         u.index = e;
         array_cat(struct unmarked, &arr, &u, 1);
@@ -57,23 +57,24 @@ uint get_components(sint *component, struct array *elems, unsigned nv,
     nnz1 = nnzg = nnzg0 = 0;
     if (bin == 1) {
       // Initialize p
-      for (e = 0; e < arr.n; e++)
-        for (d = 0; d < nv; d++)
+      for (uint e = 0; e < arr.n; e++)
+        for (uint d = 0; d < nv; d++)
           p[e * nv + d] = 0;
 
       // Mark the first non-marked element as seed
       struct unmarked *ptr = (struct unmarked *)arr.ptr;
-      slong first = start + ptr[0].index, mfirst = first;
+      slong first = start + ptr[0].index;
+      slong mfirst = first;
       comm_allreduce(&cc, gs_long, gs_min, &mfirst, 1, wrk);
 
       if (mfirst == first) {
-        for (d = 0; d < nv; d++)
+        for (uint d = 0; d < nv; d++)
           p[0 * nv + d] = 1;
       }
 
       // Setup gs
-      for (e = 0; e < arr.n; e++)
-        for (d = 0; d < nv; d++)
+      for (uint e = 0; e < arr.n; e++)
+        for (uint d = 0; d < nv; d++)
           ids[e * nv + d] = pe[ptr[e].index].vertices[d];
 
       struct gs_data *gsh = gs_setup(ids, arr.n * nv, &cc, 0, gs_pairwise, 0);
@@ -82,8 +83,9 @@ uint get_components(sint *component, struct array *elems, unsigned nv,
         gs(p, gs_long, gs_add, 0, gsh, buf);
 
         nnz1 = 0;
-        for (e = 0; e < arr.n; e++) {
-          for (d = 0; d < nv; d++) {
+        for (uint e = 0; e < arr.n; e++) {
+          uint d = 0;
+          for (; d < nv; d++) {
             if (p[e * nv + d] > 0) {
               nnz1++;
               component[ptr[e].index] = count;
@@ -158,17 +160,21 @@ static sint find_or_insert(struct array *cids, struct cmp_t *t) {
   }
   pc[n] = t0, cids->n++;
 
+  // Sanity check
+  for (unsigned i = 1; i < cids->n; i++)
+    assert(pc[i - 1].c < pc[i].c);
+
   return -1;
 }
 
 uint get_components_v2(sint *component, struct array *elems, unsigned nv,
-                       const struct comm *ci, buffer *bfr) {
+                       const struct comm *ci, buffer *bfr, int verbose) {
   uint nelt = elems->n;
   struct rsb_element *pe = (struct rsb_element *)elems->ptr;
 
   slong out[2][1], wrk[2][1], in = nelt;
   comm_scan(out, ci, gs_long, gs_add, &in, 1, wrk);
-  ulong nelg = out[1][0], start = out[0][0];
+  ulong nelg = out[1][0];
 
   if (nelg == 0)
     return 0;
@@ -202,7 +208,7 @@ uint get_components_v2(sint *component, struct array *elems, unsigned nv,
     int bin = (unmkd > 0);
     comm_split(ci, bin, ci->id, &c);
 
-    slong nnzg = 0, nnzg0, ncg = 0;
+    slong nnzg = 0, nnzg0 = 0, ncg = 0;
     if (bin == 1) {
       // Setup gs
       struct gs_data *gsh = gs_setup(ids, unmkd * nv, &c, 0, gs_pairwise, 0);
@@ -216,22 +222,18 @@ uint get_components_v2(sint *component, struct array *elems, unsigned nv,
         for (uint v = 0; v < nv; v++)
           p[e * nv + v] = -1;
 
-      sint changed;
+      sint nnz, changed;
       do {
         for (uint i = 0; i < unmkd * nv; i++)
           p0[i] = p[i];
 
         gs(p, gs_int, gs_max, 0, gsh, bfr);
 
-        sint nnz = 0;
-        changed = 0;
+        nnz = changed = 0;
         for (uint e = 0; e < unmkd; e++) {
           sint v0 = -1;
           for (uint v = 0; v < nv; v++) {
-            if (p[e * nv + v] != p0[e * nv + v])
-              changed = 1;
             if (p[e * nv + v] > -1) {
-              nnz++;
               if (v0 == -1)
                 v0 = v;
               else if (p[e * nv + v0] < p[e * nv + v])
@@ -244,6 +246,14 @@ uint get_components_v2(sint *component, struct array *elems, unsigned nv,
             sint c = p[e * nv + v0];
             for (uint v = 0; v < nv; v++)
               p[e * nv + v] = c;
+            nnz++;
+          }
+
+          for (uint v = 0; v < nv; v++) {
+            if (p[e * nv + v] != p0[e * nv + v]) {
+              changed = 1;
+              break;
+            }
           }
         }
 
@@ -265,7 +275,6 @@ uint get_components_v2(sint *component, struct array *elems, unsigned nv,
           find_or_insert(&cids, &t);
         }
       }
-      assert(cids.n <= c.np);
 
       struct crystal cr;
       crystal_init(&cr, &c);
