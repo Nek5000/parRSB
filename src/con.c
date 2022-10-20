@@ -1269,7 +1269,7 @@ static int elementCheck(Mesh mesh, struct comm *c, buffer *bfr) {
     comm_allreduce(&c, gs_int, gs_max, &err, 1, &buf);                         \
     if (err) {                                                                 \
       if (c.id == 0) {                                                         \
-        printf("\n Error: %s\n", msg);                                         \
+        printf("parCon error in %s.\n", msg);                                  \
         fflush(stdout);                                                        \
       }                                                                        \
       buffer_free(&bfr);                                                       \
