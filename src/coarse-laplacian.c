@@ -103,33 +103,31 @@ static void nmbr_local_rcb(struct array *a, uint s, uint e, const unsigned nc,
 static void number_dual_graph_dofs(ulong *dofs, struct coarse *crs, uint n,
                                    const slong *ids, uint nelt, unsigned ndim,
                                    const scalar *coord, buffer *bfr) {
-  int nnz = (n > 0);
   struct comm c;
-  comm_split(&crs->c, nnz, crs->c.id, &c);
+  comm_split(&crs->c, n > 0, crs->c.id, &c);
 
   unsigned nc = n / nelt;
-  uint i, j;
-  if (nnz) {
+  if (n > 0) {
     sint *dof = tcalloc(sint, n);
     int level = 1;
     while (c.np > 1) {
       struct gs_data *gsh = gs_setup(ids, n, &c, 0, gs_pairwise, 0);
 
       int bin = (c.id >= (c.np + 1) / 2);
-      for (i = 0; i < n; i++)
+      for (uint i = 0; i < n; i++)
         dof[i] = bin;
 
       gs(dof, gs_int, gs_add, 0, gsh, bfr);
 
       if (bin == 1) {
-        for (i = 0; i < n; i++)
+        for (uint i = 0; i < n; i++)
           dof[i] = 0;
       }
 
       gs(dof, gs_int, gs_add, 0, gsh, bfr);
 
-      for (i = 0; i < nelt; i++) {
-        for (j = 0; j < nc; j++) {
+      for (uint i = 0; i < nelt; i++) {
+        for (uint j = 0; j < nc; j++) {
           if (dof[i * nc + j] > 0 && !dofs[i]) {
             dofs[i] = level;
             break;
@@ -150,7 +148,7 @@ static void number_dual_graph_dofs(ulong *dofs, struct coarse *crs, uint n,
     free(dof);
   }
 
-  for (i = crs->n[0] = crs->n[1] = 0; i < nelt; i++) {
+  for (uint i = crs->n[0] = crs->n[1] = 0; i < nelt; i++) {
     if (dofs[i] > 0)
       crs->n[1]++;
     else
@@ -168,9 +166,9 @@ static void number_dual_graph_dofs(ulong *dofs, struct coarse *crs, uint n,
   struct rcb_t t = {.s = INT_MAX};
   ulong s = crs->ng[0] + crs->s[1];
   for (uint i = 0; i < nelt; i++) {
-    if (dofs[i] > 0)
+    if (dofs[i] > 0) {
       dofs[i] = s++;
-    else {
+    } else {
       t.i = i;
       memcpy(t.coord, &coord[i * ndim], ndim * sizeof(scalar));
       memcpy(t.vtx, &ids[i * nc], nc * sizeof(slong));

@@ -1,6 +1,7 @@
 #include "coarse-impl.h"
 #include "metrics.h"
 #include "sort.h"
+#include <float.h>
 
 //------------------------------------------------------------------------------
 // Better API for coarse grid system.
@@ -44,47 +45,35 @@ uint unique_ids(sint *perm, ulong *uid, uint n, const ulong *ids, buffer *bfr) {
   return un;
 }
 
-// Number rows, local first then interface. Returns global number of local
-// elements.
-struct rsb_t {
-  uint i, s;
-  slong vtx[8];
-};
-
+// Number dofs, local first then interface. Returns global number of dofs.
 static void number_dofs(slong *nid, struct coarse *crs, const slong *ids,
                         const ulong *uid) {
+  struct comm *ci = &crs->c, c;
   uint un = crs->un;
-  buffer *bfr = &crs->bfr;
-  struct comm *ci = &crs->c;
-  sint *u2c = crs->u2c;
+  comm_split(ci, un > 0, ci->id, &c);
 
-  int nnz = (un > 0);
-  struct comm c;
-  comm_split(ci, nnz, ci->id, &c);
-
-  uint i, j;
-  if (nnz) {
+  if (un > 0) {
     sint *dof = tcalloc(sint, un);
     int level = 1;
     while (c.np > 1) {
       struct gs_data *gsh = gs_setup(ids, un, &c, 0, gs_pairwise, 0);
 
       int bin = (c.id >= (c.np + 1) / 2);
-      for (i = 0; i < un; i++)
+      for (uint i = 0; i < un; i++)
         dof[i] = bin;
 
-      gs(dof, gs_int, gs_add, 0, gsh, bfr);
+      gs(dof, gs_int, gs_add, 0, gsh, &crs->bfr);
 
       if (bin == 1) {
-        for (i = 0; i < un; i++)
+        for (uint i = 0; i < un; i++)
           dof[i] = 0;
       }
 
-      gs(dof, gs_int, gs_add, 0, gsh, bfr);
+      gs(dof, gs_int, gs_add, 0, gsh, &crs->bfr);
 
-      for (i = 0; i < un; i++) {
-        if (dof[i] > 0 && u2c[i] >= 0 && !nid[u2c[i]])
-          nid[u2c[i]] = level;
+      for (uint i = 0; i < un; i++) {
+        if (dof[i] > 0 && crs->u2c[i] >= 0 && !nid[crs->u2c[i]])
+          nid[crs->u2c[i]] = level;
       }
 
       gs_free(gsh);
@@ -111,46 +100,48 @@ static void number_dofs(slong *nid, struct coarse *crs, const slong *ids,
   struct array arr;
   array_init(struct dof_t, &arr, crs->cn);
 
-  uint ln = 0;
   struct dof_t t = {.id = 0, .nid = 0, .p = 0, .p0 = ci->id, .idx = 0};
-  for (i = 0; i < crs->cn; i++) {
-    if (!nid[i])
+  uint ln = 0;
+  for (uint i = 0; i < crs->cn; i++) {
+    if (!nid[i]) {
       ln++;
-    else
-      t.id = uid[i], t.idx = i, array_cat(struct dof_t, &arr, &t, 1);
+    } else {
+      t.id = uid[i], t.idx = i;
+      array_cat(struct dof_t, &arr, &t, 1);
+    }
   }
   crs->n[0] = ln;
 
-  slong cnt[1] = {ln}, out[2][1], wrk[2][1];
-  comm_scan(out, ci, gs_long, gs_add, cnt, 1, wrk);
+  slong cnt = ln, out[2][1], wrk[2][1];
+  comm_scan(out, ci, gs_long, gs_add, &cnt, 1, wrk);
   crs->s[0] = out[0][0] + 1, crs->ng[0] = out[1][0];
 
-  for (i = 0, ln = 0; i < crs->cn; i++) {
+  for (uint i = 0, ln = 0; i < crs->cn; i++) {
     if (!nid[i])
       nid[i] = crs->s[0] + ln, ln++;
   }
-  assert(crs->n[0] == ln);
 
   // parallel_sort and set nid and send back to p0
-  parallel_sort(struct dof_t, &arr, id, gs_long, 0, 0, ci, bfr);
+  parallel_sort(struct dof_t, &arr, id, gs_long, 0, 0, ci, &crs->bfr);
 
   uint in = 0;
   if (arr.n > 0) {
     struct dof_t *pa = (struct dof_t *)arr.ptr;
-    for (i = in = 1; i < arr.n; i++)
+    for (uint i = in = 1; i < arr.n; i++)
       in += (pa[i].id != pa[i - 1].id);
   }
 
-  cnt[0] = in;
-  comm_scan(out, ci, gs_long, gs_add, cnt, 1, wrk);
+  cnt = in;
+  comm_scan(out, ci, gs_long, gs_add, &cnt, 1, wrk);
   crs->ng[1] = out[1][0];
   slong s = crs->ng[0] + out[0][0] + 1;
 
   if (in) {
     struct dof_t *pa = (struct dof_t *)arr.ptr;
-    i = 0;
+    uint i = 0;
     while (i < arr.n) {
-      for (j = i + 1; j < arr.n && pa[j].id == pa[i].id; j++)
+      uint j = i + 1;
+      for (; j < arr.n && pa[j].id == pa[i].id; j++)
         ;
       for (; i < j; i++)
         pa[i].nid = s;
@@ -163,9 +154,9 @@ static void number_dofs(slong *nid, struct coarse *crs, const slong *ids,
   sarray_transfer(struct dof_t, &arr, p0, 0, &cr);
   crystal_free(&cr);
 
-  sarray_sort(struct dof_t, arr.ptr, arr.n, id, 1, bfr);
+  sarray_sort(struct dof_t, arr.ptr, arr.n, id, 1, &crs->bfr);
   struct dof_t *pa = (struct dof_t *)arr.ptr;
-  for (i = 0; i < arr.n; i++)
+  for (uint i = 0; i < arr.n; i++)
     nid[pa[i].idx] = pa[i].nid;
 
   array_free(&arr);
