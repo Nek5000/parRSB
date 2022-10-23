@@ -56,7 +56,7 @@ int GenmapFiedlerDump(const char *fname, struct rsb_element *elm, uint nelt,
             __LINE__, fname);
 
   err += MPI_File_close(&file);
-  genmap_barrier(c);
+  parrsb_barrier(c);
 
   free(pbuf);
 
@@ -119,7 +119,7 @@ int GenmapElementDump(const char *fname, struct rsb_element *elm, uint nelt,
             __LINE__, fname);
 
   err += MPI_File_close(&file);
-  genmap_barrier(c);
+  parrsb_barrier(c);
 
   free(pbuf);
 
@@ -169,7 +169,7 @@ int GenmapVectorDump(const char *fname, scalar *y, struct rsb_element *elm,
             __LINE__, fname);
 
   err += MPI_File_close(&file);
-  genmap_barrier(c);
+  parrsb_barrier(c);
 
   free(pbuf);
 

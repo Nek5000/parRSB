@@ -384,7 +384,7 @@ static int tqli(scalar *eVectors, scalar *eValues, sint n, scalar *diagonal,
       for (m = l; m < n - 1; m++) {
         scalar dd = fabs(d[m]) + fabs(d[m + 1]);
         /* Should use a tolerance for this check */
-        if (fabs(e[m]) / dd < GENMAP_TOL)
+        if (fabs(e[m]) / dd < PARRSB_TOL)
           break;
       }
 
@@ -436,7 +436,7 @@ static int tqli(scalar *eVectors, scalar *eValues, sint n, scalar *diagonal,
           /* Done with eigenvectors */
         }
 
-        if (r < GENMAP_TOL && i >= l)
+        if (r < PARRSB_TOL && i >= l)
           continue;
 
         d[l] -= p;
@@ -569,7 +569,7 @@ static int lanczos(scalar *fiedler, struct array *elements, int nv,
   uint lelt = elements->n;
   struct rsb_element *elems = (struct rsb_element *)elements->ptr;
   struct laplacian *wl;
-#if defined(GENMAP_OCCA)
+#if defined(PARRSB_OCCA)
   wl = laplacian_init(elems, lelt, nv, CSR, gsc, bfr);
   occa_lanczos_init(gsc, wl, miter);
 #else
@@ -587,7 +587,7 @@ static int lanczos(scalar *fiedler, struct array *elements, int nv,
   int iter = miter, ipass;
   for (ipass = 0; iter == miter && ipass < mpass; ipass++) {
     double t = comm_time();
-#if defined(GENMAP_OCCA)
+#if defined(PARRSB_OCCA)
     iter = occa_lanczos_aux(alpha, beta, rr, lelt, nelg, miter, initv, wl, gsc,
                             bfr);
 #else
@@ -620,7 +620,7 @@ static int lanczos(scalar *fiedler, struct array *elements, int nv,
   }
 
   free(alpha), free(rr), free(eVectors), free(eValues);
-#if defined(GENMAP_OCCA)
+#if defined(PARRSB_OCCA)
   occa_lanczos_free();
 #endif
   laplacian_free(wl);

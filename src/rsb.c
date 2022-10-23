@@ -189,10 +189,10 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
     fflush(stdout);
   }
 
-  genmap_barrier(&c);
+  parrsb_barrier(&c);
   double t = comm_time();
 
-#if defined(GENMAP_OCCA)
+#if defined(PARRSB_OCCA)
   occa_init("CUDA", 0, 0, &c);
 #endif
 
@@ -244,14 +244,14 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
   metric_finalize();
   comm_free(&ca);
 
-#if defined(GENMAP_OCCA)
+#if defined(PARRSB_OCCA)
   occa_free();
 #endif
 
   restore_original(part, seq, &cr, &elist, esize, &bfr);
 
   // Report time and finish
-  genmap_barrier(&c);
+  parrsb_barrier(&c);
   if (c.id == 0 && options.verbose_level > 0) {
     printf("par%s finished in %g s\n", ALGO[options.partitioner],
            comm_time() - t);

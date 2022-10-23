@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <time.h>
 
-#if defined(GENMAP_UNDERSCORE)
+#if defined(PARRSB_UNDERSCORE)
 #define FNAME(x) TOKEN_PASTE(x, _)
 #else
 #define FNAME(x) x
@@ -12,7 +12,7 @@
 #define FDGETRF FNAME(dgetrf)
 #define FDGETRI FNAME(dgetri)
 
-#if defined(GENMAP_BLAS)
+#if defined(PARRSB_BLAS)
 
 void FDGETRF(int *M, int *N, double *A, int *lda, int *IPIV, int *INFO);
 void FDGETRI(int *N, double *A, int *lda, int *IPIV, double *WORK, int *lwork,
@@ -41,7 +41,7 @@ void matrix_inverse(int N, double *A) {
 
 void matrix_inverse(int N, double *A) {}
 
-#endif // GENMAP_BLAS
+#endif // PARRSB_BLAS
 
 #undef FDGETRF
 #undef FDGETRI

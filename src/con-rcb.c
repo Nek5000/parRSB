@@ -426,7 +426,7 @@ int parrsb_conn_rcb_mesh(long long *vtx, double *xyz, int nelt, int ndim,
     fflush(stdout);
   }
 
-  genmap_barrier(&c);
+  parrsb_barrier(&c);
   double tcon = comm_time();
 
   slong out[2][1], wrk[2][1], in = nelt;
@@ -465,50 +465,50 @@ int parrsb_conn_rcb_mesh(long long *vtx, double *xyz, int nelt, int ndim,
   buffer bfr;
   buffer_init(&bfr, 1024);
 
-  genmap_barrier(&c);
+  parrsb_barrier(&c);
   double t = comm_time();
   transfer_bc_faces(&pfaces, &cr, nelgt);
   duration[0] = comm_time() - t;
 
-  genmap_barrier(&c);
+  parrsb_barrier(&c);
   t = comm_time();
   find_dx(&points, ndim);
   duration[1] = comm_time() - t;
 
-  genmap_barrier(&c);
+  parrsb_barrier(&c);
   t = comm_time();
   rcb1(&points, ndim, &cr, &bfr);
   duration[2] = comm_time() - t;
 
-  genmap_barrier(&c);
+  parrsb_barrier(&c);
   t = comm_time();
   local_connectivity(&points, ndim, tol, verbose, &bfr);
   duration[3] = comm_time() - t;
 
-  genmap_barrier(&c);
+  parrsb_barrier(&c);
   t = comm_time();
   initial_global_ids(&points, &c);
   duration[4] = comm_time() - t;
 
-  genmap_barrier(&c);
+  parrsb_barrier(&c);
   t = comm_time();
   resolve_interface_ids(&points, &c);
   duration[5] = comm_time() - t;
 
 #if 0
-  genmap_barrier(&c);
+  parrsb_barrier(&c);
   t = comm_time();
   err = elementCheck(mesh, &c, &bfr);
   check_error(err, "elementCheck");
   duration[4] = comm_time() - t;
 
-  genmap_barrier(&c);
+  parrsb_barrier(&c);
   t = comm_time();
   err = faceCheck(mesh, &c, &bfr);
   check_error(err, "faceCheck");
   duration[5] = comm_time() - t;
 
-  genmap_barrier(&c);
+  parrsb_barrier(&c);
   t = comm_time();
   err = matchPeriodicFaces(mesh, &c, &bfr);
   check_error(err, "matchPeriodicFaces");
@@ -522,7 +522,7 @@ int parrsb_conn_rcb_mesh(long long *vtx, double *xyz, int nelt, int ndim,
   }
 
   // Report timing info and finish
-  genmap_barrier(&c);
+  parrsb_barrier(&c);
   tcon = comm_time() - tcon;
   if (c.id == 0 && verbose > 0) {
     printf("parCon finished in %g s\n", tcon);

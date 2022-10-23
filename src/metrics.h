@@ -1,5 +1,5 @@
-#ifndef _GENMAP_METRICS_H_
-#define _GENMAP_METRICS_H_
+#ifndef _PARRSB_METRICS_H_
+#define _PARRSB_METRICS_H_
 
 #include "gslib.h"
 

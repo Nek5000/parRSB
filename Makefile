@@ -44,7 +44,7 @@ EXAMPLEOBJS = $(patsubst $(SRCROOT)/%.c,$(BUILDDIR)/%,$(EXAMPLES))
 PP =
 
 ifneq ($(DEBUG),0)
-  PP += -DGENMAP_DEBUG
+  PP += -DPARRSB_DEBUG
 else
   CFLAGS += -O2
 endif
@@ -54,15 +54,15 @@ ifneq ($(MPI),0)
 endif
 
 ifneq ($(UNDERSCORE),0)
-  PP += -DGENMAP_UNDERSCORE
+  PP += -DPARRSB_UNDERSCORE
 endif
 
 ifneq ($(SYNC_BY_REDUCTION),0)
-  PP += -DGENMAP_SYNC_BY_REDUCTION
+  PP += -DPARRSB_SYNC_BY_REDUCTION
 endif
 
 ifneq ($(BLAS),0)
-  PP += -DGENMAP_BLAS
+  PP += -DPARRSB_BLAS
   ifneq ($(BLASDIR),)
     LDFLAGS+= -L$(BLASDIR)
   endif
@@ -70,7 +70,7 @@ ifneq ($(BLAS),0)
 endif
 
 ifneq ($(OCCA),0)
-  PP += -DGENMAP_OCCA
+  PP += -DPARRSB_OCCA
   LDFLAGS+= -L$(OCCADIR)/lib -locca
   INCFLAGS+= -I$(OCCADIR)/include
   SRCS += $(wildcard $(SRCDIR)/occa/*.c)

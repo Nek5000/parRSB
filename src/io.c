@@ -430,7 +430,7 @@ int parrsb_dump_con(char *name, unsigned nelt, unsigned nv, long long *vl,
   err |= MPI_File_write_ordered(file, buf, write_size, MPI_BYTE, &st);
   err |= MPI_File_close(&file);
 
-  genmap_barrier(&c);
+  parrsb_barrier(&c);
   comm_free(&c);
 
   free(buf);

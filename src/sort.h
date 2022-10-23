@@ -1,5 +1,5 @@
-#ifndef _GENMAP_SORT_H_
-#define _GENMAP_SORT_H_
+#ifndef _PARRSB_SORT_H_
+#define _PARRSB_SORT_H_
 
 #include <gslib.h>
 

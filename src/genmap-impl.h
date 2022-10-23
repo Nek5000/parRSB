@@ -1,5 +1,5 @@
-#ifndef _GENMAP_IMPL_H_
-#define _GENMAP_IMPL_H_
+#ifndef _PARRSB_IMPL_H_
+#define _PARRSB_IMPL_H_
 
 #include "parRSB.h"
 #include <assert.h>
@@ -26,8 +26,8 @@
 #endif
 #define gs_scalar gs_double
 
-#define GENMAP_ALIGN 32
-#define GENMAP_TOL 1e-12
+#define PARRSB_ALIGN 32
+#define PARRSB_TOL 1e-12
 
 #define MAXDIM 3 // Maximum dimension of the mesh
 #define MAXNV 8  // Maximum number of vertices per element
@@ -93,6 +93,6 @@ int occa_free();
 // Misc
 //
 int log2ll(long long n);
-void genmap_barrier(struct comm *c);
+void parrsb_barrier(struct comm *c);
 
 #endif

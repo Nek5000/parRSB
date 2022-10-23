@@ -313,8 +313,8 @@ void parrsb_check_error_(int err, char *file, int line, MPI_Comm comm) {
   }
 }
 
-void genmap_barrier(struct comm *c) {
-#if defined(GENMAP_SYNC_BY_REDUCTION)
+void parrsb_barrier(struct comm *c) {
+#if defined(PARRSB_SYNC_BY_REDUCTION)
   sint dummy = c->id, wrk;
   comm_allreduce(c, gs_int, gs_max, &dummy, 1, &wrk);
 #else
