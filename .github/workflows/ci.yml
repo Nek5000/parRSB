@@ -1,9 +1,9 @@
 name: parRSB tests
 on:
   push:
-    branch: [main, next]
+    branches: [main, next]
   pull_request:
-    branch: [main, next]
+    branches: [main, next]
 env:
   GITHUB.TOKEN: ${{ secrets.token }}
   PARRSB_CI: parRSB-github-ci

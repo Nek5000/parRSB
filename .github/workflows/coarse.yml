@@ -1,9 +1,9 @@
 name: Coarse tests
 on:
   push:
-    branch: [main, next]
+    branches: [main, next]
   pull_request:
-    branch: [main, next]
+    branches: [main, next]
 env:
   GITHUB.TOKEN: ${{ secrets.token }}
   PARRSB_CI: parRSB-github-ci
@@ -16,7 +16,7 @@ jobs:
         test: [box_2x2x2, box_10x1x1, box_3x5x7, pyramid, solid, ethier, vortex, expansion]
         np: [2, 3, 4]
       fail-fast: false
-    name: "Coarse: ${{ matrix.test }}, NP = ${{ matrix.np }}"
+    name: "${{ matrix.test }}, NP = ${{ matrix.np }}"
     env:
       GSVER: 1.0.7
       CC: mpicc
