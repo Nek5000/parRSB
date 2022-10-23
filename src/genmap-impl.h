@@ -4,10 +4,12 @@
 #include "parRSB.h"
 #include <assert.h>
 #include <float.h>
+#include <limits.h>
 #include <math.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 #ifdef scalar
 #undef scalar
@@ -54,6 +56,14 @@ struct rsb_element {
   scalar coord[MAXDIM], fiedler;
   slong vertices[MAXNV];
 };
+
+//------------------------------------------------------------------------------
+// Find number of components
+//
+uint get_components(sint *component, struct array *elems, unsigned nv,
+                    struct comm *c, buffer *buf, int verbose);
+uint get_components_v2(sint *component, struct array *elems, unsigned nv,
+                       const struct comm *ci, buffer *bfr, int verbose);
 
 //------------------------------------------------------------------------------
 // Laplacian

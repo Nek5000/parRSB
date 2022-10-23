@@ -2,8 +2,6 @@
 #include "metrics.h"
 #include "multigrid.h"
 #include "sort.h"
-#include <math.h>
-#include <time.h>
 
 #define MM 500
 

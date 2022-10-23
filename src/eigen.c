@@ -13,6 +13,7 @@
 #define FDGETRI FNAME(dgetri)
 
 #if defined(GENMAP_BLAS)
+
 void FDGETRF(int *M, int *N, double *A, int *lda, int *IPIV, int *INFO);
 void FDGETRI(int *N, double *A, int *lda, int *IPIV, double *WORK, int *lwork,
              int *INFO);
@@ -35,8 +36,11 @@ void matrix_inverse(int N, double *A) {
   free(ipiv);
   free(work);
 }
+
 #else
+
 void matrix_inverse(int N, double *A) {}
+
 #endif // GENMAP_BLAS
 
 #undef FDGETRF

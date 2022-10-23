@@ -1,7 +1,6 @@
 #include "genmap-impl.h"
 #include "parRSB.h"
 #include <getopt.h>
-#include <stdio.h>
 
 int parrsb_dist_mesh(unsigned int *nelt_, long long **vl_, double **coord_,
                      int *part, int nv, MPI_Comm comm) {
@@ -312,4 +311,21 @@ void parrsb_check_error_(int err, char *file, int line, MPI_Comm comm) {
     MPI_Finalize();
     exit(1);
   }
+}
+
+void genmap_barrier(struct comm *c) {
+#if defined(GENMAP_SYNC_BY_REDUCTION)
+  sint dummy = c->id, wrk;
+  comm_allreduce(c, gs_int, gs_max, &dummy, 1, &wrk);
+#else
+  comm_barrier(c);
+#endif
+}
+
+int log2ll(long long n) {
+  int k = 0;
+  while (n > 1)
+    n /= 2, k++;
+
+  return k;
 }

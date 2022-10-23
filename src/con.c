@@ -1,9 +1,5 @@
 #include "genmap-impl.h"
 #include "sort.h"
-#include <math.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <time.h>
 
 /*
  Preprocessor Corner notation:      Symmetric Corner notation:

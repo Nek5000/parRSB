@@ -1,10 +1,6 @@
 #include "genmap-impl.h"
 #include "metrics.h"
 #include "sort.h"
-#include <limits.h>
-#include <math.h>
-#include <stdio.h>
-#include <time.h>
 
 // Find the number of disconnected components
 uint get_components(sint *component, struct array *elems, unsigned nv,

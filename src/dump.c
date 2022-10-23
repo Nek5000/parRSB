@@ -1,6 +1,4 @@
-#include <stdio.h>
-
-#include <genmap-impl.h>
+#include "genmap-impl.h"
 
 #define write_T(dest, val, T, nunits)                                          \
   do {                                                                         \

@@ -1,17 +1,11 @@
 #include "genmap-impl.h"
 #include "metrics.h"
 #include "sort.h"
-#include <limits.h>
-#include <time.h>
 
 static unsigned disconnected = 0;
 
 extern int fiedler(struct array *elements, int nv, parrsb_options *options,
                    struct comm *gsc, buffer *buf, int verbose);
-extern uint get_components(sint *component, struct array *elems, unsigned nv,
-                           struct comm *c, buffer *buf, int verbose);
-extern uint get_components_v2(sint *component, struct array *elems, unsigned nv,
-                              const struct comm *ci, buffer *bfr, int verbose);
 
 static void test_component_versions(struct array *elements, struct comm *lc,
                                     unsigned nv, unsigned lvl, buffer *bfr) {

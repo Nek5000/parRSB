@@ -1,6 +1,5 @@
 #include "genmap-impl.h"
 #include "sort.h"
-#include <float.h>
 
 static void get_axis_len(double *length, size_t unit_size, char *elems,
                          uint nel, int ndim, struct comm *c) {
