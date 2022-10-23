@@ -1,6 +1,14 @@
 #include "parrsb-impl.h"
 #include <getopt.h>
 
+int log2ll(long long n) {
+  int k = 0;
+  while (n > 1)
+    n /= 2, k++;
+
+  return k;
+}
+
 int parrsb_dist_mesh(unsigned int *nelt_, long long **vl_, double **coord_,
                      int *part, int nv, MPI_Comm comm) {
   typedef struct {
@@ -321,14 +329,6 @@ void parrsb_barrier(struct comm *c) {
 #endif
 }
 
-int log2ll(long long n) {
-  int k = 0;
-  while (n > 1)
-    n /= 2, k++;
-
-  return k;
-}
-
 #define WRITE_T(dest, val, T, nunits)                                          \
   do {                                                                         \
     memcpy(dest, (val), sizeof(T) * nunits);                                   \
@@ -405,3 +405,34 @@ int parrsb_vector_dump(const char *fname, scalar *y, struct rsb_element *elm,
 }
 
 #undef WRITE_T
+
+#if defined __GLIBC__
+
+#include <execinfo.h>
+
+// Obtain a backtrace and print it to stdout.
+void parrsb_print_stack(void) {
+  void *bt[50];
+  int bt_size = backtrace(bt, 50);
+  char **symbols = backtrace_symbols(bt, bt_size);
+  printf("backtrace(): obtained %d stack frames.\n", bt_size);
+  for (unsigned i = 0; i < bt_size; i++)
+    printf("%s\n", symbols[i]);
+  free(symbols);
+}
+
+#else
+
+void parrsb_print_stack(){};
+
+#endif // defined __GLIBC__
+
+double parrsb_get_max_rss() {
+  struct rusage r_usage;
+  getrusage(RUSAGE_SELF, &r_usage);
+#if defined(__APPLE__) && defined(__MACH__)
+  return (double)r_usage.ru_maxrss;
+#else
+  return (double)(r_usage.ru_maxrss * 1024L);
+#endif
+}
