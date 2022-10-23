@@ -328,3 +328,80 @@ int log2ll(long long n) {
 
   return k;
 }
+
+#define WRITE_T(dest, val, T, nunits)                                          \
+  do {                                                                         \
+    memcpy(dest, (val), sizeof(T) * nunits);                                   \
+    dest += sizeof(T) * nunits;                                                \
+  } while (0)
+
+int parrsb_vector_dump(const char *fname, scalar *y, struct rsb_element *elm,
+                       uint nelt, unsigned nv, struct comm *c) {
+  MPI_File file;
+  sint err = MPI_File_open(c->c, fname, MPI_MODE_CREATE | MPI_MODE_WRONLY,
+                           MPI_INFO_NULL, &file);
+  slong wrk[2][1];
+  comm_scan(out, c, gs_int, gs_add, &err, 1, wrk);
+
+  uint rank = c->id;
+  if (err) {
+    if (rank == 0) {
+      fprintf(stderr, "%s:%d Error opening file: %s\n", __FILE__, __LINE__,
+              fname);
+      fflush(stderr);
+    }
+    return err;
+  }
+
+  slong out[2][1], in = nelt;
+  comm_scan(out, c, gs_long, gs_add, &in, 1, wrk);
+  slong start = out[0][0], nelgt = out[1][0];
+
+  int ndim = (nv == 8) ? 3 : 2;
+  uint write_size = ((ndim + 1) * sizeof(double) + sizeof(slong)) * nelt;
+  if (rank == 0)
+    write_size += sizeof(long) + sizeof(int); // for nelgt and ndim
+
+  char *bfr, *bfr0;
+  bfr = bfr0 = (char *)calloc(write_size, sizeof(char));
+  if (rank == 0) {
+    WRITE_T(bfr0, &nelgt, slong, 1);
+    WRITE_T(bfr0, &ndim, int, 1);
+  }
+
+  uint i;
+  for (i = 0; i < nelt; i++) {
+    WRITE_T(bfr0, &elm[i].globalId, ulong, 1);
+    WRITE_T(bfr0, &elm[i].coord[0], double, ndim);
+    WRITE_T(bfr0, &y[i], double, 1);
+  }
+
+  MPI_Status st;
+  err = MPI_File_write_ordered(file, bfr, write_size, MPI_BYTE, &st);
+  comm_scan(out, c, gs_int, gs_add, &err, 1, wrk);
+  if (err) {
+    if (rank == 0) {
+      fprintf(stderr, "%s:%d Error writing file: %s.\n", __FILE__, __LINE__,
+              fname);
+      fflush(stdout);
+    }
+    return err;
+  }
+
+  err = MPI_File_close(&file);
+  comm_scan(out, c, gs_int, gs_add, &err, 1, wrk);
+  if (err) {
+    if (rank == 0) {
+      fprintf(stderr, "%s:%d Error closing file: %s.\n", __FILE__, __LINE__,
+              fname);
+      fflush(stdout);
+    }
+    return err;
+  }
+
+  parrsb_barrier(c);
+  free(bfr);
+  return err;
+}
+
+#undef WRITE_T
