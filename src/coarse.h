@@ -1,5 +1,5 @@
-#ifndef _COARSE_H_
-#define _COARSE_H_
+#ifndef _PARRSB_COARSE_H_
+#define _PARRSB_COARSE_H_
 
 #include "gslib.h"
 #include "mat.h"

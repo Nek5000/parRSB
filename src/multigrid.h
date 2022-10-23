@@ -1,5 +1,5 @@
-#ifndef _MULTIGRID_H_
-#define _MULTIGRID_H_
+#ifndef _PARRSB_MULTIGRID_H_
+#define _PARRSB_MULTIGRID_H_
 
 #include "mat.h"
 

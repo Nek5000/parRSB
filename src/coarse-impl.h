@@ -1,5 +1,5 @@
-#ifndef _COARSE_IMPL_H_
-#define _COARSE_IMPL_H_
+#ifndef _PARRSB_COARSE_IMPL_H_
+#define _PARRSB_COARSE_IMPL_H_
 
 #include "coarse.h"
 

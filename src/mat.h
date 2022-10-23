@@ -1,5 +1,5 @@
-#ifndef _MAT_H_
-#define _MAT_H_
+#ifndef _PARRSB_MAT_H_
+#define _PARRSB_MAT_H_
 
 #include <gslib.h>
 
