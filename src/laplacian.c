@@ -1,6 +1,6 @@
-#include "genmap-impl.h"
 #include "mat.h"
 #include "multigrid.h"
+#include "parrsb-impl.h"
 
 struct laplacian {
   int type, nv;

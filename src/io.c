@@ -1,7 +1,4 @@
-#include "genmap-impl.h"
-#include "parRSB.h"
-#include <math.h>
-#include <stdio.h>
+#include "parrsb-impl.h"
 
 #define READ_T(coords, buf, T, nv)                                             \
   { memcpy((coords), buf, sizeof(T) * nv); }

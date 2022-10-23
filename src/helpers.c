@@ -1,5 +1,4 @@
-#include "genmap-impl.h"
-#include "parRSB.h"
+#include "parrsb-impl.h"
 #include <getopt.h>
 
 int parrsb_dist_mesh(unsigned int *nelt_, long long **vl_, double **coord_,

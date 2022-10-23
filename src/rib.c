@@ -1,4 +1,4 @@
-#include "genmap-impl.h"
+#include "parrsb-impl.h"
 #include "sort.h"
 
 extern int power_serial(double *y, int N, double *A, int verbose);

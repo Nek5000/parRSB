@@ -1,6 +1,5 @@
-#include "genmap-impl.h"
 #include "metrics.h"
-#include "parRSB.h"
+#include "parrsb-impl.h"
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
