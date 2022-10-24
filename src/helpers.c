@@ -1,6 +1,34 @@
 #include "parrsb-impl.h"
 #include <getopt.h>
 
+#include <sys/resource.h>
+
+#if defined __GLIBC__
+#include <execinfo.h>
+
+// Obtain a backtrace and print it to stdout.
+void parrsb_print_stack(void) {
+  void *bt[50];
+  int bt_size = backtrace(bt, 50);
+  char **symbols = backtrace_symbols(bt, bt_size);
+  printf("backtrace(): obtained %d stack frames.\n", bt_size);
+  for (unsigned i = 0; i < bt_size; i++)
+    printf("%s\n", symbols[i]);
+  free(symbols);
+}
+#else
+void parrsb_print_stack(){};
+#endif // defined __GLIBC__
+
+double parrsb_get_max_rss() {
+  struct rusage r_usage;
+  getrusage(RUSAGE_SELF, &r_usage);
+#if defined(__APPLE__) && defined(__MACH__)
+  return (double)r_usage.ru_maxrss;
+#else
+  return (double)(r_usage.ru_maxrss * 1024L);
+#endif
+}
 int log2ll(long long n) {
   int k = 0;
   while (n > 1)
@@ -339,7 +367,7 @@ int parrsb_vector_dump(const char *fname, scalar *y, struct rsb_element *elm,
   sint err = MPI_File_open(c->c, fname, MPI_MODE_CREATE | MPI_MODE_WRONLY,
                            MPI_INFO_NULL, &file);
   slong wrk[2][1];
-  comm_scan(out, c, gs_int, gs_add, &err, 1, wrk);
+  comm_allreduce(c, gs_int, gs_add, &err, 1, wrk);
 
   uint rank = c->id;
   if (err) {
@@ -376,7 +404,7 @@ int parrsb_vector_dump(const char *fname, scalar *y, struct rsb_element *elm,
 
   MPI_Status st;
   err = MPI_File_write_ordered(file, bfr, write_size, MPI_BYTE, &st);
-  comm_scan(out, c, gs_int, gs_add, &err, 1, wrk);
+  comm_allreduce(c, gs_int, gs_add, &err, 1, wrk);
   if (err) {
     if (rank == 0) {
       fprintf(stderr, "%s:%d Error writing file: %s.\n", __FILE__, __LINE__,
@@ -403,34 +431,3 @@ int parrsb_vector_dump(const char *fname, scalar *y, struct rsb_element *elm,
 }
 
 #undef WRITE_T
-
-#if defined __GLIBC__
-
-#include <execinfo.h>
-
-// Obtain a backtrace and print it to stdout.
-void parrsb_print_stack(void) {
-  void *bt[50];
-  int bt_size = backtrace(bt, 50);
-  char **symbols = backtrace_symbols(bt, bt_size);
-  printf("backtrace(): obtained %d stack frames.\n", bt_size);
-  for (unsigned i = 0; i < bt_size; i++)
-    printf("%s\n", symbols[i]);
-  free(symbols);
-}
-
-#else
-
-void parrsb_print_stack(){};
-
-#endif // defined __GLIBC__
-
-double parrsb_get_max_rss() {
-  struct rusage r_usage;
-  getrusage(RUSAGE_SELF, &r_usage);
-#if defined(__APPLE__) && defined(__MACH__)
-  return (double)r_usage.ru_maxrss;
-#else
-  return (double)(r_usage.ru_maxrss * 1024L);
-#endif
-}
