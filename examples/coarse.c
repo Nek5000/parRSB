@@ -83,7 +83,7 @@ static void setup_rhs(double *b, const unsigned int nelt, MPI_Comm comm) {
 
 static void setup_and_solve(unsigned nelt, unsigned nv, const long long *vl,
                             const scalar *centroids,
-                            const struct parrsb_input *in, MPI_Comm comm) {
+                            const struct parrsb_cmd_opts *in, MPI_Comm comm) {
   // Setup the coarse solve with schur complement solver
   struct comm c;
   comm_init(&c, comm);
@@ -121,7 +121,7 @@ int main(int argc, char *argv[]) {
   MPI_Init(&argc, &argv);
   MPI_Comm comm = MPI_COMM_WORLD;
 
-  struct parrsb_input *in = parrsb_parse_input(argc, argv, comm);
+  struct parrsb_cmd_opts *in = parrsb_parse_cmd_opts(argc, argv);
   int err = (in == NULL);
   parrsb_check_error(err, comm);
 

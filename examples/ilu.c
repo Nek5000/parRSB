@@ -8,7 +8,7 @@ int main(int argc, char *argv[]) {
   MPI_Init(&argc, &argv);
   MPI_Comm comm = MPI_COMM_WORLD;
 
-  struct parrsb_input *in = parrsb_parse_input(argc, argv, comm);
+  struct parrsb_cmd_opts *in = parrsb_parse_cmd_opts(argc, argv);
   int err = (in == NULL);
   parrsb_check_error(err, comm);
 

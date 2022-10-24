@@ -73,7 +73,8 @@ int parrsb_dist_mesh(unsigned int *nelt_, long long **vl_, double **coord_,
 }
 
 int parrsb_setup_mesh(unsigned *nelt, unsigned *nv, long long **vl,
-                      double **coord, struct parrsb_input *in, MPI_Comm comm) {
+                      double **coord, struct parrsb_cmd_opts *in,
+                      MPI_Comm comm) {
   int id, err;
   MPI_Comm_rank(comm, &id);
 
@@ -230,51 +231,48 @@ void parrsb_print_part_stat(long long *vtx, unsigned nelt, unsigned nv,
   }
 }
 
-struct parrsb_input *parrsb_parse_input(int argc, char *argv[], MPI_Comm comm) {
-  struct parrsb_input *in = tcalloc(struct parrsb_input, 1);
+struct parrsb_cmd_opts *parrsb_parse_cmd_opts(int argc, char *argv[]) {
+  struct parrsb_cmd_opts *in = tcalloc(struct parrsb_cmd_opts, 1);
 
-  // General parRSB options
-  in->mesh = NULL, in->tol = 2e-1, in->test = 0, in->dump = 1, in->verbose = 0;
-  MPI_Comm_size(comm, &in->nactive);
-
-  // ILU
+  in->mesh = NULL, in->tol = 2e-1;
+  in->test = 0, in->dump = 1, in->verbose = 0, in->nactive = INT_MAX;
   in->ilu_type = 0, in->ilu_tol = 1e-1, in->ilu_pivot = 0;
-
-  // Coarse solve
   in->crs_type = 0, in->crs_tol = 1e-3;
 
   static struct option long_options[] = {
-      {"mesh", required_argument, 0, 0},
-      {"tol", optional_argument, 0, 1},
-      {"test", no_argument, 0, 2},
-      {"no-dump", no_argument, 0, 3},
-      {"nactive", optional_argument, 0, 4},
-      {"verbose", optional_argument, 0, 5},
-      {"ilu_type", optional_argument, 0, 10},
-      {"ilu_tol", optional_argument, 0, 11},
-      {"ilu_pivot", optional_argument, 0, 12},
-      {"crs_type", optional_argument, 0, 20},
-      {"crs_tol", optional_argument, 0, 21},
-      {0, 0, 0, 0}};
+      {"mesh", required_argument, NULL, 0},
+      {"tol", optional_argument, NULL, 1},
+      {"test", optional_argument, NULL, 2},
+      {"dump", optional_argument, NULL, 3},
+      {"nactive", optional_argument, NULL, 4},
+      {"verbose", optional_argument, NULL, 5},
+      {"ilu_type", optional_argument, NULL, 10},
+      {"ilu_tol", optional_argument, NULL, 11},
+      {"ilu_pivot", optional_argument, NULL, 12},
+      {"crs_type", optional_argument, NULL, 20},
+      {"crs_tol", optional_argument, NULL, 21},
+      {NULL, 0, NULL, 0}};
 
+  unsigned len;
   for (;;) {
-    int opt_idx = 0;
-    int c = getopt_long(argc, argv, "", long_options, &opt_idx);
+    int c = getopt_long(argc, argv, "", long_options, NULL);
     if (c == -1)
       break;
 
     switch (c) {
     case 0:
-      in->mesh = optarg;
+      len = strnlen(optarg, PATH_MAX);
+      in->mesh = tcalloc(char, len);
+      strncpy(in->mesh, optarg, PATH_MAX);
       break;
     case 1:
       in->tol = atof(optarg);
       break;
     case 2:
-      in->test = 1;
+      in->test = atoi(optarg);
       break;
     case 3:
-      in->dump = 0;
+      in->dump = atoi(optarg);
       break;
     case 4:
       in->nactive = atoi(optarg);

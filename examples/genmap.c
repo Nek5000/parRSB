@@ -7,17 +7,16 @@ int main(int argc, char *argv[]) {
   MPI_Init(&argc, &argv);
   MPI_Comm world = MPI_COMM_WORLD;
 
-  struct parrsb_input *in = parrsb_parse_input(argc, argv, world);
+  struct parrsb_cmd_opts *in = parrsb_parse_cmd_opts(argc, argv);
   int err = (in == NULL);
   parrsb_check_error(err, world);
 
-  int id, active;
+  int id;
   MPI_Comm_rank(world, &id);
-  active = (id < in->nactive);
 
   MPI_Comm comm;
-  MPI_Comm_split(world, active, id, &comm);
-  if (active == 1) {
+  MPI_Comm_split(world, id < in->nactive, id, &comm);
+  if (id < in->nactive) {
     // Read the geometry from the .re2 file
     unsigned int nelt, nbcs, nv;
     double *coord = NULL;
