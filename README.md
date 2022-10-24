@@ -1,35 +1,43 @@
 # parRSB
 
 * Computes high quality partitionings using recursive spectral bisection (RSB)
-* Requires MPI and [gslib](https://github.com/gslib/gslib) (requires version 1.0.3 or later)
+* Requires MPI and [gslib](https://github.com/gslib/gslib) (requires version
+  1.0.3 or later)
 
 ### Build Instructions
+
+Download `gslib` from [here](https://github.com/Nek5000/gslib) and follow the
+build instructions there to build it. Then set the `GSLIBPATH` variable to point
+to the `gslib` build directory.
 
 ```sh
 make CC=mpicc GSLIBPATH=<path to gslib>/build  all
 ```
 
-Download `gslib` from here: https://github.com/Nek5000/gslib and follow the build
-instructions there to build it.
-
 ### Run Example
 
-You can run both `genmap` and `gencon` examples in `build/examples` directory after
-building parRSB. Examples invoked with all available options are shown below.
+You can run both `genmap` and `gencon` examples in `build/examples` directory
+after building parRSB. Examples invoked with all available options are shown
+below.
 
 ```sh
-
 cd build/examples
 mpirun -np 4 ./genmap --mesh ethier --nactive=2 --tol=0.2 --test --no-dump
 mpirun -np 4 ./gencon --mesh ethier --tol=0.2 --test --no-dump
 ```
 
-`--mesh` is the name of the input mesh (.re2 file) and is required. `--tol` is the
-tolerance used for finding connectivity. `--test` will run a check to see if `genmap`
-or `gencon` examples passed the builtin tests. If `--no-dump` is not specified, the
-examples will write a `.re2` or a `.ma2` file by default. `--nactive` parameter specify
-how many MPI ranks are active in the examples. Please note that `--tol` and `--nactive`
-requires a `=` sign (since they are optional) while `--mesh` does not need one.
+- `--mesh` (required) is the name of the input mesh (.re2 file) and is required.
+- `--tol` (optional, default = 0.2) is the tolerance used for finding mesh
+  connectivity.
+- `--test` (optional, default = 0) controls running checks in `genmap` or
+  `gencon` examples.
+- `--dump` (optional, default = 1) controls dumping `.co2` and/or `.ma2` file
+  after running `gencon` and `genmap` respectively.
+- `--nactive` (optional, default: `INT_MAX`) controls how many MPI ranks are
+  active when running `genmap`.
+
+Please note that all the optional arguments requires a `=` sign when being
+specified in the command line.
 
 ### C Interface
 

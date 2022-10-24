@@ -53,7 +53,7 @@ jobs:
           tol=(`cat test.txt | grep tol`); tol=${tol[2]}
 
           mpirun -np ${{ matrix.np }} --hostfile hostfile ./gencon \
-            --mesh ${{ matrix.test }} --tol=${tol} --no-dump --test
+            --mesh ${{ matrix.test }} --tol=${tol} --dump=0 --test=1
       - name: genmap-lanczos
         if: always()
         shell: bash
@@ -68,7 +68,7 @@ jobs:
           tol=(`cat test.txt | grep tol`); tol=${tol[2]}
 
           mpirun -np ${{ matrix.np }} --hostfile hostfile ./genmap \
-            --mesh ${{ matrix.test }} --tol=${tol} --no-dump --test
+            --mesh ${{ matrix.test }} --tol=${tol} --dump=0 --test=1
       - name: genmap-mg-factor-2
         if: always()
         shell: bash
@@ -84,7 +84,7 @@ jobs:
           tol=(`cat test.txt | grep tol`); tol=${tol[2]}
 
           mpirun -np ${{ matrix.np }} --hostfile hostfile ./genmap \
-            --mesh ${{ matrix.test }} --tol=${tol} --no-dump --test
+            --mesh ${{ matrix.test }} --tol=${tol} --dump=0 --test=1
       - name: genmap-mg-factor-4
         if: always()
         shell: bash
@@ -100,7 +100,7 @@ jobs:
           tol=(`cat test.txt | grep tol`); tol=${tol[2]}
 
           mpirun -np ${{ matrix.np }} --hostfile hostfile ./genmap \
-            --mesh ${{ matrix.test }} --tol=${tol} --no-dump --test
+            --mesh ${{ matrix.test }} --tol=${tol} --dump=0 --test=1
       - name: genmap-mg-factor-4-smooth
         if: always()
         shell: bash
@@ -117,4 +117,4 @@ jobs:
           tol=(`cat test.txt | grep tol`); tol=${tol[2]}
 
           mpirun -np ${{ matrix.np }} --hostfile hostfile ./genmap \
-            --mesh ${{ matrix.test }} --tol=${tol} --no-dump --test
+            --mesh ${{ matrix.test }} --tol=${tol} --dump=0 --test=1
