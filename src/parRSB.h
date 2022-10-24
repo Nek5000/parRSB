@@ -55,10 +55,6 @@ int parrsb_conn_mesh(long long *vtx, double *coord, int nel, int nDim,
                      long long *periodicInfo, int nPeriodicFaces, double tol,
                      MPI_Comm comm, int verbose);
 
-int parrsb_conn_new(long long *vtx, double *coord, int nel, int nDim,
-                    long long *periodicInfo, int nPeriodicFaces, double tol,
-                    MPI_Comm comm, int verbose);
-
 #define fparrsb_conn_mesh                                                      \
   FORTRAN_UNPREFIXED(fparrsb_conn_mesh, FPARRSB_CONN_MESH)
 void fparrsb_conn_mesh(long long *vtx, double *coord, int *nel, int *nDim,
@@ -100,6 +96,8 @@ struct parrsb_cmd_opts {
   double crs_tol; // Coarse tolerance, default: 1e-3
 };
 
+struct parrsb_cmd_opts *parrsb_parse_cmd_opts(int argc, char *argv[]);
+
 int parrsb_dist_mesh(unsigned *nelt, long long **vl, double **coord, int *part,
                      int nv, MPI_Comm comm);
 
@@ -112,8 +110,6 @@ void parrsb_print_part_stat(long long *vtx, unsigned nelt, unsigned nv,
 
 void parrsb_get_part_stat(int *nc, int *ns, int *nss, int *nel, long long *vtx,
                           int nelt, int nv, MPI_Comm comm);
-
-struct parrsb_cmd_opts *parrsb_parse_cmd_opts(int argc, char *argv[]);
 
 void parrsb_check_error_(int err, char *file, int line, MPI_Comm comm);
 #define parrsb_check_error(err, comm)                                          \
