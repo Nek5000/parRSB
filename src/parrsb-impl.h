@@ -26,8 +26,7 @@
 #endif
 #define gs_scalar gs_double
 
-#define PARRSB_ALIGN 32
-#define PARRSB_TOL 1e-12
+#define SCALAR_TOL 1e-12
 
 #define MAXDIM 3 // Maximum dimension of the mesh
 #define MAXNV 8  // Maximum number of vertices per element

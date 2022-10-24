@@ -384,7 +384,7 @@ static int tqli(scalar *eVectors, scalar *eValues, sint n, scalar *diagonal,
       for (m = l; m < n - 1; m++) {
         scalar dd = fabs(d[m]) + fabs(d[m + 1]);
         /* Should use a tolerance for this check */
-        if (fabs(e[m]) / dd < PARRSB_TOL)
+        if (fabs(e[m]) / dd < SCALAR_TOL)
           break;
       }
 
@@ -436,7 +436,7 @@ static int tqli(scalar *eVectors, scalar *eValues, sint n, scalar *diagonal,
           /* Done with eigenvectors */
         }
 
-        if (r < PARRSB_TOL && i >= l)
+        if (r < SCALAR_TOL && i >= l)
           continue;
 
         d[l] -= p;
