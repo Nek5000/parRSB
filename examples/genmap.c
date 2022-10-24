@@ -11,12 +11,16 @@ int main(int argc, char *argv[]) {
   int err = (in == NULL);
   parrsb_check_error(err, world);
 
-  int id;
-  MPI_Comm_rank(world, &id);
+  int rank, size;
+  MPI_Comm_rank(world, &rank);
+  MPI_Comm_size(world, &size);
+
+  if (in->nactive > size)
+    in->nactive = size;
 
   MPI_Comm comm;
-  MPI_Comm_split(world, id < in->nactive, id, &comm);
-  if (id < in->nactive) {
+  MPI_Comm_split(world, rank < in->nactive, rank, &comm);
+  if (rank < in->nactive) {
     // Read the geometry from the .re2 file
     unsigned int nelt, nbcs, nv;
     double *coord = NULL;
@@ -37,8 +41,10 @@ int main(int argc, char *argv[]) {
     // Print pre-partition statistics
     int nss[6];
     if (in->verbose > 0) {
-      if (id == 0)
+      if (rank == 0) {
         printf("Partition statistics before RSB:\n");
+        fflush(stdout);
+      }
       parrsb_print_part_stat(vl, nelt, nv, comm);
     }
     parrsb_get_part_stat(NULL, NULL, nss, NULL, vl, nelt, nv, comm);
@@ -57,8 +63,10 @@ int main(int argc, char *argv[]) {
     parrsb_check_error(err, comm);
 
     if (in->verbose > 0) {
-      if (id == 0)
+      if (rank == 0) {
         printf("Partition statistics after RSB:\n");
+        fflush(stdout);
+      }
       parrsb_print_part_stat(vl, nelt, nv, comm);
     }
     parrsb_get_part_stat(NULL, NULL, &nss[3], NULL, vl, nelt, nv, comm);
