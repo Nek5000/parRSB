@@ -4,6 +4,8 @@
 * Requires MPI and [gslib](https://github.com/gslib/gslib) (requires version
   1.0.3 or later)
 
+Note, any initial distribution of mesh elements is valid.
+
 ### Build Instructions
 
 Download `gslib` from [here](https://github.com/Nek5000/gslib) and follow the
@@ -42,8 +44,8 @@ specified in the command line.
 ### C Interface
 
 ```C
-int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord, int nel,
-                    int nv, parrsb_options options, MPI_Comm comm);
+int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
+                     int nel, int nv, parrsb_options opts, MPI_Comm comm)
 ```
 
 See `example/genmap.c` for an example.
@@ -51,47 +53,59 @@ See `example/genmap.c` for an example.
 #### Parameters
 
 ```text
-part    (out)   ... Destination processor id of each element after the partition (size = nel).
-seq     (out)   ... Local sequence id of element `i` in processor `part[i]` after the partition (size = nel).
-vtx     (in)    ... Vertices of local elements (dense unique IDs are required, size = nel * nv).
-coord   (in)    ... Coordinates of elements (size = nel * ndim).
-nel     (in)    ... Numer of local elements.
-nv      (in)    ... Number of vertices of a single element (has to be the same for all, used to calculate ndim).
-options (in)    ... Additional configuration options (See below for a detailed explanation).
-comm    (in)    ... MPI Communicator (size determines number of partitions).
+nel  [in] : Numer of local elements.
+nv   [in] : Number of vertices in a single element (has to be same the for all).
+vtx  [in] : Vertices of `nel` elements, `nv` entries for each element (dense
+            unique IDs, size = nel * nv).
+coord[in] : Coordinates of `nel` elements, should be in the same order as vtx
+            (size = nel * dimesnion of the mesh).
+opts [in] : parRSB configuration options (See below for a detailed explanation).
+comm [in] : MPI Communicator (size determines number of partitions).
+part [out]: Destination processor number for each element after partition
+            (size = nel).
+seq  [out]: Order of element `i` in processor `part[i]` after partition
+            (size = nel).
 ```
 
-`options` is a `struct` of type `parrsb_options` declared in `parRSB.h`.
+`opts` is a `struct` of type `parrsb_options` declared in `parRSB.h`.
+
 ```C
 typedef struct {
-  /* General options */
-  int partitioner;   // 0 - RSB, 1 - RCB, 2 - RIB (Default: 0)
-  int verbose_level;   // 0, 1, 2, .. etc (Default: 0)
-  int profile_level; // 0, 1, 2, .. etc (Default: 0)
-
-  /* RSB specific */
-  int rsb_algo;     // 0 - Lanczos, 1 - RQI (Default: 0)
-  int rsb_pre;      // 0 - None, 1 - RCB , 2 - RIB (Default: 1)
-  int rsb_grammian; // 0 or 1 (Default: 0)
-
-  /* Other */
-  int repair; // 0 - No, 1 - Yes (Default: 1)
+  // General options
+  int partitioner;   // Partition algo: 0 - RSB, 1 - RCB, 2 - RIB (Default: 0)
+  int verbose_level; // Verbose level: 0, 1, 2, .. etc (Default: 1)
+  int profile_level; // Profile level: 0, 1, 2, .. etc (Default: 1)
+  int two_level;     // Use two level partitioning algo (Default: 0)
+  int repair; // Repair disconnected components: 0 - No, 1 - Yes (Default: 0)
+  // RSB specific
+  int rsb_algo; // RSB algo: 0 - Lanczos, 1 - RQI (Default: 0)
+  int rsb_pre;  // RSB pre-partition algo: 0 - None, 1 - RCB , 2 - RIB (Default:
+                // 1)
+  int rsb_max_iter; // Maximum iterations in Lanczos or RQI (Default: 50)
+  double rsb_tol;   // Tolerance for Lanczos or RQI (Default: 1e-5)
+  // RSB-MG specific
+  int rsb_mg_grammian; // MG Grammian: 0 or 1 (Default: 0)
+  int rsb_mg_factor;   // MG Coarsening factor (Default: 2, should be > 1)
+  int rsb_mg_sagg;     // MG smooth aggregation: 0 or 1 (Default: 0)
+  // RSB-Lanczos specific
+  int rsb_lanczos_max_restarts; // Maximum restarts in Lanczos (Default: 50)
 } parrsb_options;
 ```
 
 You can use `parrsb_default_options` struct instance to pass default options
 to `parrsb_part_mesh` routine. All of these options can be controlled at runtime
-setting up the relevant env. variable to the corresponding value as well. Below
-is the list of env. variables:
+by setting up the relevant environment variable (named as `PARRSB_<OPT_NAME>`)
+to the corresponding value as well. Enviornment variable values will override
+what is passed to `parrsb_part_mesh` routine.
+
+Below is a list of some of environment variables:
 
 ```
 PARRSB_PARTITIONER
 PARRSB_VERBOSE_LEVEL
 PARRSB_PROFILE_LEVEL
+PARRSB_TWO_LEVEL
+PARRSB_REPAIR
 PARRSB_RSB_ALGO
 PARRSB_RSB_PRE
-PARRSB_RSB_GRAMMIAN
-PARRSB_REPAIR
 ```
-
-Note, any initial distribution of mesh elements is valid.
