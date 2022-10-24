@@ -268,20 +268,20 @@ struct parrsb_cmd_opts *parrsb_parse_cmd_opts(int argc, char *argv[]) {
   in->crs_type = 0, in->crs_tol = 1e-3;
 
   static struct option long_options[] = {
-      {"mesh", required_argument, NULL, 0},
-      {"tol", optional_argument, NULL, 1},
-      {"test", optional_argument, NULL, 2},
-      {"dump", optional_argument, NULL, 3},
-      {"nactive", optional_argument, NULL, 4},
-      {"verbose", optional_argument, NULL, 5},
-      {"ilu_type", optional_argument, NULL, 10},
-      {"ilu_tol", optional_argument, NULL, 11},
-      {"ilu_pivot", optional_argument, NULL, 12},
-      {"crs_type", optional_argument, NULL, 20},
-      {"crs_tol", optional_argument, NULL, 21},
-      {NULL, 0, NULL, 0}};
+      {"mesh", required_argument, 0, 0},
+      {"tol", optional_argument, 0, 1},
+      {"test", optional_argument, 0, 2},
+      {"dump", optional_argument, 0, 3},
+      {"nactive", optional_argument, 0, 4},
+      {"verbose", optional_argument, 0, 5},
+      {"ilu_type", optional_argument, 0, 10},
+      {"ilu_tol", optional_argument, 0, 11},
+      {"ilu_pivot", optional_argument, 0, 12},
+      {"crs_type", optional_argument, 0, 20},
+      {"crs_tol", optional_argument, 0, 21},
+      {0, 0, 0, 0}};
 
-  unsigned len;
+  size_t len;
   for (;;) {
     int c = getopt_long(argc, argv, "", long_options, NULL);
     if (c == -1)
@@ -290,8 +290,8 @@ struct parrsb_cmd_opts *parrsb_parse_cmd_opts(int argc, char *argv[]) {
     switch (c) {
     case 0:
       len = strnlen(optarg, PATH_MAX);
-      in->mesh = tcalloc(char, len);
-      strncpy(in->mesh, optarg, PATH_MAX);
+      in->mesh = tcalloc(char, len + 1);
+      strncpy(in->mesh, optarg, len);
       break;
     case 1:
       in->tol = atof(optarg);
@@ -338,9 +338,10 @@ void parrsb_check_error_(int err, char *file, int line, MPI_Comm comm) {
   if (sum != 0) {
     int id;
     MPI_Comm_rank(comm, &id);
-    if (id == 0)
-      printf("check_error failure in %s:%d\n", file, line);
-
+    if (id == 0) {
+      fprintf(stderr, "parrsb_check_error failure in %s:%d\n", file, line);
+      fflush(stderr);
+    }
     MPI_Finalize();
     exit(1);
   }
