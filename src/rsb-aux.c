@@ -30,7 +30,7 @@ static void test_component_versions(struct array *elements, struct comm *lc,
   sint nc2 = get_components_v2(NULL, elements, nv, &tc0, bfr, 0);
   if (nc1 != nc2) {
     if (tc0.id == 0)
-      printf("lvl = %u SS-BFS != MS-BFS: %d %d\n", lvl, nc1, nc2);
+      printf("lvl = %u SS BFS != MS BFS: %d %d\n", lvl, nc1, nc2);
     fflush(stdout);
   }
   if (nc1 > 1) {

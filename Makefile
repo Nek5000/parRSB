@@ -1,5 +1,6 @@
 CC ?= mpicc
 CFLAGS ?=
+LDFLAGS ?=
 DEBUG ?= 0
 MPI ?= 1
 UNDERSCORE ?= 1
@@ -28,8 +29,11 @@ SRCOBJS = $(patsubst $(SRCROOT)/%.c,$(BUILDROOT)/%.o,$(SRCS))
 EXAMPLES = $(wildcard $(EXAMPLEDIR)/*.c)
 EXAMPLEBINS = $(patsubst $(SRCROOT)/%.c,$(BUILDROOT)/%,$(EXAMPLES))
 
+LIB = $(BUILDROOT)/lib/libparRSB.a
+
 ifneq ($(DEBUG),0)
-  PP += -DPARRSB_DEBUG -g
+  PP += -DPARRSB_DEBUG
+  CFLAGS += -g
 else
   CFLAGS += -O2
 endif
@@ -54,12 +58,11 @@ ifneq ($(BLAS),0)
   LDFLAGS += $(BLASFLAGS)
 endif
 
-LIB = $(BUILDROOT)/lib/libparRSB.a
 INCFLAGS = -I$(SRCDIR) -I$(GSLIBPATH)/include
-LDFLAGS = -L$(INSTALLROOT)/lib -lparRSB -L$(GSLIBPATH)/lib -lgs -lm
 CCCMD = $(CC) $(CFLAGS) $(INCFLAGS) $(PP)
+LDFLAGS += -lm
 
-.PHONY: all install lib examples clean format
+.PHONY: all lib install examples format clean
 
 all: lib install
 
@@ -94,7 +97,8 @@ $(BUILDROOT)/%.o: $(SRCROOT)/%.c
 	$(CCCMD) -c $< -o $@
 
 $(BUILDROOT)/%: $(SRCROOT)/%.c | lib install
-	$(CCCMD) $< -o $@ $(LDFLAGS)
+	$(CCCMD) $< -o $@ -L$(INSTALLROOT)/lib -lparRSB -L$(GSLIBPATH)/lib -lgs \
+		$(LDFLAGS)
 
 $(shell mkdir -p $(BUILDROOT)/examples)
 $(shell mkdir -p $(BUILDROOT)/src)
