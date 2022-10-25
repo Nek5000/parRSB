@@ -338,27 +338,24 @@ int rsb(struct array *elements, int nv, int check, parrsb_options *options,
     struct comm tc;
     comm_split(&lc, bin, lc.id, &tc);
 
-    if (!disconnected) {
-      struct rsb_element *pe = (struct rsb_element *)elements->ptr;
-      for (unsigned i = 0; i < elements->n; i++)
-        pe[i].proc = lc.id;
+    struct rsb_element *pe = (struct rsb_element *)elements->ptr;
+    for (unsigned i = 0; i < elements->n; i++)
+      pe[i].proc = lc.id;
 
-      metric_tic(&lc, RSB_FIEDLER);
-      fiedler(elements, nv, options, &lc, bfr, gc->id == 0);
-      metric_toc(&lc, RSB_FIEDLER);
+    metric_tic(&lc, RSB_FIEDLER);
+    fiedler(elements, nv, options, &lc, bfr, gc->id == 0);
+    metric_toc(&lc, RSB_FIEDLER);
 
-      // Sort by Fiedler vector
-      metric_tic(&lc, RSB_SORT);
-      parallel_sort_2(struct rsb_element, elements, fiedler, gs_double,
-                      globalId, gs_long, 0, 1, &lc, bfr);
-      metric_toc(&lc, RSB_SORT);
+    // Sort by Fiedler vector
+    metric_tic(&lc, RSB_SORT);
+    parallel_sort_2(struct rsb_element, elements, fiedler, gs_double, globalId,
+                    gs_long, 0, 1, &lc, bfr);
+    metric_toc(&lc, RSB_SORT);
 
-      metric_tic(&lc, RSB_REPAIR);
-      if (options->repair)
-        repair_partitions_v2(elements, nv, &tc, &lc, bin, options->rsb_pre,
-                             bfr);
-      metric_toc(&lc, RSB_REPAIR);
-    }
+    metric_tic(&lc, RSB_REPAIR);
+    if (options->repair)
+      repair_partitions_v2(elements, nv, &tc, &lc, bin, options->rsb_pre, bfr);
+    metric_toc(&lc, RSB_REPAIR);
 
     // Bisect and balance
     metric_tic(&lc, RSB_BALANCE);
