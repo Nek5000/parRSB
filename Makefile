@@ -1,4 +1,3 @@
-## General build parameters ##
 CC ?= mpicc
 CFLAGS ?=
 DEBUG ?= 0
@@ -14,26 +13,20 @@ ifeq ($(GSLIBPATH),)
   $(error Specify GSLIBPATH=<path to gslib build>)
 endif
 
-MKFILEPATH = $(abspath $(lastword $(MAKEFILE_LIST)))
-SRCROOT_ ?= $(patsubst %/,%,$(dir $(MKFILEPATH)))
-SRCROOT = $(realpath $(SRCROOT_))
-
+MKFILEPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
+SRCROOT := $(realpath $(patsubst %/,%,$(dir $(MKFILEPATH))))
 SRCDIR = $(SRCROOT)/src
-BUILDDIR = $(SRCROOT)/build
 EXAMPLEDIR = $(SRCROOT)/examples
-INSTALLDIR=$(SRCROOT)
+BUILDROOT = $(SRCROOT)/build
+INSTALLROOT = $(BUILDROOT)/install
+ifneq ($(strip $(DESTDIR)),)
+  INSTALLROOT = $(realpath $(DESTDIR))
+endif
 
-INCFLAGS = -I$(SRCDIR) -I$(GSLIBPATH)/include
-LDFLAGS = -L$(BUILDDIR)/lib -lparRSB -L$(GSLIBPATH)/lib -lgs -lm
-
-SRCS  = $(wildcard $(SRCDIR)/*.c)
+SRCS = $(wildcard $(SRCDIR)/*.c)
+SRCOBJS = $(patsubst $(SRCROOT)/%.c,$(BUILDROOT)/%.o,$(SRCS))
 EXAMPLES = $(wildcard $(EXAMPLEDIR)/*.c)
-LIB = $(BUILDDIR)/lib/libparRSB.a
-
-SRCOBJS = $(patsubst $(SRCDIR)/%.c,$(BUILDDIR)/%.o,$(SRCS))
-EXAMPLEOBJS = $(patsubst $(SRCROOT)/%.c,$(BUILDDIR)/%,$(EXAMPLES))
-
-PP =
+EXAMPLEBINS = $(patsubst $(SRCROOT)/%.c,$(BUILDROOT)/%,$(EXAMPLES))
 
 ifneq ($(DEBUG),0)
   PP += -DPARRSB_DEBUG -g
@@ -61,46 +54,33 @@ ifneq ($(BLAS),0)
   LDFLAGS += $(BLASFLAGS)
 endif
 
-ifneq ($(OCCA),0)
-  PP += -DPARRSB_OCCA
-  LDFLAGS+= -L$(OCCADIR)/lib -locca
-  INCFLAGS+= -I$(OCCADIR)/include
-  SRCS += $(wildcard $(SRCDIR)/occa/*.c)
-endif
-
-ifneq (,$(strip $(DESTDIR)))
-  INSTALLDIR = $(realpath $(DESTDIR))
-endif
+LIB = $(BUILDROOT)/lib/libparRSB.a
+INCFLAGS = -I$(SRCDIR) -I$(GSLIBPATH)/include
+LDFLAGS = -L$(INSTALLROOT)/lib -lparRSB -L$(GSLIBPATH)/lib -lgs -lm
+CCCMD = $(CC) $(CFLAGS) $(INCFLAGS) $(PP)
 
 .PHONY: all install lib examples clean format
 
-all: examples
-
-install: lib
-	@mkdir -p $(INSTALLDIR)/lib 2>/dev/null
-	@cp -v $(LIB) $(INSTALLDIR)/lib 2>/dev/null
-	@mkdir -p $(INSTALLDIR)/include 2>/dev/null
-	@cp $(SRCDIR)/*.h $(INSTALLDIR)/include 2>/dev/null
-	@cp -r $(SRCDIR)/occa/*.okl $(INSTALLDIR)/ 2>/dev/null
+all: lib install
 
 lib: $(SRCOBJS)
-	@mkdir -p $(BUILDDIR)/lib
-	@$(AR) cr $(LIB) $(SRCOBJS)
+	@mkdir -p $(BUILDROOT)/lib
+	@$(AR) cr $(LIB) $?
 	@ranlib $(LIB)
 
-$(BUILDDIR)/%.o: $(SRCROOT)/src/%.c
-	$(CC) $(CFLAGS) $(PP) $(INCFLAGS) -c $< -o $@
+install: lib
+	@mkdir -p $(INSTALLROOT)/lib 2>/dev/null
+	@cp -v $(LIB) $(INSTALLROOT)/lib 2>/dev/null
+	@mkdir -p $(INSTALLROOT)/include 2>/dev/null
+	@cp $(SRCDIR)/*.h $(INSTALLROOT)/include 2>/dev/null
 
-examples: install $(EXAMPLEOBJS) $(SRCOBJS)
-
-$(BUILDDIR)/examples/%: $(SRCROOT)/examples/%.c
-	$(CC) $(CFLAGS) $(PP) $(INCFLAGS) $< -o $@ $(LDFLAGS)
-
-clean:
-	@rm -rf $(BUILDDIR)
+examples: lib install $(EXAMPLEBINS)
 
 format:
 	find . -iname *.h -o -iname *.c -o -iname *.okl | xargs clang-format -i
+
+clean:
+	@$(RM) -rf $(BUILDROOT)
 
 print-%:
 	$(info [ variable name]: $*)
@@ -110,6 +90,11 @@ print-%:
 	$(info)
 	@true
 
-$(shell mkdir -p $(BUILDDIR)/gencon)
-$(shell mkdir -p $(BUILDDIR)/occa)
-$(shell mkdir -p $(BUILDDIR)/examples)
+$(BUILDROOT)/%.o: $(SRCROOT)/%.c
+	$(CCCMD) -c $< -o $@
+
+$(BUILDROOT)/%: $(SRCROOT)/%.c | lib install
+	$(CCCMD) $< -o $@ $(LDFLAGS)
+
+$(shell mkdir -p $(BUILDROOT)/examples)
+$(shell mkdir -p $(BUILDROOT)/src)
