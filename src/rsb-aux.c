@@ -48,7 +48,7 @@ static void test_component_versions(struct array *elements, struct comm *lc,
 
 static void check_rsb_partition(struct comm *gc, parrsb_options *opts) {
   int max_levels = log2ll(gc->np);
-  int miter = opts->rsb_max_iter, mpass = opts->rsb_lanczos_max_restarts;
+  int miter = opts->rsb_max_iter, mpass = opts->rsb_max_passes;
 
   for (int i = 0; i < max_levels; i++) {
     sint converged = 1;

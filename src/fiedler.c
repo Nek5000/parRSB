@@ -643,13 +643,12 @@ int fiedler(struct array *elements, int nv, parrsb_options *opts,
   switch (opts->rsb_algo) {
   case 0:
     iter = lanczos(f, elements, nv, initv, gsc, opts->rsb_max_iter,
-                   opts->rsb_lanczos_max_restarts, opts->rsb_tol, nelg, buf);
+                   opts->rsb_max_passes, opts->rsb_tol, nelg, buf);
     break;
   case 1:
     iter = inverse(f, elements, nv, initv, gsc, opts->rsb_max_iter,
-                   opts->rsb_lanczos_max_restarts, opts->rsb_tol,
-                   opts->rsb_mg_factor, opts->rsb_mg_sagg,
-                   opts->rsb_mg_grammian, nelg, buf);
+                   opts->rsb_max_passes, opts->rsb_tol, opts->rsb_mg_factor,
+                   opts->rsb_mg_sagg, opts->rsb_mg_grammian, nelg, buf);
     break;
   default:
     break;
