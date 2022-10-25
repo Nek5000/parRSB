@@ -32,16 +32,16 @@ parrsb_options parrsb_default_options = {
 
 static char *ALGO[3] = {"RSB", "RCB", "RIB"};
 
-#define UPDATE_OPTION(opt, str, is_int)                                        \
-  {                                                                            \
-    const char *val = getenv(str);                                             \
+#define UPDATE_OPTION(OPT, STR, IS_INT)                                        \
+  do {                                                                         \
+    const char *val = getenv(STR);                                             \
     if (val != NULL) {                                                         \
-      if (is_int)                                                              \
-        options->opt = atoi(val);                                              \
+      if (IS_INT)                                                              \
+        options->OPT = atoi(val);                                              \
       else                                                                     \
-        options->opt = atof(val);                                              \
+        options->OPT = atof(val);                                              \
     }                                                                          \
-  }
+  } while (0)
 
 static void update_options(parrsb_options *options) {
   UPDATE_OPTION(partitioner, "PARRSB_PARTITIONER", 1);
@@ -61,28 +61,23 @@ static void update_options(parrsb_options *options) {
 
 #undef UPDATE_OPTION
 
-#define PRINT_OPTION(opt, str, is_int)                                         \
-  {                                                                            \
-    if (is_int)                                                                \
-      printf("%s = %d\n", str, options->opt);                                  \
-    else                                                                       \
-      printf("%s = %lf\n", str, options->opt);                                 \
-  }
+#define PRINT_OPTION(OPT, STR, FMT) printf("%s = " FMT "\n", STR, options->OPT)
 
 static void print_options(parrsb_options *options) {
-  PRINT_OPTION(partitioner, "PARRSB_PARTITIONER", 1);
-  PRINT_OPTION(verbose_level, "PARRSB_VERBOSE_LEVEL", 1);
-  PRINT_OPTION(profile_level, "PARRSB_PROFILE_LEVEL", 1);
-  PRINT_OPTION(two_level, "PARRSB_TWO_LEVEL", 1);
-  PRINT_OPTION(repair, "PARRSB_REPAIR", 1);
-  PRINT_OPTION(rsb_algo, "PARRSB_RSB_ALGO", 1);
-  PRINT_OPTION(rsb_pre, "PARRSB_RSB_PRE", 1);
-  PRINT_OPTION(rsb_max_iter, "PARRSB_RSB_MAX_ITER", 1);
-  PRINT_OPTION(rsb_tol, "PARRSB_RSB_TOL", 0);
-  PRINT_OPTION(rsb_mg_grammian, "PARRSB_RSB_MG_GRAMMIAN", 1);
-  PRINT_OPTION(rsb_mg_factor, "PARRSB_RSB_MG_FACTOR", 1);
-  PRINT_OPTION(rsb_mg_sagg, "PARRSB_RSB_MG_SMOOTH_AGGREGATION", 1);
-  PRINT_OPTION(rsb_lanczos_max_restarts, "PARRSB_RSB_LANCZOS_MAX_RESTARTS", 1);
+  PRINT_OPTION(partitioner, "PARRSB_PARTITIONER", "%d");
+  PRINT_OPTION(verbose_level, "PARRSB_VERBOSE_LEVEL", "%d");
+  PRINT_OPTION(profile_level, "PARRSB_PROFILE_LEVEL", "%d");
+  PRINT_OPTION(two_level, "PARRSB_TWO_LEVEL", "%d");
+  PRINT_OPTION(repair, "PARRSB_REPAIR", "%d");
+  PRINT_OPTION(rsb_algo, "PARRSB_RSB_ALGO", "%d");
+  PRINT_OPTION(rsb_pre, "PARRSB_RSB_PRE", "%d");
+  PRINT_OPTION(rsb_max_iter, "PARRSB_RSB_MAX_ITER", "%d");
+  PRINT_OPTION(rsb_tol, "PARRSB_RSB_TOL", "%lf");
+  PRINT_OPTION(rsb_mg_grammian, "PARRSB_RSB_MG_GRAMMIAN", "%d");
+  PRINT_OPTION(rsb_mg_factor, "PARRSB_RSB_MG_FACTOR", "%d");
+  PRINT_OPTION(rsb_mg_sagg, "PARRSB_RSB_MG_SMOOTH_AGGREGATION", "%d");
+  PRINT_OPTION(rsb_lanczos_max_restarts, "PARRSB_RSB_LANCZOS_MAX_RESTARTS",
+               "%d");
 }
 
 #undef PRINT_OPTION

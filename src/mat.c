@@ -140,10 +140,11 @@ int mat_print(struct mat *mat) {
   uint i, j;
   for (i = 0; i < mat->n; i++) {
     for (j = mat->Lp[i]; j < mat->Lp[i + 1]; j++)
-      printf("%ld %ld %lf\n", mat->start + i, mat->start + mat->Li[j],
+      printf("%llu %llu %lf\n", mat->start + i, mat->start + mat->Li[j],
              mat->L[j]);
     if (mat->D != NULL)
-      printf("%ld %ld %lf\n", mat->start + i, mat->start + i, mat->D[i]);
+      printf("%lld %lld %lf\n", mat->start + i, mat->start + i, mat->D[i]);
+    fflush(stdout);
   }
 
   return 0;
@@ -615,24 +616,24 @@ void par_csc_to_csr(struct par_mat *N, const struct par_mat *M, int diag,
 }
 
 void par_mat_print(struct par_mat *A) {
-  uint i, j;
   if (IS_CSR(A)) {
-    for (i = 0; i < A->rn; i++) {
-      for (j = A->adj_off[i]; j < A->adj_off[i + 1]; j++)
-        printf("%ld %ld %lf\n", A->rows[i], A->cols[A->adj_idx[j]],
+    for (uint i = 0; i < A->rn; i++) {
+      for (uint j = A->adj_off[i]; j < A->adj_off[i + 1]; j++)
+        printf("%lld %lld %lf\n", A->rows[i], A->cols[A->adj_idx[j]],
                A->adj_val[j]);
       if (IS_DIAG(A))
-        printf("%ld %ld %lf\n", A->rows[i], A->rows[i], A->diag_val[i]);
+        printf("%lld %lld %lf\n", A->rows[i], A->rows[i], A->diag_val[i]);
     }
   } else if (IS_CSC(A)) {
-    for (i = 0; i < A->cn; i++) {
-      for (j = A->adj_off[i]; j < A->adj_off[i + 1]; j++)
-        printf("%ld %ld %lf\n", A->rows[A->adj_idx[j]], A->cols[i],
+    for (uint i = 0; i < A->cn; i++) {
+      for (uint j = A->adj_off[i]; j < A->adj_off[i + 1]; j++)
+        printf("%lld %lld %lf\n", A->rows[A->adj_idx[j]], A->cols[i],
                A->adj_val[j]);
       if (IS_DIAG(A))
-        printf("%ld %ld %lf\n", A->cols[i], A->cols[i], A->diag_val[i]);
+        printf("%lld %lld %lf\n", A->cols[i], A->cols[i], A->diag_val[i]);
     }
   }
+  fflush(stdout);
 }
 
 void par_mat_dump(const char *name, struct par_mat *A, struct crystal *cr,
