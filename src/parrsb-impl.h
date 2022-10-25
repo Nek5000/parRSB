@@ -78,17 +78,6 @@ int laplacian(scalar *v, struct laplacian *l, scalar *u, buffer *buf);
 void laplacian_free(struct laplacian *l);
 
 //------------------------------------------------------------------------------
-// OCCA
-int occa_init(const char *backend, int device_id, int platform_id,
-              struct comm *c);
-int occa_lanczos_init(struct comm *c, struct laplacian *l, int niter);
-int occa_lanczos_aux(scalar *diag, scalar *upper, scalar *rr, uint lelt,
-                     ulong nelg, int niter, scalar *f, struct laplacian *gl,
-                     struct comm *gsc, buffer *bfr);
-int occa_lanczos_free();
-int occa_free();
-
-//------------------------------------------------------------------------------
 // Misc
 //
 int log2ll(long long n);

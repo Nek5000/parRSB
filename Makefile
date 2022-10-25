@@ -8,18 +8,10 @@ SYNC_BY_REDUCTION ?= 1
 BLAS ?= 0
 BLASDIR ?=
 BLASFLAGS ?= -lblas -llapack
-OCCA ?= 0
-OCCADIR ?=
 
 ########################## Don't touch what follows ###########################
 ifeq ($(GSLIBPATH),)
   $(error Specify GSLIBPATH=<path to gslib build>)
-endif
-
-ifneq ($(OCCA), 0)
-  ifeq ($(OCCADIR),)
-    $(error Specify OCCADIR=<path to occa> when using OCCA=1)
-  endif
 endif
 
 MKFILEPATH = $(abspath $(lastword $(MAKEFILE_LIST)))

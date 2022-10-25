@@ -568,13 +568,7 @@ static int lanczos(scalar *fiedler, struct array *elements, int nv,
   metric_tic(gsc, RSB_LANCZOS_SETUP);
   uint lelt = elements->n;
   struct rsb_element *elems = (struct rsb_element *)elements->ptr;
-  struct laplacian *wl;
-#if defined(PARRSB_OCCA)
-  wl = laplacian_init(elems, lelt, nv, CSR, gsc, bfr);
-  occa_lanczos_init(gsc, wl, miter);
-#else
-  wl = laplacian_init(elems, lelt, nv, GS, gsc, bfr);
-#endif
+  struct laplacian *wl = laplacian_init(elems, lelt, nv, GS, gsc, bfr);
   metric_toc(gsc, RSB_LANCZOS_SETUP);
 
   if (nelg < miter)
@@ -587,13 +581,8 @@ static int lanczos(scalar *fiedler, struct array *elements, int nv,
   int iter = miter, ipass;
   for (ipass = 0; iter == miter && ipass < mpass; ipass++) {
     double t = comm_time();
-#if defined(PARRSB_OCCA)
-    iter = occa_lanczos_aux(alpha, beta, rr, lelt, nelg, miter, initv, wl, gsc,
-                            bfr);
-#else
     iter = lanczos_aux(alpha, beta, rr, lelt, nelg, miter, tol, initv, wl, gsc,
                        bfr);
-#endif
     metric_acc(RSB_LANCZOS, comm_time() - t);
 
     t = comm_time();
@@ -620,9 +609,6 @@ static int lanczos(scalar *fiedler, struct array *elements, int nv,
   }
 
   free(alpha), free(rr), free(eVectors), free(eValues);
-#if defined(PARRSB_OCCA)
-  occa_lanczos_free();
-#endif
   laplacian_free(wl);
 
   return (ipass - 1) * miter + iter;

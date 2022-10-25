@@ -455,11 +455,9 @@ int parrsb_dump_map(char *name, unsigned nelt, unsigned nv, long long *vtx,
   int noutflow = 0;
 
   char header[HEADER_LEN];
-  header[HEADER_LEN] = '\0';
   sprintf(header, "%5s%12d%12d%12d%12d%12d%12d%12d", version, nelgt, nactive,
           depth, d2, npts, nrnk, noutflow);
   memset(header + strlen(header), ' ', HEADER_LEN - strlen(header));
-  header[HEADER_LEN] = '\0';
 
   MPI_Info infoIn;
   MPI_Info_create(&infoIn);

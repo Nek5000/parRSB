@@ -169,13 +169,6 @@ static void restore_original(int *part, int *seq, struct crystal *cr,
   }
 }
 
-// part = [nel], out,
-// seq = [nel], out,
-// vtx = [nel x nv], in,
-// coord = [nel x nv x ndim], in,
-// nel = in,
-// nv = in,
-// options = in
 int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
                      int nel, int nv, parrsb_options options, MPI_Comm comm) {
   update_options(&options);
@@ -190,10 +183,6 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
 
   parrsb_barrier(&c);
   double t = comm_time();
-
-#if defined(PARRSB_OCCA)
-  occa_init("CUDA", 0, 0, &c);
-#endif
 
   struct crystal cr;
   crystal_init(&cr, &c);
@@ -242,10 +231,6 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
   }
   metric_finalize();
   comm_free(&ca);
-
-#if defined(PARRSB_OCCA)
-  occa_free();
-#endif
 
   restore_original(part, seq, &cr, &elist, esize, &bfr);
 
