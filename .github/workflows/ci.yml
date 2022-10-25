@@ -7,6 +7,7 @@ on:
 env:
   GITHUB.TOKEN: ${{ secrets.token }}
   PARRSB_CI: parRSB-github-ci
+  EXAMPLESDIR: build/examples
 jobs:
   parRSB:
     runs-on: ubuntu-latest
@@ -36,7 +37,7 @@ jobs:
 
           # Build parRSB
           export GSLIBPATH=`pwd`/gslib/build/
-          make -j1
+          make -j4 examples
 
           # Clone tests
           git clone https://github.com/thilinarmtb/${PARRSB_CI}.git
@@ -46,12 +47,10 @@ jobs:
       - name: gencon
         shell: bash
         run: |
-          cp hostfile build/examples/gencon ${PARRSB_CI}/${{ matrix.test }}
-
+          cp hostfile ${EXAMPLESDIR}/gencon ${PARRSB_CI}/${{ matrix.test }}
           cd ${PARRSB_CI}/${{ matrix.test }}
 
           tol=(`cat test.txt | grep tol`); tol=${tol[2]}
-
           mpirun -np ${{ matrix.np }} --hostfile hostfile ./gencon \
             --mesh ${{ matrix.test }} --tol=${tol} --dump=0 --test=1
       - name: genmap-lanczos
@@ -61,12 +60,10 @@ jobs:
           export PARRSB_RSB_PRE=0
           export PARRSB_RSB_ALGO=0
 
-          cp hostfile build/examples/genmap ${PARRSB_CI}/${{ matrix.test }}
-
+          cp hostfile ${EXAMPLESDIR}/genmap ${PARRSB_CI}/${{ matrix.test }}
           cd ${PARRSB_CI}/${{ matrix.test }}
 
           tol=(`cat test.txt | grep tol`); tol=${tol[2]}
-
           mpirun -np ${{ matrix.np }} --hostfile hostfile ./genmap \
             --mesh ${{ matrix.test }} --tol=${tol} --dump=0 --test=1
       - name: genmap-mg-factor-2
@@ -77,12 +74,10 @@ jobs:
           export PARRSB_RSB_ALGO=1
           export PARRSB_RSB_MG_FACTOR=2
 
-          cp hostfile build/examples/genmap ${PARRSB_CI}/${{ matrix.test }}
-
+          cp hostfile ${EXAMPLESDIR}/genmap ${PARRSB_CI}/${{ matrix.test }}
           cd ${PARRSB_CI}/${{ matrix.test }}
 
           tol=(`cat test.txt | grep tol`); tol=${tol[2]}
-
           mpirun -np ${{ matrix.np }} --hostfile hostfile ./genmap \
             --mesh ${{ matrix.test }} --tol=${tol} --dump=0 --test=1
       - name: genmap-mg-factor-4
@@ -93,12 +88,10 @@ jobs:
           export PARRSB_RSB_ALGO=1
           export PARRSB_RSB_MG_FACTOR=4
 
-          cp hostfile build/examples/genmap ${PARRSB_CI}/${{ matrix.test }}
-
+          cp hostfile ${EXAMPLESDIR}/genmap ${PARRSB_CI}/${{ matrix.test }}
           cd ${PARRSB_CI}/${{ matrix.test }}
 
           tol=(`cat test.txt | grep tol`); tol=${tol[2]}
-
           mpirun -np ${{ matrix.np }} --hostfile hostfile ./genmap \
             --mesh ${{ matrix.test }} --tol=${tol} --dump=0 --test=1
       - name: genmap-mg-factor-4-smooth
@@ -110,11 +103,9 @@ jobs:
           export PARRSB_RSB_MG_FACTOR=4
           export PARRSB_RSB_MG_SMOOTH_AGGREGATION=1
 
-          cp hostfile build/examples/genmap ${PARRSB_CI}/${{ matrix.test }}
-
+          cp hostfile ${EXAMPLESDIR}/genmap ${PARRSB_CI}/${{ matrix.test }}
           cd ${PARRSB_CI}/${{ matrix.test }}
 
           tol=(`cat test.txt | grep tol`); tol=${tol[2]}
-
           mpirun -np ${{ matrix.np }} --hostfile hostfile ./genmap \
             --mesh ${{ matrix.test }} --tol=${tol} --dump=0 --test=1

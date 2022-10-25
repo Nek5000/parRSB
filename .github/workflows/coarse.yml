@@ -7,6 +7,7 @@ on:
 env:
   GITHUB.TOKEN: ${{ secrets.token }}
   PARRSB_CI: parRSB-github-ci
+  EXAMPLESDIR: build/examples
 jobs:
   coarse:
     runs-on: ubuntu-latest
@@ -25,9 +26,8 @@ jobs:
         shell: bash
         run: |
           sudo apt -y update
-          sudo apt install -y mpich libmpich-dev python3-pytest
+          sudo apt install -y mpich libmpich-dev
           sudo apt install -y libblas-dev liblapack-dev
-          sudo apt install -y octave
       - name: Build parRSB and clone tests
         shell: bash
         run: |
@@ -37,7 +37,7 @@ jobs:
 
           # Build parRSB
           export GSLIBPATH=`pwd`/gslib/build/
-          make -j1
+          make -j4 examples
 
           # Clone tests
           git clone https://github.com/thilinarmtb/${PARRSB_CI}.git
@@ -48,9 +48,9 @@ jobs:
         if: always()
         shell: bash
         run: |
+          cp hostfile ${EXAMPLESDIR}/coarse ${PARRSB_CI}/${{ matrix.test }}
           cd ${PARRSB_CI}/${{ matrix.test }}
 
           tol=(`cat test.txt | grep tol`); tol=${tol[2]}
-
           mpirun -np ${{ matrix.np }} --hostfile hostfile ./coarse \
             --mesh ${{ matrix.test }} --tol=${tol} --crs_tol=1e-12

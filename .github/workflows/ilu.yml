@@ -7,6 +7,7 @@ on:
 env:
   GITHUB.TOKEN: ${{ secrets.token }}
   PARRSB_CI: parRSB-github-ci
+  EXAMPLESDIR: build/examples
 jobs:
   ilu:
     runs-on: ubuntu-latest
@@ -37,7 +38,7 @@ jobs:
 
           # Build parRSB
           export GSLIBPATH=`pwd`/gslib/build/
-          make -j1
+          make -j4 examples
 
           # Clone tests
           git clone https://github.com/thilinarmtb/${PARRSB_CI}.git
@@ -50,13 +51,11 @@ jobs:
         run: |
           export PARRSB_DUMP_ILU=1
 
-          cp hostfile build/examples/ilu .github/workflows/ilu0.m \
+          cp hostfile ${EXAMPLESDIR}/ilu .github/workflows/ilu0.m \
             ${PARRSB_CI}/${{ matrix.test }}
-
           cd ${PARRSB_CI}/${{ matrix.test }}
 
           tol=(`cat test.txt | grep tol`); tol=${tol[2]}
-
           mpirun -np ${{ matrix.np }} --hostfile hostfile ./ilu \
             --mesh ${{ matrix.test }} --tol=${tol} --ilu_type=0
 
@@ -67,13 +66,11 @@ jobs:
         run: |
           export PARRSB_DUMP_ILU=1
 
-          cp hostfile build/examples/ilu .github/workflows/iluc.m \
+          cp hostfile ${EXAMPLESDIR}/ilu .github/workflows/iluc.m \
             ${PARRSB_CI}/${{ matrix.test }}
-
           cd ${PARRSB_CI}/${{ matrix.test }}
 
           tol=(`cat test.txt | grep tol`); tol=${tol[2]}
-
           mpirun -np ${{ matrix.np }} --hostfile hostfile ./ilu \
             --mesh ${{ matrix.test }} --tol=${tol} --ilu_type=1
 
