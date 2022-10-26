@@ -315,7 +315,7 @@ int rsb(struct array *elements, int nv, int check, parrsb_options *options,
 
   unsigned ndim = (nv == 8) ? 3 : 2;
   while (np > 1) {
-    // Run RCB, RIB or just sort by global id
+    // Run the pre-partitioner
     metric_tic(&lc, RSB_PRE);
     switch (options->rsb_pre) {
     case 0: // Sort by global id
@@ -333,7 +333,7 @@ int rsb(struct array *elements, int nv, int check, parrsb_options *options,
     }
     metric_toc(&lc, RSB_PRE);
 
-    // Run fiedler if there are no disconnected components
+    // Find the Fiedler vector
     unsigned bin = (nid >= (np + 1) / 2);
     struct comm tc;
     comm_split(&lc, bin, lc.id, &tc);
@@ -352,6 +352,7 @@ int rsb(struct array *elements, int nv, int check, parrsb_options *options,
                     gs_long, 0, 1, &lc, bfr);
     metric_toc(&lc, RSB_SORT);
 
+    // Attempt to repair if there are disconnected components
     metric_tic(&lc, RSB_REPAIR);
     if (options->repair)
       repair_partitions_v2(elements, nv, &tc, &lc, bin, options->rsb_pre, bfr);
@@ -360,10 +361,12 @@ int rsb(struct array *elements, int nv, int check, parrsb_options *options,
     // Bisect and balance
     metric_tic(&lc, RSB_BALANCE);
     balance_partitions(elements, nv, &tc, &lc, bin, bfr);
+    metric_toc(&lc, RSB_BALANCE);
+
+    // Split the communicator
     comm_free(&lc);
     comm_dup(&lc, &tc);
     comm_free(&tc);
-    metric_toc(&lc, RSB_BALANCE);
 
     get_part(&np, &nid, options->two_level, &lc, &nc);
     metric_push_level();
