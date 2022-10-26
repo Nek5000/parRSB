@@ -6,6 +6,11 @@
 #define CSR 1
 
 ilu_options ilu_default_options;
+#define FREE(x)                                                                \
+  do {                                                                         \
+    if (x)                                                                     \
+      free(x);                                                                 \
+  } while (0)
 
 //=============================================================================
 // ILU levels
@@ -594,8 +599,8 @@ static void ilu0_update_row(const uint io, const uint k, struct par_mat *A,
 
   // Oops, K is no where to be found
   if (ko == -1) {
-    fprintf(stderr, "%s:%d lvl = %d, k = %u ko = %d\n", __FILE__, __LINE__, lvl,
-            k, ko);
+    fprintf(stderr, "%s:%d lvl = %d, k = %llu ko = %d\n", __FILE__, __LINE__,
+            lvl, k, ko);
     exit(1);
   }
 
@@ -659,6 +664,10 @@ static void ilu0(struct ilu *ilu, buffer *bfr) {
     ilu0_level(l, ilu->lvl_off, &ilu->A, &E, 0);
     par_mat_free(&E);
   }
+
+  const char *val = getenv("PARRSB_DUMP_ILU");
+  if (val != NULL && atoi(val) != 0)
+    par_mat_dump("B.txt", &ilu->A, &ilu->cr, bfr);
 }
 
 //=============================================================================
@@ -1478,63 +1487,251 @@ static int ilu_setup_aux(struct ilu *ilu, unsigned nlvls, const uint *loff,
 }
 
 struct ilu *ilu_setup(unsigned n, unsigned nv, const long long *llvtx,
-                      const ilu_options *options, MPI_Comm comm, buffer *buf) {
+                      const ilu_options *options, MPI_Comm comm, buffer *bfr) {
+  struct ilu *ilu = tcalloc(struct ilu, 1);
+  ilu->pivot = options->pivot;
+  ilu->verbose = options->verbose;
+  ilu->null_space = options->null_space;
+  ilu->tol = options->tol;
+  ilu->nnz_per_row = options->nnz_per_row;
+  ilu->nlvls = 0, ilu->lvl_off = NULL;
+  ilu->perm = NULL;
+
+  // Create a gslib comm out of MPI_Comm
   struct comm c;
   comm_init(&c, comm);
-
-  struct ilu *ilu = tcalloc(struct ilu, 1);
-  ilu->pivot = options->pivot, ilu->verbose = options->verbose;
-  ilu->tol = options->tol, ilu->nnz_per_row = options->nnz_per_row;
-  ilu->lvl_off = NULL, ilu->perm = NULL;
   crystal_init(&ilu->cr, &c);
-
-  slong *vtx = tcalloc(slong, n * nv);
-  for (uint i = 0; i < n * nv; i++)
-    vtx[i] = llvtx[i];
 
   // Establish a numbering based on input
   slong out[2][1], wrk[2][1], in = n;
   comm_scan(out, &c, gs_long, gs_add, &in, 1, wrk);
   ulong s = out[0][0], ng = out[1][0];
+  comm_free(&c);
 
   ulong *ids = tcalloc(ulong, n);
   for (uint i = 0; i < n; i++)
     ids[i] = s + i + 1;
+  slong *vtx = tcalloc(slong, n * nv);
+  for (uint i = 0; i < n * nv; i++)
+    vtx[i] = llvtx[i];
 
-  buffer bfr;
-  buffer_init(&bfr, 1024);
+  uint *loff = tcalloc(uint, 100);
+  uint *lownr = tcalloc(uint, n);
+  ulong *lids = tcalloc(ulong, n);
+  int nlvls = find_lvls(loff, lownr, lids, n, nv, ids, vtx, 1, &ilu->cr,
+                        ilu->verbose, bfr);
 
-  uint *lvl_off = tcalloc(uint, 100 + n), *lvl_owner = lvl_off + 100;
-  ulong *lvl_ids = tcalloc(ulong, n);
-  int nlvls = find_lvls(lvl_off, lvl_owner, lvl_ids, n, nv, ids, vtx, 1,
-                        &ilu->cr, ilu->verbose, &bfr);
-  ilu_setup_aux(ilu, nlvls, lvl_off, lvl_owner, lvl_ids, n, nv, vtx,
-                ilu->verbose, &bfr);
+  ilu->un = n;
+  ilu_setup_aux(ilu, nlvls, loff, lownr, lids, n, nv, vtx, ilu->verbose, bfr);
+  free(ids), free(vtx);
 
-  char *val = getenv("PARRSB_DUMP_ILU");
+  const char *val = getenv("PARRSB_DUMP_ILU");
   if (val != NULL && atoi(val) != 0)
-    par_mat_dump("A.txt", &ilu->A, &ilu->cr, &bfr);
+    par_mat_dump("A.txt", &ilu->A, &ilu->cr, bfr);
 
   // Setup the ILU factors
   switch (options->type) {
   case 0:
-    ilu0(ilu, &bfr);
+    ilu0(ilu, bfr);
     break;
   case 1:
-    iluc(ilu, &bfr);
+    iluc(ilu, bfr);
     break;
   default:
     break;
   }
 
-  val = getenv("PARRSB_DUMP_ILU");
-  if (val != NULL && atoi(val) != 0)
-    par_mat_dump("B.txt", &ilu->A, &ilu->cr, &bfr);
+  // TODO: Setup the user vector to reordered vector map
+  // struct par_mat *A = &ilu->A;
+  // slong *gs_ids = tcalloc(slong, ilu->un + A->rn);
+  // for (uint i = 0; i < ilu->un; i++)
+  //   gs_ids[i] = -lids[i];
+  // for (uint i = 0, j = ilu->un; i < A->rn; i++, j++)
+  //   if (A->
+  // struct comm *comm = &ilu->cr.comm;
+  // ilu->u2r = gs_setup(gs_ids, ilu->un + A->rn, comm, 0, gs_auto, 0);
+  // free(gs_ids);
 
-  free(ids), free(vtx), free(lvl_off), free(lvl_ids);
-  buffer_free(&bfr), comm_free(&c);
+  free(loff);
+  free(lownr);
+  free(lids);
 
   return ilu;
+}
+
+// Only works for ILUC for now -- need to make it sure it works for ILU0 as well
+// Also, we should stor L as CSR and U as CSC which will make this routine more
+// efficient. L has unit diagonal (may be I shouldn't store it). Diagonal of U
+// is stored separately. Correct way to do this is to store each level in a
+// separate matrix.
+static void fw_solve(double *x, const uint lvl, const uint *lvl_off,
+                     const struct par_mat *A) {
+  // Do forward solve
+  assert(IS_CSC(A) && !IS_DIAG(A));
+  const uint *Lp = A->adj_off, *Li = A->adj_idx, Ln = A->cn;
+  const scalar *L = A->adj_val;
+
+  uint s = lvl_off[lvl], e = lvl_off[lvl + 1];
+  for (uint i = s; i < e; i++) {
+    scalar xi = x[Li[Lp[i]]];
+    for (uint p = Lp[i] + 1, pe = Lp[i + 1]; p < pe; p++)
+      x[Li[p]] -= xi * L[p];
+  }
+}
+
+static void bw_solve(double *x, const uint lvl, const uint *lvl_off,
+                     const struct par_mat *B, unsigned handle_null) {
+  // Do backward solve
+  assert(IS_CSC(B) && !IS_DIAG(B));
+  const uint *Up = B->adj_off, *Ui = B->adj_idx, Un = B->rn;
+  const scalar *U = B->adj_val;
+
+  uint s = lvl_off[lvl], e = lvl_off[lvl - 1];
+  if (handle_null && s > e)
+    x[Ui[Up[s] - 1]] = 0, s--;
+  for (uint i = s; i > e; i--) {
+    uint p = Up[i] - 1;
+    scalar xi = x[Ui[p]] = x[Ui[p]] / U[p];
+    printf("i = %u xi %lf\n", i, xi);
+    for (uint pe = Up[i - 1]; p > pe;) {
+      if (p)
+        p--;
+      else
+        break;
+      x[Ui[p]] -= xi * U[p];
+    }
+  }
+}
+
+void ilu_solve(double *x, const struct ilu *ilu, const double *b, buffer *bfr) {
+  // Input `b` is of size ilu->lvl_off[ilu->nlvls] = ilu->L.cn
+  // Output `x` is of size ilu->lvl_off[ilu->nlvls] = ilu->L.cn
+  const struct par_mat *L = &ilu->L;
+  assert(IS_CSC(L) && !IS_DIAG(L));
+
+  // Use our own RHS for testing
+  const struct comm *comm = &ilu->cr.comm;
+  slong out[2][1], wrk[2][1], n = L->cn;
+  comm_scan(out, comm, gs_long, gs_add, &n, 1, wrk);
+  ulong s = out[0][0];
+  double *bi = tcalloc(double, L->cn);
+  for (uint i = 0; i < L->cn; i++)
+    bi[i] = s + i + 1;
+
+  // TODO: Set rhs
+  double *rhs = tcalloc(double, L->rn);
+  for (uint i = 0; i < L->cn; i++) {
+    uint cs = L->adj_off[i], ci = L->adj_idx[cs];
+    rhs[ci] = bi[i];
+  }
+
+#if 1
+  for (uint p = 0; p < comm->np; p++) {
+    if (comm->id == p) {
+      printf("b (%d, %u, %u) = ", comm->id, L->cn, L->rn);
+      for (uint i = 0; i < L->rn; i++)
+        printf("(%llu %lf) ", L->rows[i], rhs[i]);
+      printf("\n");
+      fflush(stdout);
+    }
+    comm_barrier(comm);
+  }
+#endif
+
+  const uint *lvl_off = ilu->lvl_off, nlvls = ilu->nlvls;
+  struct gs_data **handles = tcalloc(struct gs_data *, nlvls);
+  for (unsigned i = 0; i < nlvls; i++) {
+    // Forward solve for the level
+    fw_solve(rhs, i, lvl_off, L);
+
+    // Update everyone with our local solutions. We need to setup a gs handle to
+    // do this, last gsh is actually useless.
+    slong *ids = tcalloc(slong, L->rn);
+    uint cs = lvl_off[i], ce = lvl_off[nlvls];
+    for (uint j = L->adj_off[cs], je = L->adj_off[ce]; j < je; j++) {
+      uint idx = local_dof(L->cols, L->rows[L->adj_idx[j]], L->cn);
+      if (idx < L->cn)
+        ids[L->adj_idx[j]] = L->rows[L->adj_idx[j]];
+      else
+        ids[L->adj_idx[j]] = -L->rows[L->adj_idx[j]];
+    }
+
+    handles[i] = gs_setup(ids, L->rn, comm, 0, gs_auto, 0);
+    gs(rhs, gs_double, gs_add, 1, handles[i], bfr);
+    free(ids);
+  }
+
+  for (uint i = 0; i < L->rn; i++) {
+    uint idx = local_dof(L->cols, L->rows[i], L->cn);
+    if (idx == L->cn)
+      rhs[i] = 0;
+  }
+
+#if 1
+  for (uint p = 0; p < comm->np; p++) {
+    if (comm->id == p) {
+      printf("y (%d, %u, %u) = ", comm->id, L->cn, L->rn);
+      for (uint i = 0; i < L->rn; i++)
+        printf("%lf ", rhs[i]);
+      printf("\n");
+      fflush(stdout);
+    }
+    comm_barrier(comm);
+  }
+#endif
+
+#if 1
+  // Backward solve
+  const struct par_mat *U = &ilu->U;
+
+  double *xx = tcalloc(double, U->rn);
+  assert(L->cn == U->cn);
+  for (uint i = 0; i < L->cn; i++)
+    xx[U->adj_idx[U->adj_off[i + 1] - 1]] = rhs[L->adj_idx[L->adj_off[i]]];
+
+  for (unsigned i = nlvls; i > 0; i--) {
+    unsigned handle_null = ilu->null_space && (i == ilu->nlvls);
+    bw_solve(xx, i, lvl_off, U, handle_null);
+
+#if 1
+    // Update everyone with our local solutions. We need to setup a gs handle to
+    // do this
+    slong *ids = tcalloc(slong, U->rn);
+    uint cs = lvl_off[0], ce = lvl_off[i];
+    for (uint j = U->adj_off[cs], je = U->adj_off[ce]; j < je; j++) {
+      uint idx = local_dof(U->cols, U->rows[U->adj_idx[j]], U->cn);
+      if (idx < U->cn)
+        ids[U->adj_idx[j]] = U->rows[U->adj_idx[j]];
+      else
+        ids[U->adj_idx[j]] = -U->rows[U->adj_idx[j]];
+    }
+
+    struct gs_data *gsh = gs_setup(ids, U->rn, comm, 0, gs_auto, 0);
+    gs(xx, gs_double, gs_add, 1, gsh, bfr);
+    gs_free(gsh);
+    free(ids);
+#endif
+  }
+#endif
+
+#if 1
+  for (uint p = 0; p < comm->np; p++) {
+    if (comm->id == p) {
+      printf("x (%d, %u, %u) = ", comm->id, U->cn, U->rn);
+      for (uint i = 0; i < U->cn; i++)
+        printf("%lf ", xx[U->adj_idx[U->adj_off[i + 1] - 1]]);
+      printf("\n");
+      fflush(stdout);
+    }
+    comm_barrier(comm);
+  }
+#endif
+
+  for (uint i = 0; i < nlvls; i++)
+    gs_free(handles[i]);
+  free(handles);
+
+  free(xx), free(rhs), free(bi);
 }
 
 void ilu_free(struct ilu *ilu) {
@@ -1542,17 +1739,17 @@ void ilu_free(struct ilu *ilu) {
     crystal_free(&ilu->cr);
     if (ilu->nlvls > 0) {
       par_mat_free(&ilu->A);
-      // FIXME: Cleanup L and U
+      // FIXME: Cleanup L and U. Only ILUC has these now. Need to make sure
+      // ILU0 create them as well.
       // par_mat_free(&ilu->L);
       // par_mat_free(&ilu->U);
     }
-    if (ilu->lvl_off)
-      free(ilu->lvl_off), ilu->lvl_off = NULL;
-    if (ilu->perm)
-      free(ilu->perm), ilu->perm = NULL;
+    FREE(ilu->lvl_off);
+    FREE(ilu->perm);
     free(ilu);
   }
 }
 
+#undef FREE
 #undef CSC
 #undef CSR
