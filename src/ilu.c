@@ -1,8 +1,11 @@
 #include "ilu.h"
+#include "mat.h"
 #include <math.h>
 
 #define CSC 0
 #define CSR 1
+
+ilu_options ilu_default_options;
 
 //=============================================================================
 // ILU levels
@@ -389,7 +392,7 @@ static int rsb_lvls(uint *lvl_off, uint *lvl_owner, ulong *lvl_ids,
       rem = 1;
     }
   }
-  nlvls += rem;
+  nlvls += rem * (c.np > 1);
   comm_allreduce(ci, gs_int, gs_max, &nlvls, 1, buf);
 
   // Reverse the level numbers
@@ -450,10 +453,14 @@ static int find_lvls(uint *lvl_off, uint *lvl_owner, ulong *lvl_ids,
 // ILU
 //
 struct ilu {
-  int pivot, verbose;
+  // TODO: User vector size and user vector to reordered vector mapping
+  uint un;
+  struct gs_data *u2r;
+
+  unsigned pivot, verbose, null_space;
   // 1st dropping rule: An entry a_ij is dropped abs(a_ij) < tol
-  scalar tol;
   // 2nd dropping rule: Entries are dropped so that total nnz per row/col < p
+  scalar tol;
   uint nnz_per_row;
 
   // Calculated values internal to ILU
@@ -668,13 +675,13 @@ struct eij_t {
 // diagonal). Since A is in CSR format, extracting U (in CSR format) is easy.
 // L will be distributed by columns and we need to figure out the owner of a
 // given column.
-static void iluc_sep_lu(struct ilu *ilu, buffer *bfr) {
+static void iluc_sep_lu(struct par_mat *L, struct par_mat *U,
+                        const struct par_mat *A, struct crystal *cr,
+                        buffer *bfr) {
   // Recover the communicator
-  struct crystal *cr = &ilu->cr;
   struct comm *c = &cr->comm;
 
   // Setup U
-  struct par_mat *A = &ilu->A;
   struct array uijs, lijs;
   array_init(struct mij, &uijs, A->rn * 30);
   array_init(struct mij, &lijs, A->rn * 30);
@@ -699,7 +706,7 @@ static void iluc_sep_lu(struct ilu *ilu, buffer *bfr) {
     }
   }
 
-  par_mat_setup(&ilu->U, &uijs, CSR, 0, bfr);
+  par_mat_setup(U, &uijs, CSR, 0, bfr);
   array_free(&uijs);
 
   // Setup L
@@ -722,7 +729,7 @@ static void iluc_sep_lu(struct ilu *ilu, buffer *bfr) {
   }
 
   sarray_transfer(struct mij, &lijs, p, 0, cr);
-  par_mat_setup(&ilu->L, &lijs, CSC, 0, bfr);
+  par_mat_setup(L, &lijs, CSC, 0, bfr);
   array_free(&lijs);
 }
 
@@ -1282,51 +1289,87 @@ static void ilucp_level(struct array *lij, struct array *uij, int lvl,
   array_free(&rij), array_free(&cij), array_free(&rqst), array_free(&fwds);
 }
 
+static void iluc_csr_to_csc(struct par_mat *A, struct crystal *cr,
+                            buffer *bfr) {
+  assert(IS_CSR(A));
+
+  // Recover the communicator
+  struct comm *c = &cr->comm;
+
+  struct array mijs;
+  array_init(struct mij, &mijs, A->rn * 30);
+
+  struct mij m = {.r = 0, .c = 0, .idx = 0, .p = 0, .v = 0};
+  for (uint i = 0; i < A->rn; i++) {
+    m.r = A->rows[i];
+    for (uint j = A->adj_off[i], je = A->adj_off[i + 1]; j < je; j++) {
+      m.c = A->cols[A->adj_idx[j]], m.v = A->adj_val[j];
+      m.p = m.c % c->np, m.idx = (local_dof(A->rows, m.c, A->rn) < A->rn);
+      array_cat(struct mij, &mijs, &m, 1);
+    }
+
+    if (IS_DIAG(A)) {
+      m.c = m.r, m.v = A->diag_val[i], m.p = m.c % c->np, m.idx = 1;
+      array_cat(struct mij, &mijs, &m, 1);
+    }
+  }
+
+  sarray_transfer(struct mij, &mijs, p, 1, cr);
+  if (mijs.n > 0) {
+    sarray_sort_2(struct mij, mijs.ptr, mijs.n, c, 1, idx, 0, bfr);
+    struct mij *pm = (struct mij *)mijs.ptr;
+    uint i = 1, j = 0;
+    for (; i < mijs.n; i++) {
+      if (pm[i].c != pm[j].c) {
+        assert(pm[i - 1].idx == 1);
+        for (; j < i; j++)
+          pm[j].p = pm[i - 1].p;
+        // j == i at the end
+      }
+    }
+    // residual
+    assert(pm[i - 1].idx == 1);
+    for (; j < i; j++)
+      pm[j].p = pm[i - 1].p;
+  }
+
+  sarray_transfer(struct mij, &mijs, p, 1, cr);
+  par_mat_free(A);
+  par_mat_setup(A, &mijs, CSC, 0, bfr);
+  array_free(&mijs);
+}
+
 static void iluc(struct ilu *ilu, buffer *bfr) {
   struct crystal *cr = &ilu->cr;
   struct comm *c = &cr->comm;
 
   // Setup L and U
-  iluc_sep_lu(ilu, bfr);
+  iluc_sep_lu(&ilu->L, &ilu->U, &ilu->A, &ilu->cr, bfr);
 
-  struct par_mat *A = &ilu->A, *L = &ilu->L, *U = &ilu->U;
-
+  uint an = ilu->A.rn, sz = an * 30 + 1;
   struct array uij, lij, data, work;
-  array_init(struct mij, &uij, A->rn * 30 + 1);
-  array_init(struct mij, &lij, A->rn * 30 + 1);
-  array_init(struct eij_t, &data, A->rn * 30 + 1);
-  array_init(struct eij_t, &work, A->rn * 30 + 1);
+  array_init(struct mij, &uij, sz);
+  array_init(struct mij, &lij, sz);
+  array_init(struct eij_t, &data, sz);
+  array_init(struct eij_t, &work, sz);
 
-  struct array pvts;
-  array_init(struct pivot_t, &pvts, L->cn + 1);
+  for (int l = 1; l <= ilu->nlvls; l++)
+    iluc_level(&lij, &uij, l, ilu, &data, &work, bfr);
 
-  if (ilu->pivot) {
-    ilu->perm = tcalloc(ulong, A->rn);
-    // Initialize with the columns of U, i.e, columns of L
-    struct pivot_t t = {.k = 0, .p = 0, .pivot = 0};
-    for (uint i = 0; i < U->cn; i++) {
-      t.k = U->cols[i], t.p = t.k % c->np;
-      array_cat(struct pivot_t, &pvts, &t, 1);
-    }
+  par_mat_free(&ilu->L), par_mat_free(&ilu->U);
+  // Combine the following two calls by getting
+  // rid of the first call
+  par_mat_setup(&ilu->U, &uij, CSR, 0, bfr);
+  iluc_csr_to_csc(&ilu->U, &ilu->cr, bfr);
 
-    for (int l = 1; l <= ilu->nlvls; l++)
-      ilucp_level(&lij, &uij, l, ilu, &pvts, &data, &work, bfr);
-  } else {
-    for (int l = 1; l <= ilu->nlvls; l++)
-      iluc_level(&lij, &uij, l, ilu, &data, &work, bfr);
-  }
-
-  par_mat_free(L), par_mat_free(U);
-  par_mat_setup(U, &uij, CSR, 0, bfr);
-  par_mat_setup(L, &lij, CSC, 0, bfr);
+  par_mat_setup(&ilu->L, &lij, CSC, 0, bfr);
 
   const char *val = getenv("PARRSB_DUMP_ILU");
   if (val != NULL && atoi(val) != 0) {
-    par_mat_dump("LL.txt", L, cr, bfr);
-    par_mat_dump("UU.txt", U, cr, bfr);
+    par_mat_dump("L.txt", &ilu->L, cr, bfr);
+    par_mat_dump("U.txt", &ilu->U, cr, bfr);
   }
 
-  array_free(&pvts);
   array_free(&lij), array_free(&uij);
   array_free(&work), array_free(&data);
 }
@@ -1335,10 +1378,9 @@ static void iluc(struct ilu *ilu, buffer *bfr) {
 // ILU API related functions
 //
 // `vtx` array is in the order of sorted element ids
-static int ilu_setup_aux(struct ilu *ilu, int nlvls, uint *lvl_off,
-                         uint *lvl_owner, ulong *lvl_ids, const uint n,
-                         const int nv, const slong *vtx, const int verbose,
-                         buffer *bfr) {
+static int ilu_setup_aux(struct ilu *ilu, unsigned nlvls, const uint *loff,
+                         const uint *lownr, const ulong *lids, uint n, int nv,
+                         const slong *vtx, int verbose, buffer *bfr) {
   struct elm {
     slong vtx[8];
     uint p, lvl;
@@ -1354,17 +1396,15 @@ static int ilu_setup_aux(struct ilu *ilu, int nlvls, uint *lvl_off,
 
   struct elm elm;
   for (int l = 0; l < nlvls; l++) {
-    for (uint i = lvl_off[l]; i < lvl_off[l + 1]; i++) {
-      elm.lvl = l + 1, elm.e = lvl_ids[i], elm.p = lvl_owner[i];
+    for (uint i = loff[l]; i < loff[l + 1]; i++) {
+      elm.lvl = l + 1, elm.e = lids[i], elm.p = lownr[i];
       array_cat(struct elm, &elms, &elm, 1);
     }
   }
   sarray_sort(struct elm, elms.ptr, elms.n, e, 1, bfr);
 
-  struct elm *pe = (struct elm *)elms.ptr;
   if (elms.n > 0) {
-    // Sanity check
-    assert(elms.n == n);
+    struct elm *pe = (struct elm *)elms.ptr;
     for (uint i = 0; i < n; i++) {
       for (int v = 0; v < nv; v++)
         pe[i].vtx[v] = vtx[i * nv + v];
@@ -1378,14 +1418,16 @@ static int ilu_setup_aux(struct ilu *ilu, int nlvls, uint *lvl_off,
   ilu->nlvls = nlvls;
   ilu->lvl_off = (uint *)tcalloc(uint, ilu->nlvls + 1);
 
-  uint s = 0, e = 0;
-  ilu->lvl_off[0] = s;
-  pe = (struct elm *)elms.ptr;
-  for (int l = 1; l <= ilu->nlvls; l++) {
-    while (e < elms.n && pe[e].lvl == l)
-      e++;
-    ilu->lvl_off[l] = ilu->lvl_off[l - 1] + e - s;
-    s = e;
+  ilu->lvl_off[0] = 0;
+  if (elms.n > 0) {
+    uint s = 0, e = 0;
+    struct elm *pe = (struct elm *)elms.ptr;
+    for (int l = 1; l <= ilu->nlvls; l++) {
+      while (e < elms.n && pe[e].lvl == l)
+        e++;
+      ilu->lvl_off[l] = ilu->lvl_off[l - 1] + e - s;
+      s = e;
+    }
   }
 
   // Number rows now: All the elements in Level 0 are numbered before Level
@@ -1393,9 +1435,9 @@ static int ilu_setup_aux(struct ilu *ilu, int nlvls, uint *lvl_off,
   ulong *ids = trealloc(ulong, ids, elms.n);
   ulong ng = 0;
   for (int l = 0; l < ilu->nlvls; l++) {
-    e = ilu->lvl_off[l + 1], s = ilu->lvl_off[l];
-    slong out[2][1], buf[2][1], in = e - s;
-    comm_scan(out, c, gs_long, gs_add, &in, 1, buf);
+    uint e = ilu->lvl_off[l + 1], s = ilu->lvl_off[l];
+    slong out[2][1], wrk[2][1], in = e - s;
+    comm_scan(out, c, gs_long, gs_add, &in, 1, wrk);
     ulong start = ng + out[0][0] + 1;
     for (; s < e; s++)
       ids[s] = start++;
@@ -1403,9 +1445,12 @@ static int ilu_setup_aux(struct ilu *ilu, int nlvls, uint *lvl_off,
   }
 
   slong *vrt = tcalloc(slong, elms.n * nv);
-  for (uint i = 0; i < elms.n; i++) {
-    for (int j = 0; j < nv; j++)
-      vrt[i * nv + j] = pe[i].vtx[j];
+  if (elms.n > 0) {
+    struct elm *pe = (struct elm *)elms.ptr;
+    for (uint i = 0; i < elms.n; i++) {
+      for (int j = 0; j < nv; j++)
+        vrt[i * nv + j] = pe[i].vtx[j];
+    }
   }
 
   if (verbose > 1) {
@@ -1432,8 +1477,8 @@ static int ilu_setup_aux(struct ilu *ilu, int nlvls, uint *lvl_off,
   return 0;
 }
 
-struct ilu *ilu_setup(const uint n, const int nv, const long long *llvtx,
-                      const ilu_options *options, MPI_Comm comm) {
+struct ilu *ilu_setup(unsigned n, unsigned nv, const long long *llvtx,
+                      const ilu_options *options, MPI_Comm comm, buffer *buf) {
   struct comm c;
   comm_init(&c, comm);
 
@@ -1448,8 +1493,8 @@ struct ilu *ilu_setup(const uint n, const int nv, const long long *llvtx,
     vtx[i] = llvtx[i];
 
   // Establish a numbering based on input
-  slong out[2][1], buf[2][1], in = n;
-  comm_scan(out, &c, gs_long, gs_add, &in, 1, buf);
+  slong out[2][1], wrk[2][1], in = n;
+  comm_scan(out, &c, gs_long, gs_add, &in, 1, wrk);
   ulong s = out[0][0], ng = out[1][0];
 
   ulong *ids = tcalloc(ulong, n);
