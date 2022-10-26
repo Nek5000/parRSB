@@ -2,6 +2,7 @@
 #define _PARRSB_COARSE_IMPL_H_
 
 #include "coarse.h"
+#include "mat.h"
 
 uint unique_ids(sint *perm, ulong *uid, uint n, const ulong *ids, buffer *bfr);
 
