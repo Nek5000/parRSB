@@ -119,7 +119,7 @@ static int par_csr(scalar *v, const struct laplacian *l, scalar *u,
                    buffer *bfr) {
   struct csr_laplacian *L = (struct csr_laplacian *)l->data;
   if (L != NULL) {
-    mat_vec_csr(v, u, L->M, L->gsh, L->buf, bfr);
+    par_mat_vec(v, u, L->M, L->gsh, L->buf, bfr);
     return 0;
   }
   return 1;
@@ -130,7 +130,7 @@ static int par_csc(scalar *v, const struct laplacian *l, scalar *u,
 #if 0
   struct csr_laplacian *L = (struct csr_laplacian *)l->data;
   if (L != NULL) {
-    mat_vec_csr(v, u, L->M, L->gsh, L->buf, bfr);
+    par_mat_vec(v, u, L->M, L->gsh, L->buf, bfr);
     return 0;
   }
   return 1;

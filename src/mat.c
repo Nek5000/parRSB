@@ -3,11 +3,13 @@
 #define CSC 0
 #define CSR 1
 
-#define FREE(ptr, x)                                                           \
-  {                                                                            \
-    if (ptr->x != NULL)                                                        \
-      free(ptr->x);                                                            \
-  }
+//------------------------------------------------------------------------------
+// Memory management
+int sfree(void *p, const char *file, unsigned line) {
+  if (!p)
+    free(p);
+  return 0;
+}
 
 //------------------------------------------------------------------------------
 // `mat` struct for local matrices
@@ -57,12 +59,11 @@ int compress_nbrs(struct array *eij, struct array *nbr, buffer *bfr) {
   }
 }
 
-int csr_setup(struct mat *mat, struct array *entries, int sep, buffer *buf) {
+int mat_setup(struct mat *mat, struct array *entries, int sep, buffer *buf) {
   uint nnz = entries->n;
   if (nnz == 0) {
     mat->start = mat->n = 0;
-    mat->Lp = mat->Li = NULL;
-    mat->L = mat->D = NULL;
+    mat->Lp = mat->Li = mat->L = mat->D = NULL;
     return 0;
   }
 
@@ -83,11 +84,12 @@ int csr_setup(struct mat *mat, struct array *entries, int sep, buffer *buf) {
   ptr = (struct mij *)entries->ptr;
   n = mat->start = ptr[0].r, ptr[0].r = 0;
 
-  for (uint i = 1; i < nnz; i++)
+  for (uint i = 1; i < nnz; i++) {
     if (ptr[i].r == n)
       ptr[i].r = ptr[i - 1].r;
     else
       n = ptr[i].r, ptr[i].r = ptr[i - 1].r + 1;
+  }
   uint nr = ptr[nnz - 1].r + 1;
 
   // Reserve enough memory for work arrays
@@ -136,7 +138,7 @@ int csr_setup(struct mat *mat, struct array *entries, int sep, buffer *buf) {
   return 0;
 }
 
-int mat_print(struct mat *mat) {
+void mat_print(const struct mat *mat) {
   uint i, j;
   for (i = 0; i < mat->n; i++) {
     for (j = mat->Lp[i]; j < mat->Lp[i + 1]; j++)
@@ -146,11 +148,9 @@ int mat_print(struct mat *mat) {
       printf("%lld %lld %lf\n", mat->start + i, mat->start + i, mat->D[i]);
     fflush(stdout);
   }
-
-  return 0;
 }
 
-void mat_dump(const char *name, struct mat *A, struct crystal *cr,
+void mat_dump(const char *name, const struct mat *A, struct crystal *cr,
               buffer *bfr) {
   struct array mijs;
   array_init(struct mij, &mijs, 1024);
@@ -188,10 +188,7 @@ void mat_dump(const char *name, struct mat *A, struct crystal *cr,
 }
 
 int mat_free(struct mat *mat) {
-  FREE(mat, Lp);
-  FREE(mat, Li);
-  FREE(mat, L);
-  FREE(mat, D);
+  tfree(mat->Lp), tfree(mat->Li), tfree(mat->L), tfree(mat->D);
   return 0;
 }
 
@@ -415,8 +412,8 @@ int par_csc_setup(struct par_mat *mat, struct array *entries, int sd,
   return 0;
 }
 
-int par_mat_setup(struct par_mat *M, struct array *mijs, const int type,
-                  const int sd, buffer *bfr) {
+int par_mat_setup(struct par_mat *M, struct array *mijs, int type, int sd,
+                  buffer *bfr) {
   assert(type == CSC || type == CSR);
 
   M->type = type;
@@ -521,7 +518,7 @@ int par_mat_setup(struct par_mat *M, struct array *mijs, const int type,
   return 0;
 }
 
-void par_csr_to_csc(struct par_mat *N, const struct par_mat *M, int diag,
+void par_csr_to_csc(struct par_mat *N, const struct par_mat *M, int sd,
                     struct crystal *cr, buffer *bfr) {
   assert(IS_CSR(M));
 
@@ -568,11 +565,11 @@ void par_csr_to_csc(struct par_mat *N, const struct par_mat *M, int diag,
   free(cols);
 
   sarray_transfer(struct mij, &mijs, p, 0, cr);
-  par_mat_setup(N, &mijs, 0, diag, bfr);
+  par_mat_setup(N, &mijs, 0, sd, bfr);
   array_free(&mijs);
 }
 
-void par_csc_to_csr(struct par_mat *N, const struct par_mat *M, int diag,
+void par_csc_to_csr(struct par_mat *N, const struct par_mat *M, int sd,
                     struct crystal *cr, buffer *bfr) {
   assert(IS_CSC(M) && !IS_DIAG(M));
 
@@ -611,7 +608,7 @@ void par_csc_to_csr(struct par_mat *N, const struct par_mat *M, int diag,
   free(rows);
 
   sarray_transfer(struct mij, &mijs, p, 0, cr);
-  par_mat_setup(N, &mijs, 1, diag, bfr);
+  par_mat_setup(N, &mijs, 1, sd, bfr);
   array_free(&mijs);
 }
 
@@ -686,16 +683,10 @@ void par_mat_dump(const char *name, struct par_mat *A, struct crystal *cr,
 }
 
 int par_mat_free(struct par_mat *A) {
-  FREE(A, rows);
-  FREE(A, cols);
-  FREE(A, adj_off);
-  FREE(A, adj_idx);
-  FREE(A, adj_val);
-  FREE(A, diag_idx);
-  FREE(A, diag_val);
-  A->rn = A->cn = 0;
-  A->type = -1;
-
+  tfree(A->rows), tfree(A->cols);
+  tfree(A->adj_off), tfree(A->adj_idx), tfree(A->adj_val);
+  tfree(A->diag_idx), tfree(A->diag_val);
+  A->rn = A->cn = 0, A->type = -1;
   return 0;
 }
 
@@ -823,10 +814,12 @@ struct gs_data *setup_Q(const struct par_mat *M, const struct comm *c,
   return gs_setup(sids, nnz, c, 0, gs_crystal_router, 0);
 }
 
-void mat_vec_csr(scalar *y, const scalar *x, const struct par_mat *M,
-                 struct gs_data *gsh, scalar *buf, buffer *bfr) {
-  assert(IS_CSR(M));
-  assert(M->rn == 0 || IS_DIAG(M));
+int par_mat_vec(scalar *y, const scalar *x, const struct par_mat *M,
+                struct gs_data *gsh, scalar *buf, buffer *bfr) {
+  if (!IS_CSR(M))
+    return 1;
+  if (M->rn > 0 && !IS_DIAG(M))
+    return 1;
 
   uint n = M->rn, *Lp = M->adj_off, nnz = n > 0 ? Lp[n] : 0;
   uint i, j, je;
@@ -842,30 +835,9 @@ void mat_vec_csr(scalar *y, const scalar *x, const struct par_mat *M,
     for (y[i] *= D[i], j = Lp[i], je = Lp[i + 1]; j != je; j++)
       y[i] += L[j] * buf[j];
   }
-}
 
-//------------------------------------------------------------------------------
-// Dump and array in parallel
-void par_arr_dump(const char *name, struct array *arr, struct crystal *cr,
-                  buffer *bfr) {
-  struct mij *ptr = arr->ptr;
-  for (uint i = 0; i < arr->n; i++)
-    ptr[i].p = 0;
-  sarray_transfer(struct mij, arr, p, 0, cr);
-  sarray_sort_2(struct mij, arr->ptr, arr->n, r, 1, c, 1, bfr);
-
-  struct comm *c = &cr->comm;
-  if (c->id == 0) {
-    FILE *fp = fopen(name, "w+");
-    if (fp != NULL) {
-      struct mij *ptr = (struct mij *)arr->ptr;
-      for (uint i = 0; i < arr->n; i++)
-        fprintf(fp, "%llu %llu %.15lf\n", ptr[i].r, ptr[i].c, ptr[i].v);
-      fclose(fp);
-    }
-  }
+  return 0;
 }
 
 #undef CSC
 #undef CSR
-#undef FREE

@@ -137,7 +137,7 @@ static int project(scalar *x, uint n, scalar *b, struct laplacian *L,
 
   uint j, k;
   for (i = 0; i < miter; i++) {
-    // mat_vec_csr(w, p, S, gsh, wrk, bfr);
+    // par_mat_vec(w, p, S, gsh, wrk, bfr);
     laplacian(w, L, p, bfr);
 
     scalar pw = dot(p, w, n);

@@ -309,7 +309,7 @@ void mg_vcycle(scalar *u1, scalar *rhs, struct mg *d, struct comm *c,
       u[off + j] = sigma * r[off + j] / M->diag_val[j];
 
     // G*u
-    mat_vec_csr(Gs + off, u + off, M, l->Q, wrk, bfr);
+    par_mat_vec(Gs + off, u + off, M, l->Q, wrk, bfr);
 
     // r = rhs - Gu
     for (j = 0; j < n; j++)
@@ -326,14 +326,14 @@ void mg_vcycle(scalar *u1, scalar *rhs, struct mg *d, struct comm *c,
       }
 
       // r = r - Gs
-      mat_vec_csr(Gs + off, s + off, M, l->Q, wrk, bfr);
+      par_mat_vec(Gs + off, s + off, M, l->Q, wrk, bfr);
       for (j = 0; j < n; j++)
         r[off + j] = r[off + j] - Gs[off + j];
     }
 
     // Apply S^T
     if (d->sagg)
-      mat_vec_csr(r + off, r + off, l->St, l->Qst, wrk, bfr);
+      par_mat_vec(r + off, r + off, l->St, l->Qst, wrk, bfr);
 
     // Interpolate to coarser level
     gs(r + off, gs_double, gs_add, 1, l->J, bfr);
@@ -361,7 +361,7 @@ void mg_vcycle(scalar *u1, scalar *rhs, struct mg *d, struct comm *c,
 
     // Apply S
     if (d->sagg)
-      mat_vec_csr(r + off, r + off, l->S, l->Qs, wrk, bfr);
+      par_mat_vec(r + off, r + off, l->S, l->Qs, wrk, bfr);
 
     // u = u + over*S*J*e
     n = lvl_off[lvl + 1] - off;

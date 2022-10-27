@@ -39,7 +39,7 @@ static double check_err(double *b, double *x, uint nelt, uint nv,
   struct gs_data *gsh = setup_Q(&M, &c, &bfr);
   double *bl = tcalloc(double, nelt);
   double *wrk = tcalloc(double, M.rn + M.adj_off[M.rn]);
-  mat_vec_csr(bl, x, &M, gsh, wrk, &bfr);
+  par_mat_vec(bl, x, &M, gsh, wrk, &bfr);
 
   crystal_free(&cr), comm_free(&c);
   gs_free(gsh), par_mat_free(&M);

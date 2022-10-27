@@ -820,7 +820,7 @@ static int schur_action(scalar *y, const struct schur *schur, scalar *x,
 
   metric_tic(c, SCHUR_PROJECT_OPERATOR_MATVEC);
   // Separately calculate Sx
-  mat_vec_csr(y, x, S, schur->Q_ss, wrk, bfr);
+  par_mat_vec(y, x, S, schur->Q_ss, wrk, bfr);
   metric_toc(c, SCHUR_PROJECT_OPERATOR_MATVEC);
 
   for (uint i = 0; i < in; i++)
@@ -1084,7 +1084,7 @@ int schur_setup(struct coarse *crs, struct array *eij, struct crystal *cr,
   // Setup local block diagonal (B). This is distributed by rows based on the
   // partitioning.
   struct mat B;
-  csr_setup(&B, &ll, 0, bfr);
+  mat_setup(&B, &ll, 0, bfr);
   if (!crs->null_space || (crs->n[1] + crs->n[2] != 0))
     cholesky_factor(&schur->A_ll, &B, 0, bfr);
   else

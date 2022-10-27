@@ -6,11 +6,6 @@
 #define CSR 1
 
 ilu_options ilu_default_options;
-#define FREE(x)                                                                \
-  do {                                                                         \
-    if (x)                                                                     \
-      free(x);                                                                 \
-  } while (0)
 
 //=============================================================================
 // ILU levels
@@ -1744,12 +1739,9 @@ void ilu_free(struct ilu *ilu) {
       // par_mat_free(&ilu->L);
       // par_mat_free(&ilu->U);
     }
-    FREE(ilu->lvl_off);
-    FREE(ilu->perm);
-    free(ilu);
+    tfree(ilu->lvl_off), tfree(ilu->perm), tfree(ilu);
   }
 }
 
-#undef FREE
 #undef CSC
 #undef CSR
