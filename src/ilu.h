@@ -1,5 +1,5 @@
-#ifndef _ILU_H_
-#define _ILU_H_
+#ifndef _PARRSB_ILU_H_
+#define _PARRSB_ILU_H_
 
 #include "gslib.h"
 

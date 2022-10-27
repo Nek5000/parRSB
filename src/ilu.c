@@ -599,8 +599,8 @@ static void ilu0_update_row(const uint io, const uint k, struct par_mat *A,
 
   // Oops, K is no where to be found
   if (ko == -1) {
-    fprintf(stderr, "%s:%d lvl = %d, k = %llu ko = %d\n", __FILE__, __LINE__,
-            lvl, k, ko);
+    fprintf(stderr, "%s:%d lvl = %d, k = %u ko = %d\n", __FILE__, __LINE__, lvl,
+            k, ko);
     exit(1);
   }
 

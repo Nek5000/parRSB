@@ -277,6 +277,7 @@ struct parrsb_cmd_opts *parrsb_parse_cmd_opts(int argc, char *argv[]) {
       {"ilu_type", optional_argument, 0, 10},
       {"ilu_tol", optional_argument, 0, 11},
       {"ilu_pivot", optional_argument, 0, 12},
+      {"ilu_null_space", optional_argument, 0, 13},
       {"crs_type", optional_argument, 0, 20},
       {"crs_tol", optional_argument, 0, 21},
       {0, 0, 0, 0}};
@@ -316,6 +317,8 @@ struct parrsb_cmd_opts *parrsb_parse_cmd_opts(int argc, char *argv[]) {
       break;
     case 12:
       in->ilu_pivot = atoi(optarg);
+    case 13:
+      in->ilu_null_space = atoi(optarg);
       break;
     case 20:
       in->crs_type = atoi(optarg);

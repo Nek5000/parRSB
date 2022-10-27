@@ -2,8 +2,8 @@
 // Test Schur complement solver
 //
 #include "coarse.h"
+#include "mat.h"
 #include "parRSB.h"
-
 #include <math.h>
 #include <time.h>
 
