@@ -69,13 +69,12 @@ uint get_components_v2(sint *component, struct array *elems, unsigned nv,
 //
 #define GS 1
 #define CSR 2
-#define CSC 4
 
 struct laplacian;
 struct laplacian *laplacian_init(struct rsb_element *elems, uint nel, int nv,
                                  int type, struct comm *c, buffer *buf);
 int laplacian(scalar *v, struct laplacian *l, scalar *u, buffer *buf);
-void laplacian_free(struct laplacian *l);
+int laplacian_free(struct laplacian *l);
 
 //------------------------------------------------------------------------------
 // Misc

@@ -90,31 +90,6 @@ static int par_csr_init(struct laplacian *l, const struct rsb_element *elems,
   return 0;
 }
 
-static int par_csc_init(struct laplacian *l, const struct rsb_element *elems,
-                        const uint nelt, const int nv, const struct comm *c,
-                        buffer *bfr) {
-  struct crystal cr;
-  crystal_init(&cr, c);
-
-  struct array nbrs, eij;
-  find_nbrs_rsb(&nbrs, elems, nelt, nv, c, &cr, bfr);
-  compress_nbrs(&eij, &nbrs, bfr);
-
-  struct csr_laplacian *L = l->data = tcalloc(struct csr_laplacian, 1);
-  struct par_mat *M = L->M = par_csc_setup_ext(&eij, 1, bfr);
-  L->gsh = setup_Q(L->M, c, bfr);
-
-  uint nnz = M->rn > 0 ? M->adj_off[M->rn] + M->rn : 0;
-  L->buf = tcalloc(scalar, nnz);
-
-  crystal_free(&cr);
-
-  array_free(&nbrs);
-  array_free(&eij);
-
-  return 0;
-}
-
 static int par_csr(scalar *v, const struct laplacian *l, scalar *u,
                    buffer *bfr) {
   struct csr_laplacian *L = (struct csr_laplacian *)l->data;
@@ -123,18 +98,6 @@ static int par_csr(scalar *v, const struct laplacian *l, scalar *u,
     return 0;
   }
   return 1;
-}
-
-static int par_csc(scalar *v, const struct laplacian *l, scalar *u,
-                   buffer *bfr) {
-#if 0
-  struct csr_laplacian *L = (struct csr_laplacian *)l->data;
-  if (L != NULL) {
-    par_mat_vec(v, u, L->M, L->gsh, L->buf, bfr);
-    return 0;
-  }
-  return 1;
-#endif
 }
 
 static int par_csr_free(struct laplacian *l) {
@@ -228,32 +191,24 @@ static int gs_weighted_free(struct laplacian *l) {
 struct laplacian *laplacian_init(struct rsb_element *elems, uint nel, int nv,
                                  int type, struct comm *c, buffer *buf) {
   struct laplacian *l = tcalloc(struct laplacian, 1);
-  l->type = type;
-  l->nv = nv;
-  l->nel = nel;
+  l->type = type, l->nv = nv, l->nel = nel;
 
   if (type & CSR)
     par_csr_init(l, elems, nel, nv, c, buf);
-  else if (type & CSC)
-    par_csc_init(l, elems, nel, nv, c, buf);
   else if (type & GS)
     gs_weighted_init(l, elems, nel, nv, c, buf);
   else
     return NULL;
-
   return l;
 }
 
 int laplacian(scalar *v, struct laplacian *l, scalar *u, buffer *buf) {
   if (l->type & CSR)
     par_csr(v, l, u, buf);
-  else if (l->type & CSC)
-    par_csc(v, l, u, buf);
   else if (l->type & GS)
     gs_weighted(v, l, u, buf);
   else
     return 1;
-
   return 0;
 }
 

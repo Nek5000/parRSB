@@ -96,7 +96,6 @@ struct par_mat *par_csr_setup_con(const uint nelt, const ulong *eid,
                                   struct comm *c, struct crystal *cr,
                                   buffer *bfr);
 struct par_mat *par_csr_setup_ext(struct array *entries, int sd, buffer *bfr);
-struct par_mat *par_csc_setup_ext(struct array *entries, int sd, buffer *bfr);
 
 // Mat vec routines
 struct gs_data *setup_Q(const struct par_mat *M, const struct comm *c,

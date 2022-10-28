@@ -764,20 +764,6 @@ struct par_mat *par_csr_setup_ext(struct array *entries, int sep, buffer *bfr) {
   return M;
 }
 
-struct par_mat *par_csc_setup_ext(struct array *entries, int sep, buffer *bfr) {
-  struct array eij;
-  array_init(struct mij, &eij, 100);
-
-  compress_mij(&eij, entries, bfr);
-
-  struct par_mat *M = tcalloc(struct par_mat, 1);
-  par_csc_setup(M, &eij, sep, bfr);
-
-  array_free(&eij);
-
-  return M;
-}
-
 int IS_CSC(const struct par_mat *A) { return (A->type == CSC); }
 
 int IS_CSR(const struct par_mat *A) { return (A->type == CSR); }
