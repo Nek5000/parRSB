@@ -57,13 +57,15 @@ int compress_nbrs(struct array *eij, struct array *nbr, buffer *bfr) {
     pe[k].v = -s;
     i = j;
   }
+  return 0;
 }
 
 int mat_setup(struct mat *mat, struct array *entries, int sep, buffer *buf) {
   uint nnz = entries->n;
   if (nnz == 0) {
     mat->start = mat->n = 0;
-    mat->Lp = mat->Li = mat->L = mat->D = NULL;
+    mat->Lp = mat->Li = NULL;
+    mat->L = mat->D = NULL;
     return 0;
   }
 
@@ -732,6 +734,7 @@ static int compress_mij(struct array *eij, struct array *entries, buffer *bfr) {
     pe[k].v = -s;
     i = j;
   }
+  return 0;
 }
 
 struct par_mat *par_csr_setup_con(const uint nelt, const ulong *eid,

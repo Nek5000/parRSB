@@ -130,6 +130,8 @@ static int set_bin(uint **proc_, struct sort *s, uint field, struct comm *c) {
   } while (id < np && index < size);
   for (; index < size; index++)
     proc[index] = np - 1;
+
+  return 0;
 }
 
 static int sort_field(struct array *arr, size_t usize, gs_dom t, uint off,
@@ -235,8 +237,8 @@ static int update_probe_counts(struct hypercube *hcube, struct comm *c) {
 
 static int update_probes(slong nelem, double *probes, ulong *probe_cnt,
                          uint threshold) {
-  slong expected = nelem / 2;
-  if (llabs(expected - probe_cnt[1]) < threshold)
+  slong expected = nelem / 2, cnt = probe_cnt[1];
+  if (llabs(expected - cnt) < threshold)
     return 0;
 
   if (probe_cnt[1] < expected)
@@ -313,10 +315,11 @@ static int parallel_hcube_sort_recursive(struct hypercube *data,
 
   int max_iter = log2((data->probes[2] - data->probes[0]) / 1e-12);
   int iter = 0;
-  while (llabs(nelem / 2 - data->probe_cnt[1]) > threshold &&
-         iter++ < max_iter) {
+  slong cnt = data->probe_cnt[1];
+  while (llabs(nelem / 2 - cnt) > threshold && iter++ < max_iter) {
     update_probes(nelem, data->probes, data->probe_cnt, threshold);
     update_probe_counts(data, c);
+    cnt = data->probe_cnt[1];
   }
 
   transfer_elem(data, c);

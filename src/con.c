@@ -152,7 +152,7 @@ void get_vertex_ids(long long **vtx_, Mesh mesh) {
   struct point_t *ptr = (struct point_t *)mesh->elements.ptr;
   for (uint e = 0, count = 0; e < nelt; e++) {
     for (int v = 0; v < nv; v++)
-      vtx[count] = ptr[count++].globalId;
+      vtx[count] = ptr[count].globalId, count++;
   }
 }
 
@@ -870,6 +870,7 @@ static int findConnectedPeriodicPairs(Mesh mesh, BoundaryFace f_,
     m.orig = MAX(f.face[i].globalId, g.face[k].globalId);
     array_cat(struct mpair_t, matched, &m, 1);
   }
+  return 0;
 }
 
 static int findConnectedPeriodicFaces(Mesh mesh, struct array *matched) {
@@ -883,6 +884,7 @@ static int findConnectedPeriodicFaces(Mesh mesh, struct array *matched) {
         findConnectedPeriodicPairs(mesh, &ptr[i], &ptr[j], matched);
       }
   }
+  return 0;
 }
 
 static int gatherMatchingPeriodicFaces(Mesh mesh, struct comm *c) {
@@ -910,6 +912,7 @@ static int gatherMatchingPeriodicFaces(Mesh mesh, struct comm *c) {
   crystal_init(&cr, c);
   sarray_transfer(struct boundary_t, &mesh->boundary, proc, 1, &cr);
   crystal_free(&cr);
+  return 0;
 }
 
 static int setPeriodicFaceCoordinates(Mesh mesh, struct comm *c, buffer *buf) {
@@ -948,6 +951,7 @@ static int setPeriodicFaceCoordinates(Mesh mesh, struct comm *c, buffer *buf) {
     }
     i++;
   }
+  return 0;
 }
 
 static int matchPeriodicFaces(Mesh mesh, struct comm *c, buffer *bfr) {

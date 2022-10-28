@@ -108,6 +108,7 @@ static int par_csr_free(struct laplacian *l) {
     free(L->buf);
     free(L), L = NULL;
   }
+  return 0;
 }
 
 //------------------------------------------------------------------------------
@@ -183,6 +184,7 @@ static int gs_weighted_free(struct laplacian *l) {
 
   free(l->data);
   l->data = NULL;
+  return 0;
 }
 
 //------------------------------------------------------------------------------

@@ -225,6 +225,7 @@ int balance_partitions(struct array *elements, int nv, struct comm *lc,
 
   free(ids);
   gs_free(gsh);
+  return 0;
 }
 
 int repair_partitions_v2(struct array *elems, unsigned nv, struct comm *tc,
