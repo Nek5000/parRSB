@@ -76,7 +76,14 @@ static int par_csr_init(struct laplacian *l, const struct rsb_element *elems,
   compress_nbrs(&eij, &nbrs, bfr);
 
   struct csr_laplacian *L = l->data = tcalloc(struct csr_laplacian, 1);
-  struct par_mat *M = L->M = par_csr_setup_ext(&eij, 1, bfr);
+
+  struct array compressed;
+  array_init(struct mij, &compressed, 100);
+  compress_mij(&compressed, &eij, bfr);
+  struct par_mat *M = L->M = tcalloc(struct par_mat, 1);
+  par_csr_setup(M, &compressed, 1, bfr);
+  array_free(&compressed);
+
   L->gsh = setup_Q(L->M, c, bfr);
 
   uint nnz = M->rn > 0 ? M->adj_off[M->rn] + M->rn : 0;
@@ -105,8 +112,7 @@ static int par_csr_free(struct laplacian *l) {
     struct csr_laplacian *L = (struct csr_laplacian *)l->data;
     par_mat_free(L->M);
     gs_free(L->gsh);
-    free(L->buf);
-    free(L), L = NULL;
+    tfree(L->buf), tfree(L);
   }
   return 0;
 }

@@ -208,7 +208,13 @@ static uint mg_setup_aux(struct mg *d, const int factor, const int sagg,
   d->nlevels++;
   d->levels = trealloc(struct mg_lvl *, d->levels, d->nlevels);
   l = d->levels[lvl] = tcalloc(struct mg_lvl, 1);
-  M = l->M = par_csr_setup_ext(mijs, 1, bfr);
+
+  struct array compressed;
+  array_init(struct mij, &compressed, 100);
+  compress_mij(&compressed, mijs, bfr);
+  M = l->M = tcalloc(struct par_mat, 1);
+  par_csr_setup(M, &compressed, 1, bfr);
+  array_free(&compressed);
 
   // Setup gs ids for coarse level (rhs interpolation )
   ids = (slong *)trealloc(slong, ids, k + M->rn);

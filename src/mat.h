@@ -40,12 +40,13 @@ struct mij {
 // `eij` is an array of type `struct mij`, input `nbr` is an array of type
 // `struct nbr`
 int compress_nbrs(struct array *eij, struct array *nbr, buffer *bfr);
+// Both `eij` and `entries` are arrays of type `struct mij`.
+int compress_mij(struct array *eij, struct array *entries, buffer *bfr);
 
 //==============================================================================
 // mat
 // * `entries` is an array of type `struct mij`
 // * sd = 0 (don't store diagonal separately) or 1 (store diagonal separately)
-
 struct mat {
   ulong start;
   uint n, *Lp, *Li;
@@ -63,7 +64,6 @@ int mat_free(struct mat *A);
 // * entries is an array of type `struct mij`
 // * type = 0 (CSC) or 1 (CSR)
 // * sd = 0 (don't store diagonal separately) or 1 (store diagonal separately)
-
 struct par_mat {
   int type;
   uint cn, rn, *adj_off, *adj_idx, *diag_idx;
@@ -89,13 +89,6 @@ void par_mat_print(struct par_mat *A);
 void par_mat_dump(const char *name, struct par_mat *A, struct crystal *cr,
                   buffer *bfr);
 int par_mat_free(struct par_mat *A);
-
-// Create a par_mat from connectivity
-struct par_mat *par_csr_setup_con(const uint nelt, const ulong *eid,
-                                  const slong *vtx, int nv, int sep,
-                                  struct comm *c, struct crystal *cr,
-                                  buffer *bfr);
-struct par_mat *par_csr_setup_ext(struct array *entries, int sd, buffer *bfr);
 
 // Mat vec routines
 struct gs_data *setup_Q(const struct par_mat *M, const struct comm *c,

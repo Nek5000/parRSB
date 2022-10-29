@@ -695,7 +695,7 @@ int par_mat_free(struct par_mat *A) {
 //------------------------------------------------------------------------------
 // compress entries of a matrix
 //
-static int compress_mij(struct array *eij, struct array *entries, buffer *bfr) {
+int compress_mij(struct array *eij, struct array *entries, buffer *bfr) {
   eij->n = 0;
   if (entries->n == 0)
     return 1;
@@ -735,36 +735,6 @@ static int compress_mij(struct array *eij, struct array *entries, buffer *bfr) {
     i = j;
   }
   return 0;
-}
-
-struct par_mat *par_csr_setup_con(const uint nelt, const ulong *eid,
-                                  const slong *vtx, int nv, int sep,
-                                  struct comm *c, struct crystal *cr,
-                                  buffer *bfr) {
-  struct array nbrs, eij;
-  find_nbrs(&nbrs, eid, vtx, nelt, nv, cr, bfr);
-  compress_nbrs(&eij, &nbrs, bfr);
-
-  struct par_mat *M = tcalloc(struct par_mat, 1);
-  par_csr_setup(M, &eij, sep, bfr);
-
-  array_free(&eij), array_free(&nbrs);
-
-  return M;
-}
-
-struct par_mat *par_csr_setup_ext(struct array *entries, int sep, buffer *bfr) {
-  struct array eij;
-  array_init(struct mij, &eij, 100);
-
-  compress_mij(&eij, entries, bfr);
-
-  struct par_mat *M = tcalloc(struct par_mat, 1);
-  par_csr_setup(M, &eij, sep, bfr);
-
-  array_free(&eij);
-
-  return M;
 }
 
 int IS_CSC(const struct par_mat *A) { return (A->type == CSC); }

@@ -205,6 +205,25 @@ static int project(scalar *x, uint n, scalar *b, struct laplacian *L,
   return i == miter ? i : i + 1;
 }
 
+static struct par_mat *setup_csr_from_con(const uint nelt, const ulong *eid,
+                                          const slong *vtx, int nv, int sep,
+                                          struct comm *c, struct crystal *cr,
+                                          buffer *bfr) {
+  struct array nbrs, eij;
+  array_init(struct nbr, &nbrs, 100);
+  array_init(struct mij, &eij, 100);
+
+  find_nbrs(&nbrs, eid, vtx, nelt, nv, cr, bfr);
+  compress_nbrs(&eij, &nbrs, bfr);
+  array_free(&nbrs);
+
+  struct par_mat *M = tcalloc(struct par_mat, 1);
+  par_csr_setup(M, &eij, sep, bfr);
+  array_free(&eij);
+
+  return M;
+}
+
 // Input z should be orthogonal to 1-vector, have unit norm.
 // inverse iteration should not change z.
 static int inverse(scalar *y, struct array *elements, int nv, scalar *z,
@@ -236,7 +255,7 @@ static int inverse(scalar *y, struct array *elements, int nv, scalar *z,
   // Setup LAMG preconditioner
   struct crystal cr;
   crystal_init(&cr, gsc);
-  struct par_mat *L = par_csr_setup_con(lelt, eid, vtx, nv, 1, gsc, &cr, buf);
+  struct par_mat *L = setup_csr_from_con(lelt, eid, vtx, nv, 1, gsc, &cr, buf);
   for (uint i = 0; i < L->rn; i++) {
     for (uint j = L->adj_off[i], je = L->adj_off[i + 1]; j < je; j++)
       L->adj_val[j] /= L->diag_val[i];
