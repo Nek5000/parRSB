@@ -84,9 +84,12 @@ void par_csr_to_csc(struct par_mat *B, const struct par_mat *A, int sd,
 void par_csc_to_csr(struct par_mat *B, const struct par_mat *A, int sd,
                     struct crystal *cr, buffer *bfr);
 void par_mat_print(struct par_mat *A);
-void par_mat_dump(const char *name, struct par_mat *A, struct crystal *cr,
-                  buffer *bfr);
+void par_mat_dump(const char *name, const struct par_mat *A,
+                  struct crystal *const cr, buffer *bfr);
 int par_mat_free(struct par_mat *A);
+
+void par_vec_dump(const char *name, unsigned n, const double *v,
+                  struct crystal *const cr, buffer *bfr);
 
 // Mat vec routines
 struct gs_data *setup_Q(const struct par_mat *M, const struct comm *c,
