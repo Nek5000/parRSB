@@ -46,9 +46,47 @@ static void inline set_proc(struct mij *m, uint nelt, uint nrem, uint np) {
   assert(m->p >= 0 && m->p < np);
 }
 
-extern int sparse_gemm(struct par_mat *WG, const struct par_mat *W,
-                       const struct par_mat *G, int diag_wg, struct crystal *cr,
-                       buffer *bfr);
+static int compress_mij(struct array *eij, struct array *entries, buffer *bfr) {
+  eij->n = 0;
+  if (entries->n == 0)
+    return 1;
+
+  sarray_sort_2(struct mij, entries->ptr, entries->n, r, 1, c, 1, bfr);
+  struct mij *ptr = (struct mij *)entries->ptr;
+
+  struct mij m;
+  m.idx = 0;
+
+  uint i = 0;
+  while (i < entries->n) {
+    m = ptr[i];
+    uint j = i + 1;
+    while (j < entries->n && ptr[j].r == ptr[i].r && ptr[j].c == ptr[i].c)
+      m.v += ptr[j].v, j++;
+
+    array_cat(struct mij, eij, &m, 1);
+    i = j;
+  }
+
+  // Now make sure the row sum is zero
+  struct mij *pe = (struct mij *)eij->ptr;
+  i = 0;
+  while (i < eij->n) {
+    sint j = i, k = -1;
+    scalar s = 0;
+    while (j < eij->n && pe[j].r == pe[i].r) {
+      if (pe[j].r == pe[j].c)
+        k = j;
+      else
+        s += pe[j].v;
+      j++;
+    }
+    assert(k >= 0);
+    pe[k].v = -s;
+    i = j;
+  }
+  return 0;
+}
 
 static uint mg_setup_aux(struct mg *d, const int factor, const int sagg,
                          struct crystal *cr, struct array *mijs, buffer *bfr) {

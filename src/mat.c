@@ -692,51 +692,6 @@ int par_mat_free(struct par_mat *A) {
   return 0;
 }
 
-//------------------------------------------------------------------------------
-// compress entries of a matrix
-//
-int compress_mij(struct array *eij, struct array *entries, buffer *bfr) {
-  eij->n = 0;
-  if (entries->n == 0)
-    return 1;
-
-  sarray_sort_2(struct mij, entries->ptr, entries->n, r, 1, c, 1, bfr);
-  struct mij *ptr = (struct mij *)entries->ptr;
-
-  struct mij m;
-  m.idx = 0;
-
-  uint i = 0;
-  while (i < entries->n) {
-    m = ptr[i];
-    uint j = i + 1;
-    while (j < entries->n && ptr[j].r == ptr[i].r && ptr[j].c == ptr[i].c)
-      m.v += ptr[j].v, j++;
-
-    array_cat(struct mij, eij, &m, 1);
-    i = j;
-  }
-
-  // Now make sure the row sum is zero
-  struct mij *pe = (struct mij *)eij->ptr;
-  i = 0;
-  while (i < eij->n) {
-    sint j = i, k = -1;
-    scalar s = 0;
-    while (j < eij->n && pe[j].r == pe[i].r) {
-      if (pe[j].r == pe[j].c)
-        k = j;
-      else
-        s += pe[j].v;
-      j++;
-    }
-    assert(k >= 0);
-    pe[k].v = -s;
-    i = j;
-  }
-  return 0;
-}
-
 int IS_CSC(const struct par_mat *A) { return (A->type == CSC); }
 
 int IS_CSR(const struct par_mat *A) { return (A->type == CSR); }
@@ -794,6 +749,80 @@ int par_mat_vec(scalar *y, const scalar *x, const struct par_mat *M,
     for (y[i] *= D[i], j = Lp[i], je = Lp[i + 1]; j != je; j++)
       y[i] += L[j] * buf[j];
   }
+
+  return 0;
+}
+
+int sparse_gemm(struct par_mat *WG, const struct par_mat *W,
+                const struct par_mat *G, int diag_wg, struct crystal *cr,
+                buffer *bfr) {
+  // W is in CSR, G is in CSC; we multiply rows of W by shifting
+  // the columns of G from processor to processor. This is not scalable
+  // at all -- need to do a 2D partition of the matrices W and G.
+  assert(IS_CSR(W) && !IS_DIAG(W));
+  assert(IS_CSC(G));
+
+  // Put G into an array to transfer from processor to processor
+  struct array gij, sij;
+  array_init(struct mij, &gij, 100);
+  array_init(struct mij, &sij, 100);
+
+  struct mij m = {.r = 0, .c = 0, .idx = 0, .p = cr->comm.id, .v = 0};
+  uint i, j, je;
+  for (i = 0; i < G->cn; i++) {
+    m.c = G->cols[i];
+    for (j = G->adj_off[i], je = G->adj_off[i + 1]; j != je; j++) {
+      m.r = G->rows[G->adj_idx[j]];
+      m.v = G->adj_val[j];
+      array_cat(struct mij, &gij, &m, 1);
+    }
+  }
+  if (IS_DIAG(G)) {
+    for (i = 0; i < G->cn; i++) {
+      m.c = m.r = G->cols[i];
+      m.v = G->diag_val[i];
+      array_cat(struct mij, &gij, &m, 1);
+    }
+  }
+
+  sarray_sort_2(struct mij, gij.ptr, gij.n, c, 1, r, 1, bfr);
+  struct mij *pg = (struct mij *)gij.ptr;
+  for (i = 0; i < gij.n; i++)
+    pg[i].idx = i;
+
+  for (uint p = 0; p < cr->comm.np; p++) {
+    // Calculate dot product of each row of W with columns of G
+    for (i = 0; i < W->rn; i++) {
+      m.r = W->rows[i];
+      uint s = 0, e = 0;
+      while (s < gij.n) {
+        m.c = pg[s].c, m.v = 0;
+        for (j = W->adj_off[i], je = W->adj_off[i + 1]; j < je; j++) {
+          ulong k = W->cols[W->adj_idx[j]];
+          while (e < gij.n && pg[s].c == pg[e].c && pg[e].r < k)
+            e++;
+          if (e < gij.n && pg[s].c == pg[e].c && pg[e].r == k)
+            m.v += W->adj_val[j] * pg[e].v;
+        }
+        while (e < gij.n && pg[s].c == pg[e].c)
+          e++;
+        if (fabs(m.v) > 1e-12)
+          array_cat(struct mij, &sij, &m, 1);
+        s = e;
+      }
+    }
+
+    sint next = (cr->comm.id + 1) % cr->comm.np;
+    for (i = 0; i < gij.n; i++)
+      pg[i].p = next;
+    sarray_transfer(struct mij, &gij, p, 0, cr);
+
+    sarray_sort(struct mij, gij.ptr, gij.n, idx, 0, bfr);
+    pg = gij.ptr;
+  }
+
+  par_csr_setup(WG, &sij, diag_wg, bfr);
+  array_free(&gij), array_free(&sij);
 
   return 0;
 }

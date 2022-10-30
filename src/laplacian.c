@@ -77,22 +77,16 @@ static int par_csr_init(struct laplacian *l, const struct rsb_element *elems,
 
   struct csr_laplacian *L = l->data = tcalloc(struct csr_laplacian, 1);
 
-  struct array compressed;
-  array_init(struct mij, &compressed, 100);
-  compress_mij(&compressed, &eij, bfr);
   struct par_mat *M = L->M = tcalloc(struct par_mat, 1);
-  par_csr_setup(M, &compressed, 1, bfr);
-  array_free(&compressed);
+  par_csr_setup(M, &eij, 1, bfr);
 
-  L->gsh = setup_Q(L->M, c, bfr);
+  L->gsh = setup_Q(M, c, bfr);
 
   uint nnz = M->rn > 0 ? M->adj_off[M->rn] + M->rn : 0;
   L->buf = tcalloc(scalar, nnz);
 
   crystal_free(&cr);
-
-  array_free(&nbrs);
-  array_free(&eij);
+  array_free(&nbrs), array_free(&eij);
 
   return 0;
 }

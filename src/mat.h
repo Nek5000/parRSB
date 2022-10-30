@@ -40,8 +40,6 @@ struct mij {
 // `eij` is an array of type `struct mij`, input `nbr` is an array of type
 // `struct nbr`
 int compress_nbrs(struct array *eij, struct array *nbr, buffer *bfr);
-// Both `eij` and `entries` are arrays of type `struct mij`.
-int compress_mij(struct array *eij, struct array *entries, buffer *bfr);
 
 //==============================================================================
 // mat
@@ -95,5 +93,10 @@ struct gs_data *setup_Q(const struct par_mat *M, const struct comm *c,
                         buffer *bfr);
 int par_mat_vec(scalar *y, const scalar *x, const struct par_mat *M,
                 struct gs_data *gsh, scalar *buf, buffer *bfr);
+
+// GEMM
+int sparse_gemm(struct par_mat *WG, const struct par_mat *W,
+                const struct par_mat *G, int diag_wg, struct crystal *cr,
+                buffer *bfr);
 
 #endif // _PARRSB_MAT_H_
