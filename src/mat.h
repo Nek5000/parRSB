@@ -89,7 +89,7 @@ void par_mat_dump(const char *name, const struct par_mat *A,
 int par_mat_free(struct par_mat *A);
 
 void par_vec_dump(const char *name, unsigned n, const double *v,
-                  struct crystal *const cr, buffer *bfr);
+                  const ulong *id, struct crystal *const cr, buffer *bfr);
 
 // Mat vec routines
 struct gs_data *setup_Q(const struct par_mat *M, const struct comm *c,

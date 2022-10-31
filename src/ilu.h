@@ -35,7 +35,7 @@ extern ilu_options ilu_default_options;
 struct ilu;
 struct ilu *ilu_setup(unsigned n, unsigned nv, const long long *vtx,
                       const ilu_options *options, MPI_Comm comm, buffer *bfr);
-void ilu_solve(double *x, const struct ilu *ilu, const double *b, buffer *bfr);
+void ilu_solve(double *x, struct ilu *ilu, const double *b, buffer *bfr);
 void ilu_free(struct ilu *ilu);
 
 #ifdef __cplusplus

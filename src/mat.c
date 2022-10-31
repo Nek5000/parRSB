@@ -700,31 +700,26 @@ int IS_CSR(const struct par_mat *A) { return (A->type == CSR); }
 int IS_DIAG(const struct par_mat *A) { return (A->diag_val != NULL); }
 
 void par_vec_dump(const char *name, unsigned n, const double *v,
-                  struct crystal *const cr, buffer *bfr) {
+                  const ulong *id, struct crystal *const cr, buffer *bfr) {
   struct vec_t {
     double v;
     ulong idx;
     uint p;
   };
 
-  struct comm *c = &cr->comm;
-
-  slong out[2][1], wrk[2][1], in = n;
-  comm_scan(out, c, gs_long, gs_add, &in, 1, wrk);
-  ulong s = out[0][0];
-
   struct array vecs;
   array_init(struct vec_t, &vecs, n);
 
   struct vec_t vt = {.v = 0, .idx = 0, .p = 0};
   for (uint i = 0; i < n; i++) {
-    vt.idx = s + i, vt.v = v[i];
+    vt.idx = id[i], vt.v = v[i];
     array_cat(struct vec_t, &vecs, &vt, 1);
   }
 
   sarray_transfer(struct vec_t, &vecs, p, 0, cr);
   sarray_sort(struct vec_t, vecs.ptr, vecs.n, idx, 1, bfr);
 
+  struct comm *c = &cr->comm;
   if (c->id == 0) {
     FILE *fp = fopen(name, "w+");
     if (fp) {
