@@ -1572,14 +1572,14 @@ static void fw_solve(double *x, const uint lvl, const uint *lvl_off,
 }
 
 static void bw_solve(double *x, const uint lvl, const uint *lvl_off,
-                     const struct par_mat *B, unsigned handle_null) {
+                     const struct par_mat *B) {
   // Do backward solve
   assert(IS_CSC(B) && !IS_DIAG(B));
   const uint *Up = B->adj_off, *Ui = B->adj_idx, Un = B->rn;
   const scalar *U = B->adj_val;
 
   uint s = lvl_off[lvl], e = lvl_off[lvl - 1];
-  if (handle_null && s > e)
+  if (s > e && fabs(U[Up[s] - 1]) < 1e-7)
     x[Ui[Up[s] - 1]] = 0, s--;
   for (uint i = s; i > e; i--) {
     uint p = Up[i] - 1;
@@ -1591,6 +1591,19 @@ static void bw_solve(double *x, const uint lvl, const uint *lvl_off,
         break;
       x[Ui[p]] -= xi * U[p];
     }
+  }
+}
+
+static void print(struct par_mat *L, double *rhs, struct comm *comm) {
+  for (unsigned j = 0; j < comm->np; j++) {
+    if (j == comm->id) {
+      printf("rank: %d rhs1: ", comm->id);
+      for (unsigned k = 0; k < L->rn; k++)
+        printf("%.15lf (%llu) ", rhs[k], L->rows[k]);
+      printf("\n");
+      fflush(stdout);
+    }
+    comm_barrier(comm);
   }
 }
 
@@ -1617,7 +1630,6 @@ void ilu_solve(double *xo, struct ilu *ilu, const double *bi, buffer *bfr) {
 
   const uint *lvl_off = ilu->lvl_off, nlvls = ilu->nlvls;
   struct gs_data **handles = tcalloc(struct gs_data *, nlvls);
-  double *y = tcalloc(double, L->cn);
   for (unsigned i = 0; i < nlvls; i++) {
     // Forward solve for the level
     fw_solve(rhs, i, lvl_off, L);
@@ -1626,7 +1638,7 @@ void ilu_solve(double *xo, struct ilu *ilu, const double *bi, buffer *bfr) {
     // handle to do this, last gsh is actually useless.
     slong *ids = tcalloc(slong, L->rn);
     uint cs = lvl_off[i], ce = lvl_off[nlvls];
-    if (L->rn > 0) {
+    if (L->cn > 0) {
       for (uint j = L->adj_off[cs], je = L->adj_off[ce]; j < je; j++) {
         uint idx = local_dof(L->cols, L->rows[L->adj_idx[j]], L->cn);
         if (idx < L->cn)
@@ -1640,7 +1652,11 @@ void ilu_solve(double *xo, struct ilu *ilu, const double *bi, buffer *bfr) {
     if (i < nlvls - 1)
       gs(rhs, gs_double, gs_add, 1, handles[i], bfr);
 
-    if (L->rn > 0) {
+    // Copy the solution to b
+    for (unsigned j = lvl_off[i]; j < lvl_off[i + 1]; j++)
+      b[j] = rhs[L->adj_idx[L->adj_off[j]]];
+
+    if (L->cn > 0) {
       for (uint j = L->adj_off[0], je = L->adj_off[L->cn]; j < je; j++) {
         uint idx = local_dof(L->cols, L->rows[L->adj_idx[j]], L->cn);
         if (idx == L->cn)
@@ -1648,28 +1664,27 @@ void ilu_solve(double *xo, struct ilu *ilu, const double *bi, buffer *bfr) {
       }
     }
 
-    // Copy the solution to y
-    for (unsigned j = lvl_off[i], je = lvl_off[i + 1]; j < je; j++)
-      y[j] = rhs[L->adj_idx[L->adj_off[j]]];
-
-    free(ids);
+    tfree(ids);
   }
+  for (uint i = 0; i < nlvls; i++)
+    gs_free(handles[i]);
+  tfree(handles);
 
+  // FIXME: Get rid of tmp
   val = getenv("PARRSB_DUMP_ILU");
   if (val != NULL && atoi(val) != 0)
-    par_vec_dump("y.txt", L->cn, y, L->cols, cr, bfr);
-  tfree(y);
+    par_vec_dump("y.txt", L->cn, b, L->cols, cr, bfr);
+
+  // Copy the solution to tmp.
+  const struct par_mat *U = &ilu->U;
+  assert(L->cn == U->cn);
+  double *tmp = tcalloc(double, U->rn);
+  for (uint i = 0; i < L->cn; i++)
+    tmp[U->adj_idx[U->adj_off[i + 1] - 1]] = b[i];
 
   // Backward solve
-  const struct par_mat *U = &ilu->U;
-  double *xx = tcalloc(double, U->rn);
-  assert(L->cn == U->cn);
-  for (uint i = 0; i < L->cn; i++)
-    xx[U->adj_idx[U->adj_off[i + 1] - 1]] = rhs[L->adj_idx[L->adj_off[i]]];
-
   for (unsigned i = nlvls; i > 0; i--) {
-    unsigned handle_null = ilu->null_space && (i == ilu->nlvls);
-    bw_solve(xx, i, lvl_off, U, handle_null);
+    bw_solve(tmp, i, lvl_off, U);
 
     // Update everyone with our local solutions. We need to setup a gs handle
     // to do this.
@@ -1686,25 +1701,28 @@ void ilu_solve(double *xo, struct ilu *ilu, const double *bi, buffer *bfr) {
     }
 
     struct gs_data *gsh = gs_setup(ids, U->rn, comm, 0, gs_auto, 0);
-    gs(xx, gs_double, gs_add, 1, gsh, bfr);
+    gs(tmp, gs_double, gs_add, 1, gsh, bfr);
     gs_free(gsh);
-    free(ids);
+
+    for (unsigned j = lvl_off[i - 1]; j < lvl_off[i]; j++)
+      b[j] = tmp[U->adj_idx[U->adj_off[j + 1] - 1]];
+
+    if (U->cn > 0) {
+      for (uint j = U->adj_off[0], je = U->adj_off[U->cn]; j < je; j++) {
+        uint idx = local_dof(U->cols, U->rows[U->adj_idx[j]], U->cn);
+        if (idx == U->cn)
+          tmp[U->adj_idx[j]] = 0;
+      }
+    }
+
+    tfree(ids);
   }
 
   val = getenv("PARRSB_DUMP_ILU");
-  if (val != NULL && atoi(val) != 0) {
-    double *x = tcalloc(double, L->cn);
-    for (uint i = 0; i < L->cn; i++)
-      x[i] = xx[L->adj_idx[L->adj_off[i]]];
-    par_vec_dump("x.txt", L->cn, x, L->cols, cr, bfr);
-    tfree(x);
-  }
+  if (val != NULL && atoi(val) != 0)
+    par_vec_dump("x.txt", U->cn, b, U->cols, cr, bfr);
 
-  for (uint i = 0; i < nlvls; i++)
-    gs_free(handles[i]);
-  free(handles);
-
-  tfree(xx), tfree(rhs), tfree(b);
+  tfree(b), tfree(tmp), tfree(rhs);
 }
 
 void ilu_free(struct ilu *ilu) {

@@ -65,6 +65,21 @@ jobs:
             --mesh ${{ matrix.test }} --tol=${tol} --ilu_type=0
 
           octave-cli ilu0.m
+      - name: ILU(0) solve
+        if: always()
+        shell: bash
+        run: |
+          export PARRSB_DUMP_ILU=1
+
+          cp hostfile ${EXAMPLESDIR}/ilu scripts/ilu-solve.py \
+            ${PARRSB_CI}/${{ matrix.test }}
+          cd ${PARRSB_CI}/${{ matrix.test }}
+
+          tol=(`cat test.txt | grep tol`); tol=${tol[2]}
+          mpirun -np ${{ matrix.np }} --hostfile hostfile ./ilu \
+            --mesh ${{ matrix.test }} --tol=${tol} --ilu_type=0 --ilu_solve=1
+
+          python ilu-solve.py --test_fw 1 --test_bw 1
       - name: ILUC factorization
         if: always()
         shell: bash
@@ -80,7 +95,7 @@ jobs:
             --mesh ${{ matrix.test }} --tol=${tol} --ilu_type=1
 
           octave-cli iluc.m
-      - name: ILUC forward solve
+      - name: ILUC solve
         if: always()
         shell: bash
         run: |
@@ -92,6 +107,6 @@ jobs:
 
           tol=(`cat test.txt | grep tol`); tol=${tol[2]}
           mpirun -np ${{ matrix.np }} --hostfile hostfile ./ilu \
-            --mesh ${{ matrix.test }} --tol=${tol} --ilu_type=1
+            --mesh ${{ matrix.test }} --tol=${tol} --ilu_type=1 --ilu_solve=1
 
-          python ilu-solve.py
+          python ilu-solve.py --test_fw 1 --test_bw 1

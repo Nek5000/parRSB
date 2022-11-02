@@ -264,7 +264,7 @@ struct parrsb_cmd_opts *parrsb_parse_cmd_opts(int argc, char *argv[]) {
 
   in->mesh = NULL, in->tol = 2e-1;
   in->test = 0, in->dump = 1, in->verbose = 0, in->nactive = INT_MAX;
-  in->ilu_type = 0, in->ilu_tol = 1e-1, in->ilu_pivot = 0;
+  in->ilu_type = 0, in->ilu_tol = 1e-1, in->ilu_pivot = 0, in->ilu_solve = 0;
   in->crs_type = 0, in->crs_tol = 1e-3;
 
   static struct option long_options[] = {
@@ -277,7 +277,7 @@ struct parrsb_cmd_opts *parrsb_parse_cmd_opts(int argc, char *argv[]) {
       {"ilu_type", optional_argument, 0, 10},
       {"ilu_tol", optional_argument, 0, 11},
       {"ilu_pivot", optional_argument, 0, 12},
-      {"ilu_null_space", optional_argument, 0, 13},
+      {"ilu_solve", optional_argument, 0, 13},
       {"crs_type", optional_argument, 0, 20},
       {"crs_tol", optional_argument, 0, 21},
       {0, 0, 0, 0}};
@@ -317,8 +317,9 @@ struct parrsb_cmd_opts *parrsb_parse_cmd_opts(int argc, char *argv[]) {
       break;
     case 12:
       in->ilu_pivot = atoi(optarg);
+      break;
     case 13:
-      in->ilu_null_space = atoi(optarg);
+      in->ilu_solve = atoi(optarg);
       break;
     case 20:
       in->crs_type = atoi(optarg);

@@ -25,16 +25,15 @@ int main(int argc, char *argv[]) {
   // Setup ILU
   ilu_options opts = {.type = in->ilu_type,
                       .tol = in->ilu_tol,
-                      .null_space = in->ilu_null_space,
                       .pivot = in->ilu_pivot,
                       .verbose = in->verbose,
                       .nnz_per_row = 0};
   struct ilu *ilu = ilu_setup(ne, nv, vl, &opts, comm, &bfr);
 
-  // Only works for ILUC as of now
-  double *x = NULL, *b = NULL;
-  if (opts.type == 1)
+  if (in->ilu_solve) {
+    double *x = NULL, *b = NULL;
     ilu_solve(x, ilu, b, &bfr);
+  }
 
   ilu_free(ilu), buffer_free(&bfr);
   free(vl), free(coord), free(in);
