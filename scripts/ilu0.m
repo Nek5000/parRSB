@@ -1,11 +1,14 @@
 load 'A.txt';
-load 'B.txt';
-A = spconvert(A);
-B = spconvert(B);
+load 'L.txt';
+load 'U.txt';
 
-[L, U] = ilu(A);
-n = size(A, 1);
-I = speye(n);
-err = norm(L + U - B - I, Inf);
-printf('ILU err = %f', err);
-assert(err < 1e-8);
+A = spconvert(A);
+L = spconvert(L);
+U = spconvert(U);
+
+[Lo, Uo] = ilu(A);
+
+Lerr = norm(Lo - L, Inf);
+Uerr = norm(Uo - U, Inf);
+printf('L err = %f, U err = %f', Lerr , Uerr);
+assert(Lerr < 1e-8 && Uerr < 1e-8);

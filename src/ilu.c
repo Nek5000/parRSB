@@ -7,6 +7,11 @@
 
 ilu_options ilu_default_options;
 
+static void iluc_sep_lu(struct par_mat *L, struct par_mat *U,
+                        const struct par_mat *A, struct crystal *cr,
+                        buffer *bfr);
+static void iluc_csr_to_csc(struct par_mat *A, struct crystal *cr, buffer *bfr);
+
 //=============================================================================
 // ILU levels
 //
@@ -662,9 +667,10 @@ static void ilu0(struct ilu *ilu, buffer *bfr) {
     par_mat_free(&E);
   }
 
-  const char *val = getenv("PARRSB_DUMP_ILU");
-  if (val != NULL && atoi(val) != 0)
-    par_mat_dump("B.txt", &ilu->A, &ilu->cr, bfr);
+  // L in CSC and U in CSR
+  iluc_sep_lu(&ilu->L, &ilu->U, &ilu->A, &ilu->cr, bfr);
+  // Convert U to CSC
+  iluc_csr_to_csc(&ilu->U, &ilu->cr, bfr);
 }
 
 //=============================================================================
@@ -677,33 +683,29 @@ struct eij_t {
 };
 
 // We are going to separate A matrix to L and U where L is the strictly lower
-// triangular part of A and U is the upper triangular part of A (including the
-// diagonal). Since A is in CSR format, extracting U (in CSR format) is easy.
-// L will be distributed by columns and we need to figure out the owner of a
-// given column.
+// triangular (with unit diagonal) part of A and U is the upper triangular
+// part of A (including the diagonal). Since A is in CSR format, extracting U
+// (in CSR format) is easy.  L will be distributed by columns (CSC) and we
+// need to figure out the owner of a given column.
 static void iluc_sep_lu(struct par_mat *L, struct par_mat *U,
                         const struct par_mat *A, struct crystal *cr,
                         buffer *bfr) {
-  // Recover the communicator
-  struct comm *c = &cr->comm;
-
-  // Setup U
   struct array uijs, lijs;
   array_init(struct mij, &uijs, A->rn * 30);
   array_init(struct mij, &lijs, A->rn * 30);
 
   struct mij m = {.r = 0, .c = 0, .idx = 0, .p = 0, .v = 0};
-  uint i, j, je;
-  for (i = 0; i < A->rn; i++) {
+  uint np = cr->comm.np;
+  for (uint i = 0; i < A->rn; i++) {
     m.r = A->rows[i];
-    j = A->adj_off[i], je = A->adj_off[i + 1];
+    uint j = A->adj_off[i], je = A->adj_off[i + 1];
     for (; j < je && A->cols[A->adj_idx[j]] < m.r; j++) {
       m.c = A->cols[A->adj_idx[j]], m.v = A->adj_val[j];
-      m.p = m.c % c->np, m.idx = (local_dof(A->rows, m.c, A->rn) < A->rn);
+      m.p = m.c % np, m.idx = (local_dof(A->rows, m.c, A->rn) < A->rn);
       array_cat(struct mij, &lijs, &m, 1);
     }
     // Add the unit diagonal to L (We actually don't need to send this)
-    m.c = m.r, m.v = 1, m.p = m.c % c->np, m.idx = 1;
+    m.c = m.r, m.v = 1, m.p = m.c % np, m.idx = 1;
     array_cat(struct mij, &lijs, &m, 1);
 
     for (; j < je; j++) {
@@ -712,6 +714,7 @@ static void iluc_sep_lu(struct par_mat *L, struct par_mat *U,
     }
   }
 
+  // Setup U
   par_mat_setup(U, &uijs, CSR, 0, bfr);
   array_free(&uijs);
 
@@ -720,6 +723,7 @@ static void iluc_sep_lu(struct par_mat *L, struct par_mat *U,
   if (lijs.n > 0) {
     sarray_sort_2(struct mij, lijs.ptr, lijs.n, c, 1, idx, 0, bfr);
     struct mij *pl = (struct mij *)lijs.ptr;
+    uint i, j;
     for (i = 1, j = 0; i < lijs.n; i++) {
       if (pl[i].c != pl[j].c) {
         assert(pl[i - 1].idx == 1);
@@ -1299,23 +1303,21 @@ static void iluc_csr_to_csc(struct par_mat *A, struct crystal *cr,
                             buffer *bfr) {
   assert(IS_CSR(A));
 
-  // Recover the communicator
-  struct comm *c = &cr->comm;
-
   struct array mijs;
   array_init(struct mij, &mijs, A->rn * 30);
 
   struct mij m = {.r = 0, .c = 0, .idx = 0, .p = 0, .v = 0};
+  uint np = cr->comm.np;
   for (uint i = 0; i < A->rn; i++) {
     m.r = A->rows[i];
     for (uint j = A->adj_off[i], je = A->adj_off[i + 1]; j < je; j++) {
       m.c = A->cols[A->adj_idx[j]], m.v = A->adj_val[j];
-      m.p = m.c % c->np, m.idx = (local_dof(A->rows, m.c, A->rn) < A->rn);
+      m.p = m.c % np, m.idx = (local_dof(A->rows, m.c, A->rn) < A->rn);
       array_cat(struct mij, &mijs, &m, 1);
     }
 
     if (IS_DIAG(A)) {
-      m.c = m.r, m.v = A->diag_val[i], m.p = m.c % c->np, m.idx = 1;
+      m.c = m.r, m.v = A->diag_val[i], m.p = m.c % np, m.idx = 1;
       array_cat(struct mij, &mijs, &m, 1);
     }
   }
@@ -1352,7 +1354,7 @@ static void iluc(struct ilu *ilu, buffer *bfr) {
   // Setup L and U
   iluc_sep_lu(&ilu->L, &ilu->U, &ilu->A, &ilu->cr, bfr);
 
-  uint an = ilu->A.rn, sz = an * 30 + 1;
+  uint sz = ilu->A.rn * 10 + 1;
   struct array uij, lij, data, work;
   array_init(struct mij, &uij, sz);
   array_init(struct mij, &lij, sz);
@@ -1363,21 +1365,15 @@ static void iluc(struct ilu *ilu, buffer *bfr) {
     iluc_level(&lij, &uij, l, ilu, &data, &work, bfr);
 
   par_mat_free(&ilu->L), par_mat_free(&ilu->U);
+
+  // Setup and L and U in CSC format
+  par_mat_setup(&ilu->L, &lij, CSC, 0, bfr);
   // Combine the following two calls by getting
   // rid of the first call
   par_mat_setup(&ilu->U, &uij, CSR, 0, bfr);
   iluc_csr_to_csc(&ilu->U, &ilu->cr, bfr);
 
-  par_mat_setup(&ilu->L, &lij, CSC, 0, bfr);
-
-  const char *val = getenv("PARRSB_DUMP_ILU");
-  if (val != NULL && atoi(val) != 0) {
-    par_mat_dump("L.txt", &ilu->L, cr, bfr);
-    par_mat_dump("U.txt", &ilu->U, cr, bfr);
-  }
-
-  array_free(&lij), array_free(&uij);
-  array_free(&work), array_free(&data);
+  array_free(&lij), array_free(&uij), array_free(&work), array_free(&data);
 }
 
 //=============================================================================
@@ -1486,27 +1482,25 @@ static int ilu_setup_aux(struct ilu *ilu, unsigned nlvls, const uint *loff,
 struct ilu *ilu_setup(unsigned n, unsigned nv, const long long *llvtx,
                       const ilu_options *options, MPI_Comm comm, buffer *bfr) {
   struct ilu *ilu = tcalloc(struct ilu, 1);
-  ilu->pivot = options->pivot;
-  ilu->verbose = options->verbose;
-  ilu->null_space = options->null_space;
-  ilu->tol = options->tol;
+  ilu->pivot = options->pivot, ilu->verbose = options->verbose;
+  ilu->null_space = options->null_space, ilu->tol = options->tol;
   ilu->nnz_per_row = options->nnz_per_row;
 
   // Create a gslib comm out of MPI_Comm
   struct comm c;
   comm_init(&c, comm);
-
   crystal_init(&ilu->cr, &c);
+  comm_free(&c);
 
   // Establish a numbering based on input
   slong out[2][1], wrk[2][1], in = n;
-  comm_scan(out, &c, gs_long, gs_add, &in, 1, wrk);
+  comm_scan(out, &ilu->cr.comm, gs_long, gs_add, &in, 1, wrk);
   ulong s = out[0][0], ng = out[1][0];
-  comm_free(&c);
 
   ulong *ids = tcalloc(ulong, n);
   for (uint i = 0; i < n; i++)
     ids[i] = s + i + 1;
+
   slong *vtx = tcalloc(slong, n * nv);
   for (uint i = 0; i < n * nv; i++)
     vtx[i] = llvtx[i];
@@ -1518,9 +1512,9 @@ struct ilu *ilu_setup(unsigned n, unsigned nv, const long long *llvtx,
 
   ilu->un = n, ilu->nlvls = 0, ilu->lvl_off = NULL, ilu->perm = NULL;
   ilu_setup_aux(ilu, nlvls, loff, lownr, lids, n, nv, vtx, ilu->verbose, bfr);
-  tfree(ids), tfree(vtx);
+  tfree(loff), tfree(lownr), tfree(ids), tfree(vtx);
 
-  const char *val = getenv("PARRSB_DUMP_ILU");
+  char *val = getenv("PARRSB_DUMP_ILU");
   if (val != NULL && atoi(val) != 0)
     par_mat_dump("A.txt", &ilu->A, &ilu->cr, bfr);
 
@@ -1546,8 +1540,13 @@ struct ilu *ilu_setup(unsigned n, unsigned nv, const long long *llvtx,
   // struct comm *comm = &ilu->cr.comm;
   // ilu->u2r = gs_setup(gs_ids, ilu->un + A->rn, comm, 0, gs_auto, 0);
   // free(gs_ids);
+  tfree(lids);
 
-  tfree(loff), tfree(lownr), tfree(lids);
+  val = getenv("PARRSB_DUMP_ILU");
+  if (val != NULL && atoi(val) != 0) {
+    par_mat_dump("L.txt", &ilu->L, &ilu->cr, bfr);
+    par_mat_dump("U.txt", &ilu->U, &ilu->cr, bfr);
+  }
 
   return ilu;
 }
@@ -1711,14 +1710,10 @@ void ilu_solve(double *xo, struct ilu *ilu, const double *bi, buffer *bfr) {
 void ilu_free(struct ilu *ilu) {
   if (ilu) {
     crystal_free(&ilu->cr);
-    if (ilu->nlvls > 0) {
-      par_mat_free(&ilu->A);
-      // FIXME: Cleanup L and U. Only ILUC has these now. Need to make sure
-      // ILU0 create them as well.
-      // par_mat_free(&ilu->L);
-      // par_mat_free(&ilu->U);
-    }
-    tfree(ilu->lvl_off), tfree(ilu->perm), tfree(ilu);
+    if (ilu->nlvls > 0)
+      par_mat_free(&ilu->A), par_mat_free(&ilu->L), par_mat_free(&ilu->U);
+    tfree(ilu->lvl_off), tfree(ilu->perm);
+    tfree(ilu);
   }
 }
 
