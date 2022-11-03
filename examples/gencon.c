@@ -83,7 +83,7 @@ int main(int argc, char *argv[]) {
   parrsb_check_error(err, world);
 
   unsigned ndim = (nv == 8 ? 3 : 2);
-  err = parrsb_conn_mesh(vl, coord, nelt, ndim, bcs, nbcs, in->tol, world, 1);
+  err = parrsb_conn_mesh(vl, coord, nelt, ndim, bcs, nbcs, in->tol, world);
   parrsb_check_error(err, world);
 
   // Write connectivity to .co2 file if dump is on
