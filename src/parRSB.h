@@ -51,13 +51,13 @@ void fparrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
 //
 int parrsb_conn_mesh(long long *vtx, double *coord, int nel, int nDim,
                      long long *periodicInfo, int nPeriodicFaces, double tol,
-                     MPI_Comm comm, int verbose);
+                     MPI_Comm comm);
 
 #define fparrsb_conn_mesh                                                      \
   FORTRAN_UNPREFIXED(fparrsb_conn_mesh, FPARRSB_CONN_MESH)
 void fparrsb_conn_mesh(long long *vtx, double *coord, int *nel, int *nDim,
                        long long *periodicInfo, int *nPeriodicFaces,
-                       double *tol, MPI_Fint *fcomm, int *verbose, int *err);
+                       double *tol, MPI_Fint *fcomm, int *err);
 
 //==============================================================================
 // I/O routines

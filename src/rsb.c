@@ -14,9 +14,9 @@ extern int rcb(struct array *elements, size_t unit_size, int ndim,
 parrsb_options parrsb_default_options = {
     // General options
     .partitioner = 0,
-    .verbose_level = 1,
-    .profile_level = 1,
-    .two_level = 0,
+    .verbose_level = 0,
+    .profile_level = 0,
+    .two_level = 1,
     .repair = 0,
     // RSB common (Lanczos + MG) options
     .rsb_algo = 0,
@@ -56,6 +56,8 @@ static void update_options(parrsb_options *options) {
   UPDATE_OPTION(rsb_mg_grammian, "PARRSB_RSB_MG_GRAMMIAN", 1);
   UPDATE_OPTION(rsb_mg_factor, "PARRSB_RSB_MG_FACTOR", 1);
   UPDATE_OPTION(rsb_mg_sagg, "PARRSB_RSB_MG_SMOOTH_AGGREGATION", 1);
+  if (options->verbose_level == 0) 
+    options->profile_level = 0;
 }
 
 #undef UPDATE_OPTION
@@ -229,7 +231,7 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
 
   // Report time and finish
   parrsb_barrier(&c);
-  if (c.id == 0 && options.verbose_level > 0) {
+  if (c.id == 0) {
     printf("par%s finished in %g s\n", ALGO[options.partitioner],
            comm_time() - t);
     fflush(stdout);

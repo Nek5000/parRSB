@@ -617,7 +617,7 @@ static int findUniqueVertices(Mesh mesh, struct comm *c, scalar tol,
       comm_allreduce(c, gs_long, gs_add, &n_pts, 1, buf);
 
       slong n_seg = countSegments(mesh, c);
-      if (c->id == 0 && verbose)
+      if (c->id == 0 && verbose > 1)
         printf("locglob: %d %d %lld %lld\n", t + 1, d + 1, n_seg, n_pts);
 
       rearrangeSegments(mesh, &seg, bfr);
@@ -1313,12 +1313,18 @@ static int transferBoundaryFaces(Mesh mesh, struct comm *c) {
 //   vtx[nelt, nv]: Global numbering of vertices of elements
 int parrsb_conn_mesh(long long *vtx, double *coord, int nelt, int ndim,
                      long long *periodicInfo, int nPeriodicFaces, double tol,
-                     MPI_Comm comm, int verbose) {
+                     MPI_Comm comm) {
   struct comm c;
   comm_init(&c, comm);
 
-  if (c.id == 0 && verbose) {
-    printf("Running parCon ... (tol = %e)\n", tol);
+  int verbose = 0;
+  {
+    const char *val = getenv("PARRSB_VERBOSE_LEVEL");
+    if (val != NULL) verbose= atoi(val);  
+  }
+
+  if (c.id == 0 && verbose > 0) {
+    printf("Running parCon ... \n");
     fflush(stdout);
   }
 
@@ -1417,8 +1423,8 @@ int parrsb_conn_mesh(long long *vtx, double *coord, int nelt, int ndim,
   // Report timing info and finish
   parrsb_barrier(&c);
   tcon = comm_time() - tcon;
-  if (c.id == 0 && verbose > 0) {
-    printf("parCon finished in %g s\n", tcon);
+  if (c.id == 0) {
+    printf("parCon (tol = %e) finished in %g s\n", tol, tcon);
     fflush(stdout);
   }
 
@@ -1428,7 +1434,7 @@ int parrsb_conn_mesh(long long *vtx, double *coord, int nelt, int ndim,
   comm_allreduce(&c, gs_double, gs_min, gmin, 8, buf);
   comm_allreduce(&c, gs_double, gs_max, gmax, 8, buf);
 
-  if (c.id == 0 && verbose > 0) {
+  if (c.id == 0 && verbose > 1) {
     for (unsigned i = 0; i < 7; i++)
       printf("%s: %e %e (min max)\n", name[i], gmin[i], gmax[i]);
     fflush(stdout);
@@ -1446,11 +1452,11 @@ int parrsb_conn_mesh(long long *vtx, double *coord, int nelt, int ndim,
 //
 void fparrsb_conn_mesh(long long *vtx, double *coord, int *nelt, int *ndim,
                        long long *periodicInfo, int *nPeriodicFaces,
-                       double *tol, MPI_Fint *fcomm, int *verbose, int *err) {
+                       double *tol, MPI_Fint *fcomm, int *err) {
   *err = 1;
   MPI_Comm c = MPI_Comm_f2c(*fcomm);
   *err = parrsb_conn_mesh(vtx, coord, *nelt, *ndim, periodicInfo,
-                          *nPeriodicFaces, *tol, c, *verbose);
+                          *nPeriodicFaces, *tol, c);
 }
 
 #undef GC_MAX_FACES

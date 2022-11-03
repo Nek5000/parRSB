@@ -118,7 +118,7 @@ int parrsb_setup_mesh(unsigned *nelt, unsigned *nv, long long **vl,
   parrsb_check_error(err, comm);
 
   int ndim = (*nv == 8 ? 3 : 2);
-  err = parrsb_conn_mesh(*vl, *coord, *nelt, ndim, bcs, nbcs, in->tol, comm, 0);
+  err = parrsb_conn_mesh(*vl, *coord, *nelt, ndim, bcs, nbcs, in->tol, comm);
   parrsb_check_error(err, comm);
 
   // Partition the mesh
