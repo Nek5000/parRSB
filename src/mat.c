@@ -813,7 +813,7 @@ struct gs_data *setup_Q(const struct par_mat *M, const struct comm *c,
   buffer_reserve(bfr, nnz * sizeof(slong));
   slong *sids = (slong *)bfr->ptr;
 
-  uint i, j;
+  uint i, j = 0;
   for (i = 0; i < n; i++)
     for (j = M->adj_off[i]; j < M->adj_off[i + 1]; j++)
       sids[j] = -ids[M->adj_idx[j]];
