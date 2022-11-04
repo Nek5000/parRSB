@@ -260,7 +260,7 @@ static int inverse(scalar *y, struct array *elements, int nv, scalar *z,
     comm_allreduce(gsc, gs_double, gs_add, &lambda, 1, bfr);
 
     for (uint j = 0; j < lelt; j++)
-      err[i] = y[i] - lambda * z[i];
+      err[j] = y[j] - lambda * z[j];
     scalar norme = dot(err, err, lelt);
     comm_allreduce(gsc, gs_double, gs_add, &norme, 1, bfr);
     norme = sqrt(norme);
@@ -347,8 +347,13 @@ static int inverse(scalar *y, struct array *elements, int nv, scalar *z,
   metric_toc(gsc, RSB_INVERSE);
 
   laplacian_free(wl);
+  if (L) {
+    par_mat_free(L);
+    free(L);
+  }
   mg_free(d);
-  free(err);
+  if (err)
+    free(err);
 
   return i;
 }
@@ -622,7 +627,7 @@ int fiedler(struct array *elements, int nv, parrsb_options *opts,
   comm_scan(out, gsc, gs_long, gs_add, &in, 1, wrk);
   slong start = out[0][0], nelg = out[1][0];
 
-  scalar *initv = tcalloc(scalar, 2 * lelt), *f = initv + lelt;
+  scalar *initv = tcalloc(scalar, lelt);
   for (uint i = 0; i < lelt; i++) {
     initv[i] = start + i + 1.0;
     if (start + i < nelg / 2)
@@ -640,6 +645,7 @@ int fiedler(struct array *elements, int nv, parrsb_options *opts,
 
   metric_tic(gsc, RSB_FIEDLER_CALC);
   int iter = 0;
+  scalar *f = tcalloc(scalar, lelt);
   switch (opts->rsb_algo) {
   case 0:
     iter = lanczos(f, elements, nv, initv, gsc, opts->rsb_max_iter,
@@ -671,6 +677,9 @@ int fiedler(struct array *elements, int nv, parrsb_options *opts,
   for (uint i = 0; i < lelt; i++)
     elems[i].fiedler = f[i];
 
-  free(initv);
+  if (initv)
+    free(initv);
+  if (f)
+    free(f);
   return 0;
 }

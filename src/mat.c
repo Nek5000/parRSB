@@ -748,16 +748,13 @@ struct par_mat *par_csr_setup_con(const uint nelt, const ulong *eid,
                                   struct comm *c, struct crystal *cr,
                                   buffer *bfr) {
   struct array nbrs, eij;
-  array_init(struct nbr, &nbrs, 100);
-  array_init(struct mij, &eij, 100);
-
   find_nbrs(&nbrs, eid, vtx, nelt, nv, cr, bfr);
   compress_nbrs(&eij, &nbrs, bfr);
-  array_free(&nbrs);
 
   struct par_mat *M = tcalloc(struct par_mat, 1);
   par_csr_setup(M, &eij, sep, bfr);
-  array_free(&eij);
+
+  array_free(&eij), array_free(&nbrs);
 
   return M;
 }
