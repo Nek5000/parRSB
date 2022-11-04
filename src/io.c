@@ -463,17 +463,21 @@ int parrsb_dump_map(char *name, unsigned nelt, unsigned nv, long long *vtx,
   MPI_Info_create(&infoIn);
   MPI_Info_set(infoIn, "access_style", "write_once,random");
 
-  int errs = 0;
   MPI_File file;
   int err = MPI_File_open(comm, ma2_name, MPI_MODE_WRONLY | MPI_MODE_CREATE,
                           infoIn, &file);
-  if (err) {
-    errs++;
-    MPI_Abort(comm, 911);
-  }
 
   int rank;
   MPI_Comm_rank(comm, &rank);
+
+  if (err) {
+    if (rank == 0) {
+      fprintf(stderr, "%s:%d MPI_File_open failed: %s\n", __FILE__, __LINE__,
+              ma2_name);
+      fflush(stderr);
+    }
+    return 1;
+  }
 
   int writeSize = 0;
   if (rank == 0)
@@ -503,14 +507,14 @@ int parrsb_dump_map(char *name, unsigned nelt, unsigned nv, long long *vtx,
 
   MPI_Status status;
   err = MPI_File_write_ordered(file, buf, writeSize, MPI_BYTE, &status);
-  if (err)
-    errs++;
+  int errs = (err != 0);
 
   err = MPI_File_close(&file);
-  if (err)
-    errs++;
+  errs += (err != 0);
 
-  free(buf);
+  MPI_Info_free(&infoIn);
+  if (buf)
+    free(buf);
 
   return errs;
 }
