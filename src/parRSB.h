@@ -95,6 +95,7 @@ struct parrsb_cmd_opts {
 };
 
 struct parrsb_cmd_opts *parrsb_parse_cmd_opts(int argc, char *argv[]);
+void parrsb_cmd_opts_free(struct parrsb_cmd_opts *opts);
 
 int parrsb_dist_mesh(unsigned *nelt, long long **vl, double **coord, int *part,
                      int nv, MPI_Comm comm);

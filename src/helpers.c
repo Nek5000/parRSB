@@ -331,6 +331,14 @@ struct parrsb_cmd_opts *parrsb_parse_cmd_opts(int argc, char *argv[]) {
   return in;
 }
 
+void parrsb_cmd_opts_free(struct parrsb_cmd_opts *opts) {
+  if (opts) {
+    if (opts->mesh)
+      free(opts->mesh);
+    free(opts);
+  }
+}
+
 void parrsb_check_error_(int err, char *file, int line, MPI_Comm comm) {
   int sum;
   MPI_Allreduce(&err, &sum, 1, MPI_INT, MPI_SUM, comm);

@@ -146,7 +146,7 @@ int main(int argc, char *argv[]) {
   setup_and_solve(nelt, nv, vl, centroids, in, comm);
 
   free(vl), free(coord), free(centroids);
-  free(in);
+  parrsb_cmd_opts_free(in);
   MPI_Finalize();
 
   return 0;

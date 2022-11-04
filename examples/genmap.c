@@ -86,7 +86,7 @@ int main(int argc, char *argv[]) {
   }
 
   // Free resources
-  free(in);
+  parrsb_cmd_opts_free(in);
   MPI_Comm_free(&comm);
   MPI_Finalize();
 

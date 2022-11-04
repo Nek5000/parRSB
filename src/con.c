@@ -786,7 +786,7 @@ static int renumberPeriodicVertices(Mesh mesh, struct comm *c,
         gs_setup(mids, size1 + 2 * size2, c, 0, gs_pairwise, 0);
 
     gs(mnew, gs_long, gs_min, 0, gsh1, bfr);
-    free(gsh1);
+    gs_free(gsh1);
 
     for (uint i = 0; i < size2; i++)
       mnew[size1 + i] = mnew[size1 + size2 + i];
@@ -801,7 +801,7 @@ static int renumberPeriodicVertices(Mesh mesh, struct comm *c,
   for (uint i = 0; i < size1; i++)
     pe[i].globalId = mcur[i];
 
-  free(gsh);
+  gs_free(gsh);
   free(mids), free(mnew), free(mcur);
 
   return 0;

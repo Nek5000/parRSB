@@ -480,12 +480,13 @@ int parrsb_dump_map(char *name, unsigned nelt, unsigned nv, long long *vtx,
     writeSize = HEADER_LEN * sizeof(char) + sizeof(float);
   writeSize += (nv + 1) * nelt * sizeof(int);
 
-  char *buf = (char *)malloc(writeSize), *buf0 = buf;
-
+  char *buf = (char *)calloc(writeSize, sizeof(char));
+  char *buf0 = buf;
   if (rank == 0) {
-    memcpy(buf0, header, HEADER_LEN * sizeof(char)),
-        buf0 += HEADER_LEN * sizeof(char);
-    memcpy(buf0, &test, sizeof(float)), buf0 += sizeof(float);
+    memcpy(buf0, header, HEADER_LEN * sizeof(char));
+    buf0 += HEADER_LEN * sizeof(char);
+    memcpy(buf0, &test, sizeof(float));
+    buf0 += sizeof(float);
   }
 
   int ivtx[8];

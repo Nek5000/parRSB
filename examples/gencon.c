@@ -99,7 +99,8 @@ int main(int argc, char *argv[]) {
   }
 
   // Free resources
-  free(vl), free(coord), free(bcs), free(in);
+  free(vl), free(coord), free(bcs);
+  parrsb_cmd_opts_free(in);
   MPI_Finalize();
 
   return 0;
