@@ -106,6 +106,8 @@ uint get_components(sint *component, struct array *elems, unsigned nv,
     nmarked += nnz1, count++;
   } while (nmarked < nelg);
 
+  array_free(&arr);
+
   free(p), free(ids);
   if (null_input == 1)
     free(component);

@@ -156,11 +156,6 @@ static uint mg_setup_aux(struct mg *d, const int factor, const int sagg,
     par_csc_to_csr(l->St, &T, 1, cr, bfr);
     par_mat_free(&T);
     l->Qst = setup_Q(l->St, c, bfr);
-
-    if (c->id == 0) {
-      printf("SAGG level = %d done.\n", lvl);
-      fflush(stdout);
-    }
   } else {
     l->S = l->St = NULL;
     l->Qs = l->Qst = NULL;
