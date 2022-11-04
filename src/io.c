@@ -18,48 +18,43 @@
 
 static int re2_header(unsigned *nelt_, unsigned *nv_, ulong *nelgt_,
                       ulong *nelgv_, MPI_File file, struct comm *c) {
-  int rank = c->id;
-  int size = c->np;
-  MPI_Comm comm = c->c;
-
-  int err = 0;
   char *buf = (char *)calloc(GC_RE2_HEADER_LEN + 1, sizeof(char));
   MPI_Status st;
-  err = MPI_File_read_all(file, buf, GC_RE2_HEADER_LEN, MPI_BYTE, &st);
+  int err = MPI_File_read_all(file, buf, GC_RE2_HEADER_LEN, MPI_BYTE, &st);
 
   long long nelgt, nelgv;
   int ndim;
   char version[6];
   sscanf(buf, "%5s %lld %d %lld", version, &nelgt, &ndim, &nelgv);
-
   // TODO: Assert version
-  int nelt = nelgt / size;
-  int nrem = nelgt - nelt * size;
+
+  int rank = c->id, size = c->np;
+  int nelt = nelgt / size, nrem = nelgt - nelt * size;
   nelt += (rank > (size - 1 - nrem) ? 1 : 0);
 
-  float byte_test;
-  MPI_File_read_all(file, &byte_test, 4, MPI_BYTE, &st);
+  float byte_test = 0;
+  err = MPI_File_read_all(file, &byte_test, 4, MPI_BYTE, &st);
   if (fabs(byte_test - 6.543210) > 1e-7) {
-    if (rank == 0)
-      printf("ERROR byte_test failed! %f\n", byte_test);
-    err = 1;
+    if (rank == 0) {
+      fprintf(stderr, "%s:%d ERROR: byte_test failed! %f\n", __FILE__, __LINE__,
+              byte_test);
+      fflush(stderr);
+    }
+    MPI_Abort(c->c, 911);
   }
 
-  *nelt_ = nelt;
-  *nv_ = (ndim == 2 ? 4 : 8);
-  *nelgt_ = nelgt;
-  *nelgv_ = nelgv;
+  *nelt_ = nelt, *nv_ = (ndim == 2 ? 4 : 8);
+  *nelgt_ = nelgt, *nelgv_ = nelgv;
 
-  free(buf);
+  if (buf)
+    free(buf);
 
   return err;
 }
 
 static int re2_coord(double **coord_, unsigned int nelt, int nv, MPI_File file,
                      struct comm *c) {
-  uint rank = c->id;
-  uint size = c->np;
-  MPI_Comm comm = c->c;
+  uint rank = c->id, size = c->np;
 
   slong out[2][1], bfr[2][1];
   slong in = nelt;
@@ -75,13 +70,11 @@ static int re2_coord(double **coord_, unsigned int nelt, int nv, MPI_File file,
   if (rank == 0)
     read_size += header_size;
 
-  int err = 0;
   char *buf = (char *)calloc(read_size, sizeof(char));
-  char *buf0 = buf;
-
   MPI_Status st;
-  err = MPI_File_read_ordered(file, buf, read_size, MPI_BYTE, &st);
+  int err = MPI_File_read_ordered(file, buf, read_size, MPI_BYTE, &st);
 
+  char *buf0 = buf;
   if (rank == 0)
     buf0 += header_size;
 
@@ -127,7 +120,8 @@ static int re2_coord(double **coord_, unsigned int nelt, int nv, MPI_File file,
     }
   }
 
-  free(buf);
+  if (buf)
+    free(buf);
 
   return 0;
 }
@@ -135,8 +129,7 @@ static int re2_coord(double **coord_, unsigned int nelt, int nv, MPI_File file,
 static int re2_boundary(unsigned int *nbcs_, long long **bcs_,
                         unsigned int nelt, int nv, ulong nelgt, MPI_File file,
                         struct comm *c) {
-  uint rank = c->id;
-  uint size = c->np;
+  uint rank = c->id, size = c->np;
   MPI_Comm comm = c->c;
 
   int ndim = (nv == 4) ? 2 : 3;
@@ -230,16 +223,19 @@ static int re2_boundary(unsigned int *nbcs_, long long **bcs_,
 static int read_geometry(unsigned *nelt, unsigned *nv, double **coord,
                          unsigned *nbcs, long long **bcs, char *fname,
                          struct comm *c) {
-  int errs = 0;
-  uint rank = c->id;
-  uint size = c->np;
-  MPI_Comm comm = c->c;
+  uint rank = c->id, size = c->np;
+
+  MPI_Info info;
+  MPI_Info_create(&info);
 
   MPI_File file;
-  int err = MPI_File_open(comm, fname, MPI_MODE_RDONLY, MPI_INFO_NULL, &file);
-  if (err != 0) {
-    if (rank == 0)
-      printf("%s:%d Error opening file: %s\n", __FILE__, __LINE__, fname);
+  int err = MPI_File_open(c->c, fname, MPI_MODE_RDONLY, info, &file);
+  if (err != MPI_SUCCESS) {
+    if (rank == 0) {
+      fprintf(stderr, "%s:%d Error opening file: %s\n", __FILE__, __LINE__,
+              fname);
+      fflush(stderr);
+    }
     return 1;
   }
 
@@ -248,24 +244,23 @@ static int read_geometry(unsigned *nelt, unsigned *nv, double **coord,
   re2_coord(coord, *nelt, *nv, file, c);
   re2_boundary(nbcs, bcs, *nelt, *nv, nelgt, file, c);
 
+  MPI_Info_free(&info);
   err = MPI_File_close(&file);
-  if (err)
-    errs++;
-
-  return errs;
+  return err != MPI_SUCCESS;
 }
 
 static int read_connectivity(unsigned int *nelt_, int *nv_, long long **vl_,
                              char *fname, struct comm *c) {
-  comm_ext comm = c->c;
-  uint rank = c->id;
-  uint size = c->np;
+  uint rank = c->id, size = c->np;
+  MPI_Comm comm = c->c;
 
   MPI_File file;
   int err = MPI_File_open(comm, fname, MPI_MODE_RDONLY, MPI_INFO_NULL, &file);
-  if (err != 0) {
-    if (rank == 0)
+  if (err != MPI_SUCCESS) {
+    if (rank == 0) {
       fprintf(stderr, "Error opening %s for reading.\n", fname);
+      fflush(stderr);
+    }
     MPI_Abort(comm, 911);
   }
 
@@ -279,25 +274,43 @@ static int read_connectivity(unsigned int *nelt_, int *nv_, long long **vl_,
   sscanf(buf, "%5s %12lld %12lld %d", version, &nelgt, &nelgv, &nv);
 
   // TODO: Assert version
-  int nelt = nelgt / size;
-  int nrem = nelgt - nelt * size;
+  int nelt = nelgt / size, nrem = nelgt - nelt * size;
   nelt += (rank > (size - 1 - nrem) ? 1 : 0);
 
-  if (*nv_ != 0)
-    assert(*nv_ == nv);
-  else
+  if (*nv_ != 0) {
+    if (*nv_ != nv) {
+      if (rank == 0) {
+        fprintf(stderr, "%s:%d nv values don't match: %d %d\n", __FILE__,
+                __LINE__, *nv_, nv);
+        fflush(stderr);
+        return 1;
+      }
+    }
+  } else {
     *nv_ = nv;
+  }
 
-  if (*nelt_ != 0)
-    assert(*nelt_ == nelt);
-  else
+  if (*nelt_ != 0) {
+    if (*nelt_ != nelt) {
+      if (rank == 0) {
+        fprintf(stderr, "%s:%d nelt values don't match: %d %d\n", __FILE__,
+                __LINE__, *nelt_, nelt);
+        fflush(stderr);
+        return 1;
+      }
+    }
+  } else {
     *nelt_ = nelt;
+  }
 
-  float byte_test;
+  float byte_test = 0;
   MPI_File_read_all(file, &byte_test, 4, MPI_BYTE, &st);
   if (fabs(byte_test - 6.543210) > 1e-7) {
-    if (rank == 0)
-      fprintf(stderr, "ERROR byte_test failed! %f\n", byte_test);
+    if (rank == 0) {
+      fprintf(stderr, "%s:%d ERROR: byte_test failed! %f\n", __FILE__, __LINE__,
+              byte_test);
+      fflush(stderr);
+    }
     MPI_Abort(comm, 911);
   }
 
@@ -315,11 +328,9 @@ static int read_connectivity(unsigned int *nelt_, int *nv_, long long **vl_,
   err = MPI_File_close(&file);
 
   char *buf0 = buf + (rank == 0) * header_size;
-
   long long *vl = *vl_ = tcalloc(long long, nv *nelt);
-  uint i;
   int j, tmp1, tmp2;
-  for (i = 0; i < nelt; i++) {
+  for (uint i = 0; i < nelt; i++) {
     READ_T(&tmp1, buf0, int, 1);
     buf0 += sizeof(int);
     for (j = 0; j < nv; j++) {
@@ -329,7 +340,8 @@ static int read_connectivity(unsigned int *nelt_, int *nv_, long long **vl_,
     }
   }
 
-  free(buf);
+  if (buf)
+    free(buf);
 
   return 0;
 }
@@ -436,7 +448,7 @@ int parrsb_dump_con(char *name, unsigned nelt, unsigned nv, long long *vl,
 }
 
 int parrsb_dump_map(char *name, unsigned nelt, unsigned nv, long long *vtx,
-                    int *pmap, MPI_Comm comm) {
+                    MPI_Comm comm) {
   char version[6] = "#v001";
   float test = 6.54321;
 
@@ -494,12 +506,11 @@ int parrsb_dump_map(char *name, unsigned nelt, unsigned nv, long long *vtx,
   }
 
   int ivtx[8];
-  int i, j;
-  for (i = 0; i < nelt; i++) {
-    memcpy(buf0, &pmap[i], sizeof(int));
+  for (uint i = 0; i < nelt; i++) {
+    memcpy(buf0, &rank, sizeof(int));
     buf0 += sizeof(int);
 
-    for (j = 0; j < nv; j++)
+    for (unsigned j = 0; j < nv; j++)
       ivtx[j] = vtx[i * nv + j];
     memcpy(buf0, ivtx, sizeof(int) * nv);
     buf0 += nv * sizeof(int);

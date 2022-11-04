@@ -73,7 +73,7 @@ int main(int argc, char *argv[]) {
 
     // Write partition to .ma2 file
     if (in->dump) {
-      err = parrsb_dump_map(in->mesh, nelt, nv, vl, part, comm);
+      err = parrsb_dump_map(in->mesh, nelt, nv, vl, comm);
       parrsb_check_error(err, comm);
     }
 

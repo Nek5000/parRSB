@@ -70,7 +70,7 @@ int parrsb_dump_con(char *name, unsigned nelt, unsigned nv, long long *vl,
                     MPI_Comm comm);
 
 int parrsb_dump_map(char *name, unsigned nelt, unsigned nv, long long *vl,
-                    int *pmap, MPI_Comm comm);
+                    MPI_Comm comm);
 
 int parrsb_dump_part(char *name, unsigned nelt, unsigned nv, double *coord,
                      int gid, MPI_Comm comm);
