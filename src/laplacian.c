@@ -218,9 +218,8 @@ void laplacian_free(struct laplacian *l) {
   if (l) {
     if (l->type & CSR)
       par_csr_free(l);
-    else if (l->type & GS) {
+    else if (l->type & GS)
       gs_weighted_free(l);
-    }
     free(l);
   }
 }

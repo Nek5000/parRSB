@@ -7,7 +7,7 @@
 //------------------------------------------------------------------------------
 // Memory management
 int sfree(void *p, const char *file, unsigned line) {
-  if (!p)
+  if (p)
     free(p);
   return 0;
 }

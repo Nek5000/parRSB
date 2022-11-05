@@ -36,7 +36,8 @@ int main(int argc, char *argv[]) {
   }
 
   ilu_free(ilu), buffer_free(&bfr);
-  free(vl), free(coord), free(in);
+  free(vl), free(coord);
+  parrsb_cmd_opts_free(in);
   MPI_Finalize();
 
   return 0;
