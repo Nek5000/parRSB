@@ -22,8 +22,6 @@ typedef struct {
   unsigned verbose;
   // Use pivoting or not: 0 or 1
   unsigned pivot;
-  // Is there a null space?
-  unsigned null_space;
   // 1st dropping rule: An entry a_ij is dropped abs(a_ij) < tol
   double tol;
   // 2nd dropping rule: Entries are dropped so that total nnz per row/col < p

@@ -27,7 +27,7 @@ int main(int argc, char *argv[]) {
                       .tol = in->ilu_tol,
                       .pivot = in->ilu_pivot,
                       .verbose = in->verbose,
-                      .nnz_per_row = 0};
+                      .nnz_per_row = in->ilu_nnz_per_row};
   struct ilu *ilu = ilu_setup(ne, nv, vl, &opts, comm, &bfr);
 
   if (in->ilu_solve) {

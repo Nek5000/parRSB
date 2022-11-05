@@ -74,7 +74,7 @@ struct laplacian;
 struct laplacian *laplacian_init(struct rsb_element *elems, uint nel, int nv,
                                  int type, struct comm *c, buffer *buf);
 int laplacian(scalar *v, struct laplacian *l, scalar *u, buffer *buf);
-int laplacian_free(struct laplacian *l);
+void laplacian_free(struct laplacian *l);
 
 //------------------------------------------------------------------------------
 // Misc

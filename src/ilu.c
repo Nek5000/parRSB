@@ -462,11 +462,8 @@ struct ilu {
   uint un;
   struct gs_data *u2r;
 
-  unsigned pivot, verbose, null_space;
-  // 1st dropping rule: An entry a_ij is dropped abs(a_ij) < tol
-  scalar tol;
-  // 2nd dropping rule: Entries are dropped so that total nnz per row/col < p
-  uint nnz_per_row;
+  // Options
+  unsigned pivot, verbose;
 
   // Calculated values internal to ILU
   uint nlvls, *lvl_off;
@@ -1483,8 +1480,6 @@ struct ilu *ilu_setup(unsigned n, unsigned nv, const long long *llvtx,
                       const ilu_options *options, MPI_Comm comm, buffer *bfr) {
   struct ilu *ilu = tcalloc(struct ilu, 1);
   ilu->pivot = options->pivot, ilu->verbose = options->verbose;
-  ilu->null_space = options->null_space, ilu->tol = options->tol;
-  ilu->nnz_per_row = options->nnz_per_row;
 
   // Create a gslib comm out of MPI_Comm
   struct comm c;
