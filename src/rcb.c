@@ -1,8 +1,10 @@
 #include "parrsb-impl.h"
 #include "sort.h"
 
-static void get_axis_len(double *length, size_t unit_size, char *elems,
-                         uint nel, int ndim, struct comm *c) {
+extern unsigned get_rsb_bin(uint id, uint np);
+
+static unsigned get_axis(size_t unit_size, char *elems, uint nel, int ndim,
+                         struct comm *c) {
   double min[3] = {DBL_MAX, DBL_MAX, DBL_MAX},
          max[3] = {-DBL_MAX, -DBL_MAX, -DBL_MAX};
 
@@ -36,28 +38,25 @@ static void get_axis_len(double *length, size_t unit_size, char *elems,
     comm_allreduce(c, gs_double, gs_max, max, 3, wrk);
   }
 
-  for (uint i = 0; i < ndim; i++)
-    length[i] = max[i] - min[i];
+  unsigned axis = 0;
+  for (unsigned d = 1; d < ndim; d++) {
+    if ((max[axis] - min[axis]) < (max[d] - min[d]))
+      axis = d;
+  }
+
+  return axis;
 }
 
-void rcb_local(struct array *a, size_t unit_size, uint start, uint end,
-               int ndim, buffer *buf) {
-  sint size = end - start;
+void rcb_local(struct array *a, size_t usize, uint sidx, uint eidx, int ndim,
+               buffer *buf) {
+  sint size = eidx - sidx;
   if (size <= 1)
     return;
 
-  double length[3];
-  char *st = (char *)a->ptr + unit_size * start;
-  get_axis_len(length, unit_size, st, size, ndim, NULL);
+  char *st = (char *)a->ptr + usize * sidx;
 
-  int axis = 0;
-  if (length[1] > length[0])
-    axis = 1;
-  if (ndim == 3)
-    if (length[2] > length[axis])
-      axis = 2;
-
-  if (unit_size == sizeof(struct rcb_element)) {
+  unsigned axis = get_axis(usize, st, size, ndim, NULL);
+  if (usize == sizeof(struct rcb_element)) {
     switch (axis) {
     case 0:
       sarray_sort(struct rcb_element, st, size, coord[0], 3, buf);
@@ -71,7 +70,7 @@ void rcb_local(struct array *a, size_t unit_size, uint start, uint end,
     default:
       break;
     }
-  } else if (unit_size == sizeof(struct rsb_element)) {
+  } else if (usize == sizeof(struct rsb_element)) {
     switch (axis) {
     case 0:
       sarray_sort(struct rsb_element, st, size, coord[0], 3, buf);
@@ -87,82 +86,65 @@ void rcb_local(struct array *a, size_t unit_size, uint start, uint end,
     }
   }
 
-  uint mid = (start + end) / 2;
-  rcb_local(a, unit_size, start, mid, ndim, buf);
-  rcb_local(a, unit_size, mid, end, ndim, buf);
+  uint midx = (sidx + eidx) / 2;
+  rcb_local(a, usize, sidx, midx, ndim, buf);
+  rcb_local(a, usize, midx, eidx, ndim, buf);
 }
 
-static int rcb_level(struct array *a, size_t unit_size, int ndim,
-                     struct comm *c, buffer *bfr) {
-  if (c->np == 1)
-    return 0;
-
-  double length[3];
-  get_axis_len(length, unit_size, (char *)a->ptr, a->n, ndim, c);
-
-  int axis = 0, d;
-  for (d = 1; d < ndim; d++)
-    if (length[d] > length[axis])
-      axis = d;
-
-  if (unit_size == sizeof(struct rcb_element)) {
-    switch (axis) {
-    case 0:
-      parallel_sort(struct rcb_element, a, coord[0], gs_double, 0, 1, c, bfr);
-      break;
-    case 1:
-      parallel_sort(struct rcb_element, a, coord[1], gs_double, 0, 1, c, bfr);
-      break;
-    case 2:
-      parallel_sort(struct rcb_element, a, coord[2], gs_double, 0, 1, c, bfr);
-      break;
-    default:
-      break;
-    }
-  } else if (unit_size == sizeof(struct rsb_element)) {
-    switch (axis) {
-    case 0:
-      parallel_sort(struct rsb_element, a, coord[0], gs_double, 0, 1, c, bfr);
-      break;
-    case 1:
-      parallel_sort(struct rsb_element, a, coord[1], gs_double, 0, 1, c, bfr);
-      break;
-    case 2:
-      parallel_sort(struct rsb_element, a, coord[2], gs_double, 0, 1, c, bfr);
-      break;
-    default:
-      break;
-    }
-  }
-
-  return 0;
-}
-
-int rcb(struct array *elements, size_t unit_size, int ndim, struct comm *ci,
+int rcb(struct array *elems, size_t usize, int ndim, struct comm *ci,
         buffer *bfr) {
-  struct comm c, t;
+  struct comm c;
   comm_dup(&c, ci);
 
-  int size = c.np;
-  int rank = c.id;
+  while (c.np > 1) {
+    unsigned axis = get_axis(usize, (char *)elems->ptr, elems->n, ndim, &c);
+    if (usize == sizeof(struct rcb_element)) {
+      switch (axis) {
+      case 0:
+        parallel_sort(struct rcb_element, elems, coord[0], gs_double, 0, 1, &c,
+                      bfr);
+        break;
+      case 1:
+        parallel_sort(struct rcb_element, elems, coord[1], gs_double, 0, 1, &c,
+                      bfr);
+        break;
+      case 2:
+        parallel_sort(struct rcb_element, elems, coord[2], gs_double, 0, 1, &c,
+                      bfr);
+        break;
+      default:
+        break;
+      }
+    } else if (usize == sizeof(struct rsb_element)) {
+      switch (axis) {
+      case 0:
+        parallel_sort(struct rsb_element, elems, coord[0], gs_double, 0, 1, &c,
+                      bfr);
+        break;
+      case 1:
+        parallel_sort(struct rsb_element, elems, coord[1], gs_double, 0, 1, &c,
+                      bfr);
+        break;
+      case 2:
+        parallel_sort(struct rsb_element, elems, coord[2], gs_double, 0, 1, &c,
+                      bfr);
+        break;
+      default:
+        break;
+      }
+    }
 
-  while (size > 1) {
-    rcb_level(elements, unit_size, ndim, &c, bfr);
+    unsigned bin = get_rsb_bin(c.id, c.np);
 
-    int bin = 1;
-    if (rank < (size + 1) / 2)
-      bin = 0;
-
-    comm_split(&c, bin, rank, &t);
+    struct comm t;
+    comm_split(&c, bin, c.id, &t);
     comm_free(&c);
     comm_dup(&c, &t);
     comm_free(&t);
-
-    size = c.np, rank = c.id;
   }
   comm_free(&c);
 
-  rcb_local(elements, unit_size, 0, elements->n, ndim, bfr);
+  rcb_local(elems, usize, 0, elems->n, ndim, bfr);
 
   return 0;
 }
