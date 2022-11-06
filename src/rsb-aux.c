@@ -2,10 +2,12 @@
 #include "parrsb-impl.h"
 #include "sort.h"
 
-static unsigned disconnected = 0;
-
 extern int fiedler(struct array *elements, int nv, parrsb_options *options,
                    struct comm *gsc, buffer *buf, int verbose);
+
+unsigned get_rsb_bin(uint id, uint np) { return id >= (np + 1) / 2; }
+
+static unsigned disconnected = 0;
 
 static void test_component_versions(struct array *elements, struct comm *lc,
                                     unsigned nv, unsigned lvl, buffer *bfr) {
