@@ -458,10 +458,6 @@ static int find_lvls(uint *lvl_off, uint *lvl_owner, ulong *lvl_ids,
 // ILU
 //
 struct ilu {
-  // TODO: User vector size and user vector to reordered vector mapping
-  uint un;
-  struct gs_data *u2r;
-
   // Options
   unsigned pivot, verbose;
 
@@ -1548,9 +1544,9 @@ struct ilu *ilu_setup(unsigned n, unsigned nv, const long long *llvtx,
   int nlvls = find_lvls(loff, lownr, lids, n, nv, ids, vtx, 1, &ilu->cr,
                         ilu->verbose, bfr);
 
-  ilu->un = n, ilu->nlvls = 0, ilu->lvl_off = NULL, ilu->perm = NULL;
+  ilu->nlvls = 0, ilu->lvl_off = NULL, ilu->perm = NULL;
   ilu_setup_aux(ilu, nlvls, loff, lownr, lids, n, nv, vtx, ilu->verbose, bfr);
-  tfree(loff), tfree(lownr), tfree(ids), tfree(vtx);
+  tfree(loff), tfree(lownr), tfree(lids), tfree(ids), tfree(vtx);
 
   char *val = getenv("PARRSB_DUMP_ILU");
   if (val != NULL && atoi(val) != 0)
@@ -1572,18 +1568,6 @@ struct ilu *ilu_setup(unsigned n, unsigned nv, const long long *llvtx,
   assert(IS_CSC(&ilu->U) && !IS_DIAG(&ilu->U));
 
   ilu_solve_setup(ilu, bfr);
-
-  // TODO: Setup the user vector to reordered vector map
-  // struct par_mat *A = &ilu->A;
-  // slong *gs_ids = tcalloc(slong, ilu->un + A->rn);
-  // for (uint i = 0; i < ilu->un; i++)
-  //   gs_ids[i] = -lids[i];
-  // for (uint i = 0, j = ilu->un; i < A->rn; i++, j++)
-  //   if (A->
-  // struct comm *comm = &ilu->cr.comm;
-  // ilu->u2r = gs_setup(gs_ids, ilu->un + A->rn, comm, 0, gs_auto, 0);
-  // free(gs_ids);
-  tfree(lids);
 
   val = getenv("PARRSB_DUMP_ILU");
   if (val != NULL && atoi(val) != 0) {
@@ -1725,21 +1709,15 @@ void ilu_solve(double *xo, struct ilu *ilu, const double *bi, buffer *bfr) {
 
 void ilu_free(struct ilu *ilu) {
   if (ilu) {
-    // tfree(ilu->u2r);
+    crystal_free(&ilu->cr);
     for (unsigned i = 0; i < ilu->nlvls; i++)
       gs_free(ilu->fwh[i]), gs_free(ilu->bwh[i]);
     tfree(ilu->fwh), tfree(ilu->bwh);
 
     tfree(ilu->lvl_off);
-    if (ilu->nlvls > 0) {
-      par_mat_free(&ilu->A);
-      par_mat_free(&ilu->L);
-      par_mat_free(&ilu->U);
-    }
-
-    tfree(ilu->perm);
-    crystal_free(&ilu->cr);
-    tfree(ilu);
+    if (ilu->nlvls > 0)
+      par_mat_free(&ilu->A), par_mat_free(&ilu->L), par_mat_free(&ilu->U);
+    tfree(ilu->perm), tfree(ilu);
   }
 }
 

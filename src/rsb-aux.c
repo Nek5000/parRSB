@@ -320,8 +320,6 @@ void rsb_local(struct array *a, uint sidx, uint eidx, unsigned nv,
   // Sort by Fiedler vector
   sarray_sort(struct rsb_element, st, size, fiedler, 3, bfr);
 
-  // TODO: Renumber the vertices
-
   uint midx = (sidx + eidx) / 2;
   rsb_local(a, sidx, midx, nv, options, bfr);
   rsb_local(a, midx, eidx, nv, options, bfr);
@@ -379,7 +377,7 @@ int rsb(struct array *elements, int nv, int check, parrsb_options *options,
     metric_toc(&lc, RSB_PRE);
 
     // Find the Fiedler vector
-    unsigned bin = (nid >= (np + 1) / 2);
+    unsigned bin = get_rsb_bin(nid, np);
     struct comm tc;
     comm_split(&lc, bin, lc.id, &tc);
 

@@ -167,10 +167,11 @@ static void restore_original(int *part, int *seq, struct crystal *cr,
 
 int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
                      int nel, int nv, parrsb_options options, MPI_Comm comm) {
-  update_options(&options);
-
   struct comm c;
   comm_init(&c, comm);
+
+  update_options(&options);
+
   if (c.id == 0 && options.verbose_level > 0) {
     printf("Running parRSB ...\n");
     print_options(&options);

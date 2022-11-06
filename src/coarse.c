@@ -3,9 +3,6 @@
 #include "sort.h"
 #include <float.h>
 
-//------------------------------------------------------------------------------
-// Better API for coarse grid system.
-//
 uint unique_ids(sint *perm, ulong *uid, uint n, const ulong *ids, buffer *bfr) {
   struct id_t {
     ulong id;
@@ -193,12 +190,6 @@ struct coarse *crs_parrsb_setup(uint n, const ulong *id, uint nz,
   ulong *uid = tcalloc(ulong, crs->un);
   crs->u2c = tcalloc(sint, crs->un);
   crs->cn = unique_ids(crs->u2c, uid, crs->un, tid, &crs->bfr);
-#if 0
-  for (uint i = 0; i < crs->un; i++) {
-    printf("p = %d i = %u perm[i] = %d\n", c->id, i, crs->u2c[i]);
-    fflush(stdout);
-  }
-#endif
 
   // Now renumber unique ids based on whether they are internal or on interface.
   slong *nid = tcalloc(slong, crs->cn);
