@@ -49,12 +49,12 @@ static unsigned get_axis(size_t unit_size, char *elems, uint nel, int ndim,
 
 void rcb_local(struct array *a, size_t usize, uint sidx, uint eidx, int ndim,
                buffer *buf) {
-  sint size = eidx - sidx;
-  if (size <= 1)
+  if (eidx <= sidx + 1)
     return;
 
   char *st = (char *)a->ptr + usize * sidx;
 
+  uint size = eidx - sidx;
   unsigned axis = get_axis(usize, st, size, ndim, NULL);
   if (usize == sizeof(struct rcb_element)) {
     switch (axis) {

@@ -15,17 +15,25 @@ inline static scalar dot(scalar *y, scalar *x, uint n) {
   return result;
 }
 
-inline static void ortho(scalar *q, uint lelt, ulong n, struct comm *c) {
-  uint i;
+inline static void ortho(scalar *q, uint n, ulong N, struct comm *c) {
   scalar sum = 0.0;
-  for (i = 0; i < lelt; i++)
+  for (uint i = 0; i < n; i++)
     sum += q[i];
 
-  scalar buf;
-  comm_allreduce(c, gs_double, gs_add, &sum, 1, &buf);
-  sum /= n;
+  scalar wrk;
+  comm_allreduce(c, gs_double, gs_add, &sum, 1, &wrk);
+  sum /= N;
 
-  for (i = 0; i < lelt; i++)
+  for (uint i = 0; i < n; i++)
+    q[i] -= sum;
+}
+
+inline static void orthol(scalar *q, uint n) {
+  scalar sum = 0.0;
+  for (uint i = 0; i < n; i++)
+    sum += q[i];
+  sum /= n;
+  for (uint i = 0; i < n; i++)
     q[i] -= sum;
 }
 
@@ -74,7 +82,7 @@ int power_serial(double *y, uint N, double *A, int verbose) {
     if (fabs(err) < 1.e-12)
       break;
   }
-  free(Ay);
+  tfree(Ay);
 
   return i;
 }
@@ -95,7 +103,7 @@ int inv_power_serial(double *y, uint N, double *A, int verbose) {
   }
   j = power_serial(y, N, Ainv, verbose);
 
-  free(Ainv);
+  tfree(Ainv);
 
   return j;
 }
@@ -199,8 +207,7 @@ static int project(scalar *x, uint n, scalar *b, struct laplacian *L,
       p[k] -= P[miter * n + k];
   }
 
-  free(z);
-  free(P);
+  tfree(z), tfree(P);
 
   return i == miter ? i : i + 1;
 }
@@ -365,14 +372,11 @@ static int inverse(scalar *y, struct array *elements, int nv, scalar *z,
   }
   metric_toc(gsc, RSB_INVERSE);
 
-  laplacian_free(wl);
   if (L) {
     par_mat_free(L);
-    free(L);
+    tfree(L);
   }
-  mg_free(d);
-  if (err)
-    free(err);
+  laplacian_free(wl), mg_free(d), tfree(err);
 
   return i;
 }
@@ -494,211 +498,463 @@ static int tqli(scalar *eVectors, scalar *eValues, sint n, scalar *diagonal,
   for (i = 0; i < n; i++)
     eValues[i] = d[i];
 
-  free(d);
+  tfree(d);
 
   return 0;
 }
 
-static int lanczos_aux(scalar *diag, scalar *upper, scalar *rr, uint lelt,
-                       ulong nelg, int niter, double tol, scalar *f,
+static int lanczos_aux(scalar *diag, scalar *upper, scalar *rr, uint n,
+                       ulong ng, int niter, double tol, scalar *f,
                        struct laplacian *gl, struct comm *gsc, buffer *bfr) {
-  scalar *r = tcalloc(scalar, 3 * lelt), *p = r + lelt, *w = p + lelt;
-  // vec_copy(r, f);
-  uint i;
-  for (i = 0; i < lelt; i++)
+  scalar *r = tcalloc(scalar, n);
+  scalar *p = tcalloc(scalar, n);
+  scalar *w = tcalloc(scalar, n);
+
+  for (uint i = 0; i < n; i++)
     r[i] = f[i];
 
-  // vec_ortho(gsc, r, nelg);
-  ortho(r, lelt, nelg, gsc);
+  ortho(r, n, ng, gsc);
 
-  scalar rtz1 = 1, pap = 0, alpha, beta, rtz2, pap_old;
-
-  scalar rtr = dot(r, r, lelt), buf[2];
-  comm_allreduce(gsc, gs_double, gs_add, &rtr, 1, buf);
+  scalar rtz1 = 1, rtz2, pap1 = 0, pap2;
+  scalar rtr = dot(r, r, n), wrk[2];
+  comm_allreduce(gsc, gs_double, gs_add, &rtr, 1, wrk);
   scalar rnorm = sqrt(rtr), rtol = rnorm * tol;
 
   // vec_scale(rr[0], r, rni);
   scalar rni = 1.0 / rnorm;
-  for (i = 0; i < lelt; i++)
-    rr[0 * lelt + i] = r[i] * rni;
+  for (uint i = 0; i < n; i++)
+    rr[0 * n + i] = r[i] * rni;
 
-  int iter;
-  for (iter = 0; iter < niter; iter++) {
+  unsigned iter = 0;
+  while (iter < niter) {
     rtz2 = rtz1, rtz1 = rtr;
-    beta = rtz1 / rtz2;
+    scalar beta = rtz1 / rtz2;
     if (iter == 0)
       beta = 0.0;
 
-    // add2s1(p,r,beta,n)
-    for (i = 0; i < lelt; i++)
+    // add2s1(p, r, beta, n)
+    for (uint i = 0; i < n; i++)
       p[i] = beta * p[i] + r[i];
 
-    scalar pp = dot(p, p, lelt);
-    comm_allreduce(gsc, gs_double, gs_add, &pp, 1, buf);
+    // scalar pp = dot(p, p, n);
+    // comm_allreduce(gsc, gs_double, gs_add, &pp, 1, wrk);
 
-    // vec_ortho(gsc, p, nelg);
-    ortho(p, lelt, nelg, gsc);
+    // vec_ortho(gsc, p, ng);
+    ortho(p, n, ng, gsc);
 
     laplacian(w, gl, p, bfr);
 
-    scalar ww = dot(w, w, lelt);
-    comm_allreduce(gsc, gs_double, gs_add, &ww, 1, buf);
+    // scalar ww = dot(w, w, n);
+    // comm_allreduce(gsc, gs_double, gs_add, &ww, 1, wrk);
 
-    pap_old = pap, pap = dot(w, p, lelt);
-    comm_allreduce(gsc, gs_double, gs_add, &pap, 1, buf);
-    /*
-    if (gsc->id == 0)
-      printf("host iter = %d beta = %lf pp = %lf pap = %lf\n", iter, beta, pp,
-             pap);
-             */
+    pap2 = pap1, pap1 = dot(w, p, n);
+    comm_allreduce(gsc, gs_double, gs_add, &pap1, 1, wrk);
 
-    alpha = rtz1 / pap;
     // vec_axpby(r, r, 1.0, w, -1.0 * alpha);
-    for (i = 0; i < lelt; i++)
+    scalar alpha = rtz1 / pap1;
+    for (uint i = 0; i < n; i++)
       r[i] = r[i] - alpha * w[i];
 
-    rtr = dot(r, r, lelt);
-    comm_allreduce(gsc, gs_double, gs_add, &rtr, 1, buf);
-    rnorm = sqrt(rtr), rni = 1.0 / rnorm;
+    rtr = dot(r, r, n);
+    comm_allreduce(gsc, gs_double, gs_add, &rtr, 1, wrk);
+    rnorm = sqrt(rtr);
 
     // vec_scale(rr[iter + 1], r, rni);
-    for (i = 0; i < lelt; i++)
-      rr[(iter + 1) * lelt + i] = r[i] * rni;
+    scalar rni = 1.0 / rnorm;
+    for (uint i = 0; i < n; i++)
+      rr[(iter + 1) * n + i] = r[i] * rni;
 
     if (iter == 0) {
-      diag[iter] = pap / rtz1;
+      diag[iter] = pap1 / rtz1;
     } else {
-      diag[iter] = (beta * beta * pap_old + pap) / rtz1;
-      upper[iter - 1] = -beta * pap_old / sqrt(rtz2 * rtz1);
+      diag[iter] = (beta * beta * pap2 + pap1) / rtz1;
+      upper[iter - 1] = -beta * pap2 / sqrt(rtz2 * rtz1);
     }
 
-    if (rnorm < rtol) {
-      iter++;
+    iter++;
+    if (rnorm < rtol)
       break;
-    }
   }
 
   metric_acc(TOL_FNL, rnorm);
   metric_acc(TOL_TGT, rtol);
 
-  free(r);
-
+  tfree(r), tfree(p), tfree(w);
   return iter;
 }
 
-static int lanczos(scalar *fiedler, struct array *elements, int nv,
-                   scalar *initv, struct comm *gsc, int miter, int mpass,
-                   double tol, slong nelg, buffer *bfr) {
-  metric_tic(gsc, RSB_LANCZOS_SETUP);
-  uint lelt = elements->n;
-  struct rsb_element *elems = (struct rsb_element *)elements->ptr;
-  struct laplacian *wl = laplacian_init(elems, lelt, nv, GS, gsc, bfr);
-  metric_toc(gsc, RSB_LANCZOS_SETUP);
+static int lanczos(scalar *fiedler, struct array *arr, int nv, scalar *initv,
+                   struct comm *c, int miter, int mpass, double tol, slong ng,
+                   buffer *bfr) {
+  metric_tic(c, RSB_LANCZOS_SETUP);
+  uint n = arr->n;
+  struct rsb_element *pa = (struct rsb_element *)arr->ptr;
+  struct laplacian *wl = laplacian_init(pa, n, nv, GS, c, bfr);
+  metric_toc(c, RSB_LANCZOS_SETUP);
 
-  if (nelg < miter)
-    miter = nelg;
+  if (miter > ng)
+    miter = ng;
 
-  scalar *alpha = tcalloc(scalar, 2 * miter - 1), *beta = alpha + miter;
-  scalar *rr = tcalloc(scalar, (miter + 1) * lelt);
-  scalar *eVectors = tcalloc(scalar, miter * miter);
-  scalar *eValues = tcalloc(scalar, miter);
-  int iter = miter, ipass;
-  for (ipass = 0; iter == miter && ipass < mpass; ipass++) {
+  scalar *alpha = tcalloc(scalar, miter);
+  scalar *beta = tcalloc(scalar, miter);
+  scalar *rr = tcalloc(scalar, (miter + 1) * n);
+  scalar *evecs = tcalloc(scalar, miter * miter);
+  scalar *evals = tcalloc(scalar, miter);
+
+  if (mpass < 1)
+    mpass = 1;
+
+  unsigned iter = miter, pass = 0;
+  while (pass < mpass) {
     double t = comm_time();
-    iter = lanczos_aux(alpha, beta, rr, lelt, nelg, miter, tol, initv, wl, gsc,
-                       bfr);
+    iter = lanczos_aux(alpha, beta, rr, n, ng, miter, tol, initv, wl, c, bfr);
     metric_acc(RSB_LANCZOS, comm_time() - t);
 
-    t = comm_time();
     // Use TQLI and find the minimum eigenvalue and associated vector
-    tqli(eVectors, eValues, iter, alpha, beta, gsc->id);
-    scalar eValMin = fabs(eValues[0]);
-    uint eValMinI = 0;
+    t = comm_time();
+    tqli(evecs, evals, iter, alpha, beta, c->id);
+
+    scalar ev_min = fabs(evals[0]);
+    uint ev_min_idx = 0;
     for (uint i = 1; i < iter; i++) {
-      if (fabs(eValues[i]) < eValMin) {
-        eValMin = fabs(eValues[i]);
-        eValMinI = i;
+      if (fabs(evals[i]) < ev_min) {
+        ev_min = fabs(evals[i]);
+        ev_min_idx = i;
       }
     }
 
-    for (uint i = 0; i < lelt; i++) {
+    for (uint i = 0; i < n; i++) {
       fiedler[i] = 0.0;
       for (uint j = 0; j < iter; j++)
-        fiedler[i] += rr[j * lelt + i] * eVectors[eValMinI * iter + j];
+        fiedler[i] += rr[j * n + i] * evecs[ev_min_idx * iter + j];
     }
-    ortho(fiedler, lelt, nelg, gsc);
-    for (uint i = 0; i < lelt; i++)
+    ortho(fiedler, n, ng, c);
+
+    pass++;
+    if (iter < miter)
+      break;
+
+    for (uint i = 0; i < n; i++)
       initv[i] = fiedler[i];
+
     metric_acc(RSB_LANCZOS_TQLI, comm_time() - t);
   }
 
-  free(alpha), free(rr), free(eVectors), free(eValues);
+  tfree(alpha), tfree(beta), tfree(rr), tfree(evecs), tfree(evals);
   laplacian_free(wl);
 
-  return (ipass - 1) * miter + iter;
+  return (pass - 1) * miter + iter;
 }
 
-int fiedler(struct array *elements, int nv, parrsb_options *opts,
-            struct comm *gsc, buffer *buf, int verbose) {
-  metric_tic(gsc, RSB_FIEDLER_SETUP);
-  uint lelt = elements->n;
-  slong out[2][1], wrk[2][1], in = lelt;
-  comm_scan(out, gsc, gs_long, gs_add, &in, 1, wrk);
-  slong start = out[0][0], nelg = out[1][0];
+void fiedler(struct array *arr, int nv, parrsb_options *opts, struct comm *c,
+             buffer *bfr, int verbose) {
+  metric_tic(c, RSB_FIEDLER_SETUP);
+  slong out[2][1], wrk[2][1], in = arr->n;
+  comm_scan(out, c, gs_long, gs_add, &in, 1, wrk);
+  slong start = out[0][0], ng = out[1][0];
 
-  scalar *initv = tcalloc(scalar, lelt);
-  for (uint i = 0; i < lelt; i++) {
+  uint n = arr->n;
+  scalar *initv = tcalloc(scalar, n);
+  for (uint i = 0; i < n; i++) {
     initv[i] = start + i + 1.0;
-    if (start + i < nelg / 2)
-      initv[i] += 1000 * nelg;
+    if (start + i < ng / 2)
+      initv[i] += 1000 * ng;
   }
 
-  ortho(initv, lelt, nelg, gsc);
-  scalar rtr = dot(initv, initv, lelt), rni;
-  comm_allreduce(gsc, gs_double, gs_add, &rtr, 1, &rni);
+  ortho(initv, n, ng, c);
+  scalar rtr = dot(initv, initv, n);
+  comm_allreduce(c, gs_double, gs_add, &rtr, 1, wrk);
 
-  rni = 1.0 / sqrt(rtr);
-  for (uint i = 0; i < lelt; i++)
+  scalar rni = 1.0 / sqrt(rtr);
+  for (uint i = 0; i < n; i++)
     initv[i] *= rni;
-  metric_toc(gsc, RSB_FIEDLER_SETUP);
+  metric_toc(c, RSB_FIEDLER_SETUP);
 
-  metric_tic(gsc, RSB_FIEDLER_CALC);
-  int iter = 0;
-  scalar *f = tcalloc(scalar, lelt);
+  metric_tic(c, RSB_FIEDLER_CALC);
+  unsigned iter = 0;
+  scalar *f = tcalloc(scalar, n);
   switch (opts->rsb_algo) {
   case 0:
-    iter = lanczos(f, elements, nv, initv, gsc, opts->rsb_max_iter,
-                   opts->rsb_max_passes, opts->rsb_tol, nelg, buf);
+    iter = lanczos(f, arr, nv, initv, c, opts->rsb_max_iter,
+                   opts->rsb_max_passes, opts->rsb_tol, ng, bfr);
     break;
   case 1:
-    iter = inverse(f, elements, nv, initv, gsc, opts->rsb_max_iter,
+    iter = inverse(f, arr, nv, initv, c, opts->rsb_max_iter,
                    opts->rsb_max_passes, opts->rsb_tol, opts->rsb_mg_factor,
-                   opts->rsb_mg_sagg, opts->rsb_mg_grammian, nelg, buf);
+                   opts->rsb_mg_sagg, opts->rsb_mg_grammian, ng, bfr);
     break;
   default:
     break;
   }
-  metric_toc(gsc, RSB_FIEDLER_CALC);
+  metric_toc(c, RSB_FIEDLER_CALC);
   metric_acc(RSB_FIEDLER_CALC_NITER, iter);
 
-  scalar norm = 0;
-  for (uint i = 0; i < lelt; i++)
-    norm += f[i] * f[i];
+  scalar norm = dot(f, f, n);
+  comm_allreduce(c, gs_double, gs_add, &norm, 1, wrk);
 
-  scalar normi;
-  comm_allreduce(gsc, gs_double, gs_add, &norm, 1, &normi);
-  normi = 1.0 / sqrt(norm);
+  rni = 1.0 / sqrt(norm);
+  for (uint i = 0; i < n; i++)
+    f[i] *= rni;
 
-  for (uint i = 0; i < lelt; i++)
-    f[i] *= normi;
+  struct rsb_element *pa = (struct rsb_element *)arr->ptr;
+  for (uint i = 0; i < n; i++)
+    pa[i].fiedler = f[i];
 
-  struct rsb_element *elems = (struct rsb_element *)elements->ptr;
-  for (uint i = 0; i < lelt; i++)
-    elems[i].fiedler = f[i];
+  tfree(initv), tfree(f);
+}
 
-  if (initv)
-    free(initv);
-  if (f)
-    free(f);
-  return 0;
+static struct mat *laplacian_local(const struct rsb_element *pe, uint ne,
+                                   unsigned nv, unsigned sep, buffer *bfr) {
+  struct nbr_t {
+    ulong r, c;
+  };
+
+  struct array vertices;
+  array_init(struct nbr_t, &vertices, ne * nv + 1);
+
+  struct nbr_t v = {.r = 0, .c = 0};
+  for (uint i = 0; i < ne; i++) {
+    v.r = pe[i].globalId;
+    for (unsigned j = 0; j < nv; j++) {
+      v.c = pe[i].vertices[j];
+      array_cat(struct nbr_t, &vertices, &v, 1);
+    }
+  }
+
+  struct array nbrs;
+  array_init(struct nbr_t, &nbrs, vertices.n * 10 + 1);
+
+  sarray_sort(struct nbr_t, vertices.ptr, vertices.n, c, 1, bfr);
+  const struct nbr_t *pv = (struct nbr_t *)vertices.ptr;
+
+  sint i = 0;
+  while (i < vertices.n) {
+    sint j = i + 1;
+    while (j < vertices.n && pv[j].c == pv[i].c)
+      j++;
+    for (unsigned s = i; s < j; s++) {
+      for (unsigned t = i; t < j; t++) {
+        v.r = pv[s].r, v.c = pv[t].r;
+        array_cat(struct nbr_t, &nbrs, &v, 1);
+      }
+    }
+  }
+  array_free(&vertices);
+
+  struct array mijs;
+  array_init(struct mij, &mijs, nbrs.n * 10 + 1);
+
+  sarray_sort_2(struct nbr_t, nbrs.ptr, nbrs.n, r, 1, c, 1, bfr);
+  const struct nbr_t *pn = (struct nbr_t *)nbrs.ptr;
+
+  struct mij m = {.r = 0, .c = 0, .v = 0};
+  i = 0;
+  while (i < nbrs.n) {
+    sint j = i + 1;
+    while (j < nbrs.n && pn[i].c == pn[j].c && pn[i].r == pn[j].r)
+      j++;
+    m.r = pn[i].r, pn[i].c, m.v = i - j; // -(j - i)
+    array_cat(struct mij, &mijs, &m, 1);
+  }
+  array_free(&nbrs);
+
+  // Make sure that we have zero row sum
+  struct mij *pm = (struct mij *)mijs.ptr;
+  i = 0;
+  while (i < mijs.n) {
+    sint j = i, d = -1, sum = 0;
+    // Go through the row
+    while (j < mijs.n && pm[j].r == pm[i].r) {
+      if (pm[j].r == pm[j].c)
+        d = j;
+      else
+        sum += pm[j].v;
+      j++;
+    }
+    assert(d >= 0);
+    pm[d].v = -sum;
+    i = j;
+  }
+
+  struct mat *A = tcalloc(struct mat, 1);
+  mat_setup(A, &mijs, 0, bfr);
+
+  array_free(&mijs);
+
+  return A;
+}
+
+static int lanczos_aux_local(scalar *diag, scalar *upper, scalar *rr, uint n,
+                             int niter, double tol, scalar *f, struct mat *L,
+                             buffer *bfr) {
+  scalar *r = tcalloc(scalar, n);
+  scalar *p = tcalloc(scalar, n);
+  scalar *w = tcalloc(scalar, n);
+
+  for (uint i = 0; i < n; i++)
+    r[i] = f[i];
+
+  orthol(r, n);
+
+  scalar rtz1 = 1, rtz2, pap1 = 0, pap2;
+  scalar rtr = dot(r, r, n), wrk[2];
+  scalar rnorm = sqrt(rtr), rtol = rnorm * tol;
+
+  // vec_scale(rr[0], r, rni);
+  scalar rni = 1.0 / rnorm;
+  for (uint i = 0; i < n; i++)
+    rr[0 * n + i] = r[i] * rni;
+
+  unsigned iter = 0;
+  while (iter < niter) {
+    rtz2 = rtz1, rtz1 = rtr;
+    scalar beta = rtz1 / rtz2;
+    if (iter == 0)
+      beta = 0.0;
+
+    // add2s1(p, r, beta, n)
+    for (uint i = 0; i < n; i++)
+      p[i] = beta * p[i] + r[i];
+
+    // scalar pp = dot(p, p, n);
+
+    // vec_ortho(gsc, p, ng);
+    orthol(p, n);
+
+    mat_vec(w, L, p);
+
+    // scalar ww = dot(w, w, n);
+
+    pap2 = pap1, pap1 = dot(w, p, n);
+
+    // vec_axpby(r, r, 1.0, w, -1.0 * alpha);
+    scalar alpha = rtz1 / pap1;
+    for (uint i = 0; i < n; i++)
+      r[i] = r[i] - alpha * w[i];
+
+    rtr = dot(r, r, n), rnorm = sqrt(rtr);
+
+    // vec_scale(rr[iter + 1], r, rni);
+    scalar rni = 1.0 / rnorm;
+    for (uint i = 0; i < n; i++)
+      rr[(iter + 1) * n + i] = r[i] * rni;
+
+    if (iter == 0) {
+      diag[iter] = pap1 / rtz1;
+    } else {
+      diag[iter] = (beta * beta * pap2 + pap1) / rtz1;
+      upper[iter - 1] = -beta * pap2 / sqrt(rtz2 * rtz1);
+    }
+
+    iter++;
+    if (rnorm < rtol)
+      break;
+  }
+
+  tfree(r), tfree(p), tfree(w);
+  return iter;
+}
+
+static int lanczos_local(scalar *fiedler, struct array *arr, uint sidx,
+                         uint eidx, int nv, scalar *initv, int miter, int mpass,
+                         double tol, buffer *bfr) {
+  if (eidx <= sidx + 1)
+    return 0;
+
+  uint n = eidx - sidx;
+  struct rsb_element *pa = (struct rsb_element *)arr->ptr;
+  struct mat *A = laplacian_local(&pa[sidx], n, nv, 0, bfr);
+
+  if (miter > n)
+    miter = n;
+
+  scalar *alpha = tcalloc(scalar, miter);
+  scalar *beta = tcalloc(scalar, miter);
+  scalar *rr = tcalloc(scalar, (miter + 1) * n);
+  scalar *evecs = tcalloc(scalar, miter * miter);
+  scalar *evals = tcalloc(scalar, miter);
+
+  if (mpass < 1)
+    mpass = 1;
+
+  unsigned iter = miter, pass = 0;
+  while (pass < mpass) {
+    double t = comm_time();
+    iter = lanczos_aux_local(alpha, beta, rr, n, miter, tol, initv, A, bfr);
+
+    // Use TQLI and find the minimum eigenvalue and associated vector
+    tqli(evecs, evals, iter, alpha, beta, 0);
+
+    scalar ev_min = fabs(evals[0]);
+    uint ev_min_idx = 0;
+    for (uint i = 1; i < iter; i++) {
+      if (fabs(evals[i]) < ev_min) {
+        ev_min = fabs(evals[i]);
+        ev_min_idx = i;
+      }
+    }
+
+    for (uint i = 0; i < n; i++) {
+      fiedler[i] = 0.0;
+      for (uint j = 0; j < iter; j++)
+        fiedler[i] += rr[j * n + i] * evecs[ev_min_idx * iter + j];
+    }
+    orthol(fiedler, n);
+
+    pass++;
+    if (iter < miter)
+      break;
+
+    for (uint i = 0; i < n; i++)
+      initv[i] = fiedler[i];
+  }
+
+  tfree(alpha), tfree(beta), tfree(rr), tfree(evecs), tfree(evals);
+  mat_free(A);
+
+  return (pass - 1) * miter + iter;
+}
+
+void fiedler_local(struct array *arr, uint sidx, uint eidx, int nv,
+                   parrsb_options *opts, buffer *bfr, int verbose) {
+  if (eidx <= sidx + 1)
+    return;
+
+  uint n = eidx - sidx;
+  scalar *initv = tcalloc(scalar, n);
+  for (uint i = 0; i < n / 2; i++)
+    initv[i] = i + 1.0;
+  for (uint i = n / 2; i < n; i++)
+    initv[i] = i + 1.0 + 1000 * n;
+
+  orthol(initv, n);
+  scalar rtr = dot(initv, initv, n);
+  rtr = 1.0 / sqrt(rtr);
+  for (uint i = 0; i < n; i++)
+    initv[i] *= rtr;
+
+  unsigned iter = 0;
+  scalar *f = tcalloc(scalar, n);
+  switch (opts->rsb_algo) {
+  case 0:
+    iter = lanczos_local(f, arr, sidx, eidx, nv, initv, opts->rsb_max_iter,
+                         opts->rsb_max_passes, opts->rsb_tol, bfr);
+    break;
+  default:
+    break;
+  }
+
+  scalar norm = 1.0 / sqrt(dot(f, f, n));
+  for (uint i = 0; i < n; i++)
+    f[i] *= norm;
+
+  struct rsb_element *pa = (struct rsb_element *)arr->ptr;
+  for (uint i = 0; i < n; i++)
+    pa[sidx + i].fiedler = f[i];
+
+  tfree(initv), tfree(f);
+
+  uint midx = (sidx + eidx) / 2;
+  fiedler_local(arr, sidx, midx, nv, opts, bfr, verbose);
+  fiedler_local(arr, midx, eidx, nv, opts, bfr, verbose);
 }

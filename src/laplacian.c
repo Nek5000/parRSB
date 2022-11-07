@@ -38,31 +38,30 @@ static void find_nbrs_rsb(struct array *arr, const struct rsb_element *elems,
   }
 
   sarray_transfer(struct nbr, &vertices, proc, 1, cr);
-
   sarray_sort(struct nbr, vertices.ptr, vertices.n, c, 1, buf);
-  struct nbr *vptr = vertices.ptr;
-  uint vn = vertices.n;
 
   // FIXME: Assumes quads or hexes
   struct nbr t;
-  uint s = 0, e;
   array_init(struct nbr, arr, vertices.n * 10);
-  while (s < vn) {
+
+  struct nbr *pv = vertices.ptr;
+  uint s = 0, e;
+  while (s < vertices.n) {
     e = s + 1;
-    while (e < vn && vptr[s].c == vptr[e].c)
+    while (e < vertices.n && pv[s].c == pv[e].c)
       e++;
     for (i = s; i < e; i++) {
-      t = vptr[i];
+      t = pv[i];
       for (j = s; j < e; j++) {
-        t.c = vptr[j].r;
+        t.c = pv[j].r;
         array_cat(struct nbr, arr, &t, 1);
       }
     }
     s = e;
   }
+  array_free(&vertices);
 
   sarray_transfer(struct nbr, arr, proc, 1, cr);
-  array_free(&vertices);
 }
 
 static int par_csr_init(struct laplacian *l, const struct rsb_element *elems,

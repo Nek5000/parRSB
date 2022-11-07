@@ -195,6 +195,22 @@ int mat_free(struct mat *mat) {
   return 0;
 }
 
+int mat_vec(double *y, struct mat *A, const double *x) {
+  if (A->D != NULL)
+    return 1;
+
+  for (uint i = 0; i < A->n; i++) {
+    double sum = 0;
+    for (uint j = A->Lp[i], je = A->Lp[i + 1]; j < je; j++) {
+      uint idx = A->Li[j];
+      sum += x[idx] * A->L[idx];
+    }
+    y[i] = sum;
+  }
+
+  return 0;
+}
+
 //------------------------------------------------------------------------------
 // Find neighbors in the graph
 //
@@ -219,8 +235,10 @@ void find_nbrs(struct array *arr, const ulong *eid, const slong *vtx,
   sarray_sort(struct nbr, vertices.ptr, vertices.n, c, 1, buf);
 
   // FIXME: Assumes quads or hexes
-  struct nbr *pv = (struct nbr *)vertices.ptr, t = {.r = 0, .c = 0, .proc = 0};
   array_init(struct nbr, arr, vertices.n * 10 + 1);
+  struct nbr *pv = (struct nbr *)vertices.ptr;
+
+  struct nbr t = {.r = 0, .c = 0, .proc = 0};
   uint s = 0, e;
   while (s < vertices.n) {
     e = s + 1;

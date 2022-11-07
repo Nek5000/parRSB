@@ -55,11 +55,11 @@ static void calc_inertia(char *elems, uint nel, size_t usize, int ndim,
 
 void rib_local(struct array *a, size_t usize, uint sidx, uint eidx, int ndim,
                buffer *bfr) {
-  sint size = eidx - sidx;
-  if (size <= 1)
+  if (eidx <= sidx + 1)
     return;
 
   char *st = (char *)a->ptr + usize * sidx;
+  uint size = eidx - sidx;
   calc_inertia(st, size, usize, ndim, NULL);
 
   if (usize == sizeof(struct rcb_element))

@@ -2,8 +2,14 @@
 #include "parrsb-impl.h"
 #include "sort.h"
 
-extern int fiedler(struct array *elements, int nv, parrsb_options *options,
-                   struct comm *gsc, buffer *buf, int verbose);
+extern void rcb_local(struct array *a, size_t usize, uint sidx, uint eidx,
+                      int ndim, buffer *buf);
+extern void rib_local(struct array *a, size_t usize, uint sidx, uint eidx,
+                      int ndim, buffer *buf);
+extern void fiedler_local(struct array *arr, uint sidx, uint eidx, int nv,
+                          parrsb_options *opts, buffer *bfr, int verbose);
+extern void fiedler(struct array *elements, int nv, parrsb_options *options,
+                    struct comm *gsc, buffer *buf, int verbose);
 
 unsigned get_rsb_bin(uint id, uint np) { return id >= (np + 1) / 2; }
 
@@ -283,6 +289,42 @@ static void get_part(sint *np, sint *nid, int two_lvl, struct comm *lc,
   } else {
     *np = lc->np, *nid = lc->id;
   }
+}
+
+void rsb_local(struct array *a, uint sidx, uint eidx, unsigned nv,
+               struct comm *c, parrsb_options *options, buffer *bfr) {
+  if (eidx <= sidx + 1)
+    return;
+
+  uint size = eidx - sidx;
+  size_t usize = sizeof(struct rsb_element);
+
+  unsigned ndim = (nv == 8) ? 3 : 2;
+  char *st = (char *)a->ptr + usize * sidx;
+  switch (options->rsb_pre) {
+  case 0:
+    sarray_sort(struct rsb_element, st, size, globalId, 1, bfr);
+    break;
+  case 1:
+    rcb_local(a, usize, sidx, eidx, ndim, bfr);
+    break;
+  case 2:
+    rib_local(a, usize, sidx, eidx, ndim, bfr);
+    break;
+  default:
+    break;
+  }
+
+  fiedler_local(a, sidx, eidx, nv, options, bfr, 0);
+
+  // Sort by Fiedler vector
+  sarray_sort(struct rsb_element, st, size, fiedler, 3, bfr);
+
+  // TODO: Renumber the vertices
+
+  uint midx = (sidx + eidx) / 2;
+  rsb_local(a, sidx, midx, nv, c, options, bfr);
+  rsb_local(a, midx, eidx, nv, c, options, bfr);
 }
 
 int rsb(struct array *elements, int nv, int check, parrsb_options *options,
