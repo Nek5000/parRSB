@@ -748,16 +748,13 @@ struct par_mat *par_csr_setup_con(const uint nelt, const ulong *eid,
                                   struct comm *c, struct crystal *cr,
                                   buffer *bfr) {
   struct array nbrs, eij;
-  array_init(struct nbr, &nbrs, 100);
-  array_init(struct mij, &eij, 100);
-
   find_nbrs(&nbrs, eid, vtx, nelt, nv, cr, bfr);
   compress_nbrs(&eij, &nbrs, bfr);
-  array_free(&nbrs);
 
   struct par_mat *M = tcalloc(struct par_mat, 1);
   par_csr_setup(M, &eij, sep, bfr);
-  array_free(&eij);
+
+  array_free(&eij), array_free(&nbrs);
 
   return M;
 }
@@ -816,7 +813,7 @@ struct gs_data *setup_Q(const struct par_mat *M, const struct comm *c,
   buffer_reserve(bfr, nnz * sizeof(slong));
   slong *sids = (slong *)bfr->ptr;
 
-  uint i, j;
+  uint i, j = 0;
   for (i = 0; i < n; i++)
     for (j = M->adj_off[i]; j < M->adj_off[i + 1]; j++)
       sids[j] = -ids[M->adj_idx[j]];

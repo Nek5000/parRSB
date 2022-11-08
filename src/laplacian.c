@@ -258,9 +258,12 @@ int laplacian(scalar *v, struct laplacian *l, scalar *u, buffer *buf) {
 }
 
 void laplacian_free(struct laplacian *l) {
-  if (l->type & CSR)
-    par_csr_free(l);
-  else if (l->type & GS) {
-    gs_weighted_free(l);
+  if (l) {
+    if (l->type & CSR)
+      par_csr_free(l);
+    else if (l->type & GS) {
+      gs_weighted_free(l);
+    }
+    free(l);
   }
 }

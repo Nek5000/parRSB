@@ -70,7 +70,7 @@ int parrsb_dump_con(char *name, unsigned nelt, unsigned nv, long long *vl,
                     MPI_Comm comm);
 
 int parrsb_dump_map(char *name, unsigned nelt, unsigned nv, long long *vl,
-                    int *pmap, MPI_Comm comm);
+                    MPI_Comm comm);
 
 int parrsb_dump_part(char *name, unsigned nelt, unsigned nv, double *coord,
                      int gid, MPI_Comm comm);
@@ -95,6 +95,7 @@ struct parrsb_cmd_opts {
 };
 
 struct parrsb_cmd_opts *parrsb_parse_cmd_opts(int argc, char *argv[]);
+void parrsb_cmd_opts_free(struct parrsb_cmd_opts *opts);
 
 int parrsb_dist_mesh(unsigned *nelt, long long **vl, double **coord, int *part,
                      int nv, MPI_Comm comm);

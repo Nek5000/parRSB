@@ -786,7 +786,7 @@ static int renumberPeriodicVertices(Mesh mesh, struct comm *c,
         gs_setup(mids, size1 + 2 * size2, c, 0, gs_pairwise, 0);
 
     gs(mnew, gs_long, gs_min, 0, gsh1, bfr);
-    free(gsh1);
+    gs_free(gsh1);
 
     for (uint i = 0; i < size2; i++)
       mnew[size1 + i] = mnew[size1 + size2 + i];
@@ -801,7 +801,7 @@ static int renumberPeriodicVertices(Mesh mesh, struct comm *c,
   for (uint i = 0; i < size1; i++)
     pe[i].globalId = mcur[i];
 
-  free(gsh);
+  gs_free(gsh);
   free(mids), free(mnew), free(mcur);
 
   return 0;
@@ -998,7 +998,7 @@ static VToEMap *getVToEMap(Mesh m, struct comm *c, buffer *bfr) {
   ulong elemId = out[0][0];
   ulong sequenceId = elemId * nv;
 
-  size_t size = nelt * nv;
+  size_t size = nelt * (size_t)nv;
   struct array vertices;
   array_init(vertex, &vertices, size);
 
@@ -1024,7 +1024,7 @@ static VToEMap *getVToEMap(Mesh m, struct comm *c, buffer *bfr) {
 
   struct array vtcsCmpct;
   array_init(vertex, &vtcsCmpct, 10);
-  vertex *vPtr = vertices.ptr;
+  vertex *vPtr = (vertex *)vertices.ptr;
 
   if (vertices.n > 0) {
     vertex prev = vPtr[0];
@@ -1090,6 +1090,7 @@ static VToEMap *getVToEMap(Mesh m, struct comm *c, buffer *bfr) {
 
   sarray_transfer(vertex, &a, workProc, 1, &cr);
   sarray_sort_2(vertex, a.ptr, a.n, vertexId, 1, elementId, 1, bfr);
+  crystal_free(&cr);
 
   // create the map
   if (a.n == 0)
@@ -1099,7 +1100,7 @@ static VToEMap *getVToEMap(Mesh m, struct comm *c, buffer *bfr) {
   map->elements = calloc(a.n, sizeof(ulong));
 
   uint nGIds = 1, prev = 0;
-  vertex *aPtr = a.ptr;
+  vertex *aPtr = (vertex *)a.ptr;
   for (i = 1; i < a.n; i++) {
     if (aPtr[i].vertexId != aPtr[prev].vertexId)
       nGIds++;

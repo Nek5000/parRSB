@@ -156,11 +156,6 @@ static uint mg_setup_aux(struct mg *d, const int factor, const int sagg,
     par_csc_to_csr(l->St, &T, 1, cr, bfr);
     par_mat_free(&T);
     l->Qst = setup_Q(l->St, c, bfr);
-
-    if (c->id == 0) {
-      printf("SAGG level = %d done.\n", lvl);
-      fflush(stdout);
-    }
   } else {
     l->S = l->St = NULL;
     l->Qs = l->Qst = NULL;
@@ -383,6 +378,8 @@ void mg_free(struct mg *d) {
   if (d != NULL) {
     struct mg_lvl **l = d->levels;
     for (uint i = 0; i < d->nlevels; i++) {
+      if (i > 0 && l[i]->M != NULL)
+        par_mat_free(l[i]->M), free(l[i]->M);
       if (l[i]->J != NULL)
         gs_free(l[i]->J), l[i]->J = NULL;
       if (l[i]->Q != NULL)
@@ -391,8 +388,6 @@ void mg_free(struct mg *d) {
         gs_free(l[i]->Qs), l[i]->Qs = NULL;
       if (l[i]->Qst != NULL)
         gs_free(l[i]->Qst), l[i]->Qst = NULL;
-      if (l[i]->M != NULL)
-        par_mat_free(l[i]->M), l[i]->M = NULL;
       if (l[i]->S != NULL)
         par_mat_free(l[i]->S), l[i]->S = NULL;
       if (l[i]->St != NULL)
@@ -407,8 +402,6 @@ void mg_free(struct mg *d) {
       free(d->level_off), d->level_off = NULL;
     if (d->buf != NULL)
       free(d->buf), d->buf = NULL;
-    // We don't set d to NULL here -- we need to pass struct `struct mg **d` to
-    // mg_free in order to do so
     free(d);
   }
 }
