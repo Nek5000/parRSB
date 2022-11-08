@@ -2,7 +2,7 @@
 
 * Computes high quality partitionings using recursive spectral bisection (RSB)
 * Requires MPI and [gslib](https://github.com/gslib/gslib) (requires version
-  1.0.3 or later)
+  1.0.8 or later)
 
 Note, any initial distribution of mesh elements is valid.
 
