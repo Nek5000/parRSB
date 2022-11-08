@@ -1,0 +1,16 @@
+name: clang-format check
+on:
+  push:
+    branches: [main, next]
+  pull_request:
+    branches: [main, next]
+jobs:
+  clang-format-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup GitHub actions
+        uses: actions/checkout@v3
+      - name: Run clang-format style check
+        uses: jidicula/clang-format-action@v4.9.0
+        with:
+          clang-format-version: '15'
