@@ -18,6 +18,7 @@ parrsb_options parrsb_default_options = {
     .profile_level = 1,
     .two_level = 0,
     .repair = 0,
+    .local = 0,
     // RSB common (Lanczos + MG) options
     .rsb_algo = 0,
     .rsb_pre = 1,
@@ -48,6 +49,7 @@ static void update_options(parrsb_options *options) {
   UPDATE_OPTION(profile_level, "PARRSB_PROFILE_LEVEL", 1);
   UPDATE_OPTION(two_level, "PARRSB_TWO_LEVEL", 1);
   UPDATE_OPTION(repair, "PARRSB_REPAIR", 1);
+  UPDATE_OPTION(local, "PARRSB_LOCAL", 1);
   UPDATE_OPTION(rsb_algo, "PARRSB_RSB_ALGO", 1);
   UPDATE_OPTION(rsb_pre, "PARRSB_RSB_PRE", 1);
   UPDATE_OPTION(rsb_max_iter, "PARRSB_RSB_MAX_ITER", 1);
@@ -68,6 +70,7 @@ static void print_options(parrsb_options *options) {
   PRINT_OPTION(profile_level, "PARRSB_PROFILE_LEVEL", "%d");
   PRINT_OPTION(two_level, "PARRSB_TWO_LEVEL", "%d");
   PRINT_OPTION(repair, "PARRSB_REPAIR", "%d");
+  PRINT_OPTION(local, "PARRSB_LOCAL", "%d");
   PRINT_OPTION(rsb_algo, "PARRSB_RSB_ALGO", "%d");
   PRINT_OPTION(rsb_pre, "PARRSB_RSB_PRE", "%d");
   PRINT_OPTION(rsb_max_iter, "PARRSB_RSB_MAX_ITER", "%d");

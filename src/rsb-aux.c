@@ -292,7 +292,7 @@ static void get_part(sint *np, sint *nid, int two_lvl, struct comm *lc,
 }
 
 void rsb_local(struct array *a, uint sidx, uint eidx, unsigned nv,
-               struct comm *c, parrsb_options *options, buffer *bfr) {
+               parrsb_options *options, buffer *bfr) {
   if (eidx <= sidx + 1)
     return;
 
@@ -323,8 +323,8 @@ void rsb_local(struct array *a, uint sidx, uint eidx, unsigned nv,
   // TODO: Renumber the vertices
 
   uint midx = (sidx + eidx) / 2;
-  rsb_local(a, sidx, midx, nv, c, options, bfr);
-  rsb_local(a, midx, eidx, nv, c, options, bfr);
+  rsb_local(a, sidx, midx, nv, options, bfr);
+  rsb_local(a, midx, eidx, nv, options, bfr);
 }
 
 int rsb(struct array *elements, int nv, int check, parrsb_options *options,
@@ -424,6 +424,9 @@ int rsb(struct array *elements, int nv, int check, parrsb_options *options,
     rsb(elements, nv, 0, options, &nc, bfr);
     comm_free(&nc);
   }
+
+  if (options->local)
+    rsb_local(elements, 0, elements->n, nv, options, bfr);
 
   if (check)
     check_rsb_partition(gc, options);

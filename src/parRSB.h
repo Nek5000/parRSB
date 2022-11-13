@@ -25,6 +25,7 @@ typedef struct {
   int profile_level; // Profile level: 0, 1, 2, .. etc (Default: 1)
   int two_level;     // Enable two level partitioning (Default: 0)
   int repair; // Repair disconnected components: 0 - No, 1 - Yes (Default: 0)
+  int local;  // Do local partitioning: 0 - NO, 1 - Yes (Default: 0)
   // RSB common (Lanczos + MG) options
   int rsb_algo; // RSB algo: 0 - Lanczos, 1 - MG (Default: 0)
   int rsb_pre;  // RSB pre-partition : 0 - None, 1 - RCB , 2 - RIB (Default: 1)
