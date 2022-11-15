@@ -289,33 +289,7 @@ void crs_parrsb_solve(scalar *x, struct coarse *crs, scalar *b, scalar tol) {
       rhs[crs->u2c[i]] += b[i];
   }
 
-#if 0
-  for (uint i = 0; i < crs->cn; i++) {
-    printf("p = %d i = %u before b[i] = %lf\n", crs->c.id, i, rhs[i]);
-    fflush(stdout);
-  }
-#endif
-
   gs(rhs, gs_double, gs_add, 1, crs->c2a, &crs->bfr);
-
-#if 0
-  char name[BUFSIZ];
-  snprintf(name, BUFSIZ, "rsb_b_np_%d_id_%d_nl_%lld_ni_%lld.txt", crs->c.np,
-           crs->c.id, crs->n[0], crs->n[1]);
-  FILE *fp = fopen(name, "w");
-  if (fp) {
-    for (uint i = 0; i < crs->an; i++)
-      fprintf(fp, "%lf\n", rhs[crs->cn + i]);
-    fclose(fp);
-  }
-#endif
-
-#if 0
-  for (uint i = 0; i < crs->an; i++) {
-    printf("p = %d i = %u after b[i] = %lf\n", crs->c.id, i, rhs[crs->cn + i]);
-    fflush(stdout);
-  }
-#endif
 
   switch (crs->type) {
   case 0:
@@ -324,14 +298,6 @@ void crs_parrsb_solve(scalar *x, struct coarse *crs, scalar *b, scalar tol) {
   default:
     break;
   }
-
-#if 0
-  for (uint i = 0; i < crs->an; i++) {
-    printf("p = %d i = %u x[i] = %lf w[i] = %lf\n", crs->c.id, i,
-           rhs[crs->cn + i], weights[crs->cn + i]);
-    fflush(stdout);
-  }
-#endif
 
   gs(rhs, gs_double, gs_add, 0, crs->c2a, &crs->bfr);
   for (uint i = 0; i < crs->un; i++) {
@@ -342,19 +308,8 @@ void crs_parrsb_solve(scalar *x, struct coarse *crs, scalar *b, scalar tol) {
   }
   free(rhs);
 
-#if 0
-  snprintf(name, BUFSIZ, "rsb_x_np_%d_id_%d_un_%u.txt", crs->c.np, crs->c.id,
-           crs->un);
-  fp = fopen(name, "w");
-  if (fp) {
-    for (uint i = 0; i < crs->un; i++)
-      fprintf(fp, "%lf\n", x[i]);
-    fclose(fp);
-  }
-#endif
-
   metric_push_level();
-  metric_crs_print(&crs->c, 1);
+  // metric_crs_print(&crs->c, 1);
   metric_finalize();
 }
 
