@@ -6,7 +6,7 @@ on:
     branches: [main, next]
 env:
   GITHUB.TOKEN: ${{ secrets.token }}
-  PARRSB_CI: parRSB-github-ci
+  CIDIR: parRSB-github-ci
   EXAMPLESDIR: build/examples
 jobs:
   ilu:
@@ -32,6 +32,7 @@ jobs:
         run: |
           sudo apt -y update
           sudo apt install -y mpich libmpich-dev libblas-dev liblapack-dev octave
+          sudo apt install -y build-essential
           python3 -m pip install --upgrade pip
           pip install numpy scipy
       - name: Build parRSB and clone tests
@@ -46,7 +47,7 @@ jobs:
           make -j4 examples
 
           # Clone tests
-          git clone https://github.com/thilinarmtb/${PARRSB_CI}.git
+          git clone https://github.com/thilinarmtb/${CIDIR}.git
 
           # For MPI
           echo "localhost:4" > hostfile
@@ -57,8 +58,8 @@ jobs:
           export PARRSB_DUMP_ILU=1
 
           cp hostfile ${EXAMPLESDIR}/ilu scripts/ilu0.m \
-            ${PARRSB_CI}/${{ matrix.test }}
-          cd ${PARRSB_CI}/${{ matrix.test }}
+            ${CIDIR}/${{ matrix.test }}
+          cd ${CIDIR}/${{ matrix.test }}
 
           tol=(`cat test.txt | grep tol`); tol=${tol[2]}
           mpirun -np ${{ matrix.np }} --hostfile hostfile ./ilu \
@@ -72,8 +73,8 @@ jobs:
           export PARRSB_DUMP_ILU=1
 
           cp hostfile ${EXAMPLESDIR}/ilu scripts/ilu-solve.py \
-            ${PARRSB_CI}/${{ matrix.test }}
-          cd ${PARRSB_CI}/${{ matrix.test }}
+            ${CIDIR}/${{ matrix.test }}
+          cd ${CIDIR}/${{ matrix.test }}
 
           tol=(`cat test.txt | grep tol`); tol=${tol[2]}
           mpirun -np ${{ matrix.np }} --hostfile hostfile ./ilu \
@@ -87,8 +88,8 @@ jobs:
           export PARRSB_DUMP_ILU=1
 
           cp hostfile ${EXAMPLESDIR}/ilu scripts/iluc.m \
-            ${PARRSB_CI}/${{ matrix.test }}
-          cd ${PARRSB_CI}/${{ matrix.test }}
+            ${CIDIR}/${{ matrix.test }}
+          cd ${CIDIR}/${{ matrix.test }}
 
           tol=(`cat test.txt | grep tol`); tol=${tol[2]}
           mpirun -np ${{ matrix.np }} --hostfile hostfile ./ilu \
@@ -102,8 +103,8 @@ jobs:
           export PARRSB_DUMP_ILU=1
 
           cp hostfile ${EXAMPLESDIR}/ilu scripts/ilu-solve.py \
-            ${PARRSB_CI}/${{ matrix.test }}
-          cd ${PARRSB_CI}/${{ matrix.test }}
+            ${CIDIR}/${{ matrix.test }}
+          cd ${CIDIR}/${{ matrix.test }}
 
           tol=(`cat test.txt | grep tol`); tol=${tol[2]}
           mpirun -np ${{ matrix.np }} --hostfile hostfile ./ilu \

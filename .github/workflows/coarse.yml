@@ -6,19 +6,18 @@ on:
     branches: [main, next]
 env:
   GITHUB.TOKEN: ${{ secrets.token }}
-  PARRSB_CI: parRSB-github-ci
-  EXAMPLESDIR: build/examples
+  CIDIR: parRSB-github-ci
+  MPICH_FC: gfortran
 jobs:
   coarse:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        test: [box_2x2x2, box_10x1x1, box_3x5x7, pyramid, solid, ethier, vortex, expansion]
-        np: [2, 3, 4]
+        test: [e3q, tgv]
+        np: [1, 2, 3, 4]
       fail-fast: false
     name: "${{ matrix.test }}, NP = ${{ matrix.np }}"
     env:
-      GSVER: 1.0.7
       CC: mpicc
     steps:
       - uses: actions/checkout@v3
@@ -26,31 +25,42 @@ jobs:
         shell: bash
         run: |
           sudo apt -y update
-          sudo apt install -y mpich libmpich-dev
-          sudo apt install -y libblas-dev liblapack-dev
-      - name: Build parRSB and clone tests
+          sudo apt install -y mpich libmpich-dev libblas-dev liblapack-dev
+          sudo apt install -y gfortran build-essential
+      - name: Clone Nek5000 and tests
         shell: bash
         run: |
-          # Build gslib
-          git clone https://github.com/Nek5000/gslib.git
-          make -C gslib -j4
-
-          # Build parRSB
-          export GSLIBPATH=`pwd`/gslib/build/
-          make -j4 examples
+          # Clone Nek5000
+          git clone https://github.com/thilinarmtb/Nek5000.git -b algo
+          echo "NEK_SOURCE_ROOT=`pwd`/Nek5000" >> $GITHUB_ENV
 
           # Clone tests
-          git clone https://github.com/thilinarmtb/${PARRSB_CI}.git
+          git clone https://github.com/thilinarmtb/${CIDIR}.git
 
           # For MPI
           echo "localhost:4" > hostfile
-      - name: schur
+      - name: Schur, with tolerance = 1e-12
         if: always()
         shell: bash
         run: |
-          cp hostfile ${EXAMPLESDIR}/coarse ${PARRSB_CI}/${{ matrix.test }}
-          cd ${PARRSB_CI}/${{ matrix.test }}
+          export PARRSB_SCHUR_TOL=1e-12
 
-          tol=(`cat test.txt | grep tol`); tol=${tol[2]}
-          mpirun -np ${{ matrix.np }} --hostfile hostfile ./coarse \
-            --mesh ${{ matrix.test }} --tol=${tol} --crs_tol=1e-12
+          cd ${CIDIR}/${{ matrix.test }}
+
+          # Copy the scripts
+          cp ${NEK_SOURCE_ROOT}/bin/makenek ${NEK_SOURCE_ROOT}/bin/nekmpi .
+
+          # Buld the case
+          PPLIST="PARRSB DPROCMAP" ./makenek ${{ matrix.test }}
+
+          # Run with xxt as preconditioner
+          ./nekmpi ${{ matrix.test }} ${{ matrix.np }} | tee xxt.log
+          grep 'PRES gmres' | awk '{ print $4 }' > xxt.iter
+
+          # Run with Schur as preconditioner
+          sed -i.bak 's/semg_xxt/schur/g' ${{ matrix.test }}.par
+          ./nekmpi ${{ matrix.test }} ${{ matrix.np }} | tee schur.log
+          grep 'PRES gmres' | awk '{ print $4 }' > schur.iter
+
+          diff=`paste -d' ' schur.iter xxt.iter | awk '{ tmp=$1-$2; print sqrt(tmp*tmp) }' | sort -n | tail -n 1`
+          echo ${diff}

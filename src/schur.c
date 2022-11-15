@@ -1127,9 +1127,9 @@ int schur_solve(scalar *x, struct coarse *crs, scalar *b, scalar tol,
   metric_toc(c, SCHUR_SOLVE_SETRHS1);
 
   metric_tic(c, SCHUR_SOLVE_PROJECT);
-  unsigned miter = (tol < 0 ? fabs(tol) : 100);
+  unsigned miter = (tol < 0 ? fabs(tol) : 20);
   scalar mtol = (tol > 0 ? tol : 1e-7);
-  int iter = project(xi, rhs, schur, crs->s[0], c, miter, mtol, 0, 1, bfr);
+  int iter = project(xi, rhs, schur, crs->s[0], c, miter, mtol, crs->null_space, 1, bfr);
   metric_toc(c, SCHUR_SOLVE_PROJECT);
   metric_acc(SCHUR_PROJECT_NITER, iter);
 

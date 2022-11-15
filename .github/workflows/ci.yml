@@ -6,7 +6,7 @@ on:
     branches: [main, next]
 env:
   GITHUB.TOKEN: ${{ secrets.token }}
-  PARRSB_CI: parRSB-github-ci
+  CIDIR: parRSB-github-ci
   EXAMPLESDIR: build/examples
 jobs:
   parRSB:
@@ -26,8 +26,8 @@ jobs:
         shell: bash
         run: |
           sudo apt -y update
-          sudo apt install -y mpich libmpich-dev
-          sudo apt install -y libblas-dev liblapack-dev
+          sudo apt install -y mpich libmpich-dev libblas-dev liblapack-dev
+          sudo apt install -y build-essential
       - name: Build parRSB and clone tests
         shell: bash
         run: |
@@ -40,15 +40,15 @@ jobs:
           make -j4 examples
 
           # Clone tests
-          git clone https://github.com/thilinarmtb/${PARRSB_CI}.git
+          git clone https://github.com/thilinarmtb/${CIDIR}.git
 
           # For MPI
           echo "localhost:4" > hostfile
       - name: gencon
         shell: bash
         run: |
-          cp hostfile ${EXAMPLESDIR}/gencon ${PARRSB_CI}/${{ matrix.test }}
-          cd ${PARRSB_CI}/${{ matrix.test }}
+          cp hostfile ${EXAMPLESDIR}/gencon ${CIDIR}/${{ matrix.test }}
+          cd ${CIDIR}/${{ matrix.test }}
 
           tol=(`cat test.txt | grep tol`); tol=${tol[2]}
           mpirun -np ${{ matrix.np }} --hostfile hostfile ./gencon \
@@ -60,8 +60,8 @@ jobs:
           export PARRSB_RSB_PRE=0
           export PARRSB_RSB_ALGO=0
 
-          cp hostfile ${EXAMPLESDIR}/genmap ${PARRSB_CI}/${{ matrix.test }}
-          cd ${PARRSB_CI}/${{ matrix.test }}
+          cp hostfile ${EXAMPLESDIR}/genmap ${CIDIR}/${{ matrix.test }}
+          cd ${CIDIR}/${{ matrix.test }}
 
           tol=(`cat test.txt | grep tol`); tol=${tol[2]}
           mpirun -np ${{ matrix.np }} --hostfile hostfile ./genmap \
@@ -74,8 +74,8 @@ jobs:
           export PARRSB_RSB_ALGO=1
           export PARRSB_RSB_MG_FACTOR=2
 
-          cp hostfile ${EXAMPLESDIR}/genmap ${PARRSB_CI}/${{ matrix.test }}
-          cd ${PARRSB_CI}/${{ matrix.test }}
+          cp hostfile ${EXAMPLESDIR}/genmap ${CIDIR}/${{ matrix.test }}
+          cd ${CIDIR}/${{ matrix.test }}
 
           tol=(`cat test.txt | grep tol`); tol=${tol[2]}
           mpirun -np ${{ matrix.np }} --hostfile hostfile ./genmap \
@@ -88,8 +88,8 @@ jobs:
           export PARRSB_RSB_ALGO=1
           export PARRSB_RSB_MG_FACTOR=4
 
-          cp hostfile ${EXAMPLESDIR}/genmap ${PARRSB_CI}/${{ matrix.test }}
-          cd ${PARRSB_CI}/${{ matrix.test }}
+          cp hostfile ${EXAMPLESDIR}/genmap ${CIDIR}/${{ matrix.test }}
+          cd ${CIDIR}/${{ matrix.test }}
 
           tol=(`cat test.txt | grep tol`); tol=${tol[2]}
           mpirun -np ${{ matrix.np }} --hostfile hostfile ./genmap \
@@ -103,8 +103,8 @@ jobs:
           export PARRSB_RSB_MG_FACTOR=4
           export PARRSB_RSB_MG_SMOOTH_AGGREGATION=1
 
-          cp hostfile ${EXAMPLESDIR}/genmap ${PARRSB_CI}/${{ matrix.test }}
-          cd ${PARRSB_CI}/${{ matrix.test }}
+          cp hostfile ${EXAMPLESDIR}/genmap ${CIDIR}/${{ matrix.test }}
+          cd ${CIDIR}/${{ matrix.test }}
 
           tol=(`cat test.txt | grep tol`); tol=${tol[2]}
           mpirun -np ${{ matrix.np }} --hostfile hostfile ./genmap \
