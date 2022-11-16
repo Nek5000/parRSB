@@ -50,7 +50,7 @@ jobs:
           git clone https://github.com/thilinarmtb/${CIDIR}.git
 
           # For MPI
-          echo "localhost:4" > hostfile
+          echo "localhost:6" > hostfile
       - name: ILU(0) factorization
         if: always()
         shell: bash
