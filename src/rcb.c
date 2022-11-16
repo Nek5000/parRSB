@@ -1,7 +1,7 @@
 #include "parrsb-impl.h"
 #include "sort.h"
 
-extern unsigned get_rsb_bin(uint id, uint np);
+extern unsigned get_proc_bin(uint id, uint np);
 
 static unsigned get_axis(size_t unit_size, char *elems, uint nel, int ndim,
                          struct comm *c) {
@@ -134,7 +134,7 @@ int rcb(struct array *elems, size_t usize, int ndim, struct comm *ci,
       }
     }
 
-    unsigned bin = get_rsb_bin(c.id, c.np);
+    unsigned bin = get_proc_bin(c.id, c.np);
 
     struct comm t;
     comm_split(&c, bin, c.id, &t);

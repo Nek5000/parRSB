@@ -1,6 +1,6 @@
 #include "sort.h"
 
-extern unsigned get_rsb_bin(uint id, uint np);
+extern unsigned get_proc_bin(uint id, uint np);
 
 static void sfree(void *p, const char *file, unsigned line) {
   if (p)
@@ -57,7 +57,7 @@ static void number_dofs(ulong *nid, uint n, const slong *ids, unsigned nc,
     sint *wrk = tcalloc(sint, n);
     unsigned lvl = 1e6;
     while (c.np > 1) {
-      unsigned bin = get_rsb_bin(c.id, c.np);
+      unsigned bin = get_proc_bin(c.id, c.np);
 
       struct gs_data *gsh = gs_setup(ids, n, &c, 0, gs_pairwise, 0);
 

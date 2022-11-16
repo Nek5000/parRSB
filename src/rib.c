@@ -1,7 +1,7 @@
 #include "parrsb-impl.h"
 #include "sort.h"
 
-extern unsigned get_rsb_bin(uint id, uint np);
+extern unsigned get_proc_bin(uint id, uint np);
 
 extern int power_serial(double *y, int N, double *A, int verbose);
 
@@ -87,7 +87,7 @@ int rib(struct array *elems, size_t usize, int ndim, struct comm *ci,
       parallel_sort(struct rsb_element, elems, fiedler, gs_double, 0, 1, &c,
                     bfr);
 
-    unsigned bin = get_rsb_bin(c.id, c.np);
+    unsigned bin = get_proc_bin(c.id, c.np);
 
     struct comm t;
     comm_split(&c, bin, c.id, &t);

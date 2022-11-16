@@ -11,7 +11,7 @@ extern void fiedler_local(struct array *arr, uint sidx, uint eidx, int nv,
 extern void fiedler(struct array *elements, int nv, parrsb_options *options,
                     struct comm *gsc, buffer *buf, int verbose);
 
-unsigned get_rsb_bin(uint id, uint np) { return id >= (np + 1) / 2; }
+unsigned get_proc_bin(uint id, uint np) { return id >= (np + 1) / 2; }
 
 static unsigned disconnected = 0;
 
@@ -357,19 +357,20 @@ int rsb(struct array *elements, int nv, int check, parrsb_options *options,
   }
 
   unsigned ndim = (nv == 8) ? 3 : 2;
+  size_t usize = sizeof(struct rsb_element);
   while (np > 1) {
     // Run the pre-partitioner
     metric_tic(&lc, RSB_PRE);
     switch (options->rsb_pre) {
-    case 0: // Sort by global id
+    case 1:
+      rcb(elements, usize, ndim, &lc, bfr);
+      break;
+    case 2:
+      rib(elements, usize, ndim, &lc, bfr);
+      break;
+    case 3:
       parallel_sort(struct rsb_element, elements, globalId, gs_long, 0, 1, &lc,
                     bfr);
-      break;
-    case 1: // RCB
-      rcb(elements, sizeof(struct rsb_element), ndim, &lc, bfr);
-      break;
-    case 2: // RIB
-      rib(elements, sizeof(struct rsb_element), ndim, &lc, bfr);
       break;
     default:
       break;
@@ -377,7 +378,7 @@ int rsb(struct array *elements, int nv, int check, parrsb_options *options,
     metric_toc(&lc, RSB_PRE);
 
     // Find the Fiedler vector
-    unsigned bin = get_rsb_bin(nid, np);
+    unsigned bin = get_proc_bin(nid, np);
     struct comm tc;
     comm_split(&lc, bin, lc.id, &tc);
 
@@ -423,8 +424,19 @@ int rsb(struct array *elements, int nv, int check, parrsb_options *options,
     comm_free(&nc);
   }
 
-  if (options->local)
+  switch (options->local) {
+  case 1:
+    rcb_local(elements, usize, 0, elements->n, ndim, bfr);
+    break;
+  case 2:
+    rib_local(elements, usize, 0, elements->n, ndim, bfr);
+    break;
+  case 3:
     rsb_local(elements, 0, elements->n, nv, options, bfr);
+    break;
+  default:
+    break;
+  }
 
   if (check)
     check_rsb_partition(gc, options);
