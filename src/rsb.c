@@ -10,6 +10,8 @@ extern int rsb(struct array *elements, int nv, int check,
                parrsb_options *options, struct comm *gc, buffer *bfr);
 extern int rcb(struct array *elements, size_t unit_size, int ndim,
                struct comm *ci, buffer *bfr);
+extern int rib(struct array *elements, size_t unit_size, int ndim,
+               struct comm *ci, buffer *bfr);
 
 parrsb_options parrsb_default_options = {
     // General options
@@ -99,11 +101,11 @@ static size_t load_balance(struct array *elist, uint nel, int nv, double *coord,
     unit_size = sizeof(struct rsb_element);
 
   array_init_(elist, nel, unit_size, __FILE__, __LINE__);
-
-  struct rcb_element *pe = (struct rcb_element *)calloc(1, unit_size);
-  pe->origin = c->id;
+  elist->n = 0;
 
   int ndim = (nv == 8) ? 3 : 2;
+  struct rcb_element *pe = (struct rcb_element *)calloc(1, unit_size);
+  pe->origin = c->id;
   for (uint e = 0; e < nel; ++e) {
     slong eg = pe->globalId = start + e + 1;
     if (nstar == 0)

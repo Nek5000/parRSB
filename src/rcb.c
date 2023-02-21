@@ -143,9 +143,7 @@ int rcb(struct array *elements, size_t unit_size, int ndim, struct comm *ci,
   struct comm c, t;
   comm_dup(&c, ci);
 
-  int size = c.np;
-  int rank = c.id;
-
+  int size = c.np, rank = c.id;
   while (size > 1) {
     rcb_level(elements, unit_size, ndim, &c, bfr);
 
