@@ -151,8 +151,10 @@ void get_vertex_ids(long long **vtx_, Mesh mesh) {
 
   struct point_t *ptr = (struct point_t *)mesh->elements.ptr;
   for (uint e = 0, count = 0; e < nelt; e++) {
-    for (int v = 0; v < nv; v++)
-      vtx[count] = ptr[count++].globalId;
+    for (int v = 0; v < nv; v++) {
+      vtx[count] = ptr[count].globalId;
+      count++;
+    }
   }
 }
 

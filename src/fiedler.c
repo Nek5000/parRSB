@@ -528,8 +528,8 @@ static int lanczos_aux(scalar *diag, scalar *upper, scalar *rr, uint lelt,
     comm_allreduce(gsc, gs_double, gs_add, &pap, 1, buf);
 
     // if (gsc->id == 0) {
-    //   printf("host iter = %d beta = %lf pp = %lf pap = %lf\n", iter, beta, pp,
-    //          pap);
+    //   printf("host iter = %d beta = %lf pp = %lf pap = %lf\n", iter, beta,
+    //   pp, pap);
     // }
 
     alpha = rtz1 / pap;
