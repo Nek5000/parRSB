@@ -1321,7 +1321,8 @@ int parrsb_conn_mesh(long long *vtx, double *coord, int nelt, int ndim,
   int verbose = 0;
   {
     const char *val = getenv("PARRSB_VERBOSE_LEVEL");
-    if (val != NULL) verbose= atoi(val);  
+    if (val != NULL)
+      verbose = atoi(val);
   }
 
   if (c.id == 0 && verbose > 0) {

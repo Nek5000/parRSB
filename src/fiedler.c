@@ -493,7 +493,6 @@ static int lanczos_aux(scalar *diag, scalar *upper, scalar *rr, uint lelt,
   ortho(r, lelt, nelg, gsc);
 
   scalar rtz1 = 1, pap = 0, alpha, beta, rtz2, pap_old;
-
   scalar rtr = dot(r, r, lelt), buf[2];
   comm_allreduce(gsc, gs_double, gs_add, &rtr, 1, buf);
   scalar rnorm = sqrt(rtr), rtol = rnorm * tol;
@@ -522,16 +521,13 @@ static int lanczos_aux(scalar *diag, scalar *upper, scalar *rr, uint lelt,
 
     laplacian(w, gl, p, bfr);
 
-    scalar ww = dot(w, w, lelt);
-    comm_allreduce(gsc, gs_double, gs_add, &ww, 1, buf);
-
     pap_old = pap, pap = dot(w, p, lelt);
     comm_allreduce(gsc, gs_double, gs_add, &pap, 1, buf);
-    /*
-    if (gsc->id == 0)
-      printf("host iter = %d beta = %lf pp = %lf pap = %lf\n", iter, beta, pp,
-             pap);
-             */
+
+    // if (gsc->id == 0) {
+    //   printf("host iter = %d beta = %lf pp = %lf pap = %lf\n", iter, beta, pp,
+    //          pap);
+    // }
 
     alpha = rtz1 / pap;
     // vec_axpby(r, r, 1.0, w, -1.0 * alpha);
@@ -559,8 +555,8 @@ static int lanczos_aux(scalar *diag, scalar *upper, scalar *rr, uint lelt,
     }
   }
 
-  metric_acc(TOL_FNL, rnorm);
-  metric_acc(TOL_TGT, rtol);
+  metric_set(TOL_FNL, rnorm);
+  metric_set(TOL_TGT, rtol);
 
   free(r);
 
