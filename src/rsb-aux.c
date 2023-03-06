@@ -61,25 +61,28 @@ static void check_rsb_partition(struct comm *gc, parrsb_options *opts) {
         converged = 0;
     }
 
-    sint ibfr;
-    double dbfr;
-    comm_allreduce(gc, gs_int, gs_min, &converged, 1, &ibfr);
+    struct comm c;
+    comm_split(gc, converged, gc->id, &c);
+
+    slong bfr[4];
     if (converged == 0) {
       if (opts->rsb_algo == 0) {
-        double final = metric_get_value(i, TOL_FNL);
-        comm_allreduce(gc, gs_double, gs_min, &final, 1, &dbfr);
+        double init = metric_get_value(i, TOL_INIT);
+        comm_allreduce(&c, gs_double, gs_min, &init, 1, (void *)bfr);
 
         double target = metric_get_value(i, TOL_TGT);
-        comm_allreduce(gc, gs_double, gs_min, &target, 1, &dbfr);
+        comm_allreduce(&c, gs_double, gs_min, &target, 1, (void *)bfr);
 
-        if (gc->id == 0) {
-          printf("Warning: Lanczos only reached a tolerance of %lf given %lf "
-                 "after %d x %d iterations in Level=%d!\n",
-                 final, target, mpass, miter, i);
+        double final = metric_get_value(i, TOL_FNL);
+        comm_allreduce(&c, gs_double, gs_min, &final, 1, (void *)bfr);
+        if (c.id == 0) {
+          printf("Warning: Lanczos reached a tolerance of %lf (target: %lf) "
+                 "starting from %lf after %d x %d iterations in Level=%d!\n",
+                 final, target, init, mpass, miter, i);
           fflush(stdout);
         }
       } else if (opts->rsb_algo == 1) {
-        if (gc->id == 0) {
+        if (c.id == 0) {
           printf("Warning: Inverse iteration didn't converge after %d "
                  "iterations in Level = %d\n",
                  mpass, i);
@@ -87,11 +90,12 @@ static void check_rsb_partition(struct comm *gc, parrsb_options *opts) {
         }
       }
     }
+    comm_free(&c);
 
     sint minc, maxc;
     minc = maxc = (sint)metric_get_value(i, RSB_COMPONENTS);
-    comm_allreduce(gc, gs_int, gs_min, &minc, 1, &ibfr);
-    comm_allreduce(gc, gs_int, gs_max, &maxc, 1, &ibfr);
+    comm_allreduce(gc, gs_int, gs_min, &minc, 1, (void *)bfr);
+    comm_allreduce(gc, gs_int, gs_max, &maxc, 1, (void *)bfr);
 
     if (maxc > 1 && gc->id == 0) {
       printf("Warning: Partition created %d/%d (min/max) disconnected "

@@ -7,7 +7,7 @@
 // Metrics
 //
 typedef enum {
-  RSB_COMPONENTS,
+  RSB_COMPONENTS = 0,
   RSB_FIEDLER,
   RSB_FIEDLER_SETUP,
   RSB_FIEDLER_CALC,
@@ -34,7 +34,8 @@ typedef enum {
   SCHUR_SOLVE_SETRHS1,
   SCHUR_SOLVE_SETRHS2,
   TOL_FNL,
-  TOL_TGT
+  TOL_TGT,
+  TOL_INIT
 } metric;
 
 void metric_init();

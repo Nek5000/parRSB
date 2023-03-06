@@ -497,6 +497,9 @@ static int lanczos_aux(scalar *diag, scalar *upper, scalar *rr, uint lelt,
   comm_allreduce(gsc, gs_double, gs_add, &rtr, 1, buf);
   scalar rnorm = sqrt(rtr), rtol = rnorm * tol;
 
+  metric_set(TOL_INIT, rnorm);
+  metric_set(TOL_TGT, rtol);
+
   // vec_scale(rr[0], r, rni);
   scalar rni = 1.0 / rnorm;
   for (i = 0; i < lelt; i++)
@@ -556,7 +559,6 @@ static int lanczos_aux(scalar *diag, scalar *upper, scalar *rr, uint lelt,
   }
 
   metric_set(TOL_FNL, rnorm);
-  metric_set(TOL_TGT, rtol);
 
   free(r);
 
