@@ -138,7 +138,9 @@ static int project(scalar *x, uint n, scalar *b, struct laplacian *L,
   uint j, k;
   for (i = 0; i < miter; i++) {
     // mat_vec_csr(w, p, S, gsh, wrk, bfr);
+    metric_tic(c, RSB_PROJECT_AX);
     laplacian(w, L, p, bfr);
+    metric_toc(c, RSB_PROJECT_AX);
 
     scalar pw = dot(p, w, n);
     comm_allreduce(c, gs_double, gs_add, &pw, 1, buf);
@@ -160,7 +162,9 @@ static int project(scalar *x, uint n, scalar *b, struct laplacian *L,
     for (j = 0; j < n; j++)
       z0[j] = z[j];
 
+    metric_tic(c, RSB_PROJECT_MG);
     mg_vcycle(z, r, d, c, bfr);
+    metric_toc(c, RSB_PROJECT_MG);
 
     rzt = rz1;
     if (null_space)
@@ -237,11 +241,6 @@ static int inverse(scalar *y, struct array *elements, int nv, scalar *z,
   struct crystal cr;
   crystal_init(&cr, gsc);
   struct par_mat *L = par_csr_setup_con(lelt, eid, vtx, nv, 1, gsc, &cr, buf);
-  for (uint i = 0; i < L->rn; i++) {
-    for (uint j = L->adj_off[i], je = L->adj_off[i + 1]; j < je; j++)
-      L->adj_val[j] /= L->diag_val[i];
-    L->diag_val[i] = 1.0;
-  }
   struct mg *d = mg_setup(L, factor, sagg, &cr, buf);
   crystal_free(&cr);
   metric_toc(gsc, RSB_INVERSE_SETUP);
@@ -251,8 +250,10 @@ static int inverse(scalar *y, struct array *elements, int nv, scalar *z,
   scalar *rhs = GZ + miter * miter, *v = rhs + miter;
 
   metric_tic(gsc, RSB_INVERSE);
+  int iters = 0;
   for (i = 0; i < mpass; i++) {
     int ppfi = project(y, lelt, z, wl, d, gsc, miter, tol, 1, 0, buf);
+    iters += ppfi;
 
     ortho(y, lelt, nelg, gsc);
 
@@ -355,7 +356,7 @@ static int inverse(scalar *y, struct array *elements, int nv, scalar *z,
   if (err)
     free(err);
 
-  return i;
+  return iters;
 }
 
 static double sign(scalar a, scalar b) {
