@@ -628,7 +628,7 @@ static int findUniqueVertices(Mesh mesh, struct comm *c, scalar tol,
       comm_allreduce(c, gs_long, gs_add, &n_pts, 1, buf);
 
       slong n_seg = countSegments(mesh, c);
-      debug_print(c, verbose, "\tlocglob: %d %d %lld %lld\n", t + 1, d + 1,
+      debug_print(c, verbose, "\t\tlocglob: %d %d %lld %lld\n", t + 1, d + 1,
                   n_seg, n_pts);
       rearrangeSegments(mesh, &seg, bfr);
       parrsb_barrier(c);
@@ -1348,7 +1348,7 @@ int parrsb_conn_mesh(long long *vtx, double *coord, int nelt, int ndim,
   const char *name[8] = {"transferBoundaryFaces", "findMinNbrDistance   ",
                          "findSegments         ", "setGlobalId          ",
                          "elementCheck         ", "faceCheck            ",
-                         "matchPeriodicFaces   "};
+                         "matchPeriodicFaces   ", "copyOutput           "};
 
   parrsb_barrier(&c);
   double tcon = comm_time();
@@ -1391,31 +1391,30 @@ int parrsb_conn_mesh(long long *vtx, double *coord, int nelt, int ndim,
   buffer bfr;
   buffer_init(&bfr, 1024);
 
-  debug_print(&c, verbose, "\ttransferBoundaryFaces ...");
+  debug_print(&c, verbose, "\t%s ...", name[0]);
   parrsb_barrier(&c);
   double t = comm_time();
   sint err = transferBoundaryFaces(mesh, &c);
-  check_error(err, "transferBoundaryFaces");
+  check_error(err, name[0]);
   duration[0] = comm_time() - t;
   debug_print(&c, verbose, "done.\n");
 
-  debug_print(&c, verbose, "\tfindMinNeighborDistance ...");
+  debug_print(&c, verbose, "\t%s ...", name[1]);
   parrsb_barrier(&c);
   t = comm_time();
   err = findMinNeighborDistance(mesh);
-  check_error(err, "findMinNeighborDistance");
+  check_error(err, name[1]);
   duration[1] = comm_time() - t;
   debug_print(&c, verbose, "done.\n");
 
-  debug_print(&c, verbose, "\tfindSegments ...");
+  debug_print(&c, verbose, "\t%s ...\n", name[2]);
   parrsb_barrier(&c);
   t = comm_time();
   err = findUniqueVertices(mesh, &c, tol, verbose, &bfr);
-  check_error(err, "findSegments");
+  check_error(err, name[2]);
   duration[2] = comm_time() - t;
-  debug_print(&c, verbose, "done.\n");
 
-  debug_print(&c, verbose, "\tSet global id ...");
+  debug_print(&c, verbose, "\t%s ...", name[3]);
   parrsb_barrier(&c);
   t = comm_time();
   setGlobalID(mesh, &c);
@@ -1423,36 +1422,39 @@ int parrsb_conn_mesh(long long *vtx, double *coord, int nelt, int ndim,
   duration[3] = comm_time() - t;
   debug_print(&c, verbose, "done.\n");
 
-  debug_print(&c, verbose, "\telementCheck ...");
+  debug_print(&c, verbose, "\t%s ...", name[4]);
   parrsb_barrier(&c);
   t = comm_time();
   err = elementCheck(mesh, &c, &bfr);
-  check_error(err, "elementCheck");
+  check_error(err, name[4]);
   duration[4] = comm_time() - t;
   debug_print(&c, verbose, "done.\n");
 
-  debug_print(&c, verbose, "\tfaceCheck ...");
+  debug_print(&c, verbose, "\t%s ...", name[5]);
   parrsb_barrier(&c);
   t = comm_time();
   err = faceCheck(mesh, &c, &bfr);
-  check_error(err, "faceCheck");
+  check_error(err, name[5]);
   duration[5] = comm_time() - t;
   debug_print(&c, verbose, "done.\n");
 
-  debug_print(&c, verbose, "\tmatchPeriodicFaces ...");
+  debug_print(&c, verbose, "\t%s ...", name[6]);
   parrsb_barrier(&c);
   t = comm_time();
   err = matchPeriodicFaces(mesh, &c, &bfr);
-  check_error(err, "matchPeriodicFaces");
+  check_error(err, name[6]);
   duration[6] = comm_time() - t;
   debug_print(&c, verbose, "done.\n");
 
-  debug_print(&c, verbose, "\tCopy output ...");
+  debug_print(&c, verbose, "\t%s ...", name[7]);
+  parrsb_barrier(&c);
+  t = comm_time();
   Point ptr = mesh->elements.ptr;
   for (i = 0; i < nelt; i++) {
     for (j = 0; j < nvertex; j++)
       vtx[i * nvertex + j] = ptr[i * nvertex + j].globalId + 1;
   }
+  duration[7] = comm_time() - t;
   debug_print(&c, verbose, "done.\n");
 
   // Report timing info and finish

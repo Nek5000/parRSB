@@ -263,7 +263,7 @@ struct parrsb_cmd_opts *parrsb_parse_cmd_opts(int argc, char *argv[]) {
   struct parrsb_cmd_opts *in = tcalloc(struct parrsb_cmd_opts, 1);
 
   in->mesh = NULL, in->tol = 2e-1;
-  in->test = 0, in->dump = 1, in->verbose = 0, in->nactive = INT_MAX;
+  in->test = 0, in->dump = 0, in->verbose = 0, in->nactive = INT_MAX;
   in->ilu_type = 0, in->ilu_tol = 1e-1, in->ilu_pivot = 0;
   in->crs_type = 0, in->crs_tol = 1e-3;
 
@@ -297,10 +297,10 @@ struct parrsb_cmd_opts *parrsb_parse_cmd_opts(int argc, char *argv[]) {
       in->tol = atof(optarg);
       break;
     case 2:
-      in->test = atoi(optarg);
+      in->test = 1;
       break;
     case 3:
-      in->dump = atoi(optarg);
+      in->dump = 1;
       break;
     case 4:
       in->nactive = atoi(optarg);

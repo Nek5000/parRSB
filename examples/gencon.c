@@ -6,7 +6,7 @@
 static int test_parcon(unsigned int neltp, long long *vlp, char *name,
                        MPI_Comm comm) {
   unsigned int nelt;
-  int nv;
+  unsigned nv;
   long long *vls = NULL;
   int err = parrsb_read_mesh(&nelt, &nv, &vls, NULL, NULL, NULL, name, comm, 2);
   parrsb_check_error(err, comm);
