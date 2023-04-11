@@ -56,7 +56,7 @@ static void update_options(parrsb_options *options) {
   UPDATE_OPTION(rsb_mg_grammian, "PARRSB_RSB_MG_GRAMMIAN", 1);
   UPDATE_OPTION(rsb_mg_factor, "PARRSB_RSB_MG_FACTOR", 1);
   UPDATE_OPTION(rsb_mg_sagg, "PARRSB_RSB_MG_SMOOTH_AGGREGATION", 1);
-  if (options->verbose_level == 0) 
+  if (options->verbose_level == 0)
     options->profile_level = 0;
 }
 

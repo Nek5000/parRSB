@@ -249,8 +249,8 @@ static int read_geometry(unsigned *nelt, unsigned *nv, double **coord,
   return err != MPI_SUCCESS;
 }
 
-static int read_connectivity(unsigned int *nelt_, int *nv_, long long **vl_,
-                             char *fname, struct comm *c) {
+static int read_connectivity(unsigned int *nelt_, unsigned *nv_,
+                             long long **vl_, char *fname, struct comm *c) {
   uint rank = c->id, size = c->np;
   MPI_Comm comm = c->c;
 
