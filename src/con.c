@@ -1,5 +1,6 @@
 #include "parrsb-impl.h"
 #include "sort.h"
+#include <stdarg.h>
 
 /*
  Preprocessor Corner notation:      Symmetric Corner notation:
@@ -81,6 +82,16 @@ as arguments:
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
+
+static inline debug_print(struct comm *c, int verbose, const char *fmt, ...) {
+  va_list vargs;
+  va_start(vargs, fmt);
+  if (c->id == 0 && verbose > 0) {
+    vprintf(fmt, vargs);
+    fflush(stdout);
+  }
+  va_end(vargs);
+}
 
 // Upper bounds for elements and face quantities
 #define GC_MAX_FACES 6
@@ -1332,10 +1343,7 @@ int parrsb_conn_mesh(long long *vtx, double *coord, int nelt, int ndim,
       verbose = atoi(val);
   }
 
-  if (c.id == 0 && verbose > 0) {
-    printf("Running parCon ... \n");
-    fflush(stdout);
-  }
+  debug_print(&c, verbose, "Running parCon ...\n");
 
   double duration[8] = {0};
   const char *name[8] = {"transferBoundaryFaces", "findMinNbrDistance   ",
@@ -1349,11 +1357,14 @@ int parrsb_conn_mesh(long long *vtx, double *coord, int nelt, int ndim,
   Mesh mesh;
   mesh_init(&mesh, nelt, ndim);
 
+  debug_print(&c, verbose, "\tCalculating global problem size ...");
   slong out[2][1], wrk[2][1], in = nelt;
   comm_scan(out, &c, gs_long, gs_add, &in, 1, wrk);
   ulong start = out[0][0], nelgt = out[1][0];
   mesh->nelgt = mesh->nelgv = nelgt;
+  debug_print(&c, verbose, "done.\n");
 
+  debug_print(&c, verbose, "\tSet internal data structures ...");
   int nvertex = mesh->nVertex;
   struct point_t p = {.origin = c.id};
   uint i, j, k, l;
@@ -1376,58 +1387,74 @@ int parrsb_conn_mesh(long long *vtx, double *coord, int nelt, int ndim,
     b.bc[1] = PRE_TO_SYM_FACE[periodicInfo[4 * i + 3] - 1];
     array_cat(struct boundary_t, &mesh->boundary, &b, 1);
   }
+  debug_print(&c, verbose, "done.\n");
 
   buffer bfr;
   buffer_init(&bfr, 1024);
 
+  debug_print(&c, verbose, "\ttransferBoundaryFaces ...");
   parrsb_barrier(&c);
   double t = comm_time();
   sint err = transferBoundaryFaces(mesh, &c);
   check_error(err, "transferBoundaryFaces");
   duration[0] = comm_time() - t;
+  debug_print(&c, verbose, "done.\n");
 
+  debug_print(&c, verbose, "\tfindMinNeighborDistance ...");
   parrsb_barrier(&c);
   t = comm_time();
   err = findMinNeighborDistance(mesh);
   check_error(err, "findMinNeighborDistance");
   duration[1] = comm_time() - t;
+  debug_print(&c, verbose, "done.\n");
 
+  debug_print(&c, verbose, "\tfindSegments ...");
   parrsb_barrier(&c);
   t = comm_time();
   err = findUniqueVertices(mesh, &c, tol, verbose, &bfr);
   check_error(err, "findSegments");
   duration[2] = comm_time() - t;
+  debug_print(&c, verbose, "done.\n");
 
+  debug_print(&c, verbose, "\tSet global id ...");
   parrsb_barrier(&c);
   t = comm_time();
   setGlobalID(mesh, &c);
   sendBack(mesh, &c, &bfr);
   duration[3] = comm_time() - t;
+  debug_print(&c, verbose, "done.\n");
 
+  debug_print(&c, verbose, "\telementCheck ...");
   parrsb_barrier(&c);
   t = comm_time();
   err = elementCheck(mesh, &c, &bfr);
   check_error(err, "elementCheck");
   duration[4] = comm_time() - t;
+  debug_print(&c, verbose, "done.\n");
 
+  debug_print(&c, verbose, "\tfaceCheck ...");
   parrsb_barrier(&c);
   t = comm_time();
   err = faceCheck(mesh, &c, &bfr);
   check_error(err, "faceCheck");
   duration[5] = comm_time() - t;
+  debug_print(&c, verbose, "done.\n");
 
+  debug_print(&c, verbose, "\tmatchPeriodicFaces ...");
   parrsb_barrier(&c);
   t = comm_time();
   err = matchPeriodicFaces(mesh, &c, &bfr);
   check_error(err, "matchPeriodicFaces");
   duration[6] = comm_time() - t;
+  debug_print(&c, verbose, "done.\n");
 
-  // Copy output
+  debug_print(&c, verbose, "\tCopy output ...");
   Point ptr = mesh->elements.ptr;
   for (i = 0; i < nelt; i++) {
     for (j = 0; j < nvertex; j++)
       vtx[i * nvertex + j] = ptr[i * nvertex + j].globalId + 1;
   }
+  debug_print(&c, verbose, "done.\n");
 
   // Report timing info and finish
   parrsb_barrier(&c);
