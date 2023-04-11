@@ -83,7 +83,8 @@ as arguments:
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-static inline debug_print(struct comm *c, int verbose, const char *fmt, ...) {
+static inline void debug_print(struct comm *c, int verbose, const char *fmt,
+                               ...) {
   va_list vargs;
   va_start(vargs, fmt);
   if (c->id == 0 && verbose > 0) {
@@ -617,9 +618,8 @@ static int findUniqueVertices(Mesh mesh, struct comm *c, scalar tol,
   struct comm seg;
   comm_dup(&seg, c);
 
-  int t, d;
-  for (t = 0; t < nDim; t++) {
-    for (d = 0; d < nDim; d++) {
+  for (int t = 0; t < nDim; t++) {
+    for (int d = 0; d < nDim; d++) {
       sortSegments(mesh, &seg, d, bfr);
       findSegments(mesh, &seg, d, tolSquared);
 
@@ -628,9 +628,8 @@ static int findUniqueVertices(Mesh mesh, struct comm *c, scalar tol,
       comm_allreduce(c, gs_long, gs_add, &n_pts, 1, buf);
 
       slong n_seg = countSegments(mesh, c);
-      if (c->id == 0 && verbose > 1)
-        printf("locglob: %d %d %lld %lld\n", t + 1, d + 1, n_seg, n_pts);
-
+      debug_print(c, verbose, "\tlocglob: %d %d %lld %lld\n", t + 1, d + 1,
+                  n_seg, n_pts);
       rearrangeSegments(mesh, &seg, bfr);
       parrsb_barrier(c);
     }
