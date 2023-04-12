@@ -3,18 +3,15 @@
 
 #include <gslib.h>
 
-typedef enum { bin_sort = 0, hypercube_sort = 1 } sort_algo;
-
 struct sort {
+  int balance, algo;
+
   int nfields;
   gs_dom t[3];
   uint offset[3];
 
   struct array *a;
   size_t unit_size, align;
-
-  int balance;
-  sort_algo algo;
 
   buffer *buf;
 };

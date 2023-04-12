@@ -349,8 +349,7 @@ int parallel_sort_private(struct sort *data, struct comm *c) {
   struct comm dup;
   comm_dup(&dup, c);
 
-  int balance = data->balance;
-  sort_algo algo = data->algo;
+  int balance = data->balance, algo = data->algo;
 
   struct array *a = data->a;
   size_t usize = data->unit_size;
@@ -358,10 +357,10 @@ int parallel_sort_private(struct sort *data, struct comm *c) {
   struct hypercube hdata;
 
   switch (algo) {
-  case bin_sort:
+  case 0:
     parallel_bin_sort(data, c);
     break;
-  case hypercube_sort:
+  case 1:
     hdata.data = data;
     hdata.probes = NULL;
     hdata.probe_cnt = NULL;
