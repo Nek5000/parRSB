@@ -397,15 +397,15 @@ static int sortSegments(Mesh mesh, struct comm *c, int dim, buffer *bfr) {
     // Parallel sort -- we haven't localized the problem yet
     switch (dim) {
     case 0:
-      parallel_sort(struct point_t, &mesh->elements, x[0], gs_scalar, 0, 1, c,
+      parallel_sort(struct point_t, &mesh->elements, x[0], gs_double, 0, 1, c,
                     bfr);
       break;
     case 1:
-      parallel_sort(struct point_t, &mesh->elements, x[1], gs_scalar, 0, 1, c,
+      parallel_sort(struct point_t, &mesh->elements, x[1], gs_double, 0, 1, c,
                     bfr);
       break;
     case 2:
-      parallel_sort(struct point_t, &mesh->elements, x[2], gs_scalar, 0, 1, c,
+      parallel_sort(struct point_t, &mesh->elements, x[2], gs_double, 0, 1, c,
                     bfr);
       break;
     default:
