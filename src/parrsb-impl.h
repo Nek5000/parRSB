@@ -20,12 +20,6 @@
 #undef SCALAR_MAX
 #endif
 #define SCALAR_MAX DBL_MAX
-
-#ifdef gs_scalar
-#undef gs_scalar
-#endif
-#define gs_scalar gs_double
-
 #define SCALAR_TOL 1e-12
 
 #define MAXDIM 3 // Maximum dimension of the mesh
