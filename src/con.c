@@ -229,7 +229,7 @@ static inline double distance_3d(struct point_t *a, struct point_t *b) {
 }
 
 int findMinNeighborDistance(Mesh mesh) {
-  struct point_t *p = mesh->elements.ptr;
+  struct point_t *p = (struct point_t *)mesh->elements.ptr;
   int nDim = mesh->nDim;
   int nVertex = mesh->nVertex;
 
@@ -332,7 +332,7 @@ static void tuple_sort_(void *ra, uint n, uint usize, uint offset) {
 
 static void initSegment(Mesh mesh, struct comm *c) {
   uint nPoints = mesh->elements.n;
-  Point points = mesh->elements.ptr;
+  Point points = (struct point_t *)mesh->elements.ptr;
 
   uint i;
   for (i = 0; i < nPoints; i++) {
@@ -422,7 +422,7 @@ static int sortSegments(Mesh mesh, struct comm *c, int dim, buffer *bfr) {
 }
 
 static int sendLastPoint(struct array *arr, Mesh mesh, struct comm *c) {
-  Point pts = mesh->elements.ptr;
+  Point pts = (struct point_t *)mesh->elements.ptr;
   sint npts = mesh->elements.n;
 
   struct point_t lastp = pts[npts - 1];
@@ -440,12 +440,11 @@ static int sendLastPoint(struct array *arr, Mesh mesh, struct comm *c) {
 }
 
 static int findSegments(Mesh mesh, struct comm *c, int i, scalar tolSquared) {
-  Point pts = mesh->elements.ptr;
-  sint npts = mesh->elements.n;
+  Point pts = (struct point_t *)mesh->elements.ptr;
+  uint npts = mesh->elements.n;
   int nDim = mesh->nDim;
 
-  sint j;
-  for (j = 1; j < npts; j++) {
+  for (uint j = 1; j < npts; j++) {
     scalar d = diff_sqr(pts[j].x[i], pts[j - 1].x[i]);
     scalar dx = MIN(pts[j].dx, pts[j - 1].dx) * tolSquared;
 
@@ -458,7 +457,7 @@ static int findSegments(Mesh mesh, struct comm *c, int i, scalar tolSquared) {
     sendLastPoint(&arr, mesh, c);
 
     if (c->id > 0) {
-      struct point_t *lastp = arr.ptr;
+      struct point_t *lastp = (struct point_t *)arr.ptr;
       scalar d = diff_sqr(lastp->x[i], pts->x[i]);
       scalar dx = MIN(lastp->dx, pts->dx) * tolSquared;
       if (d > dx)
@@ -473,15 +472,14 @@ static int findSegments(Mesh mesh, struct comm *c, int i, scalar tolSquared) {
 
 static slong countSegments(Mesh mesh, struct comm *c) {
   uint nPoints = mesh->elements.n;
-  Point points = mesh->elements.ptr;
+  Point points = (struct point_t *)mesh->elements.ptr;
 
-  sint count = 0, i;
-  for (i = 0; i < nPoints; i++)
+  uint count = 0;
+  for (uint i = 0; i < nPoints; i++)
     if (points[i].ifSegment > 0)
       count++;
 
-  slong buf[2][1];
-  slong in = count;
+  slong in = count, buf[2][1];
   comm_allreduce(c, gs_long, gs_add, &in, 1, buf);
 
   return in;
@@ -537,14 +535,12 @@ static int setProc(Mesh mesh, sint rankg, uint index, int inc_proc,
 static int rearrangeSegments(Mesh mesh, struct comm *seg, buffer *bfr) {
   while (seg->np > 1 && countSegments(mesh, seg) > 1) {
     uint nPoints = mesh->elements.n;
-    Point points = mesh->elements.ptr;
+    Point points = (struct point_t *)mesh->elements.ptr;
 
     /* comm_scan */
-    slong out[2][1], buf[2][1];
-    slong in = nPoints;
+    slong in = nPoints, out[2][1], buf[2][1];
     comm_scan(out, seg, gs_long, gs_add, &in, 1, buf);
-    slong start = out[0][0];
-    slong nelg = out[1][0];
+    slong start = out[0][0], nelg = out[1][0];
 
     double min = DBL_MAX;
     int inc_proc = 1;
@@ -573,21 +569,18 @@ static int rearrangeSegments(Mesh mesh, struct comm *seg, buffer *bfr) {
       }
     }
 
-    double dbuf[2];
-    double ming = min;
+    double ming = min, dbuf[2];
     comm_allreduce(seg, gs_double, gs_min, &ming, 1, dbuf);
 
     sint rankg = -1;
-    if (fabs(ming - min) < 1e-15)
+    if (fabs(ming - min) < 1e-12)
       rankg = seg->id;
     comm_allreduce(seg, gs_int, gs_max, &rankg, 1, buf);
 
     setProc(mesh, rankg, index, inc_proc, seg);
 
     int bin = 1;
-    if (seg->id < rankg)
-      bin = 0;
-    if (seg->id == rankg && inc_proc == 1)
+    if ((seg->id < rankg) || (seg->id == rankg && inc_proc == 1))
       bin = 0;
 
     struct crystal cr;
@@ -647,42 +640,30 @@ static int findUniqueVertices(Mesh mesh, struct comm *c, scalar tol,
 //
 static int setGlobalID(Mesh mesh, struct comm *c) {
   uint nPoints = mesh->elements.n;
-  Point points = mesh->elements.ptr;
+  Point points = (struct point_t *)mesh->elements.ptr;
 
-  sint bin = 1;
-  if (nPoints == 0)
-    bin = 0;
-
-  comm_ext old = c->c;
+  sint bin = (nPoints > 0);
   struct comm nonZeroRanks;
-#ifdef MPI
-  MPI_Comm new;
-  MPI_Comm_split(old, bin, c->id, &new);
-  comm_init(&nonZeroRanks, new);
-  MPI_Comm_free(&new);
-#else
-  comm_init(&nonZeroRanks, 1);
-#endif
+  comm_split(c, bin, c->id, &nonZeroRanks);
 
   sint rank = nonZeroRanks.id;
   sint size = nonZeroRanks.np;
 
   if (bin == 1) {
     slong count = 0;
-    sint i;
-    for (i = 0; i < nPoints; i++)
+    for (uint i = 0; i < nPoints; i++)
       if (points[i].ifSegment)
         count++;
 
-    slong out[2][1], buf[2][1];
-    slong in = count;
+    slong in = count, out[2][1], buf[2][1];
     comm_scan(out, &nonZeroRanks, gs_long, gs_add, &in, 1, buf);
     slong start = out[0][0];
 
     count = -1;
-    for (i = 0; i < nPoints; i++) {
+    for (uint i = 0; i < nPoints; i++) {
       if (points[i].ifSegment)
         count++;
+      assert(start + count >= 0);
       points[i].globalId = start + count;
     }
   }
@@ -1297,7 +1278,7 @@ static int transferBoundaryFaces(Mesh mesh, struct comm *c) {
   uint size = c->np;
 
   struct array *boundary = &mesh->boundary;
-  BoundaryFace ptr = boundary->ptr;
+  BoundaryFace ptr = (struct boundary_t *)boundary->ptr;
   int nFaces = boundary->n;
 
   slong nelgt = mesh->nelgt;
@@ -1438,6 +1419,7 @@ int parrsb_conn_mesh(long long *vtx, double *coord, int nelt, int ndim,
   duration[5] = comm_time() - t;
   debug_print(&c, verbose, "done.\n");
 
+#if 0
   debug_print(&c, verbose, "\t%s ...", name[6]);
   parrsb_barrier(&c);
   t = comm_time();
@@ -1445,6 +1427,7 @@ int parrsb_conn_mesh(long long *vtx, double *coord, int nelt, int ndim,
   check_error(err, name[6]);
   duration[6] = comm_time() - t;
   debug_print(&c, verbose, "done.\n");
+#endif
 
   debug_print(&c, verbose, "\t%s ...", name[7]);
   parrsb_barrier(&c);
