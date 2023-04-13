@@ -493,12 +493,12 @@ static int setProc(Mesh mesh, sint rankg, uint index, int inc_proc,
   slong size[2] = {0};
   if (c->id < rankg)
     size[0] = nPoints;
+  if (c->id > rankg)
+    size[1] = nPoints;
   if (c->id == rankg) {
     size[0] = index;
     size[1] = nPoints - index;
   }
-  if (c->id > rankg)
-    size[1] = nPoints;
 
   slong out[2][2], buf[2][2];
   comm_scan(out, c, gs_long, gs_add, size, 2, buf);
@@ -506,48 +506,53 @@ static int setProc(Mesh mesh, sint rankg, uint index, int inc_proc,
   sint np[2] = {0};
   if (c->id < rankg)
     np[0] = 1;
+  if (c->id > rankg)
+    np[1] = 1;
   if (c->id == rankg) {
     np[0] = inc_proc;
     np[1] = 1 - inc_proc;
   }
-  if (c->id > rankg)
-    np[1] = 1;
 
   comm_allreduce(c, gs_int, gs_add, np, 2, buf);
+  assert(np[0] > 0 && np[1] > 0);
 
   sint low_size = (out[1][0] + np[0] - 1) / np[0];
   sint high_size = (out[1][1] + np[1] - 1) / np[1];
 
-  uint i;
-  for (i = 0; i < size[0]; i++) {
+  for (uint i = 0; i < size[0]; i++) {
     points[i].globalId = out[0][0] + i;
     points[i].proc = (out[0][0] + i) / low_size;
+    assert(points[i].proc >= 0 && points[i].proc < np[0]);
   }
 
-  for (i = size[0]; i < size[0] + size[1]; i++) {
+  for (uint i = size[0]; i < size[0] + size[1]; i++) {
     points[i].globalId = out[0][1] + i - size[0];
     points[i].proc = np[0] + (out[0][1] + i - size[0]) / high_size;
+    assert(points[i].proc >= np[0] && points[i].proc < np[0] + np[1]);
   }
 
   return 0;
 }
 
-static int rearrangeSegments(Mesh mesh, struct comm *seg, buffer *bfr) {
+static int rearrangeSegments(Mesh mesh, struct comm *seg, int verbose,
+                             buffer *bfr) {
   while (seg->np > 1 && countSegments(mesh, seg) > 1) {
     uint nPoints = mesh->elements.n;
     Point points = (struct point_t *)mesh->elements.ptr;
 
-    /* comm_scan */
     slong in = nPoints, out[2][1], buf[2][1];
     comm_scan(out, seg, gs_long, gs_add, &in, 1, buf);
     slong start = out[0][0], nelg = out[1][0];
+
+    slong minl = nPoints, maxl = nPoints;
+    comm_allreduce(seg, gs_long, gs_max, &maxl, 1, buf);
+    comm_allreduce(seg, gs_long, gs_min, &minl, 1, buf);
 
     double min = DBL_MAX;
     int inc_proc = 1;
     uint index = (seg->id == 0) ? 1 : 0;
 
-    uint i;
-    for (i = index; i < nPoints; i++) {
+    for (uint i = index; i < nPoints; i++) {
       if (points[i].ifSegment > 0) {
         double f0 = fabs((start + i + 0.0) / nelg - (seg->id + 0.0) / seg->np);
         if (seg->id == 0)
@@ -569,13 +574,15 @@ static int rearrangeSegments(Mesh mesh, struct comm *seg, buffer *bfr) {
       }
     }
 
-    double ming = min, dbuf[2];
+    double ming = min, maxg = min, dbuf[2];
     comm_allreduce(seg, gs_double, gs_min, &ming, 1, dbuf);
+    comm_allreduce(seg, gs_double, gs_max, &maxg, 1, dbuf);
 
     sint rankg = -1;
     if (fabs(ming - min) < 1e-12)
       rankg = seg->id;
     comm_allreduce(seg, gs_int, gs_max, &rankg, 1, buf);
+    assert(rankg >= 0);
 
     setProc(mesh, rankg, index, inc_proc, seg);
 
@@ -616,15 +623,13 @@ static int findUniqueVertices(Mesh mesh, struct comm *c, scalar tol,
       sortSegments(mesh, &seg, d, bfr);
       findSegments(mesh, &seg, d, tolSquared);
 
-      slong n_pts = mesh->elements.n;
-      slong buf[2];
+      slong n_pts = mesh->elements.n, buf[2];
       comm_allreduce(c, gs_long, gs_add, &n_pts, 1, buf);
-
       slong n_seg = countSegments(mesh, c);
       debug_print(c, verbose, "\t\tlocglob: %d %d %lld %lld\n", t + 1, d + 1,
                   n_seg, n_pts);
-      rearrangeSegments(mesh, &seg, bfr);
-      parrsb_barrier(c);
+
+      rearrangeSegments(mesh, &seg, verbose, bfr);
     }
   }
 
