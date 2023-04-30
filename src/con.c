@@ -118,8 +118,7 @@ typedef struct boundary_t *BoundaryFace;
 
 struct mesh_t {
   ulong nelgt, nelgv;
-  uint nelt;
-  int nDim, nVertex, nNeighbors;
+  uint nelt, ndim, nv, nnbrs;
   struct array elements;
   struct array boundary;
 };
@@ -127,7 +126,7 @@ typedef struct mesh_t *Mesh;
 
 typedef struct {
   ulong sequenceId;
-  int nNeighbors;
+  int nnbrs;
   ulong elementId;
   ulong vertexId;
   uint workProc;
@@ -138,8 +137,8 @@ typedef struct {
 //
 int mesh_init(Mesh *m_, int nel, int ndim) {
   Mesh m = *m_ = tcalloc(struct mesh_t, 1);
-  m->nelt = nel, m->nDim = ndim, m->nNeighbors = ndim;
-  m->nVertex = (ndim == 2) ? 4 : 8;
+  m->nelt = nel, m->ndim = ndim, m->nnbrs = ndim;
+  m->nv = (ndim == 2) ? 4 : 8;
 
   array_init(struct point_t, &m->elements, 10);
   array_init(struct boundary_t, &m->boundary, 10);
@@ -176,29 +175,29 @@ static inline double distance_3d(struct point_t *a, struct point_t *b) {
 
 int findMinNeighborDistance(Mesh mesh) {
   struct point_t *p = (struct point_t *)mesh->elements.ptr;
-  int nDim = mesh->nDim;
-  int nVertex = mesh->nVertex;
+  int ndim = mesh->ndim;
+  int nv = mesh->nv;
 
   uint i, j, k;
   int neighbor;
   scalar d;
 
-  if (nDim == 3) {
-    for (i = 0; i < mesh->elements.n; i += nVertex) {
-      for (j = 0; j < nVertex; j++) {
+  if (ndim == 3) {
+    for (i = 0; i < mesh->elements.n; i += nv) {
+      for (j = 0; j < nv; j++) {
         p[i + j].dx = SCALAR_MAX;
-        for (k = 0; k < mesh->nNeighbors; k++) {
+        for (k = 0; k < mesh->nnbrs; k++) {
           neighbor = NEIGHBOR_MAP[j][k];
           d = distance_3d(&p[i + j], &p[i + neighbor]);
           p[i + j].dx = MIN(p[i + j].dx, d);
         }
       }
     }
-  } else if (nDim == 2) {
-    for (i = 0; i < mesh->elements.n; i += nVertex) {
-      for (j = 0; j < nVertex; j++) {
+  } else if (ndim == 2) {
+    for (i = 0; i < mesh->elements.n; i += nv) {
+      for (j = 0; j < nv; j++) {
         p[i + j].dx = SCALAR_MAX;
-        for (k = 0; k < mesh->nNeighbors; k++) {
+        for (k = 0; k < mesh->nnbrs; k++) {
           neighbor = NEIGHBOR_MAP[j][k];
           d = distance_2d(&p[i + j], &p[i + neighbor]);
           p[i + j].dx = MIN(p[i + j].dx, d);
@@ -388,7 +387,7 @@ static int sendLastPoint(struct array *arr, Mesh mesh, struct comm *c) {
 static int findSegments(Mesh mesh, struct comm *c, int i, scalar tolSquared) {
   Point pts = (struct point_t *)mesh->elements.ptr;
   uint npts = mesh->elements.n;
-  int nDim = mesh->nDim;
+  int ndim = mesh->ndim;
 
   for (uint j = 1; j < npts; j++) {
     scalar d = diff_sqr(pts[j].x[i], pts[j - 1].x[i]);
@@ -556,18 +555,18 @@ static int rearrangeSegments(Mesh mesh, struct comm *seg, int verbose,
 
 static int findUniqueVertices(Mesh mesh, struct comm *c, scalar tol,
                               int verbose, buffer *bfr) {
-  scalar tolSquared = tol * tol;
-  int nDim = mesh->nDim;
+  scalar tol2 = tol * tol;
+  int ndim = mesh->ndim;
 
   initSegment(mesh, c);
 
   struct comm seg;
   comm_dup(&seg, c);
 
-  for (int t = 0; t < nDim; t++) {
-    for (int d = 0; d < nDim; d++) {
+  for (int t = 0; t < ndim; t++) {
+    for (int d = 0; d < ndim; d++) {
       sortSegments(mesh, &seg, d, bfr);
-      findSegments(mesh, &seg, d, tolSquared);
+      findSegments(mesh, &seg, d, tol2);
 
       slong n_pts = mesh->elements.n, buf[2];
       comm_allreduce(c, gs_long, gs_add, &n_pts, 1, buf);
@@ -753,13 +752,13 @@ static int findConnectedPeriodicPairs(Mesh mesh, BoundaryFace f_,
                                       BoundaryFace g_, struct array *matched) {
   struct boundary_t f = *f_, g = *g_;
 
-  int nvf = mesh->nVertex / 2;
-  int nDim = mesh->nDim;
+  int nvf = mesh->nv / 2;
+  int ndim = mesh->ndim;
 
   int i, j;
   scalar fMax = 0.0, gMax = 0.0;
 
-  for (i = 0; i < nDim; i++) {
+  for (i = 0; i < ndim; i++) {
     scalar meanF = 0.0, meanG = 0.0;
 
     for (j = 0; j < nvf; j++) {
@@ -782,9 +781,9 @@ static int findConnectedPeriodicPairs(Mesh mesh, BoundaryFace f_,
     for (j = 0; j < nvf; j++) {
       k = (j + i) % nvf;
       k = nvf - 1 - k;
-      if (nDim == 3)
+      if (ndim == 3)
         d2 += distance3D(f.face[j], g.face[k]);
-      else if (nDim == 2)
+      else if (ndim == 2)
         d2 += distance2D(f.face[j], g.face[k]);
     }
     if (d2 < d2Min) {
@@ -877,13 +876,13 @@ static int setPeriodicFaceCoordinates(Mesh mesh, struct comm *c, buffer *buf) {
   sarray_sort(struct point_t, ePtr, eSize, sequenceId, 1, buf);
 
   int faces[GC_MAX_FACES][GC_MAX_FACE_VERTICES];
-  if (mesh->nDim == 3)
+  if (mesh->ndim == 3)
     memcpy(faces, faces3D, GC_MAX_FACES * GC_MAX_FACE_VERTICES * sizeof(int));
   else
     memcpy(faces, faces2D, GC_MAX_FACES * GC_MAX_FACE_VERTICES * sizeof(int));
 
   sint i = 0, k = 0;
-  int nv = mesh->nVertex, nvf = mesh->nVertex / 2, j;
+  int nv = mesh->nv, nvf = mesh->nv / 2, j;
   while (i < bSize) {
     while (k < eSize && ePtr[k].elementId < bPtr[i].elementId)
       k += nv;
@@ -940,7 +939,7 @@ typedef struct {
 
 static VToEMap *getVToEMap(Mesh m, struct comm *c, buffer *bfr) {
   sint nelt = m->nelt;
-  sint nv = m->nVertex;
+  sint nv = m->nv;
 
   slong out[2][1], buf[2][1], in = nelt;
   comm_scan(out, c, gs_long, gs_add, &in, 1, buf);
@@ -1116,7 +1115,7 @@ static int faceCheck(Mesh mesh, struct comm *c, buffer *bfr) {
   VToEMap *map = getVToEMap(mesh, c, bfr);
 
   sint nelt = mesh->nelt;
-  sint ndim = mesh->nDim;
+  sint ndim = mesh->ndim;
 
   int faces[GC_MAX_FACES][GC_MAX_FACE_VERTICES];
   if (ndim == 3)
@@ -1182,7 +1181,7 @@ static int faceCheck(Mesh mesh, struct comm *c, buffer *bfr) {
 
 static int elementCheck(Mesh mesh, struct comm *c, buffer *bfr) {
   uint nelt = mesh->nelt;
-  uint ndim = mesh->nDim;
+  uint ndim = mesh->ndim;
   int nv = (ndim == 3) ? 8 : 4;
 
   LongID globalIds[8];
@@ -1298,7 +1297,7 @@ int parrsb_conn_mesh(long long *vtx, double *coord, int nelt, int ndim,
   debug_print(&c, verbose, "done.\n");
 
   debug_print(&c, verbose, "\tSet internal data structures ...");
-  int nvertex = mesh->nVertex;
+  int nvertex = mesh->nv;
   struct point_t p = {.origin = c.id};
   uint i, j, k, l;
   for (i = 0; i < nelt; i++) {
