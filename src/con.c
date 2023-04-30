@@ -155,60 +155,6 @@ int mesh_free(Mesh m) {
   return 0;
 }
 
-void get_vertex_ids(long long **vtx_, Mesh mesh) {
-  int nelt = mesh->nelt;
-  int nv = (mesh->nDim == 3) ? 8 : 4;
-
-  long long *vtx = *vtx_ = tcalloc(long long, nelt *nv);
-
-  struct point_t *ptr = (struct point_t *)mesh->elements.ptr;
-  for (uint e = 0, count = 0; e < nelt; e++) {
-    for (int v = 0; v < nv; v++)
-      vtx[count] = ptr[count].globalId, count++;
-  }
-}
-
-void get_vertex_coordinates(double **coords_, Mesh mesh) {
-  int nelt = mesh->nelt;
-  int ndim = mesh->nDim;
-  int nv = (ndim == 3) ? 8 : 4;
-
-  size_t size = nelt;
-  size = size * nv * ndim;
-
-  double *coords = *coords_ = tcalloc(double, size);
-
-  struct point_t *ptr = (struct point_t *)mesh->elements.ptr;
-  int e, v, d;
-  int count = 0;
-  for (e = 0; e < nelt; e++)
-    for (v = 0; v < nv; v++)
-      for (d = 0; d < ndim; d++) {
-        coords[count] = ptr[e * nv + v].x[d];
-        count++;
-      }
-}
-
-int get_bcs(unsigned int *nbcs_, long long **bcs_, Mesh m) {
-  unsigned int nbcs = *nbcs_ = m->boundary.n;
-  long long *bcs = *bcs_ = tcalloc(long long, 4 * nbcs);
-
-  struct boundary_t *ptr = m->boundary.ptr;
-  uint i;
-  for (i = 0; i < nbcs; i++) {
-    bcs[4 * i + 0] = ptr[i].elementId;
-    bcs[4 * i + 1] = ptr[i].faceId;
-    bcs[4 * i + 2] = ptr[i].bc[0];
-    bcs[4 * i + 3] = ptr[i].bc[1];
-  }
-
-  return 0;
-}
-
-int get_mesh_dim(Mesh mesh) { return mesh->nDim; }
-
-int get_mesh_nel(Mesh mesh) { return mesh->nelt; }
-
 //==============================================================================
 // Find the minimum distance between a vertex and its neighbors
 //
