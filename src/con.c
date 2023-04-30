@@ -268,30 +268,23 @@ static void tuple_sort_(void *ra, uint n, uint usize, uint offset) {
 #undef cpy
 #undef get
 
-  if (rra != NULL)
-    free(rra);
+  free(rra);
 }
 
 #define tuple_sort(T, arr, n, index)                                           \
   tuple_sort_((void *)arr, n, sizeof(T), offsetof(T, index))
 
-static void initSegment(Mesh mesh, struct comm *c) {
-  uint nPoints = mesh->elements.n;
+static void init_segment(Mesh mesh, struct comm *c) {
+  uint npts = mesh->elements.n;
   Point points = (struct point_t *)mesh->elements.ptr;
 
-  uint i;
-  for (i = 0; i < nPoints; i++) {
-    points[i].ifSegment = 0;
-    points[i].globalId = 0;
-  }
+  for (uint i = 0; i < npts; i++)
+    points[i].ifSegment = 0, points[i].globalId = 0;
 
-  /* First rank with nPoints > 0 will have ifSegment = 1 */
-  sint rank = c->id;
-  if (nPoints == 0)
-    rank = c->np;
-
-  sint buf[2];
-  comm_allreduce(c, gs_int, gs_min, &rank, 1, buf);
+  // First rank with npts > 0 will have ifSegment = 1
+  sint rank = (npts > 0) ? c->id : c->np;
+  sint wrk[2];
+  comm_allreduce(c, gs_int, gs_min, &rank, 1, wrk);
 
   if (c->id == rank)
     points[0].ifSegment = 1;
@@ -357,7 +350,7 @@ static int sortSegments(Mesh mesh, struct comm *c, int dim, buffer *bfr) {
       break;
     }
 
-    initSegment(mesh, c);
+    init_segment(mesh, c);
   } else {
     // Local sort: Segments are local
     sortSegmentsLocal(mesh, dim, bfr);
@@ -384,14 +377,14 @@ static int sendLastPoint(struct array *arr, Mesh mesh, struct comm *c) {
   return 0;
 }
 
-static int findSegments(Mesh mesh, struct comm *c, int i, scalar tolSquared) {
+static int findSegments(Mesh mesh, struct comm *c, int i, scalar tol2) {
   Point pts = (struct point_t *)mesh->elements.ptr;
   uint npts = mesh->elements.n;
   int ndim = mesh->ndim;
 
   for (uint j = 1; j < npts; j++) {
     scalar d = diff_sqr(pts[j].x[i], pts[j - 1].x[i]);
-    scalar dx = MIN(pts[j].dx, pts[j - 1].dx) * tolSquared;
+    scalar dx = MIN(pts[j].dx, pts[j - 1].dx) * tol2;
 
     if (d > dx)
       pts[j].ifSegment = 1;
@@ -404,7 +397,7 @@ static int findSegments(Mesh mesh, struct comm *c, int i, scalar tolSquared) {
     if (c->id > 0) {
       struct point_t *lastp = (struct point_t *)arr.ptr;
       scalar d = diff_sqr(lastp->x[i], pts->x[i]);
-      scalar dx = MIN(lastp->dx, pts->dx) * tolSquared;
+      scalar dx = MIN(lastp->dx, pts->dx) * tol2;
       if (d > dx)
         pts->ifSegment = 1;
     }
@@ -558,10 +551,10 @@ static int findUniqueVertices(Mesh mesh, struct comm *c, scalar tol,
   scalar tol2 = tol * tol;
   int ndim = mesh->ndim;
 
-  initSegment(mesh, c);
-
   struct comm seg;
   comm_dup(&seg, c);
+
+  init_segment(mesh, c);
 
   for (int t = 0; t < ndim; t++) {
     for (int d = 0; d < ndim; d++) {
@@ -582,8 +575,6 @@ static int findUniqueVertices(Mesh mesh, struct comm *c, scalar tol,
 
   return 0;
 }
-
-#undef tuple_sort
 
 //==============================================================================
 // Global numbering
