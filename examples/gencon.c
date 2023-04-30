@@ -29,33 +29,44 @@ static int test_parcon(unsigned int neltp, long long *vlp, char *name,
   buffer_init(&bfr, 1024);
   gs(minp, gs_long, gs_min, 0, gsh, &bfr);
   gs(maxp, gs_long, gs_max, 0, gsh, &bfr);
-
-  for (i = 0; err == 0 && i < size; i++) {
-    if (minp[i] != maxp[i])
-      err = 1;
-  }
-
   gs_free(gsh);
+
+  for (i = 0; i < size; i++) {
+    if (minp[i] != maxp[i]) {
+      err = 1;
+      break;
+    }
+  }
+  parrsb_check_error(err, comm);
+
   gsh = gs_setup(vlp, size, &c, 0, gs_pairwise, 0);
 
-  for (i = 0; err == 0 && i < size; i++)
+  for (i = 0; i < size; i++)
     minp[i] = maxp[i] = vls[i];
 
   gs(minp, gs_long, gs_min, 0, gsh, &bfr);
   gs(maxp, gs_long, gs_max, 0, gsh, &bfr);
+  gs_free(gsh);
 
-  for (i = 0; err == 0 && i < size; i++) {
-    if (minp[i] != maxp[i])
+  for (i = 0; i < size; i++) {
+    if (minp[i] != maxp[i]) {
       err = 1;
+      break;
+    }
   }
+  parrsb_check_error(err, comm);
 
   if (c.np == 1) {
-    for (i = 0; err == 0 && i < size; i++)
-      if (vls[i] != vlp[i])
+    for (i = 0; i < size; i++) {
+      if (vls[i] != vlp[i]) {
         err = 1;
+        break;
+      }
+    }
   }
+  parrsb_check_error(err, comm);
 
-  gs_free(gsh), comm_free(&c), buffer_free(&bfr);
+  comm_free(&c), buffer_free(&bfr);
   free(minp), free(maxp), free(vls);
 
   return err;
