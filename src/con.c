@@ -27,7 +27,7 @@ struct mesh_t *mesh_init(int nel, int ndim) {
   array_init(struct point_t, &m->elements, 1024);
   array_init(struct boundary_t, &m->boundary, 1024);
 
-  return 0;
+  return m;
 }
 
 int mesh_free(struct mesh_t *m) {
