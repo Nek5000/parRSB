@@ -130,12 +130,12 @@ static void sort_segments_shared_aux(struct array *arr, int dim, struct comm *c,
 
 static void sort_segments_shared(struct array *shared, int dim, struct comm *c,
                                  buffer *bfr) {
-  // Each processor can only have at most a single ifSegment equal to one in
-  // shared array. Otherwise, we can always move the segments into the local
-  // segments array till we end up in such a configuration. Let's first check
-  // for this condition and find how many distince global ids (either 1 or 2)
-  // are residing on this MPI process. While doing so, we will also split shared
-  // array to two segments.
+  // Each processor can only have at most a single ifSegment = 1 in shared
+  // array. Otherwise, we can always move the segments into the local segments
+  // array till we end up in such a configuration. Let's first check for this
+  // condition and find how many distinct global ids (either 1 or 2) are
+  // residing on this MPI process. While doing so, we will also split shared
+  // array to two segments each corresponding to a distinct global id.
   struct array segments[2];
   array_init(struct point_t, &segments[0], (shared->n + 1) / 2);
   array_init(struct point_t, &segments[1], (shared->n + 1) / 2);
@@ -150,7 +150,6 @@ static void sort_segments_shared(struct array *shared, int dim, struct comm *c,
     for (uint i = 1; i < shared->n; i++) {
       if (pts[i].ifSegment > 0)
         gids[1] = pts[i].globalId, ngids++;
-      assert(ngids <= 2);
       sum += pts[i].ifSegment;
       array_cat(struct point_t, &segments[ngids - 1], &pts[i], 1);
     }
@@ -173,6 +172,7 @@ static void sort_segments_shared(struct array *shared, int dim, struct comm *c,
     comm_split(c, index >= 0, c->id, &active);
     if (index >= 0) {
       // index >= 0 --> gids[index] >= 0 --> segments[index].n > 0
+      // FIXME: gids[index] is a long value.
       comm_split(&active, gids[index], active.id, &seg);
       sort_segments_shared_aux(&segments[index], dim, &seg, bfr);
       comm_free(&seg);
@@ -180,6 +180,7 @@ static void sort_segments_shared(struct array *shared, int dim, struct comm *c,
     comm_free(&active);
   }
 
+  // Combine the segments after sorting.
   shared->n = 0;
   array_cat(struct point_t, shared, segments[0].ptr, segments[0].n);
   array_cat(struct point_t, shared, segments[1].ptr, segments[1].n);
@@ -354,8 +355,11 @@ int find_unique_vertices(Mesh mesh, struct comm *c, scalar tol, int verbose,
   scalar tol2 = tol * tol;
   int ndim = mesh->ndim;
 
-  // Initialize globalId and ifSegment to zero. These will be updated as we
-  // go along. ifSegment denotes the start of a segment.
+  // Initialize globalId and ifSegment of each point to zero. These will be
+  // updated as the gencon algorithm progress. ifSegment = 1 denotes the start
+  // of a segment. A segment is a set of points which have the same global id
+  // (or a set of points which we can't distinguish yet). Initially, all the
+  // points are a single segment.
   struct array *elems = &mesh->elements;
   struct point_t *pts = (struct point_t *)elems->ptr;
   for (uint i = 0; i < elems->n; i++)
@@ -364,16 +368,15 @@ int find_unique_vertices(Mesh mesh, struct comm *c, scalar tol, int verbose,
   slong npts = elems->n, wrk[2];
   comm_allreduce(c, gs_long, gs_add, &npts, 1, wrk);
 
-  // Initialize shared and local arrays and then copy all the elements to shared
-  // array first. Shared array contains only the segments which are split across
-  // two or more processors. This means that the shared array on a given
-  // processor can only have one ifSegment value set to 1. Initially all points
-  // are just one segment. Points will be removed and added to local array as we
-  // progress in the algorithm.
+  // Initialize shared and local arrays and then copy all points in `elems`
+  // array to shared array first. Shared array contains only the segments which
+  // are split across two or more processors. This means that the shared array
+  // on a given processor can only have at most one ifSegment value set to 1.
+  // Initially all points are just one segment. Points will be removed from
+  // shared array and added to local array as we progress in the algorithm.
   struct array shared, local;
   array_init(struct point_t, &shared, elems->n);
   array_init(struct point_t, &local, elems->n);
-
   array_cat(struct point_t, &shared, elems->ptr, elems->n);
 
   for (int t = 0; t < ndim; t++) {
@@ -399,7 +402,10 @@ int find_unique_vertices(Mesh mesh, struct comm *c, scalar tol, int verbose,
   }
 
   // Copy everything back to elements array.
+  elems->n = 0;
   array_cat(struct point_t, elems, local.ptr, local.n);
+  // FIXME: Assemble shared segments which are still split across multiple
+  // processes.
   array_cat(struct point_t, elems, shared.ptr, shared.n);
   array_free(&shared), array_free(&local);
 
