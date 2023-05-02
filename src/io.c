@@ -341,7 +341,8 @@ int parrsb_read_mesh(unsigned *nel, unsigned *nv, long long **vl,
   struct comm c;
   comm_init(&c, comm);
 
-  // Set nv and nelt to 0 so we know if .re2 is read before .co2
+  // Set nv and nelt to 0 so we know if .re2 file is read before .co2 in the
+  // case where we are reading both.
   *nv = 0, *nel = 0;
 
   // Read geometry from .re2 file
@@ -352,7 +353,7 @@ int parrsb_read_mesh(unsigned *nel, unsigned *nv, long long **vl,
     read_geometry(nel, nv, coord, nbcs, bcs, geom_name, &c);
   }
 
-  // Read connectivity from .co2 file
+  // Read connectivity from .co2 file if the user asks us to read it.
   if (read & 2) {
     char conn_name[BUFSIZ];
     strncpy(conn_name, name, BUFSIZ);
