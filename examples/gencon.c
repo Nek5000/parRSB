@@ -88,8 +88,6 @@ int main(int argc, char *argv[]) {
   unsigned ndim = (nv == 8 ? 3 : 2);
   long long *vl = (long long *)calloc(nelt * nv, sizeof(long long));
   parrsb_check_error(vl == NULL, world);
-
-  unsigned ndim = (nv == 8 ? 3 : 2);
   err = parrsb_conn_mesh(vl, coord, nelt, ndim, bcs, nbcs, in->tol, world);
   parrsb_check_error(err, world);
 
