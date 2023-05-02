@@ -130,69 +130,61 @@ static void sort_segments_shared_aux(struct array *arr, int dim, struct comm *c,
 
 static void sort_segments_shared(struct array *shared, int dim, struct comm *c,
                                  buffer *bfr) {
-  struct comm active;
-  int bin = (shared->n > 0) ? 1 : 0;
-  comm_split(c, bin, c->id, &active);
-
-  if (bin == 0) {
-    comm_free(&active);
-    return;
-  }
-
   // Each processor can only have at most a single ifSegment equal to one in
-  // shared array.  Otherwise, we can always move the segments into the local
-  // segments array till we end up in such configuration.  Let's first check
-  // for this condition and find how many global ids (either 1 or 2) are owned
-  // by this MPI process. While doing so, we will also split shared array to
-  // two segments.
+  // shared array. Otherwise, we can always move the segments into the local
+  // segments array till we end up in such a configuration. Let's first check
+  // for this condition and find how many distince global ids (either 1 or 2)
+  // are residing on this MPI process. While doing so, we will also split shared
+  // array to two segments.
   struct array segments[2];
   array_init(struct point_t, &segments[0], (shared->n + 1) / 2);
   array_init(struct point_t, &segments[1], (shared->n + 1) / 2);
   slong gids[2] = {INT_MIN, INT_MIN};
 
-  sint sum = 0, ngids = 1;
-  struct point_t *pts = (struct point_t *)shared->ptr;
-  gids[0] = pts[0].globalId, sum += pts[0].ifSegment;
-  array_cat(struct point_t, &segments[ngids - 1], &pts[0], 1);
-  for (uint i = 1; i < shared->n; i++) {
-    if (pts[i].ifSegment > 0)
-      gids[1] = pts[i].globalId, ngids++;
-    sum += pts[i].ifSegment;
+  sint sum = 0, ngids = 0;
+  if (shared->n > 0) {
+    struct point_t *pts = (struct point_t *)shared->ptr;
+    gids[0] = pts[0].globalId, ngids++;
+    sum += pts[0].ifSegment;
     array_cat(struct point_t, &segments[ngids - 1], &pts[0], 1);
+    for (uint i = 1; i < shared->n; i++) {
+      if (pts[i].ifSegment > 0)
+        gids[1] = pts[i].globalId, ngids++;
+      assert(ngids <= 2);
+      sum += pts[i].ifSegment;
+      array_cat(struct point_t, &segments[ngids - 1], &pts[i], 1);
+    }
   }
   assert(sum <= 1);
-  assert(ngids == 1 || (ngids == 2 && gids[0] + 1 == gids[1]));
+  assert(ngids <= 1 || (ngids == 2 && gids[0] + 1 == gids[1]));
 
-  // We sort the shared points in two phases. All the points having a global id
-  // with the same parity as the maximum global id first and the other points
-  // next. This is to avoid same processor having to work on both the global
-  // ids it owns at the same time.
-  slong max = gids[ngids - 1], wrk[2];
-  comm_allreduce(&active, gs_long, gs_max, &max, 1, wrk);
+  // We sort the shared segments in two phases. All the segments having an even
+  // global id are sorted first and then the segments having an odd globla id.
+  // This is done to avoid same processor having to work on both the global ids
+  // (if ngids = 2) it owns at the same time.
+  for (int parity = 0; parity < 2; parity++) {
+    int index = INT_MIN;
+    if (gids[0] >= 0 && (gids[0] % 2 == parity))
+      index = 0;
+    else if (gids[1] >= 0 && (gids[1] % 2 == parity))
+      index = 1;
 
-  struct array *arr = NULL;
-  int index = 0;
-  if (((max ^ gids[0]) & 1) == 0)
-    arr = &segments[0], index = 0;
-  else // if ngids = 1, segments[1] is empty so, no harm done.
-    arr = &segments[1], index = 1;
-
-  struct comm seg;
-  comm_split(&active, gids[index], active.id, &seg);
-  sort_segments_shared_aux(arr, dim, &seg, bfr);
-  comm_free(&seg);
-
-  arr = &segments[1 - index];
-  comm_split(&active, gids[1 - index], active.id, &seg);
-  sort_segments_shared_aux(arr, dim, &seg, bfr);
-  comm_free(&seg);
+    struct comm active, seg;
+    comm_split(c, index >= 0, c->id, &active);
+    if (index >= 0) {
+      // index >= 0 --> gids[index] >= 0 --> segments[index].n > 0
+      comm_split(&active, gids[index], active.id, &seg);
+      sort_segments_shared_aux(&segments[index], dim, &seg, bfr);
+      comm_free(&seg);
+    }
+    comm_free(&active);
+  }
 
   shared->n = 0;
   array_cat(struct point_t, shared, segments[0].ptr, segments[0].n);
   array_cat(struct point_t, shared, segments[1].ptr, segments[1].n);
 
   array_free(&segments[0]), array_free(&segments[1]);
-  comm_free(&active);
 }
 
 static int talk_to_neighbor(struct point_t *pnt, struct array *arr, int dir,
@@ -202,13 +194,22 @@ static int talk_to_neighbor(struct point_t *pnt, struct array *arr, int dir,
   if (c->np <= 1)
     return 0;
 
+  struct comm active;
+  comm_split(c, arr->n > 0, c->id, &active);
+
+  if (arr->n == 0) {
+    comm_free(&active);
+    return 0;
+  }
+
   struct array tmp;
   array_init(struct point_t, &tmp, 1);
 
-  struct point_t *pts = (struct point_t *)tmp.ptr;
-  if (arr->n > 0 && c->id + dir >= 0 && c->id + dir < c->np) {
+  struct point_t *pts = (struct point_t *)arr->ptr;
+  sint dest = (sint)c->id + dir;
+  if (dest >= 0 && dest < c->np) {
     struct point_t p = (dir == 1) ? pts[arr->n - 1] : pts[0];
-    p.proc = c->id + dir;
+    p.proc = dest;
     array_cat(struct point_t, &tmp, &p, 1);
   }
 
@@ -220,7 +221,8 @@ static int talk_to_neighbor(struct point_t *pnt, struct array *arr, int dir,
   if (tmp.n == 0)
     return 0;
 
-  pnt[0] = pts[0], array_free(&tmp);
+  pts = (struct point_t *)tmp.ptr, pnt[0] = pts[0];
+  array_free(&tmp), comm_free(&active);
   return 1;
 }
 
@@ -237,7 +239,7 @@ static void find_segments(struct array *arr, int i, scalar tol2,
 
   struct point_t pnt;
   int npts = talk_to_neighbor(&pnt, arr, 1 /* send */, c);
-  if (npts > 0) {
+  if (npts > 0) { // npts > 0 --> arr->n > 0
     scalar d = diff_sqr(pnt.x[i], pts->x[i]);
     scalar dx = MIN(pnt.dx, pts->dx) * tol2;
     if (d > dx)
@@ -272,21 +274,35 @@ static void separate_local_segments(struct array *local, struct array *shared,
     for (; e < shared->n && pts[e].ifSegment == 0; e++)
       ;
     if (e < shared->n) {
-      for (uint i = s; i < e; i++)
+      for (uint i = s; i < e; i++) {
         array_cat(struct point_t, local, &pts[i], 1);
+        // Mark the point to be removed from shared array.
+        pts[i].ifSegment = -1;
+      }
     } else if (e == shared->n) {
       // Bring the first point from next processor. Check if `ifSegment` value
       // of that point is a 1 or a 0. If it is a 1, add the current range to
       // the local segment.
       struct point_t pnt;
       int npts = talk_to_neighbor(&pnt, shared, -1 /* recv */, c);
-      if (npts > 0 && pnt.ifSegment == 1) {
-        for (uint i = s; i < shared->n; i++)
+      if (npts == 0 || (npts > 0 && pnt.ifSegment == 1)) {
+        for (uint i = s; i < shared->n; i++) {
           array_cat(struct point_t, local, &pts[i], 1);
+          // Mark the point to be removed from shared array.
+          pts[i].ifSegment = -1;
+        }
       }
     }
     s = e;
   }
+
+  // Remove all the local points from shared array.
+  uint count = 0;
+  for (uint i = 0; i < shared->n; i++) {
+    if (pts[i].ifSegment != -1)
+      pts[count] = pts[i], count++;
+  }
+  shared->n = count;
 }
 
 static slong number_segments(struct array *local, struct array *shared,
@@ -362,6 +378,8 @@ int find_unique_vertices(Mesh mesh, struct comm *c, scalar tol, int verbose,
 
   for (int t = 0; t < ndim; t++) {
     for (int d = 0; d < ndim; d++) {
+      debug_print(c, verbose, "\t\tlocglob: %d %d", t + 1, d + 1);
+
       // Sort both local and shared segments.
       sort_segments_shared(&shared, d, c, bfr);
       sort_segments_local(&local, d);
@@ -370,12 +388,13 @@ int find_unique_vertices(Mesh mesh, struct comm *c, scalar tol, int verbose,
       find_segments(&shared, d, tol2, c);
       find_segments(&local, d, tol2, &COMM_NULL);
 
+      // Separate local segments from the shared segments.
       separate_local_segments(&local, &shared, c);
 
+      // Number the segments.
       slong nseg = number_segments(&local, &shared, c);
 
-      debug_print(c, verbose, "\t\tlocglob: %d %d %lld %lld\n", t + 1, d + 1,
-                  nseg, npts);
+      debug_print(c, verbose, " %lld %lld\n", nseg, npts);
     }
   }
 
