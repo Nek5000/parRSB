@@ -200,6 +200,9 @@ int parrsb_conn_mesh(long long *vtx, double *coord, int nelt, int ndim,
   struct comm c;
   comm_init(&c, comm);
 
+  buffer bfr;
+  buffer_init(&bfr, 1024);
+
   int verbose = 0;
   {
     const char *val = getenv("PARRSB_VERBOSE_LEVEL");
@@ -219,9 +222,6 @@ int parrsb_conn_mesh(long long *vtx, double *coord, int nelt, int ndim,
                          "matchPeriodicFaces   ", "copyOutput           "};
 
   Mesh mesh = mesh_init(nelt, ndim);
-
-  buffer bfr;
-  buffer_init(&bfr, 1024);
 
   debug_print(&c, verbose, "\tCalculating global problem size ...");
   slong out[2][1], wrk[2][1], in = nelt;
