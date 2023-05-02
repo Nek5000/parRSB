@@ -215,7 +215,7 @@ static int talk_to_neighbor(struct point_t *pnt, struct array *arr, int dir,
   }
 
   struct crystal cr;
-  crystal_init(&cr, c);
+  crystal_init(&cr, &active);
   sarray_transfer(struct point_t, &tmp, proc, 1, &cr);
   crystal_free(&cr);
 
@@ -241,10 +241,10 @@ static void find_segments(struct array *arr, int i, scalar tol2,
   struct point_t pnt;
   int npts = talk_to_neighbor(&pnt, arr, 1 /* send */, c);
   if (npts > 0) { // npts > 0 --> arr->n > 0
-    scalar d = diff_sqr(pnt.x[i], pts->x[i]);
-    scalar dx = MIN(pnt.dx, pts->dx) * tol2;
+    scalar d = diff_sqr(pnt.x[i], pts[0].x[i]);
+    scalar dx = MIN(pnt.dx, pts[0].dx) * tol2;
     if (d > dx)
-      pts->ifSegment = 1;
+      pts[0].ifSegment = 1;
   }
 }
 
