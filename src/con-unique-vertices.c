@@ -270,6 +270,7 @@ static void separate_local_segments(struct array *local, struct array *shared,
   uint s = 0;
   for (; s < shared->n && pts[s].ifSegment == 0; s++)
     ;
+  sint lcheck = 0;
   while (s < shared->n) {
     uint e = s + 1;
     for (; e < shared->n && pts[e].ifSegment == 0; e++)
@@ -281,20 +282,26 @@ static void separate_local_segments(struct array *local, struct array *shared,
         pts[i].ifSegment = -1;
       }
     } else if (e == shared->n) {
-      // Bring the first point from next processor. Check if `ifSegment` value
-      // of that point is a 1 or a 0. If it is a 1, add the current range to
-      // the local segment.
-      struct point_t pnt;
-      int npts = talk_to_neighbor(&pnt, shared, -1 /* recv */, c);
-      if (npts == 0 || (npts > 0 && pnt.ifSegment == 1)) {
-        for (uint i = s; i < shared->n; i++) {
-          array_cat(struct point_t, local, &pts[i], 1);
-          // Mark the point to be removed from shared array.
-          pts[i].ifSegment = -1;
-        }
-      }
+      lcheck = 1;
     }
     s = e;
+  }
+
+  sint check = lcheck, wrk[2];
+  comm_allreduce(c, gs_int, gs_min, &check, 1, wrk);
+  if (check) {
+    // Bring the first point from next processor. Check if `ifSegment` value
+    // of that point is a 1 or a 0. If it is a 1, add the current range to
+    // the local segment.
+    struct point_t pnt;
+    int npts = talk_to_neighbor(&pnt, shared, -1 /* recv */, c);
+    if (lcheck && (npts == 0 || (npts > 0 && pnt.ifSegment == 1))) {
+      for (uint i = s; i < shared->n; i++) {
+        array_cat(struct point_t, local, &pts[i], 1);
+        // Mark the point to be removed from shared array.
+        pts[i].ifSegment = -1;
+      }
+    }
   }
 
   // Remove all the local points from shared array.
@@ -350,6 +357,52 @@ static slong number_segments(struct array *local, struct array *shared,
   return st + lt;
 }
 
+static void assemble_shared_segments(struct array *arr, struct comm *c,
+                                     buffer *bfr) {
+  struct comm active;
+  comm_split(c, arr->n > 0, c->id, &active);
+  if (arr->n > 0) {
+    struct point_t *pts = (struct point_t *)arr->ptr;
+    slong *ids = tcalloc(slong, arr->n);
+    for (uint i = 0; i < arr->n; i++)
+      ids[i] = pts[i].globalId + 1;
+    struct gs_data *gsh = gs_setup(ids, arr->n, &active, 0, gs_pairwise, 0);
+
+    sint *owner = tcalloc(sint, arr->n);
+    for (uint i = 0; i < arr->n; i++)
+      owner[i] = active.id;
+
+    gs(owner, gs_int, gs_min, 0, gsh, bfr);
+    gs_free(gsh), free(ids);
+
+    struct array tmp;
+    array_init(struct point_t, &tmp, 27);
+    for (uint i = 0; i < arr->n && pts[i].ifSegment == 0; i++) {
+      struct point_t p = pts[i];
+      p.proc = owner[i], pts[i].ifSegment = -1;
+      array_cat(struct point_t, &tmp, &p, 1);
+    }
+    free(owner);
+
+    struct crystal cr;
+    crystal_init(&cr, &active);
+    sarray_transfer(struct point_t, &tmp, proc, 0, &cr);
+    crystal_free(&cr);
+
+    array_cat(struct point_t, arr, tmp.ptr, tmp.n);
+    array_free(&tmp);
+
+    uint count = 0;
+    pts = (struct point_t *)arr->ptr;
+    for (uint i = 0; i < arr->n; i++) {
+      if (pts[i].ifSegment != -1)
+        pts[count] = pts[i], count++;
+    }
+    arr->n = count;
+  }
+  comm_free(&active);
+}
+
 int find_unique_vertices(Mesh mesh, struct comm *c, scalar tol, int verbose,
                          buffer *bfr) {
   scalar tol2 = tol * tol;
@@ -396,16 +449,17 @@ int find_unique_vertices(Mesh mesh, struct comm *c, scalar tol, int verbose,
 
       // Number the segments.
       slong nseg = number_segments(&local, &shared, c);
-
       debug_print(c, verbose, " %lld %lld\n", nseg, npts);
     }
   }
 
+  // Assemble shared segments which are still split across multiple
+  // processes.
+  assemble_shared_segments(&shared, c, bfr);
+
   // Copy everything back to elements array.
   elems->n = 0;
   array_cat(struct point_t, elems, local.ptr, local.n);
-  // FIXME: Assemble shared segments which are still split across multiple
-  // processes.
   array_cat(struct point_t, elems, shared.ptr, shared.n);
   array_free(&shared), array_free(&local);
 
