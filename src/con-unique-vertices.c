@@ -64,7 +64,7 @@ static void tuple_sort_(void *ra, uint n, uint usize, uint offset) {
 
 static void sort_segments_local(struct array *local, int dim) {
   sint npts = local->n;
-  Point pts = (struct point_t *)local->ptr;
+  struct point_t *pts = (struct point_t *)local->ptr;
 
   sint s = 0, e;
   while (s < npts) {
@@ -193,12 +193,11 @@ static void sort_segments_shared(struct array *shared, int dim, struct comm *c,
   shared->n = 0;
   array_cat(struct point_t, shared, segments[0].ptr, segments[0].n);
   array_cat(struct point_t, shared, segments[1].ptr, segments[1].n);
-
   array_free(&segments[0]), array_free(&segments[1]);
 }
 
-static int talk_to_neighbor(struct point_t *pnt, struct array *arr, int dir,
-                            struct comm *c) {
+static int talk_to_neighbor(struct point_t *pnt, const struct array *arr,
+                            int dir, const struct comm *c) {
   assert(dir == -1 || dir == 1);
 
   if (c->np <= 1)
@@ -237,7 +236,7 @@ static int talk_to_neighbor(struct point_t *pnt, struct array *arr, int dir,
 }
 
 static void find_segments(struct array *arr, int i, scalar tol2,
-                          struct comm *c) {
+                          const struct comm *c) {
   struct point_t *pts = (struct point_t *)arr->ptr;
   for (uint j = 1; j < arr->n; j++) {
     scalar d = diff_sqr(pts[j].x[i], pts[j - 1].x[i]);
@@ -257,25 +256,20 @@ static void find_segments(struct array *arr, int i, scalar tol2,
   }
 }
 
-static slong countSegments(Mesh mesh, struct comm *c) {
-  uint nPoints = mesh->elements.n;
-  Point points = (struct point_t *)mesh->elements.ptr;
-
+static inline void remove_marked(struct array *arr) {
+  struct point_t *pts = (struct point_t *)arr->ptr;
   uint count = 0;
-  for (uint i = 0; i < nPoints; i++)
-    if (points[i].ifSegment > 0)
-      count++;
-
-  slong in = count, buf[2][1];
-  comm_allreduce(c, gs_long, gs_add, &in, 1, buf);
-
-  return in;
+  for (uint i = 0; i < arr->n; i++) {
+    if (pts[i].ifSegment != -1)
+      pts[count] = pts[i], count++;
+  }
+  arr->n = count;
 }
 
 static void separate_local_segments(struct array *local, struct array *shared,
-                                    struct comm *c) {
-  struct point_t *pts = (struct point_t *)shared->ptr;
+                                    const struct comm *c) {
   // Find the first non-zero `ifSegment` value.
+  struct point_t *pts = (struct point_t *)shared->ptr;
   uint s = 0;
   for (; s < shared->n && pts[s].ifSegment == 0; s++)
     ;
@@ -316,18 +310,11 @@ static void separate_local_segments(struct array *local, struct array *shared,
       }
     }
   }
-
-  // Remove all the local points from shared array.
-  uint count = 0;
-  for (uint i = 0; i < shared->n; i++) {
-    if (pts[i].ifSegment != -1)
-      pts[count] = pts[i], count++;
-  }
-  shared->n = count;
+  remove_marked(shared);
 }
 
 static slong number_segments(struct array *local, struct array *shared,
-                             struct comm *c) {
+                             const struct comm *c) {
   // First number the local segments.
   struct point_t *pts = (struct point_t *)local->ptr;
   uint lcnt = 0;
@@ -370,7 +357,7 @@ static slong number_segments(struct array *local, struct array *shared,
   return st + lt;
 }
 
-static void assemble_shared_segments(struct array *arr, struct comm *c,
+static void assemble_shared_segments(struct array *arr, const struct comm *c,
                                      buffer *bfr) {
   struct comm active;
   comm_split(c, arr->n > 0, c->id, &active);
@@ -404,14 +391,7 @@ static void assemble_shared_segments(struct array *arr, struct comm *c,
 
     array_cat(struct point_t, arr, tmp.ptr, tmp.n);
     array_free(&tmp);
-
-    uint count = 0;
-    pts = (struct point_t *)arr->ptr;
-    for (uint i = 0; i < arr->n; i++) {
-      if (pts[i].ifSegment != -1)
-        pts[count] = pts[i], count++;
-    }
-    arr->n = count;
+    remove_marked(arr);
   }
   comm_free(&active);
 }

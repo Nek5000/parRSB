@@ -3,6 +3,12 @@
 #include "sort.h"
 #include <stdarg.h>
 
+int PRE_TO_SYM_VERTEX[GC_MAX_VERTICES] = {0, 1, 3, 2, 4, 5, 7, 6};
+int PRE_TO_SYM_FACE[GC_MAX_FACES] = {2, 1, 3, 0, 4, 5};
+int NEIGHBOR_MAP[GC_MAX_VERTICES][GC_MAX_NEIGHBORS] = {
+    {1, 2, 4}, {0, 3, 5}, {0, 3, 6}, {1, 2, 7},
+    {0, 5, 6}, {1, 4, 7}, {2, 4, 7}, {3, 5, 6}};
+
 void debug_print(struct comm *c, int verbose, const char *fmt, ...) {
   va_list vargs;
   va_start(vargs, fmt);
@@ -18,19 +24,45 @@ double diff_sqr(double x, double y) { return (x - y) * (x - y); }
 //==============================================================================
 // Mesh struct
 //
-struct mesh_t *mesh_init(int nel, int ndim) {
+static struct mesh_t *mesh_init(int nelt, int ndim, double *coord,
+                                long long *pinfo, int npinfo,
+                                const struct comm *c) {
   struct mesh_t *m = tcalloc(struct mesh_t, 1);
-
-  m->nelt = nel, m->ndim = ndim, m->nnbrs = ndim;
+  m->nelt = nelt, m->ndim = ndim, m->nnbrs = ndim;
   m->nv = (ndim == 2) ? 4 : 8;
 
-  array_init(struct point_t, &m->elements, 1024);
-  array_init(struct boundary_t, &m->boundary, 1024);
+  slong out[2][1], wrk[2][1], in = nelt;
+  comm_scan(out, c, gs_long, gs_add, &in, 1, wrk);
+  ulong start = out[0][0];
+  m->nelgt = out[1][0];
+
+  int nv = m->nv;
+  array_init(struct point_t, &m->elements, nelt * nv);
+  struct point_t p = {.origin = c->id};
+  for (uint i = 0; i < nelt; i++) {
+    for (uint k = 0; k < nv; k++) {
+      uint j = PRE_TO_SYM_VERTEX[k];
+      for (uint l = 0; l < ndim; l++)
+        p.x[l] = coord[i * nv * ndim + j * ndim + l];
+      p.elementId = start + i, p.sequenceId = nv * (start + i) + k;
+      array_cat(struct point_t, &m->elements, &p, 1);
+    }
+  }
+
+  array_init(struct boundary_t, &m->boundary, npinfo);
+  struct boundary_t b;
+  for (uint i = 0; i < npinfo; i++) {
+    b.elementId = pinfo[4 * i + 0] - 1;
+    b.faceId = PRE_TO_SYM_FACE[pinfo[4 * i + 1] - 1];
+    b.bc[0] = pinfo[4 * i + 2] - 1;
+    b.bc[1] = PRE_TO_SYM_FACE[pinfo[4 * i + 3] - 1];
+    array_cat(struct boundary_t, &m->boundary, &b, 1);
+  }
 
   return m;
 }
 
-int mesh_free(struct mesh_t *m) {
+static int mesh_free(struct mesh_t *m) {
   array_free(&m->elements), array_free(&m->boundary), free(m);
   return 0;
 }
@@ -38,12 +70,6 @@ int mesh_free(struct mesh_t *m) {
 //==============================================================================
 // Find the minimum distance between a vertex and its neighbors
 //
-int PRE_TO_SYM_VERTEX[GC_MAX_VERTICES] = {0, 1, 3, 2, 4, 5, 7, 6};
-int PRE_TO_SYM_FACE[GC_MAX_FACES] = {2, 1, 3, 0, 4, 5};
-int NEIGHBOR_MAP[GC_MAX_VERTICES][GC_MAX_NEIGHBORS] = {
-    {1, 2, 4}, {0, 3, 5}, {0, 3, 6}, {1, 2, 7},
-    {0, 5, 6}, {1, 4, 7}, {2, 4, 7}, {3, 5, 6}};
-
 static inline double distance_2d(struct point_t *a, struct point_t *b) {
   return diff_sqr(a->x[0], b->x[0]) + diff_sqr(a->x[1], b->x[1]);
 }
@@ -174,7 +200,7 @@ static int transferBoundaryFaces(Mesh mesh, struct comm *c) {
 // C interface to find_conn
 //
 #define check_error(call, msg)                                                 \
-  do {                                                                         \
+  {                                                                            \
     sint err = (call);                                                         \
     sint buf;                                                                  \
     comm_allreduce(&c, gs_int, gs_max, &err, 1, &buf);                         \
@@ -186,7 +212,7 @@ static int transferBoundaryFaces(Mesh mesh, struct comm *c) {
       buffer_free(&bfr), mesh_free(mesh), comm_free(&c);                       \
       return err;                                                              \
     }                                                                          \
-  } while (0)
+  }
 
 // Input:
 //   nelt: Number of elements, nv: Number of vertices in an element
@@ -195,8 +221,7 @@ static int transferBoundaryFaces(Mesh mesh, struct comm *c) {
 // Output:
 //   vtx[nelt, nv]: Global numbering of vertices of elements
 int parrsb_conn_mesh(long long *vtx, double *coord, int nelt, int ndim,
-                     long long *periodicInfo, int nPeriodicFaces, double tol,
-                     MPI_Comm comm) {
+                     long long *pinfo, int npinfo, double tol, MPI_Comm comm) {
   struct comm c;
   comm_init(&c, comm);
 
@@ -221,39 +246,11 @@ int parrsb_conn_mesh(long long *vtx, double *coord, int nelt, int ndim,
                          "elementCheck         ", "faceCheck            ",
                          "matchPeriodicFaces   ", "copyOutput           "};
 
-  Mesh mesh = mesh_init(nelt, ndim);
-
-  debug_print(&c, verbose, "\tCalculating global problem size ...");
-  slong out[2][1], wrk[2][1], in = nelt;
-  comm_scan(out, &c, gs_long, gs_add, &in, 1, wrk);
-  ulong start = out[0][0], nelgt = out[1][0];
-  mesh->nelgt = mesh->nelgv = nelgt;
-  debug_print(&c, verbose, "done.\n");
-
-  debug_print(&c, verbose, "\tSet internal data structures ...");
-  int nvertex = mesh->nv;
-  struct point_t p = {.origin = c.id};
-  uint i, j, k, l;
-  for (i = 0; i < nelt; i++) {
-    for (k = 0; k < nvertex; k++) {
-      j = PRE_TO_SYM_VERTEX[k];
-      for (l = 0; l < ndim; l++)
-        p.x[l] = coord[i * nvertex * ndim + j * ndim + l];
-      p.elementId = start + i;
-      p.sequenceId = nvertex * (start + i) + k;
-      array_cat(struct point_t, &mesh->elements, &p, 1);
-    }
-  }
-
-  struct boundary_t b;
-  for (i = 0; i < nPeriodicFaces; i++) {
-    b.elementId = periodicInfo[4 * i + 0] - 1;
-    b.faceId = PRE_TO_SYM_FACE[periodicInfo[4 * i + 1] - 1];
-    b.bc[0] = periodicInfo[4 * i + 2] - 1;
-    b.bc[1] = PRE_TO_SYM_FACE[periodicInfo[4 * i + 3] - 1];
-    array_cat(struct boundary_t, &mesh->boundary, &b, 1);
-  }
-  debug_print(&c, verbose, "done.\n");
+  // debug_print(&c, verbose, "\t%s ...");
+  // parrsb_barrier(&c), t = comm_time();
+  Mesh mesh = mesh_init(nelt, ndim, coord, pinfo, npinfo, &c);
+  // duration[0] = comm_time() - t;
+  // debug_print(&c, verbose, "done.\n");
 
   debug_print(&c, verbose, "\t%s ...", name[0]);
   parrsb_barrier(&c), t = comm_time();
@@ -300,9 +297,9 @@ int parrsb_conn_mesh(long long *vtx, double *coord, int nelt, int ndim,
   debug_print(&c, verbose, "\t%s ...", name[7]);
   parrsb_barrier(&c), t = comm_time();
   Point ptr = mesh->elements.ptr;
-  for (i = 0; i < nelt; i++) {
-    for (j = 0; j < nvertex; j++)
-      vtx[i * nvertex + j] = ptr[i * nvertex + j].globalId + 1;
+  for (uint i = 0; i < nelt; i++) {
+    for (uint j = 0; j < mesh->nv; j++)
+      vtx[i * mesh->nv + j] = ptr[i * mesh->nv + j].globalId + 1;
   }
   duration[7] = comm_time() - t;
   debug_print(&c, verbose, "done.\n");
@@ -335,12 +332,11 @@ int parrsb_conn_mesh(long long *vtx, double *coord, int nelt, int ndim,
 // Fortran interface
 //
 void fparrsb_conn_mesh(long long *vtx, double *coord, int *nelt, int *ndim,
-                       long long *periodicInfo, int *nPeriodicFaces,
-                       double *tol, MPI_Fint *fcomm, int *err) {
+                       long long *pinfo, int *npinfo, double *tol,
+                       MPI_Fint *fcomm, int *err) {
   *err = 1;
   MPI_Comm c = MPI_Comm_f2c(*fcomm);
-  *err = parrsb_conn_mesh(vtx, coord, *nelt, *ndim, periodicInfo,
-                          *nPeriodicFaces, *tol, c);
+  *err = parrsb_conn_mesh(vtx, coord, *nelt, *ndim, pinfo, *npinfo, *tol, c);
 }
 
 #undef check_error

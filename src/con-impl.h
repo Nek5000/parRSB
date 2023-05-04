@@ -113,7 +113,7 @@ struct boundary_t {
 typedef struct boundary_t *BoundaryFace;
 
 struct mesh_t {
-  ulong nelgt, nelgv;
+  ulong nelgt;
   uint nelt, ndim, nv, nnbrs;
   struct array elements, boundary;
 };
