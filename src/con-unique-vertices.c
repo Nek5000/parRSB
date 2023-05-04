@@ -130,12 +130,14 @@ static void sort_segments_shared_aux(struct array *arr, int dim, struct comm *c,
 
 static void sort_segments_shared(struct array *shared, int dim, struct comm *c,
                                  buffer *bfr) {
-  // Each processor can only have at most a single ifSegment = 1 in shared
+  // Each process can only have at most a single ifSegment = 1 in shared
   // array. Otherwise, we can always move the segments into the local segments
   // array till we end up in such a configuration. Let's first check for this
-  // condition and find how many distinct global ids (either 1 or 2) are
+  // condition and find how many distinct global ids (either 1 or 2 ids
+  // respectively depending on if there is 0 or 1 ifSegment = 1 points) are
   // residing on this MPI process. While doing so, we will also split shared
-  // array to two segments each corresponding to a distinct global id.
+  // array to at most two segments each corresponding to a distinct global id.
+  // Algorithm listed below discard MPI processes with shared array size 0.
   struct array segments[2];
   array_init(struct point_t, &segments[0], (shared->n + 1) / 2);
   array_init(struct point_t, &segments[1], (shared->n + 1) / 2);
@@ -158,9 +160,9 @@ static void sort_segments_shared(struct array *shared, int dim, struct comm *c,
   assert(ngids <= 1 || (ngids == 2 && gids[0] + 1 == gids[1]));
 
   // We sort the shared segments in two phases. All the segments having an even
-  // global id are sorted first and then the segments having an odd globla id.
-  // This is done to avoid same processor having to work on both the global ids
-  // (if ngids = 2) it owns at the same time.
+  // global id are sorted first and then the segments having an odd global id
+  // are sorted. This is done to avoid same process having to work on both the
+  // global ids (if ngids = 2) it owns at the same time.
   for (int parity = 0; parity < 2; parity++) {
     int index = INT_MIN;
     if (gids[0] >= 0 && (gids[0] % 2 == parity))
@@ -171,9 +173,16 @@ static void sort_segments_shared(struct array *shared, int dim, struct comm *c,
     struct comm active, seg;
     comm_split(c, index >= 0, c->id, &active);
     if (index >= 0) {
+      // Setup a gs handle to find the minimum rank with the current global id
+      // and use that rank as the bin for the comm_split.
+      slong id = gids[index] + 1;
+      struct gs_data *gsh = gs_setup(&id, 1, &active, 0, gs_pairwise, 0);
+      sint bin = active.id;
+      gs(&bin, gs_int, gs_min, 0, gsh, bfr);
+      gs_free(gsh);
+
       // index >= 0 --> gids[index] >= 0 --> segments[index].n > 0
-      // FIXME: gids[index] is a long value.
-      comm_split(&active, gids[index], active.id, &seg);
+      comm_split(&active, bin, active.id, &seg);
       sort_segments_shared_aux(&segments[index], dim, &seg, bfr);
       comm_free(&seg);
     }
@@ -282,6 +291,10 @@ static void separate_local_segments(struct array *local, struct array *shared,
         pts[i].ifSegment = -1;
       }
     } else if (e == shared->n) {
+      // We reached end of the array without getting to a new segment.  This
+      // means we have to talk to neighbor process. We will call
+      // talk_to_neighbor if at least one of the process has to talk to the
+      // neighbor.
       lcheck = 1;
     }
     s = e;
@@ -290,7 +303,7 @@ static void separate_local_segments(struct array *local, struct array *shared,
   sint check = lcheck, wrk[2];
   comm_allreduce(c, gs_int, gs_min, &check, 1, wrk);
   if (check) {
-    // Bring the first point from next processor. Check if `ifSegment` value
+    // Bring the first point from next process. Check if `ifSegment` value
     // of that point is a 1 or a 0. If it is a 1, add the current range to
     // the local segment.
     struct point_t pnt;
@@ -423,8 +436,8 @@ int find_unique_vertices(Mesh mesh, struct comm *c, scalar tol, int verbose,
 
   // Initialize shared and local arrays and then copy all points in `elems`
   // array to shared array first. Shared array contains only the segments which
-  // are split across two or more processors. This means that the shared array
-  // on a given processor can only have at most one ifSegment value set to 1.
+  // are split across two or more processes. This means that the shared array
+  // on a given process can only have at most one ifSegment value set to 1.
   // Initially all points are just one segment. Points will be removed from
   // shared array and added to local array as we progress in the algorithm.
   struct array shared, local;
