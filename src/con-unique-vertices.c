@@ -301,7 +301,7 @@ static void separate_local_segments(struct array *local, struct array *shared,
   }
 
   sint check = lcheck, wrk[2];
-  comm_allreduce(c, gs_int, gs_min, &check, 1, wrk);
+  comm_allreduce(c, gs_int, gs_add, &check, 1, wrk);
   if (check) {
     // Bring the first point from next process. Check if `ifSegment` value
     // of that point is a 1 or a 0. If it is a 1, add the current range to
