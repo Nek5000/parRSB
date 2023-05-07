@@ -119,8 +119,6 @@ struct mesh_t {
 };
 typedef struct mesh_t *Mesh;
 
-void debug_print(struct comm *c, int verbose, const char *fmt, ...);
-
 double diff_sqr(double x, double y);
 
 int send_back(Mesh mesh, struct comm *c, buffer *bfr);
