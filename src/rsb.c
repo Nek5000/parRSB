@@ -190,12 +190,12 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
   size_t esize = load_balance(&elist, nel, nv, coord, vtx, &cr, &bfr);
 
   struct comm ca;
-  comm_split(&c, nel > 0, c.id, &ca);
+  comm_split(&c, elist.n > 0, c.id, &ca);
 
   // Run RSB now
   metric_init();
-  if (nel > 0) {
-    slong out[2][1], wrk[2][1], in = nel;
+  if (elist.n > 0) {
+    slong out[2][1], wrk[2][1], in = elist.n;
     comm_scan(out, &ca, gs_long, gs_add, &in, 1, wrk);
     slong nelg = out[1][0];
 
