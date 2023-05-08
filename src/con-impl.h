@@ -100,7 +100,7 @@ struct point_t {
   scalar dx, x[3];
   uint proc, origin;
   int ifSegment;
-  ulong sequenceId, elementId, globalId;
+  ulong sequenceId, elementId, globalId, pntid;
 };
 typedef struct point_t *Point;
 

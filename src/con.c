@@ -10,6 +10,7 @@ int NEIGHBOR_MAP[GC_MAX_VERTICES][GC_MAX_NEIGHBORS] = {
     {0, 5, 6}, {1, 4, 7}, {2, 4, 7}, {3, 5, 6}};
 
 void debug_print(struct comm *c, int verbose, const char *fmt, ...) {
+  comm_barrier(c);
   va_list vargs;
   va_start(vargs, fmt);
   if (c->id == 0 && verbose > 0) {
@@ -205,10 +206,6 @@ static int transferBoundaryFaces(Mesh mesh, struct comm *c) {
     sint buf;                                                                  \
     comm_allreduce(&c, gs_int, gs_max, &err, 1, &buf);                         \
     if (err) {                                                                 \
-      if (c.id == 0) {                                                         \
-        printf("parCon error in %s.\n", msg);                                  \
-        fflush(stdout);                                                        \
-      }                                                                        \
       buffer_free(&bfr), mesh_free(mesh), comm_free(&c);                       \
       return err;                                                              \
     }                                                                          \
@@ -327,6 +324,7 @@ int parrsb_conn_mesh(long long *vtx, double *coord, int nelt, int ndim,
 
   return 0;
 }
+#undef check_error
 
 //=============================================================================
 // Fortran interface
@@ -338,5 +336,3 @@ void fparrsb_conn_mesh(long long *vtx, double *coord, int *nelt, int *ndim,
   MPI_Comm c = MPI_Comm_f2c(*fcomm);
   *err = parrsb_conn_mesh(vtx, coord, *nelt, *ndim, pinfo, *npinfo, *tol, c);
 }
-
-#undef check_error

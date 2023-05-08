@@ -17,7 +17,7 @@ struct sort {
 };
 
 int sort_local(struct sort *s);
-int parallel_sort_private(struct sort *s, struct comm *c);
+int parallel_sort_private(struct sort *s, const struct comm *c);
 
 // Uniform parallel sort
 #define parallel_sort(T, A, field, type, method, loadbalance, c, bufp)         \

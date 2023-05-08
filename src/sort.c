@@ -25,7 +25,7 @@ static double get_scalar(struct array *a, uint i, uint offset, uint usize,
 }
 
 static void get_extrema(void *extrema_, struct sort *data, uint field,
-                        struct comm *c) {
+                        const struct comm *c) {
   struct array *a = data->a;
   uint usize = data->unit_size;
   uint offset = data->offset[field];
@@ -72,7 +72,8 @@ static int set_dest(uint *proc, uint size, sint np, slong start, slong nelem) {
 //-----------------------------------------------------------------------------
 // Parallel Bin-Sort
 //
-static int set_bin(uint **proc_, struct sort *s, uint field, struct comm *c) {
+static int set_bin(uint **proc_, struct sort *s, uint field,
+                   const struct comm *c) {
   struct array *a = s->a;
   gs_dom t = s->t[field];
   uint offset = s->offset[field];
@@ -144,7 +145,7 @@ int sort_local(struct sort *s) {
   return 0;
 }
 
-static int parallel_bin_sort(struct sort *s, struct comm *c) {
+static int parallel_bin_sort(struct sort *s, const struct comm *c) {
   // Local sort
   sort_local(s);
 
@@ -331,7 +332,7 @@ static int parallel_hypercube_sort(struct hypercube *data, struct comm *c) {
   return 0;
 }
 
-static int load_balance(struct array *a, size_t size, struct comm *c,
+static int load_balance(struct array *a, size_t size, const struct comm *c,
                         struct crystal *cr) {
   slong out[2][1], buf[2][1], in = a->n;
   comm_scan(out, c, gs_long, gs_add, &in, 1, buf);
@@ -345,7 +346,7 @@ static int load_balance(struct array *a, size_t size, struct comm *c,
   return 0;
 }
 
-int parallel_sort_private(struct sort *data, struct comm *c) {
+int parallel_sort_private(struct sort *data, const struct comm *c) {
   struct comm dup;
   comm_dup(&dup, c);
 

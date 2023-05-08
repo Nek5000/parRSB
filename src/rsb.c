@@ -189,7 +189,7 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
   crystal_init(&cr, &c);
 
   buffer bfr;
-  buffer_init(&bfr, nel * sizeof(struct rsb_element));
+  buffer_init(&bfr, (nel + 1) * sizeof(struct rsb_element));
 
   // Load balance input data
   debug_print(&c, options.verbose_level, "Load balance ...");

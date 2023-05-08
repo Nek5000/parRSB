@@ -357,43 +357,33 @@ static slong number_segments(struct array *local, struct array *shared,
   return st + lt;
 }
 
-static void assemble_shared_segments(struct array *arr, const struct comm *c,
-                                     buffer *bfr) {
-  struct comm active;
-  comm_split(c, arr->n > 0, c->id, &active);
-  if (arr->n > 0) {
-    struct point_t *pts = (struct point_t *)arr->ptr;
-    slong *ids = tcalloc(slong, arr->n);
-    for (uint i = 0; i < arr->n; i++)
-      ids[i] = pts[i].globalId + 1;
-    struct gs_data *gsh = gs_setup(ids, arr->n, &active, 0, gs_pairwise, 0);
+static int number_points(struct array *elems, const struct array *local,
+                         const struct array *shared, const struct comm *c,
+                         buffer *bfr) {
+  // First number local points and then number shared points.
+  slong out[2][1], wrk[2][1], in = local->n;
+  comm_scan(out, c, gs_long, gs_add, &in, 1, wrk);
+  slong s = out[0][0], nl = out[1][0];
 
-    sint *owner = tcalloc(sint, arr->n);
-    for (uint i = 0; i < arr->n; i++)
-      owner[i] = active.id;
+  struct point_t *pts = (struct point_t *)local->ptr;
+  for (uint i = 0; i < local->n; i++)
+    pts[i].pntid = s + i;
 
-    gs(owner, gs_int, gs_min, 0, gsh, bfr);
-    gs_free(gsh), free(ids);
+  in = shared->n;
+  comm_scan(out, c, gs_long, gs_add, &in, 1, wrk);
+  s = out[0][0] + nl;
 
-    struct array tmp;
-    array_init(struct point_t, &tmp, 27);
-    for (uint i = 0; i < arr->n && pts[i].ifSegment == 0; i++) {
-      struct point_t p = pts[i];
-      p.proc = owner[i], pts[i].ifSegment = -1;
-      array_cat(struct point_t, &tmp, &p, 1);
-    }
-    free(owner);
+  pts = (struct point_t *)shared->ptr;
+  for (uint i = 0; i < shared->n; i++)
+    pts[i].pntid = s + i;
 
-    struct crystal cr;
-    crystal_init(&cr, &active);
-    sarray_transfer(struct point_t, &tmp, proc, 0, &cr);
-    crystal_free(&cr);
+  // Copy everything back to elements array.
+  elems->n = 0;
+  array_cat(struct point_t, elems, local->ptr, local->n);
+  array_cat(struct point_t, elems, shared->ptr, shared->n);
 
-    array_cat(struct point_t, arr, tmp.ptr, tmp.n);
-    array_free(&tmp);
-    remove_marked(arr);
-  }
-  comm_free(&active);
+  // Now do a sort to load balance.
+  parallel_sort(struct point_t, elems, pntid, gs_long, 0, 1, c, bfr);
 }
 
 int find_unique_vertices(Mesh mesh, struct comm *c, scalar tol, int verbose,
@@ -445,15 +435,11 @@ int find_unique_vertices(Mesh mesh, struct comm *c, scalar tol, int verbose,
       debug_print(c, verbose, " %lld %lld\n", nseg, npts);
     }
   }
-
-  // Assemble shared segments which are still split across multiple
-  // processes.
-  assemble_shared_segments(&shared, c, bfr);
-
-  // Copy everything back to elements array.
-  elems->n = 0;
-  array_cat(struct point_t, elems, local.ptr, local.n);
-  array_cat(struct point_t, elems, shared.ptr, shared.n);
+  // Number points consecutively -- shared points after local and then load
+  // balance.
+  debug_print(c, verbose, "\t\tnumber points and load balance ...");
+  number_points(elems, &local, &shared, c, bfr);
+  debug_print(c, verbose, "done.\n");
   array_free(&shared), array_free(&local);
 
   return 0;
