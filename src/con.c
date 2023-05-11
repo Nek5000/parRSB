@@ -151,8 +151,10 @@ void get_vertex_ids(long long **vtx_, Mesh mesh) {
 
   struct point_t *ptr = (struct point_t *)mesh->elements.ptr;
   for (uint e = 0, count = 0; e < nelt; e++) {
-    for (int v = 0; v < nv; v++)
-      vtx[count] = ptr[count++].globalId;
+    for (int v = 0; v < nv; v++) {
+      vtx[count] = ptr[count].globalId;
+      count++;
+    }
   }
 }
 
@@ -1321,7 +1323,8 @@ int parrsb_conn_mesh(long long *vtx, double *coord, int nelt, int ndim,
   int verbose = 0;
   {
     const char *val = getenv("PARRSB_VERBOSE_LEVEL");
-    if (val != NULL) verbose= atoi(val);  
+    if (val != NULL)
+      verbose = atoi(val);
   }
 
   if (c.id == 0 && verbose > 0) {
