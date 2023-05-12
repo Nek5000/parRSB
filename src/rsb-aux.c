@@ -227,8 +227,8 @@ int balance_partitions(struct array *elements, int nv, struct comm *lc,
                   bfr);
   }
 
-  free(ids);
-  gs_free(gsh);
+  free(ids), gs_free(gsh);
+  return 0;
 }
 
 int repair_partitions_v2(struct array *elems, unsigned nv, struct comm *tc,
@@ -311,15 +311,14 @@ int rsb(struct array *elements, int nv, int check, parrsb_options *options,
   // Get number of partitions we are going to perform RSB on first level
   sint np, nid;
   get_part(&np, &nid, options->two_level, &lc, &nc);
-  if (options->two_level && options->verbose_level) {
-    if (gc->id == 0)
-      printf("Number of nodes = %d\n", np);
-    fflush(stdout);
-  }
+  debug_print(gc, options->two_level && options->verbose_level,
+              "Number of nodes = %d\n", np);
 
+  struct comm tc;
   unsigned ndim = (nv == 8) ? 3 : 2;
   while (np > 1) {
     // Run the pre-partitioner
+    debug_print(&lc, options->verbose_level > 1, "\tPre-partitioner ...");
     metric_tic(&lc, RSB_PRE);
     switch (options->rsb_pre) {
     case 0: // Sort by global id
@@ -336,10 +335,11 @@ int rsb(struct array *elements, int nv, int check, parrsb_options *options,
       break;
     }
     metric_toc(&lc, RSB_PRE);
+    debug_print(&lc, options->verbose_level > 1, " done.\n");
 
     // Find the Fiedler vector
+    debug_print(&lc, options->verbose_level > 1, "\tFiedler ...");
     unsigned bin = (nid >= (np + 1) / 2);
-    struct comm tc;
     comm_split(&lc, bin, lc.id, &tc);
 
     struct rsb_element *pe = (struct rsb_element *)elements->ptr;
@@ -349,30 +349,35 @@ int rsb(struct array *elements, int nv, int check, parrsb_options *options,
     metric_tic(&lc, RSB_FIEDLER);
     fiedler(elements, nv, options, &lc, bfr, gc->id == 0);
     metric_toc(&lc, RSB_FIEDLER);
+    debug_print(&lc, options->verbose_level > 1, " done.\n");
 
     // Sort by Fiedler vector
+    debug_print(&lc, options->verbose_level > 1, "\tSort ...");
     metric_tic(&lc, RSB_SORT);
     parallel_sort_2(struct rsb_element, elements, fiedler, gs_double, globalId,
                     gs_long, 0, 1, &lc, bfr);
     metric_toc(&lc, RSB_SORT);
+    debug_print(&lc, options->verbose_level > 1, " done.\n");
 
     // Attempt to repair if there are disconnected components
+    debug_print(&lc, options->verbose_level > 1, "\tRepair ...");
     metric_tic(&lc, RSB_REPAIR);
     if (options->repair)
       repair_partitions_v2(elements, nv, &tc, &lc, bin, options->rsb_pre, bfr);
     metric_toc(&lc, RSB_REPAIR);
+    debug_print(&lc, options->verbose_level > 1, " done.\n");
 
     // Bisect and balance
+    debug_print(&lc, options->verbose_level > 1, "\tBalance ...");
     metric_tic(&lc, RSB_BALANCE);
     balance_partitions(elements, nv, &tc, &lc, bin, bfr);
     metric_toc(&lc, RSB_BALANCE);
+    debug_print(&lc, options->verbose_level > 1, " done.\n");
 
-    // Split the communicator
-    comm_free(&lc);
-    comm_dup(&lc, &tc);
-    comm_free(&tc);
-
+    // Split the communicator and recurse on the sub-problems.
+    comm_free(&lc), comm_dup(&lc, &tc), comm_free(&tc);
     get_part(&np, &nid, options->two_level, &lc, &nc);
+    debug_print(&lc, options->verbose_level > 1, "\tBisect ... done.\n");
     metric_push_level();
   }
   comm_free(&lc);
