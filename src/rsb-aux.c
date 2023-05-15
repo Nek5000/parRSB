@@ -76,9 +76,9 @@ static void check_rsb_partition(struct comm *gc, parrsb_options *opts) {
         double final = metric_get_value(i, TOL_FNL);
         comm_allreduce(&c, gs_double, gs_min, &final, 1, (void *)bfr);
         if (c.id == 0) {
-          printf("Warning: Lanczos reached a tolerance of %lf (target: %lf) "
-                 "starting from %lf after %d x %d iterations in Level=%d!\n",
-                 final, target, init, mpass, miter, i);
+          printf("Warning: Lanczos reached a residual of %lf (target: %lf) "
+                 "after %d x %d iterations in Level=%d!\n",
+                 final, target, mpass, miter, i);
           fflush(stdout);
         }
       } else if (opts->rsb_algo == 1) {
