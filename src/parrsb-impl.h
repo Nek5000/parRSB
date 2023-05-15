@@ -63,7 +63,6 @@ uint get_components_v2(sint *component, struct array *elems, unsigned nv,
 //
 #define GS 1
 #define CSR 2
-#define CSC 4
 
 struct laplacian;
 struct laplacian *laplacian_init(struct rsb_element *elems, uint nel, int nv,
