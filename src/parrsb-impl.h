@@ -78,5 +78,5 @@ int log2ll(long long n);
 
 void parrsb_barrier(struct comm *c);
 
-void debug_print(struct comm *c, int verbose, const char *fmt, ...);
+void debug_print(const struct comm *c, int verbose, const char *fmt, ...);
 #endif

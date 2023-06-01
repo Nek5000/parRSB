@@ -96,7 +96,7 @@ static int set_bin(uint **proc_, struct sort *s, uint field,
     while (index < size) {
       double val = get_scalar(a, index, offset, s->unit_size, t);
       if (val <= end)
-        proc[index++] = id;
+        proc[index] = id, index++;
       else
         break;
     }
@@ -351,12 +351,10 @@ int parallel_sort_private(struct sort *data, const struct comm *c) {
   comm_dup(&dup, c);
 
   int balance = data->balance, algo = data->algo;
-
   struct array *a = data->a;
   size_t usize = data->unit_size;
 
   struct hypercube hdata;
-
   switch (algo) {
   case 0:
     parallel_bin_sort(data, c);
@@ -380,7 +378,6 @@ int parallel_sort_private(struct sort *data, const struct comm *c) {
     crystal_free(&cr);
     sort_local(data);
   }
-
   comm_free(&dup);
 
   return 0;
