@@ -132,6 +132,45 @@ static void sort_segments_shared_aux(struct array *arr, int dim, struct comm *c,
   debug_print(c, 0, "\t\t\t\tsss_aux_mark_first_point: done.\n");
 }
 
+static uint find_bin(slong id, const struct comm *c, buffer *bfr) {
+  struct gid_t {
+    ulong id;
+    uint proc, procm;
+  };
+
+  struct array arr;
+  array_init(struct gid_t, &arr, 1);
+
+  struct gid_t sgt = {.id = id, .proc = id % c->np, .procm = c->id};
+  array_cat(struct gid_t, &arr, &sgt, 1);
+
+  struct crystal cr;
+  crystal_init(&cr, c);
+
+  sarray_transfer(struct gid_t, &arr, proc, 1, &cr);
+  if (arr.n > 0) {
+    sarray_sort_2(struct gid_t, arr.ptr, arr.n, id, 1, procm, 0, bfr);
+    struct gid_t *pa = (struct gid_t *)arr.ptr;
+    uint s = 0;
+    while (s < arr.n) {
+      uint e = s + 1;
+      for (; e < arr.n && pa[s].id == pa[e].id; e++)
+        pa[e].procm = pa[s].procm;
+      s = e;
+    }
+  }
+  sarray_transfer(struct gid_t, &arr, proc, 0, &cr);
+
+  crystal_free(&cr);
+
+  assert(arr.n == 1);
+  struct gid_t *pa = (struct gid_t *)arr.ptr;
+  uint procm = pa[0].procm;
+  array_free(&arr);
+
+  return procm;
+}
+
 static void sort_segments_shared(struct array *shared, int dim, struct comm *c,
                                  int verbose, buffer *bfr) {
   debug_print(c, verbose, "\t\t\tsss_local.\n");
@@ -181,6 +220,7 @@ static void sort_segments_shared(struct array *shared, int dim, struct comm *c,
     debug_print(c, verbose, "\t\t\tsss_parity_%d.\n", parity);
     if (index >= 0) {
       assert(gids[index] >= 0);
+#if 0
       // Setup a gs handle to find the minimum rank with the current global id
       // and use that rank as the bin for the comm_split.
       slong id = gids[index] + 1;
@@ -190,6 +230,12 @@ static void sort_segments_shared(struct array *shared, int dim, struct comm *c,
       gs(&bin, gs_int, gs_min, 0, gsh, bfr);
       debug_print(&active, verbose, "\t\t\tsss_gs_%d: done.\n", parity);
       gs_free(gsh);
+#else
+      slong id = gids[index];
+      sint bin = find_bin(id, &active, bfr);
+      debug_print(&active, verbose, "\t\t\tsss_find_bin_%d: done.\n", parity);
+      assert(bin >= 0 && bin <= active.np);
+#endif
 
       // index >= 0 --> gids[index] >= 0 --> segments[index].n > 0
       comm_split(&active, bin, active.id, &seg);
