@@ -176,9 +176,10 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
 
   update_options(&options);
 
-  debug_print(&c, options.verbose_level,
-              "Running parRSB ..., nv = %d, nelg = %lld\n", nv, nelg);
-  if (c.id == 0 && options.verbose_level > 0)
+  int verbose = options.verbose_level;
+  debug_print(&c, verbose, "Running parRSB ..., nv = %d, nelg = %lld\n", nv,
+              nelg);
+  if (c.id == 0 && verbose > 0)
     print_options(&options);
   fflush(stdout);
 
@@ -192,13 +193,13 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
   buffer_init(&bfr, (nel + 1) * sizeof(struct rsb_element));
 
   // Load balance input data
-  debug_print(&c, options.verbose_level, "Load balance ...");
+  debug_print(&c, verbose, "Load balance: ...\n");
   struct array elist;
   size_t esize = load_balance(&elist, nel, nv, coord, vtx, &cr, &bfr);
-  debug_print(&c, options.verbose_level, " done.\n");
+  debug_print(&c, verbose, "Load balance: done.\n");
 
   // Run RSB now
-  debug_print(&c, options.verbose_level, "Running the partitioner ...");
+  debug_print(&c, verbose, "Running partitioner: ...\n");
   struct comm ca;
   comm_split(&c, elist.n > 0, c.id, &ca);
   metric_init();
@@ -225,14 +226,13 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
     metric_rsb_print(&ca, options.profile_level);
   }
   metric_finalize(), comm_free(&ca);
-  debug_print(&c, options.verbose_level, " done.\n");
+  debug_print(&c, verbose, "Running partitioner: done.\n");
 
-  debug_print(&c, options.verbose_level, "Restore the original input ...");
+  debug_print(&c, verbose, "Restore original input: ...\n");
   restore_original(part, seq, &cr, &elist, esize, &bfr);
-  debug_print(&c, options.verbose_level, " done.\n");
+  debug_print(&c, verbose, "Restore original input: done.\n");
 
   // Report time and finish
-  parrsb_barrier(&c);
   debug_print(&c, 1, "par%s finished in %g seconds.\n",
               ALGO[options.partitioner], comm_time() - t);
 

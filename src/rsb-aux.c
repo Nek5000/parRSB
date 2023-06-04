@@ -292,10 +292,10 @@ int rsb(struct array *elements, int nv, int check, parrsb_options *options,
   // keep splitting it. `nc` is the communicator for the two level partitioning.
   struct comm lc, nc;
 
-  // Duplicate the global communicator to `lc`
+  // Duplicate the global communicator to `lc`.
   comm_dup(&lc, gc);
 
-  // Initialize `nc` based on `lc`
+  // Initialize `nc` based on `lc`.
   if (options->two_level) {
 #ifdef MPI
     MPI_Comm node;
@@ -308,17 +308,19 @@ int rsb(struct array *elements, int nv, int check, parrsb_options *options,
 #endif
   }
 
-  // Get number of partitions we are going to perform RSB on first level
+  // Set verbosity.
+  int verbose = options->verbose_level > 1;
+
+  // Get number of partitions we are going to perform RSB on first level.
   sint np, nid;
   get_part(&np, &nid, options->two_level, &lc, &nc);
-  debug_print(gc, options->two_level && options->verbose_level,
-              "Number of nodes = %d\n", np);
+  debug_print(gc, options->two_level && verbose, "Number of nodes = %d\n", np);
 
   struct comm tc;
   unsigned ndim = (nv == 8) ? 3 : 2;
   while (np > 1) {
-    // Run the pre-partitioner
-    debug_print(&lc, options->verbose_level > 1, "\tPre-partitioner ...");
+    // Run the pre-partitioner.
+    debug_print(&lc, verbose, "\tPre-partitioner: ...\n");
     metric_tic(&lc, RSB_PRE);
     switch (options->rsb_pre) {
     case 0: // Sort by global id
@@ -335,10 +337,9 @@ int rsb(struct array *elements, int nv, int check, parrsb_options *options,
       break;
     }
     metric_toc(&lc, RSB_PRE);
-    debug_print(&lc, options->verbose_level > 1, " done.\n");
 
     // Find the Fiedler vector
-    debug_print(&lc, options->verbose_level > 1, "\tFiedler ...");
+    debug_print(&lc, verbose, "\tFiedler ...\n");
     unsigned bin = (nid >= (np + 1) / 2);
     comm_split(&lc, bin, lc.id, &tc);
 
@@ -349,36 +350,35 @@ int rsb(struct array *elements, int nv, int check, parrsb_options *options,
     metric_tic(&lc, RSB_FIEDLER);
     fiedler(elements, nv, options, &lc, bfr, gc->id == 0);
     metric_toc(&lc, RSB_FIEDLER);
-    debug_print(&lc, options->verbose_level > 1, " done.\n");
 
     // Sort by Fiedler vector
-    debug_print(&lc, options->verbose_level > 1, "\tSort ...");
+    debug_print(&lc, verbose, "\tSort ...\n");
     metric_tic(&lc, RSB_SORT);
     parallel_sort_2(struct rsb_element, elements, fiedler, gs_double, globalId,
                     gs_long, 0, 1, &lc, bfr);
     metric_toc(&lc, RSB_SORT);
-    debug_print(&lc, options->verbose_level > 1, " done.\n");
 
     // Attempt to repair if there are disconnected components
-    debug_print(&lc, options->verbose_level > 1, "\tRepair ...");
+    debug_print(&lc, verbose, "\tRepair ...\n");
     metric_tic(&lc, RSB_REPAIR);
     if (options->repair)
       repair_partitions_v2(elements, nv, &tc, &lc, bin, options->rsb_pre, bfr);
     metric_toc(&lc, RSB_REPAIR);
-    debug_print(&lc, options->verbose_level > 1, " done.\n");
 
     // Bisect and balance
-    debug_print(&lc, options->verbose_level > 1, "\tBalance ...");
+    debug_print(&lc, verbose, "\tBalance ...\n");
     metric_tic(&lc, RSB_BALANCE);
     balance_partitions(elements, nv, &tc, &lc, bin, bfr);
     metric_toc(&lc, RSB_BALANCE);
-    debug_print(&lc, options->verbose_level > 1, " done.\n");
 
     // Split the communicator and recurse on the sub-problems.
     comm_free(&lc), comm_dup(&lc, &tc), comm_free(&tc);
     get_part(&np, &nid, options->two_level, &lc, &nc);
-    debug_print(&lc, options->verbose_level > 1, "\tBisect ... done.\n");
+    debug_print(&lc, verbose, "\tBisect ...\n");
     metric_push_level();
+
+    // Turning verbose off for subsequent levels.
+    verbose = 0;
   }
   comm_free(&lc);
 

@@ -100,7 +100,7 @@ static void sort_segments_local(struct array *local, int dim) {
 
 static void sort_segments_shared_aux(struct array *arr, int dim, struct comm *c,
                                      int verbose, buffer *bfr) {
-  debug_print(c, 0, "\t\t\t\tsss_aux_parallel_sort.\n");
+  debug_print(c, verbose, "\t\t\t\tsss_aux_parallel_sort: ...\n");
   switch (dim) {
   case 0:
     parallel_sort(struct point_t, arr, x[0], gs_double, 0, 1, c, bfr);
@@ -114,7 +114,7 @@ static void sort_segments_shared_aux(struct array *arr, int dim, struct comm *c,
   default:
     break;
   }
-  debug_print(c, 0, "\t\t\t\tsss_aux_parallel_sort: done.\n");
+  debug_print(c, verbose, "\t\t\t\tsss_aux_parallel_sort: done.\n");
 
   // Mark the first point of the segment to have ifSegment = 1 and zero out
   // everything else.
@@ -129,7 +129,7 @@ static void sort_segments_shared_aux(struct array *arr, int dim, struct comm *c,
   if (c->id == rank)
     pts[0].ifSegment = 1;
 
-  debug_print(c, 0, "\t\t\t\tsss_aux_mark_first_point: done.\n");
+  debug_print(c, verbose, "\t\t\t\tsss_aux_mark_first_point: done.\n");
 }
 
 static uint find_bin_scan(const sint sum, const struct comm *c,
@@ -193,7 +193,6 @@ static uint find_bin_cr(const slong id, const struct comm *c, const int verbose,
 
 static void sort_segments_shared(struct array *shared, int dim, struct comm *c,
                                  int verbose, buffer *bfr) {
-  debug_print(c, verbose, "\t\t\tsss_local.\n");
   // Each process can only have at most a single ifSegment = 1 in shared
   // array. Otherwise, we can always move the segments into the local segments
   // array till we end up in such a configuration. Let's first check for this
@@ -238,6 +237,7 @@ static void sort_segments_shared(struct array *shared, int dim, struct comm *c,
   // are sorted. This is done to avoid same process having to work on both the
   // global ids (if ngids = 2) it owns at the same time.
   for (int parity = 0; parity < 2; parity++) {
+    debug_print(c, verbose, "\t\t\tsss_parity_%d: ...\n", parity);
     int index = INT_MIN;
     if (gids[0] >= 0 && (gids[0] % 2 == parity))
       index = 0;
@@ -246,17 +246,16 @@ static void sort_segments_shared(struct array *shared, int dim, struct comm *c,
 
     struct comm active, seg;
     comm_split(c, index >= 0, c->id, &active);
-    debug_print(c, verbose, "\t\t\tsss_parity_%d.\n", parity);
     if (index >= 0) {
       assert(gids[index] >= 0);
       sint bin = -1;
       if (algo == 0) {
         uint off = (ngids == 1 && sum == 1) || (ngids == 2 && index == 1);
-        bin = find_bin_scan(sum, &active, verbose, bfr) + off;
+        bin = find_bin_scan(sum, &active, verbose - 1, bfr) + off;
       } else if (algo == 1) {
-        bin = find_bin_gs(gids[index], &active, verbose, bfr);
+        bin = find_bin_gs(gids[index], &active, verbose - 1, bfr);
       } else if (algo == 2) {
-        bin = find_bin_cr(gids[index], &active, verbose, bfr);
+        bin = find_bin_cr(gids[index], &active, verbose - 1, bfr);
       }
       debug_print(&active, verbose,
                   "\t\t\tsss_find_bin_algo_%d_parity_%d: done.\n", algo,
@@ -265,12 +264,12 @@ static void sort_segments_shared(struct array *shared, int dim, struct comm *c,
 
       // index >= 0 --> gids[index] >= 0 --> segments[index].n > 0
       comm_split(&active, bin, active.id, &seg);
-      debug_print(&active, verbose, "\t\t\tsss_aux_%d: done.\n", parity);
-      sort_segments_shared_aux(&segments[index], dim, &seg, verbose, bfr);
+      sort_segments_shared_aux(&segments[index], dim, &seg, verbose - 1, bfr);
       comm_free(&seg);
+      debug_print(&active, verbose, "\t\t\tsss_aux_%d: done.\n", parity);
     }
-    debug_print(c, verbose, "\t\t\tsss_parity_%d: done.\n", parity);
     comm_free(&active);
+    debug_print(c, verbose, "\t\t\tsss_parity_%d: done.\n", parity);
   }
   debug_print(c, verbose, "\t\t\tsss_shared: done.\n");
 
@@ -502,35 +501,34 @@ int find_unique_vertices(Mesh mesh, struct comm *c, scalar tol, int verbose,
 
   for (int t = 0; t < ndim; t++) {
     for (int d = 0; d < ndim; d++) {
-      debug_print(c, verbose, "\t  locglob: %d %d", t + 1, d + 1);
+      debug_print(c, verbose, "\tlocglob: %d %d", t + 1, d + 1);
 
       // Sort both local and shared segments.
-      debug_print(c, verbose, "\t\tsort_shared_segments.\n");
-      sort_segments_shared(&shared, d, c, verbose, bfr);
-      debug_print(c, verbose, "\t\tsort_local_segments.\n");
+      sort_segments_shared(&shared, d, c, verbose - 1, bfr);
+      debug_print(c, verbose - 1, "\t\tsort_shared_segments: done.\n");
       sort_segments_local(&local, d);
+      debug_print(c, verbose - 1, "\t\tsort_local_segments: done.\n");
 
       // Find segments in local and shared segments now.
-      debug_print(c, verbose, "\t\tfind_shared_segments.\n");
       find_segments(&shared, d, tol2, c);
-      debug_print(c, verbose, "\t\tfind_local_segments.\n");
+      debug_print(c, verbose - 1, "\t\tfind_shared_segments: done.\n");
       find_segments(&local, d, tol2, &COMM_NULL);
+      debug_print(c, verbose - 1, "\t\tfind_local_segments: done.\n");
 
       // Separate local segments from the shared segments.
-      debug_print(c, verbose, "\t\tseparate_local_segments.\n");
       separate_local_segments(&local, &shared, c);
+      debug_print(c, verbose - 1, "\t\tseparate_local_segments: done.\n");
 
       // Number the segments.
-      debug_print(c, verbose, "\t\tnumber_segments.\n");
       slong nseg = number_segments(&local, &shared, c);
+      debug_print(c, verbose - 1, "\t\tnumber_segments: done.\n");
       debug_print(c, verbose, " %lld %lld\n", nseg, npts);
     }
   }
   // Number points consecutively -- shared points after local and then load
   // balance.
-  debug_print(c, verbose, "\t\tnumber points and load balance ...");
   number_points(elems, &local, &shared, c, bfr);
-  debug_print(c, verbose, "done.\n");
+  debug_print(c, verbose, "\tnumber_points_and_load_balance: done.\n");
   array_free(&shared), array_free(&local);
 
   return 0;
