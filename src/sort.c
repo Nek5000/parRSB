@@ -104,18 +104,62 @@ void sort_local(struct sort *s) {
   sarray_permute_buf_(s->align, usize, a->ptr, a->n, buf);
 }
 
-static int load_balance(struct array *a, size_t size, const struct comm *c,
-                        struct crystal *cr) {
+static int load_balance(struct array *a, size_t size, const struct comm *c) {
   slong out[2][1], buf[2][1], in = a->n;
   comm_scan(out, c, gs_long, gs_add, &in, 1, buf);
   slong start = out[0][0], nelem = out[1][0];
 
-  uint *proc = tcalloc(uint, a->n);
+  uint *proc = tcalloc(uint, a->n + 1);
   set_proc_from_idx(proc, a->n, c->np, start, nelem);
-  sarray_transfer_ext_(a, size, proc, sizeof(uint), cr);
+  sarray_transfer_chunk(a, size, proc, c);
   free(proc);
 
   return 0;
+}
+
+void sarray_transfer_chunk(struct array *arr, const size_t usize,
+                           const uint *proc, const struct comm *c) {
+  // Calculate the global array size. If it is zero, nothing to do, just return.
+  slong ng = arr->n, wrk[2];
+  comm_allreduce(c, gs_long, gs_add, &ng, 1, wrk);
+  if (ng == 0)
+    return;
+
+  // Initialize the crystal router.
+  struct crystal cr;
+  crystal_init(&cr, c);
+
+  // Transfer the array elements to destination processor. To avoid message
+  // sizes larger than INT_MAX, we calculate total message size and then figure
+  // out how many transfers we need. Then we transfer array using that many
+  // transfers.
+  uint nt = 2 * ((ng * usize + INT_MAX - 1) / INT_MAX);
+  uint tsize = (arr->n + nt - 1) / nt;
+
+  struct array brr, crr;
+  array_init_(&brr, tsize + 1, usize, __FILE__, __LINE__);
+  array_init_(&crr, arr->n + 1, usize, __FILE__, __LINE__);
+
+  char *pe = (char *)arr->ptr;
+  uint off = 0;
+  for (unsigned i = 0; i < nt; i++) {
+    // Copy from arr to brr.
+    brr.n = 0;
+    uint off1 = off + tsize;
+    for (uint j = off; j < arr->n && j < off1; j++)
+      array_cat_(usize, &brr, &pe[j * usize], 1, __FILE__, __LINE__);
+    assert(off <= arr->n);
+    sarray_transfer_ext_(&brr, usize, &proc[off], sizeof(uint), &cr);
+    array_cat_(usize, &crr, brr.ptr, brr.n, __FILE__, __LINE__);
+    off = (off1 < arr->n ? off1 : arr->n);
+  }
+  array_free(&brr);
+
+  arr->n = 0;
+  array_cat_(usize, arr, crr.ptr, crr.n, __FILE__, __LINE__);
+  array_free(&crr);
+
+  crystal_free(&cr);
 }
 
 void parallel_sort_private(struct sort *data, const struct comm *c) {
@@ -144,11 +188,9 @@ void parallel_sort_private(struct sort *data, const struct comm *c) {
   }
 
   if (balance) {
-    struct crystal cr;
-    crystal_init(&cr, c);
-    load_balance(a, usize, c, &cr);
-    crystal_free(&cr);
+    load_balance(a, usize, c);
     sort_local(data);
   }
+
   comm_free(&dup);
 }

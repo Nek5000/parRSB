@@ -85,7 +85,7 @@ static int transfer_elem(struct hypercube *data, struct comm *c) {
   slong lelem = out[1][0], uelem = out[1][1];
 
   uint np = c->np, lnp = np / 2;
-  uint *proc = tcalloc(uint, size);
+  uint *proc = tcalloc(uint, size + 1);
   set_proc_from_idx(proc, lnp, lstart, lown, lelem);
   set_proc_from_idx(proc + lown, np - lnp, ustart, uppern, uelem);
 
