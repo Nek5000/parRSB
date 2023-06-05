@@ -133,7 +133,9 @@ void sarray_transfer_chunk(struct array *arr, const size_t usize,
   // sizes larger than INT_MAX, we calculate total message size and then figure
   // out how many transfers we need. Then we transfer array using that many
   // transfers.
-  uint nt = 2 * ((ng * usize + INT_MAX - 1) / INT_MAX);
+  slong msg_size = INT_MAX;
+  msg_size *= 2;
+  uint nt = (ng * usize + msg_size - 1) / msg_size;
   uint tsize = (arr->n + nt - 1) / nt;
 
   struct array brr, crr;

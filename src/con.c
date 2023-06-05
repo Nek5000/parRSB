@@ -12,13 +12,12 @@ int NEIGHBOR_MAP[GC_MAX_VERTICES][GC_MAX_NEIGHBORS] = {
 void debug_print(const struct comm *c, int verbose, const char *fmt, ...) {
   comm_barrier(c);
   va_list vargs;
-  va_start(vargs, fmt);
   if (c->id == 0 && verbose > 0) {
+    va_start(vargs, fmt);
     vprintf(fmt, vargs);
+    va_end(vargs);
     fflush(stdout);
   }
-  fflush(stdout);
-  va_end(vargs);
 }
 
 double diff_sqr(double x, double y) { return (x - y) * (x - y); }

@@ -309,7 +309,8 @@ int rsb(struct array *elements, int nv, int check, parrsb_options *options,
   }
 
   // Set verbosity.
-  int verbose = options->verbose_level > 1;
+  // int verbose = options->verbose_level > 1;
+  int verbose = 2;
 
   // Get number of partitions we are going to perform RSB on first level.
   sint np, nid;
@@ -320,7 +321,7 @@ int rsb(struct array *elements, int nv, int check, parrsb_options *options,
   unsigned ndim = (nv == 8) ? 3 : 2;
   while (np > 1) {
     // Run the pre-partitioner.
-    debug_print(&lc, verbose, "\tPre-partitioner: ...\n");
+    debug_print(&lc, verbose, "\tPre-partitioner: ... %d\n", verbose);
     metric_tic(&lc, RSB_PRE);
     switch (options->rsb_pre) {
     case 0: // Sort by global id
@@ -339,7 +340,7 @@ int rsb(struct array *elements, int nv, int check, parrsb_options *options,
     metric_toc(&lc, RSB_PRE);
 
     // Find the Fiedler vector
-    debug_print(&lc, verbose, "\tFiedler ...\n");
+    debug_print(&lc, verbose, "\tFiedler ... %d\n", verbose);
     unsigned bin = (nid >= (np + 1) / 2);
     comm_split(&lc, bin, lc.id, &tc);
 
@@ -352,21 +353,21 @@ int rsb(struct array *elements, int nv, int check, parrsb_options *options,
     metric_toc(&lc, RSB_FIEDLER);
 
     // Sort by Fiedler vector
-    debug_print(&lc, verbose, "\tSort ...\n");
+    debug_print(&lc, verbose, "\tSort ... %d\n", verbose);
     metric_tic(&lc, RSB_SORT);
     parallel_sort_2(struct rsb_element, elements, fiedler, gs_double, globalId,
                     gs_long, 0, 1, &lc, bfr);
     metric_toc(&lc, RSB_SORT);
 
     // Attempt to repair if there are disconnected components
-    debug_print(&lc, verbose, "\tRepair ...\n");
+    debug_print(&lc, verbose, "\tRepair ... %d\n", verbose);
     metric_tic(&lc, RSB_REPAIR);
     if (options->repair)
       repair_partitions_v2(elements, nv, &tc, &lc, bin, options->rsb_pre, bfr);
     metric_toc(&lc, RSB_REPAIR);
 
     // Bisect and balance
-    debug_print(&lc, verbose, "\tBalance ...\n");
+    debug_print(&lc, verbose, "\tBalance ... %d\n", verbose);
     metric_tic(&lc, RSB_BALANCE);
     balance_partitions(elements, nv, &tc, &lc, bin, bfr);
     metric_toc(&lc, RSB_BALANCE);
@@ -374,11 +375,11 @@ int rsb(struct array *elements, int nv, int check, parrsb_options *options,
     // Split the communicator and recurse on the sub-problems.
     comm_free(&lc), comm_dup(&lc, &tc), comm_free(&tc);
     get_part(&np, &nid, options->two_level, &lc, &nc);
-    debug_print(&lc, verbose, "\tBisect ...\n");
+    debug_print(&lc, verbose, "\tBisect ... %d\n", verbose);
     metric_push_level();
 
     // Turning verbose off for subsequent levels.
-    verbose = 0;
+    verbose--;
   }
   comm_free(&lc);
 
