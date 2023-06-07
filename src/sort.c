@@ -171,21 +171,31 @@ void sarray_transfer_chunk(struct array *arr, const size_t usize,
   crystal_free(&cr);
 }
 
-void parallel_sort_private(struct sort *data, const struct comm *c) {
-  struct comm dup;
-  comm_dup(&dup, c);
+void parallel_sort_(struct array *arr, size_t usize, size_t align,
+                    unsigned algo, unsigned balance, const struct comm *c,
+                    buffer *bfr, int nfields, ...) {
+  struct sort sd = {.a = arr, .unit_size = usize, .align = align};
+  sd.nfields = nfields;
 
-  int balance = data->balance, algo = data->algo;
-  struct array *a = data->a;
-  size_t usize = data->unit_size;
+  va_list vargs;
+  va_start(vargs, nfields);
+  for (uint i = 0; i < nfields; i++) {
+    sd.t[i] = va_arg(vargs, gs_dom);
+    sd.offset[i] = va_arg(vargs, size_t);
+  }
+  va_end(vargs);
+
+  sd.buf = bfr;
 
   struct hypercube hdata;
+  struct comm dup;
+  comm_dup(&dup, c);
   switch (algo) {
   case 0:
-    parallel_bin_sort(data, c);
+    parallel_bin_sort(&sd, c);
     break;
   case 1:
-    hdata.data = data;
+    hdata.data = &sd;
     hdata.probes = NULL;
     hdata.probe_cnt = NULL;
     parallel_hypercube_sort(&hdata, &dup);
@@ -195,11 +205,10 @@ void parallel_sort_private(struct sort *data, const struct comm *c) {
   default:
     break;
   }
+  comm_free(&dup);
 
   if (balance) {
-    load_balance(a, usize, c);
-    sort_local(data);
+    load_balance(sd.a, sd.unit_size, c);
+    sort_local(&sd);
   }
-
-  comm_free(&dup);
 }
