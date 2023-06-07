@@ -1,10 +1,10 @@
 #include "sort-impl.h"
 #include <math.h>
 
-static int init_probes(struct hypercube *data, struct comm *c) {
+static void init_probes(struct hypercube *data, const struct comm *c) {
   struct sort *input = data->data;
 
-  // Allocate space for probes and counts
+  // Allocate space for probes and counts.
   int nprobes = data->nprobes = 3;
   if (!data->probes)
     data->probes = tcalloc(double, nprobes);
@@ -19,40 +19,35 @@ static int init_probes(struct hypercube *data, struct comm *c) {
   data->probes[0] = extrema[0];
   data->probes[1] = extrema[0] + delta;
   data->probes[2] = extrema[1];
-
-  return 0;
 }
 
-static int update_probe_counts(struct hypercube *data, struct comm *c) {
+static void update_probe_counts(struct hypercube *data, const struct comm *c) {
   struct sort *input = data->data;
   uint offset = input->offset[0];
   gs_dom t = input->t[0];
 
   uint nprobes = data->nprobes;
-  uint i;
-  for (i = 0; i < nprobes; i++)
+  for (uint i = 0; i < nprobes; i++)
     data->probe_cnt[i] = 0;
 
   struct array *a = input->a;
-  uint e;
-  for (e = 0; e < a->n; e++) {
-    double val_e = get_scalar(a, e, offset, input->unit_size, t);
-    for (i = 0; i < nprobes; i++)
-      if (val_e < data->probes[i])
+  for (uint e = 0; e < a->n; e++) {
+    double val = get_scalar(a, e, offset, input->unit_size, t);
+    for (uint i = 0; i < nprobes; i++) {
+      if (val < data->probes[i])
         data->probe_cnt[i]++;
+    }
   }
 
-  slong buf[6];
-  comm_allreduce(c, gs_long, gs_add, data->probe_cnt, nprobes, buf);
-
-  return 0;
+  slong wrk[6];
+  comm_allreduce(c, gs_long, gs_add, data->probe_cnt, nprobes, wrk);
 }
 
-static int update_probes(slong nelem, double *probes, ulong *probe_cnt,
-                         uint threshold) {
+static void update_probes(slong nelem, double *probes, ulong *probe_cnt,
+                          uint threshold) {
   slong expected = nelem / 2;
   if (llabs(expected - (slong)probe_cnt[1]) < threshold)
-    return 0;
+    return;
 
   if (probe_cnt[1] < expected)
     probes[0] = probes[1];
@@ -60,13 +55,12 @@ static int update_probes(slong nelem, double *probes, ulong *probe_cnt,
     probes[2] = probes[1];
 
   probes[1] = probes[0] + (probes[2] - probes[0]) / 2.0;
-
-  return 0;
 }
 
-static int transfer_elem(struct hypercube *data, struct comm *c) {
+static void transfer_elem(const struct hypercube *data, const struct comm *c) {
   struct sort *input = data->data;
-  uint usize = input->unit_size, offset = input->offset[0];
+  uint usize = input->unit_size;
+  uint offset = input->offset[0];
   gs_dom t = input->t[0];
   struct array *a = input->a;
 
@@ -79,54 +73,46 @@ static int transfer_elem(struct hypercube *data, struct comm *c) {
       uppern++;
   }
 
-  slong out[2][2], in[2] = {lown, uppern}, buf[2][2];
-  comm_scan(out, c, gs_long, gs_add, in, 2, buf);
+  slong out[2][2], in[2] = {lown, uppern}, wrk[2][2];
+  comm_scan(out, c, gs_long, gs_add, in, 2, wrk);
   slong lstart = out[0][0], ustart = out[0][1];
   slong lelem = out[1][0], uelem = out[1][1];
 
   uint np = c->np, lnp = np / 2;
-  uint *proc = tcalloc(uint, size + 1);
+  uint *proc = tcalloc(uint, size);
   set_proc_from_idx(proc, lnp, lstart, lown, lelem);
   set_proc_from_idx(proc + lown, np - lnp, ustart, uppern, uelem);
 
   for (uint e = lown; e < size; e++)
     proc[e] += lnp;
 
-  struct crystal cr;
-  crystal_init(&cr, c);
-  sarray_transfer_ext_(a, usize, proc, sizeof(uint), &cr);
-  crystal_free(&cr);
-
+  sarray_transfer_chunk(a, usize, proc, c);
   free(proc);
-
-  return 0;
 }
 
-void parallel_hypercube_sort(struct hypercube *data, struct comm *c) {
+// TODO: Get rid of this recursive implementation.
+void parallel_hypercube_sort(struct hypercube *data, const struct comm *c) {
   struct sort *input = data->data;
   struct array *a = input->a;
   gs_dom t = input->t[0];
   uint offset = input->offset[0];
-
-  sint size = c->np, rank = c->id;
 
   slong out[2][1], buf[2][1], in = a->n;
   comm_scan(out, c, gs_long, gs_add, &in, 1, buf);
   slong start = out[0][0];
   slong nelem = out[1][0];
 
-  uint threshold = nelem / (10 * size);
+  uint threshold = nelem / (10 * c->np);
   if (threshold < 2)
     threshold = 2;
 
   sort_local(data->data);
 
-  if (size == 1)
+  if (c->np == 1)
     return;
 
   init_probes(data, c);
   update_probe_counts(data, c);
-
   int max_iter = log2((data->probes[2] - data->probes[0]) / 1e-12);
   int iter = 0;
   while (llabs(nelem / 2 - (slong)data->probe_cnt[1]) > threshold &&
@@ -139,17 +125,11 @@ void parallel_hypercube_sort(struct hypercube *data, struct comm *c) {
 
   // split the communicator
   struct comm nc;
-  sint lower = (rank < size / 2) ? 1 : 0;
-#if defined(MPI)
-  MPI_Comm nc_;
-  MPI_Comm_split(c->c, lower, rank, &nc_);
-  comm_init(&nc, nc_);
-  MPI_Comm_free(&nc_);
-#else
-  comm_init(&nc, 1);
-#endif
+  sint lower = (c->id < c->np / 2);
+  comm_split(c, lower, c->id, &nc);
 
   // TODO: Keep load balancing after each split
   parallel_hypercube_sort(data, &nc);
+
   comm_free(&nc);
 }

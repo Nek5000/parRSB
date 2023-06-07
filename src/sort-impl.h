@@ -23,7 +23,7 @@ struct hypercube {
   double *probes;
   ulong *probe_cnt;
 };
-void parallel_hypercube_sort(struct hypercube *data, struct comm *c);
+void parallel_hypercube_sort(struct hypercube *data, const struct comm *c);
 
 void parallel_bin_sort(struct sort *s, const struct comm *c);
 
