@@ -309,8 +309,7 @@ int rsb(struct array *elements, int nv, int check, parrsb_options *options,
   }
 
   // Set verbosity.
-  // int verbose = options->verbose_level > 1;
-  int verbose = 2;
+  int verbose = options->verbose_level > 1;
 
   // Get number of partitions we are going to perform RSB on first level.
   sint np, nid;
@@ -377,9 +376,6 @@ int rsb(struct array *elements, int nv, int check, parrsb_options *options,
     get_part(&np, &nid, options->two_level, &lc, &nc);
     debug_print(&lc, verbose, "\tBisect ... %d\n", verbose);
     metric_push_level();
-
-    // Turning verbose off for subsequent levels.
-    verbose--;
   }
   comm_free(&lc);
 
