@@ -28,14 +28,7 @@ void sort_local(struct sort *s);
 void get_extrema(void *extrema_, struct sort *data, uint field,
                  const struct comm *c);
 
-struct hypercube {
-  struct sort *data;
-  int nprobes;
-  double *probes;
-  ulong *probe_cnt;
-};
-
-void parallel_hypercube_sort(struct hypercube *data, const struct comm *c);
+void parallel_hypercube_sort(struct sort *s, const struct comm *c);
 
 void parallel_bin_sort(struct sort *s, const struct comm *c);
 

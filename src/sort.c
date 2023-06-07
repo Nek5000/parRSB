@@ -175,6 +175,7 @@ void parallel_sort_(struct array *arr, size_t usize, size_t align,
                     unsigned algo, unsigned balance, const struct comm *c,
                     buffer *bfr, int nfields, ...) {
   struct sort sd = {.a = arr, .unit_size = usize, .align = align};
+  sd.buf = bfr;
   sd.nfields = nfields;
 
   va_list vargs;
@@ -185,27 +186,16 @@ void parallel_sort_(struct array *arr, size_t usize, size_t align,
   }
   va_end(vargs);
 
-  sd.buf = bfr;
-
-  struct hypercube hdata;
-  struct comm dup;
-  comm_dup(&dup, c);
   switch (algo) {
   case 0:
     parallel_bin_sort(&sd, c);
     break;
   case 1:
-    hdata.data = &sd;
-    hdata.probes = NULL;
-    hdata.probe_cnt = NULL;
-    parallel_hypercube_sort(&hdata, &dup);
-    free(hdata.probes);
-    free(hdata.probe_cnt);
+    parallel_hypercube_sort(&sd, c);
     break;
   default:
     break;
   }
-  comm_free(&dup);
 
   if (balance) {
     load_balance(sd.a, sd.unit_size, c);

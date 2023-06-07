@@ -1,6 +1,13 @@
 #include "sort-impl.h"
 #include <math.h>
 
+struct hypercube {
+  struct sort *data;
+  int nprobes;
+  double *probes;
+  ulong *probe_cnt;
+};
+
 static void init_probes(struct hypercube *data, const struct comm *c) {
   struct sort *input = data->data;
 
@@ -91,7 +98,8 @@ static void transfer_elem(const struct hypercube *data, const struct comm *c) {
 }
 
 // TODO: Get rid of this recursive implementation.
-void parallel_hypercube_sort(struct hypercube *data, const struct comm *c) {
+static void parallel_hypercube_sort_aux(struct hypercube *data,
+                                        const struct comm *c) {
   struct sort *input = data->data;
   struct array *a = input->a;
   gs_dom t = input->t[0];
@@ -129,7 +137,18 @@ void parallel_hypercube_sort(struct hypercube *data, const struct comm *c) {
   comm_split(c, lower, c->id, &nc);
 
   // TODO: Keep load balancing after each split
-  parallel_hypercube_sort(data, &nc);
+  parallel_hypercube_sort_aux(data, &nc);
 
   comm_free(&nc);
+}
+
+void parallel_hypercube_sort(struct sort *sd, const struct comm *c) {
+  struct comm dup;
+  comm_dup(&dup, c);
+
+  struct hypercube hdata = {.data = sd, .probes = NULL, .probe_cnt = NULL};
+  parallel_hypercube_sort_aux(&hdata, &dup);
+  free(hdata.probes), free(hdata.probe_cnt);
+
+  comm_free(&dup);
 }
