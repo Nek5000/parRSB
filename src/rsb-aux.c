@@ -355,9 +355,6 @@ int rsb(struct array *elements, int nv, int check, parrsb_options *options,
     // Sort by Fiedler vector
     debug_print(&lc, verbose, "\tSort ... %d\n", verbose);
     metric_tic(&lc, RSB_SORT);
-    // parallel_sort_2(struct rsb_element, elements, fiedler, gs_double,
-    // globalId,
-    //                 gs_long, 0, 1, &lc, bfr);
     parallel_sort(struct rsb_element, elements, fiedler, gs_double, 0, 1, &lc,
                   bfr);
     metric_toc(&lc, RSB_SORT);

@@ -7,7 +7,7 @@ static uint *set_proc_from_val(struct sort *s, uint field,
   uint offset = s->offset[field];
 
   uint size = a->n;
-  uint *proc = tcalloc(uint, size + 1);
+  uint *proc = tcalloc(uint, size);
 
   double extrema[2];
   get_extrema((void *)extrema, s, field, c);

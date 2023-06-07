@@ -118,7 +118,7 @@ static int load_balance(struct array *a, size_t size, const struct comm *c) {
 }
 
 void sarray_transfer_chunk(struct array *arr, const size_t usize,
-                           const uint *proc, const struct comm *c) {
+                           const uint *proci, const struct comm *c) {
   // Calculate the global array size. If it is zero, nothing to do, just return.
   slong ng = arr->n, wrk[2];
   comm_allreduce(c, gs_long, gs_add, &ng, 1, wrk);
@@ -129,12 +129,16 @@ void sarray_transfer_chunk(struct array *arr, const size_t usize,
   struct crystal cr;
   crystal_init(&cr, c);
 
+  // Allocate `proc` with some buffer space.
+  uint *proc = tcalloc(uint, arr->n + 1);
+  for (uint i = 0; i < arr->n; i++)
+    proc[i] = proci[i];
+
   // Transfer the array elements to destination processor. To avoid message
   // sizes larger than INT_MAX, we calculate total message size and then figure
   // out how many transfers we need. Then we transfer array using that many
   // transfers.
   slong msg_size = INT_MAX;
-  msg_size *= 2;
   uint nt = (ng * usize + msg_size - 1) / msg_size;
   uint tsize = (arr->n + nt - 1) / nt;
 
@@ -145,13 +149,15 @@ void sarray_transfer_chunk(struct array *arr, const size_t usize,
   char *pe = (char *)arr->ptr;
   uint off = 0;
   for (unsigned i = 0; i < nt; i++) {
-    // Copy from arr to brr.
+    // Copy a chunk from `arr` to `brr`.
     brr.n = 0;
     uint off1 = off + tsize;
     for (uint j = off; j < arr->n && j < off1; j++)
       array_cat_(usize, &brr, &pe[j * usize], 1, __FILE__, __LINE__);
     assert(off <= arr->n);
+    // Transfer the chunk in `brr` to the destination.
     sarray_transfer_ext_(&brr, usize, &proc[off], sizeof(uint), &cr);
+    // Append the received chunk to `crr`.
     array_cat_(usize, &crr, brr.ptr, brr.n, __FILE__, __LINE__);
     off = (off1 < arr->n ? off1 : arr->n);
   }
@@ -161,6 +167,7 @@ void sarray_transfer_chunk(struct array *arr, const size_t usize,
   array_cat_(usize, arr, crr.ptr, crr.n, __FILE__, __LINE__);
   array_free(&crr);
 
+  free(proc);
   crystal_free(&cr);
 }
 
