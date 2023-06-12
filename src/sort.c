@@ -2,6 +2,9 @@
 #include <float.h>
 #include <math.h>
 
+extern void debug_print(const struct comm *c, int verbose, const char *fmt,
+                        ...);
+
 double get_scalar(struct array *a, uint i, uint offset, uint usize,
                   gs_dom type) {
   char *v = (char *)a->ptr + i * usize + offset;
@@ -138,8 +141,9 @@ void sarray_transfer_chunk(struct array *arr, const size_t usize,
   // sizes larger than INT_MAX, we calculate total message size and then figure
   // out how many transfers we need. Then we transfer array using that many
   // transfers.
-  slong msg_size = INT_MAX;
+  slong msg_size = 9 * (INT_MAX / 10);
   uint nt = (ng * usize + msg_size - 1) / msg_size;
+  debug_print(c, 1, "\t\t\t msg_size = %lld, nt = %u", msg_size, nt);
   uint tsize = (arr->n + nt - 1) / nt;
 
   struct array brr, crr;
@@ -147,19 +151,27 @@ void sarray_transfer_chunk(struct array *arr, const size_t usize,
   array_init_(&crr, arr->n + 1, usize, __FILE__, __LINE__);
 
   char *pe = (char *)arr->ptr;
-  uint off = 0;
-  for (unsigned i = 0; i < nt; i++) {
+  uint off = 0, off1;
+  for (unsigned t = 0; t < nt; t++) {
     // Copy a chunk from `arr` to `brr`.
-    brr.n = 0;
-    uint off1 = off + tsize;
+    brr.n = 0, off1 = off + tsize;
+    assert(off <= arr->n);
     for (uint j = off; j < arr->n && j < off1; j++)
       array_cat_(usize, &brr, &pe[j * usize], 1, __FILE__, __LINE__);
-    assert(off <= arr->n);
+
     // Transfer the chunk in `brr` to the destination.
     sarray_transfer_ext_(&brr, usize, &proc[off], sizeof(uint), &cr);
+
     // Append the received chunk to `crr`.
     array_cat_(usize, &crr, brr.ptr, brr.n, __FILE__, __LINE__);
     off = (off1 < arr->n ? off1 : arr->n);
+
+    // Some debug printing.
+    slong cmax = crr.n, bmax = brr.n;
+    comm_allreduce(c, gs_long, gs_max, &cmax, 1, wrk);
+    comm_allreduce(c, gs_long, gs_max, &bmax, 1, wrk);
+    debug_print(c, 1, "\t\t\t %d/%d brr.n = %u crr.n = %u\n", t, nt, bmax,
+                cmax);
   }
   array_free(&brr);
 
