@@ -6,19 +6,17 @@ static uint *set_proc_from_val(struct sort *s, uint field,
   gs_dom t = s->t[field];
   uint offset = s->offset[field];
 
-  uint size = a->n;
-  uint *proc = tcalloc(uint, size);
-
   double extrema[2];
   get_extrema((void *)extrema, s, field, c);
   double range = extrema[1] - extrema[0];
 
+  uint size = a->n;
   if (size == 0)
-    return 0;
+    return NULL;
+  uint *proc = tcalloc(uint, size);
 
   sint np = c->np;
-  uint id = 0;
-  uint index = 0;
+  uint id = 0, index = 0;
   do {
     double end = extrema[0] + (range / np) * (id + 1);
     while (index < size) {
@@ -32,6 +30,7 @@ static uint *set_proc_from_val(struct sort *s, uint field,
   } while (id < np && index < size);
   for (; index < size; index++)
     proc[index] = np - 1;
+
   return proc;
 }
 

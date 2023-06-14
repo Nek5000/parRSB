@@ -18,7 +18,7 @@ parrsb_options parrsb_default_options = {
     .profile_level = 0,
     .two_level = 1,
     .repair = 0,
-    // RSB common (Lanczos + MG) options
+    // RSB common (Lanczos and MG) options
     .rsb_algo = 0,
     .rsb_pre = 1,
     .rsb_max_iter = 50,
@@ -56,8 +56,6 @@ static void update_options(parrsb_options *options) {
   UPDATE_OPTION(rsb_mg_grammian, "PARRSB_RSB_MG_GRAMMIAN", 1);
   UPDATE_OPTION(rsb_mg_factor, "PARRSB_RSB_MG_FACTOR", 1);
   UPDATE_OPTION(rsb_mg_sagg, "PARRSB_RSB_MG_SMOOTH_AGGREGATION", 1);
-  if (options->verbose_level == 0)
-    options->profile_level = 0;
 
 #undef UPDATE_OPTION
 }

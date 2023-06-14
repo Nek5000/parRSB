@@ -170,8 +170,8 @@ void sarray_transfer_chunk(struct array *arr, const size_t usize,
     slong cmax = crr.n, bmax = brr.n;
     comm_allreduce(c, gs_long, gs_max, &cmax, 1, wrk);
     comm_allreduce(c, gs_long, gs_max, &bmax, 1, wrk);
-    debug_print(c, 1, "\t\t\t %d/%d brr.n = %u crr.n = %u\n", t, nt, bmax,
-                cmax);
+    debug_print(c, 1, "\t\t\t %d/%d brr.n = %u/%u crr.n = %u/%u\n", t, nt,
+                brr.n, bmax, crr.n, cmax);
   }
   array_free(&brr);
 
@@ -187,12 +187,8 @@ void parallel_sort_private(struct sort *data, const struct comm *c) {
   struct comm dup;
   comm_dup(&dup, c);
 
-  int balance = data->balance, algo = data->algo;
-  struct array *a = data->a;
-  size_t usize = data->unit_size;
-
   struct hypercube hdata;
-  switch (algo) {
+  switch (data->algo) {
   case 0:
     parallel_bin_sort(data, c);
     break;
@@ -208,8 +204,8 @@ void parallel_sort_private(struct sort *data, const struct comm *c) {
     break;
   }
 
-  if (balance) {
-    load_balance(a, usize, c);
+  if (data->balance) {
+    load_balance(data->a, data->unit_size, c);
     sort_local(data);
   }
 
