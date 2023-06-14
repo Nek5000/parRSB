@@ -49,26 +49,30 @@ void get_extrema(void *extrema_, struct sort *data, uint field,
   extrema[0] *= -1;
 }
 
-void set_proc_from_idx(uint *proc, uint size, sint np, slong start,
-                       slong nelem) {
+uint *set_proc_from_idx(uint size, sint np_, slong start, slong nelem) {
   if (nelem == 0)
-    return;
+    return NULL;
+  uint *proc = tcalloc(uint, size + 1);
 
-  uint nelt = nelem / np, nrem = nelem - np * nelt;
+  ulong np = np_;
+  ulong nelt = nelem / np, nrem = nelem - np * nelt;
+  assert(nrem >= 0 && nrem < np);
   if (nrem == 0) {
-    for (uint i = 0; i < size; i++) {
-      proc[i] = (start + i) / nelt;
-    }
+    for (uint i = 0; i < size; i++)
+      proc[i] = (uint)((start + i) / nelt);
   } else {
-    uint s = np - nrem;
-    slong t = nelt * s;
+    ulong s = np - nrem;
+    ulong t1 = nelt * s;
     for (uint i = 0; i < size; i++) {
-      if (start + i < t)
-        proc[i] = (start + i) / nelt;
+      ulong spi = start + i;
+      if (spi < t1)
+        proc[i] = (uint)(spi / nelt);
       else
-        proc[i] = s + (start + i - t) / (nelt + 1);
+        proc[i] = (uint)s + (uint)((spi - t1) / (nelt + 1));
     }
   }
+
+  return proc;
 }
 
 static int sort_field(struct array *arr, size_t usize, gs_dom t, uint off,
@@ -108,12 +112,12 @@ void sort_local(struct sort *s) {
 }
 
 static int load_balance(struct array *a, size_t size, const struct comm *c) {
-  slong out[2][1], buf[2][1], in = a->n;
-  comm_scan(out, c, gs_long, gs_add, &in, 1, buf);
+  slong out[2][1], wrk[2][1], in = a->n;
+  comm_scan(out, c, gs_long, gs_add, &in, 1, wrk);
   slong start = out[0][0], nelem = out[1][0];
 
-  uint *proc = tcalloc(uint, a->n + 1);
-  set_proc_from_idx(proc, a->n, c->np, start, nelem);
+  debug_print(c, 1, "\t\t\tstart = %lld, nelem = %lld", start, nelem);
+  uint *proc = set_proc_from_idx(a->n, c->np, start, nelem);
   sarray_transfer_chunk(a, size, proc, c);
   free(proc);
 
@@ -143,7 +147,7 @@ void sarray_transfer_chunk(struct array *arr, const size_t usize,
   // transfers.
   slong msg_size = 9 * (INT_MAX / 10);
   uint nt = (ng * usize + msg_size - 1) / msg_size;
-  debug_print(c, 1, "\t\t\t msg_size = %lld, nt = %u", msg_size, nt);
+  debug_print(c, 1, "\t\t\tmsg_size = %lld, nt = %u", msg_size, nt);
   uint tsize = (arr->n + nt - 1) / nt;
 
   struct array brr, crr;
@@ -167,11 +171,14 @@ void sarray_transfer_chunk(struct array *arr, const size_t usize,
     off = (off1 < arr->n ? off1 : arr->n);
 
     // Some debug printing.
-    slong cmax = crr.n, bmax = brr.n;
+    slong cmax = crr.n, bmax = brr.n, cmin = crr.n, bmin = brr.n;
     comm_allreduce(c, gs_long, gs_max, &cmax, 1, wrk);
     comm_allreduce(c, gs_long, gs_max, &bmax, 1, wrk);
-    debug_print(c, 1, "\t\t\t %d/%d brr.n = %u/%u crr.n = %u/%u\n", t, nt,
-                brr.n, bmax, crr.n, cmax);
+    comm_allreduce(c, gs_long, gs_min, &cmin, 1, wrk);
+    comm_allreduce(c, gs_long, gs_min, &bmin, 1, wrk);
+    debug_print(c, 1,
+                "\t\t\t %d/%d brr.n = %u/%lld/%lld crr.n = %u/%lld/%lld\n", t,
+                nt, brr.n, bmin, bmax, crr.n, cmin, cmax);
   }
   array_free(&brr);
 

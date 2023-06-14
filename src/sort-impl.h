@@ -9,8 +9,7 @@ double get_scalar(struct array *a, uint i, uint offset, uint usize,
 void get_extrema(void *extrema_, struct sort *data, uint field,
                  const struct comm *c);
 
-void set_proc_from_idx(uint *proc, uint size, sint np, slong start,
-                       slong nelem);
+uint *set_proc_from_idx(uint size, sint np, slong start, slong nelem);
 
 void sort_local(struct sort *s);
 

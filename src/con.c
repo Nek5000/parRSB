@@ -243,11 +243,7 @@ int parrsb_conn_mesh(long long *vtx, double *coord, int nelt, int ndim,
                          "elementCheck         ", "faceCheck            ",
                          "matchPeriodicFaces   ", "copyOutput           "};
 
-  // debug_print(&c, verbose, "\t%s ...");
-  // parrsb_barrier(&c), t = comm_time();
   Mesh mesh = mesh_init(nelt, ndim, coord, pinfo, npinfo, &c);
-  // duration[0] = comm_time() - t;
-  // debug_print(&c, verbose, "done.\n");
 
   debug_print(&c, verbose, "\t%s ...", name[0]);
   parrsb_barrier(&c), t = comm_time();
