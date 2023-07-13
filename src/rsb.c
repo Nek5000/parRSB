@@ -88,7 +88,7 @@ static void check_rsb_partition(struct comm *gc, parrsb_options *opts) {
     comm_free(&c);
 
     sint minc, maxc;
-    minc = maxc = (sint)metric_get_value(i, RSB_COMPONENTS);
+    minc = maxc = (sint)metric_get_value(i, RSB_COMPONENTS_NCOMP);
     comm_allreduce(gc, gs_int, gs_min, &minc, 1, (void *)bfr);
     comm_allreduce(gc, gs_int, gs_max, &maxc, 1, (void *)bfr);
 
@@ -335,15 +335,12 @@ int rsb(struct array *elements, int nv, int check, parrsb_options *options,
     }
     metric_toc(&lc, RSB_PRE);
 
-    // Find the Fiedler vector.
-    debug_print(&lc, verbose, "\tFiedler ... \n");
-    unsigned bin = (nid >= (np + 1) / 2);
-    comm_split(&lc, bin, lc.id, &tc);
-
     struct rsb_element *pe = (struct rsb_element *)elements->ptr;
     for (unsigned i = 0; i < elements->n; i++)
       pe[i].proc = lc.id;
 
+    // Find the Fiedler vector.
+    debug_print(&lc, verbose, "\tFiedler ... \n");
     metric_tic(&lc, RSB_FIEDLER);
     fiedler(elements, nv, options, &lc, bfr, gc->id == 0);
     metric_toc(&lc, RSB_FIEDLER);
@@ -354,6 +351,16 @@ int rsb(struct array *elements, int nv, int check, parrsb_options *options,
     parallel_sort(struct rsb_element, elements, fiedler, gs_double, 0, 1, &lc,
                   bfr);
     metric_toc(&lc, RSB_SORT);
+
+    unsigned bin = (nid >= (np + 1) / 2);
+    comm_split(&lc, bin, lc.id, &tc);
+
+    // Find the number of disconnected components.
+    debug_print(&lc, verbose, "\tComponents ...\n");
+    metric_tic(&lc, RSB_COMPONENTS);
+    const uint ncomp = get_components_v2(NULL, elements, nv, &tc, bfr, 0);
+    metric_acc(RSB_COMPONENTS_NCOMP, ncomp);
+    metric_toc(&lc, RSB_COMPONENTS);
 
     // Attempt to repair if there are disconnected components.
     debug_print(&lc, verbose, "\tRepair ...\n");
@@ -369,9 +376,9 @@ int rsb(struct array *elements, int nv, int check, parrsb_options *options,
     metric_toc(&lc, RSB_BALANCE);
 
     // Split the communicator and recurse on the sub-problems.
+    debug_print(&lc, verbose, "\tBisect ...\n");
     comm_free(&lc), comm_dup(&lc, &tc), comm_free(&tc);
     get_part(&np, &nid, options->two_level, &lc, &nc);
-    debug_print(&lc, verbose, "\tBisect ...\n");
     metric_push_level();
   }
   comm_free(&lc);
