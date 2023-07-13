@@ -86,15 +86,14 @@ static void transfer_elem(const struct hypercube *data, const struct comm *c) {
   slong lelem = out[1][0], uelem = out[1][1];
 
   uint np = c->np, lnp = np / 2;
-  uint *proc = tcalloc(uint, size);
-  set_proc_from_idx(proc, lnp, lstart, lown, lelem);
-  set_proc_from_idx(proc + lown, np - lnp, ustart, uppern, uelem);
-
+  uint *proc1 = set_proc_from_idx(lnp, lstart, lown, lelem);
+  uint *proc2 = set_proc_from_idx(np - lnp, ustart, uppern, uelem);
+  proc1 = trealloc(uint, proc1, size);
   for (uint e = lown; e < size; e++)
-    proc[e] += lnp;
+    proc1[e] = proc2[e - lown] + lnp;
 
-  sarray_transfer_chunk(a, usize, proc, c);
-  free(proc);
+  sarray_transfer_chunk(a, usize, proc1, c);
+  free(proc1), free(proc2);
 }
 
 // TODO: Get rid of this recursive implementation.

@@ -2,6 +2,9 @@
 #include <float.h>
 #include <math.h>
 
+extern void debug_print(const struct comm *c, int verbose, const char *fmt,
+                        ...);
+
 double get_scalar(struct array *a, uint i, uint offset, uint usize,
                   gs_dom type) {
   char *v = (char *)a->ptr + i * usize + offset;
@@ -46,26 +49,30 @@ void get_extrema(void *extrema_, struct sort *data, uint field,
   extrema[0] *= -1;
 }
 
-void set_proc_from_idx(uint *proc, uint size, sint np, slong start,
-                       slong nelem) {
+uint *set_proc_from_idx(uint size, sint np_, slong start, slong nelem) {
   if (nelem == 0)
-    return;
+    return NULL;
+  uint *proc = tcalloc(uint, size + 1);
 
-  uint nelt = nelem / np, nrem = nelem - np * nelt;
+  ulong np = np_;
+  ulong nelt = nelem / np, nrem = nelem - np * nelt;
+  assert(nrem >= 0 && nrem < np);
   if (nrem == 0) {
-    for (uint i = 0; i < size; i++) {
-      proc[i] = (start + i) / nelt;
-    }
+    for (uint i = 0; i < size; i++)
+      proc[i] = (uint)((start + i) / nelt);
   } else {
-    uint s = np - nrem;
-    slong t = nelt * s;
+    ulong s = np - nrem;
+    ulong t1 = nelt * s;
     for (uint i = 0; i < size; i++) {
-      if (start + i < t)
-        proc[i] = (start + i) / nelt;
+      ulong spi = start + i;
+      if (spi < t1)
+        proc[i] = (uint)(spi / nelt);
       else
-        proc[i] = s + (start + i - t) / (nelt + 1);
+        proc[i] = (uint)s + (uint)((spi - t1) / (nelt + 1));
     }
   }
+
+  return proc;
 }
 
 static int sort_field(struct array *arr, size_t usize, gs_dom t, uint off,
@@ -105,12 +112,12 @@ void sort_local(struct sort *s) {
 }
 
 static int load_balance(struct array *a, size_t size, const struct comm *c) {
-  slong out[2][1], buf[2][1], in = a->n;
-  comm_scan(out, c, gs_long, gs_add, &in, 1, buf);
+  slong out[2][1], wrk[2][1], in = a->n;
+  comm_scan(out, c, gs_long, gs_add, &in, 1, wrk);
   slong start = out[0][0], nelem = out[1][0];
 
-  uint *proc = tcalloc(uint, a->n + 1);
-  set_proc_from_idx(proc, a->n, c->np, start, nelem);
+  debug_print(c, 0, "\t\t\tstart = %lld, nelem = %lld\n", start, nelem);
+  uint *proc = set_proc_from_idx(a->n, c->np, start, nelem);
   sarray_transfer_chunk(a, size, proc, c);
   free(proc);
 
@@ -138,8 +145,9 @@ void sarray_transfer_chunk(struct array *arr, const size_t usize,
   // sizes larger than INT_MAX, we calculate total message size and then figure
   // out how many transfers we need. Then we transfer array using that many
   // transfers.
-  slong msg_size = INT_MAX;
+  slong msg_size = 9 * (INT_MAX / 10);
   uint nt = (ng * usize + msg_size - 1) / msg_size;
+  debug_print(c, 0, "\t\t\tmsg_size = %lld, nt = %u\n", msg_size, nt);
   uint tsize = (arr->n + nt - 1) / nt;
 
   struct array brr, crr;
@@ -147,19 +155,30 @@ void sarray_transfer_chunk(struct array *arr, const size_t usize,
   array_init_(&crr, arr->n + 1, usize, __FILE__, __LINE__);
 
   char *pe = (char *)arr->ptr;
-  uint off = 0;
-  for (unsigned i = 0; i < nt; i++) {
+  uint off = 0, off1;
+  for (unsigned t = 0; t < nt; t++) {
     // Copy a chunk from `arr` to `brr`.
-    brr.n = 0;
-    uint off1 = off + tsize;
+    brr.n = 0, off1 = off + tsize;
+    assert(off <= arr->n);
     for (uint j = off; j < arr->n && j < off1; j++)
       array_cat_(usize, &brr, &pe[j * usize], 1, __FILE__, __LINE__);
-    assert(off <= arr->n);
+
     // Transfer the chunk in `brr` to the destination.
     sarray_transfer_ext_(&brr, usize, &proc[off], sizeof(uint), &cr);
+
     // Append the received chunk to `crr`.
     array_cat_(usize, &crr, brr.ptr, brr.n, __FILE__, __LINE__);
     off = (off1 < arr->n ? off1 : arr->n);
+
+    // Some debug printing.
+    slong cmax = crr.n, bmax = brr.n, cmin = crr.n, bmin = brr.n;
+    comm_allreduce(c, gs_long, gs_max, &cmax, 1, wrk);
+    comm_allreduce(c, gs_long, gs_max, &bmax, 1, wrk);
+    comm_allreduce(c, gs_long, gs_min, &cmin, 1, wrk);
+    comm_allreduce(c, gs_long, gs_min, &bmin, 1, wrk);
+    debug_print(c, 0,
+                "\t\t\t %d/%d brr.n = %u/%lld/%lld crr.n = %u/%lld/%lld\n", t,
+                nt, brr.n, bmin, bmax, crr.n, cmin, cmax);
   }
   array_free(&brr);
 

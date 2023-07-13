@@ -6,8 +6,7 @@
 double get_scalar(struct array *a, uint i, uint offset, uint usize,
                   gs_dom type);
 
-void set_proc_from_idx(uint *proc, uint size, sint np, slong start,
-                       slong nelem);
+uint *set_proc_from_idx(uint size, sint np, slong start, slong nelem);
 
 void sarray_transfer_chunk(struct array *arr, const size_t usize,
                            const uint *proc, const struct comm *c);

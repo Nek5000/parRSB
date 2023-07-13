@@ -18,7 +18,7 @@ parrsb_options parrsb_default_options = {
     .profile_level = 0,
     .two_level = 1,
     .repair = 0,
-    // RSB common (Lanczos + MG) options
+    // RSB common (Lanczos and MG) options
     .rsb_algo = 0,
     .rsb_pre = 1,
     .rsb_max_iter = 50,
@@ -31,6 +31,7 @@ parrsb_options parrsb_default_options = {
 
 static char *ALGO[3] = {"RSB", "RCB", "RIB"};
 
+static void update_options(parrsb_options *options) {
 #define UPDATE_OPTION(OPT, STR, IS_INT)                                        \
   do {                                                                         \
     const char *val = getenv(STR);                                             \
@@ -42,7 +43,6 @@ static char *ALGO[3] = {"RSB", "RCB", "RIB"};
     }                                                                          \
   } while (0)
 
-static void update_options(parrsb_options *options) {
   UPDATE_OPTION(partitioner, "PARRSB_PARTITIONER", 1);
   UPDATE_OPTION(verbose_level, "PARRSB_VERBOSE_LEVEL", 1);
   UPDATE_OPTION(profile_level, "PARRSB_PROFILE_LEVEL", 1);
@@ -56,15 +56,14 @@ static void update_options(parrsb_options *options) {
   UPDATE_OPTION(rsb_mg_grammian, "PARRSB_RSB_MG_GRAMMIAN", 1);
   UPDATE_OPTION(rsb_mg_factor, "PARRSB_RSB_MG_FACTOR", 1);
   UPDATE_OPTION(rsb_mg_sagg, "PARRSB_RSB_MG_SMOOTH_AGGREGATION", 1);
-  if (options->verbose_level == 0)
-    options->profile_level = 0;
-}
 
 #undef UPDATE_OPTION
+}
 
-#define PRINT_OPTION(OPT, STR, FMT) printf("%s = " FMT "\n", STR, options->OPT)
+static void print_options(const struct comm *c, parrsb_options *options) {
+#define PRINT_OPTION(OPT, STR, FMT)                                            \
+  debug_print(c, options->verbose_level, "%s = " FMT "\n", STR, options->OPT)
 
-static void print_options(parrsb_options *options) {
   PRINT_OPTION(partitioner, "PARRSB_PARTITIONER", "%d");
   PRINT_OPTION(verbose_level, "PARRSB_VERBOSE_LEVEL", "%d");
   PRINT_OPTION(profile_level, "PARRSB_PROFILE_LEVEL", "%d");
@@ -78,9 +77,9 @@ static void print_options(parrsb_options *options) {
   PRINT_OPTION(rsb_mg_grammian, "PARRSB_RSB_MG_GRAMMIAN", "%d");
   PRINT_OPTION(rsb_mg_factor, "PARRSB_RSB_MG_FACTOR", "%d");
   PRINT_OPTION(rsb_mg_sagg, "PARRSB_RSB_MG_SMOOTH_AGGREGATION", "%d");
-}
 
 #undef PRINT_OPTION
+}
 
 static size_t load_balance(struct array *elist, uint nel, int nv, double *coord,
                            long long *vtx, struct crystal *cr, buffer *bfr) {
@@ -179,9 +178,7 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
   int verbose = options.verbose_level;
   debug_print(&c, verbose, "Running parRSB ..., nv = %d, nelg = %lld\n", nv,
               nelg);
-  if (c.id == 0 && verbose > 0)
-    print_options(&options);
-  fflush(stdout);
+  print_options(&c, &options);
 
   parrsb_barrier(&c);
   double t = comm_time();
