@@ -520,58 +520,6 @@ int parrsb_dump_map(char *name, unsigned nelt, unsigned nv, long long *vtx,
   return errs;
 }
 
-int parrsb_dump_part(char *name, unsigned nel, unsigned nv, double *coord,
-                     int gid, MPI_Comm comm) {
-  struct comm c;
-  comm_init(&c, comm);
-
-  int rank = c.id, size = c.np;
-
-  MPI_File file;
-  int err = MPI_File_open(comm, name, MPI_MODE_CREATE | MPI_MODE_WRONLY,
-                          MPI_INFO_NULL, &file);
-  parrsb_check_error(err, comm);
-
-  slong out[2][1], buf[2][1], nelt = nel;
-  comm_scan(out, &c, gs_long, gs_add, &nelt, 1, buf);
-  slong start = out[0][0], nelgt = out[1][0];
-
-  int ndim = (nv == 8) ? 3 : 2;
-  uint wsize = (ndim * sizeof(double) + sizeof(int)) * nelt;
-  if (rank == 0)
-    wsize += sizeof(slong) + sizeof(int); // for nelgt and ndim
-
-  char *pbuf, *pbuf0;
-  pbuf = pbuf0 = (char *)tcalloc(char, wsize);
-  if (rank == 0) {
-    WRITE_T(pbuf0, &nelgt, slong, 1);
-    WRITE_T(pbuf0, &ndim, int, 1);
-  }
-
-  uint i, j, k;
-  double tcoord[3];
-  for (i = 0; i < nelt; i++) {
-    tcoord[0] = tcoord[1] = tcoord[2] = 0.0;
-    for (j = 0; j < nv; j++)
-      for (k = 0; k < ndim; k++)
-        tcoord[k] += coord[i * nv * ndim + j * ndim + k];
-    tcoord[0] /= nv, tcoord[1] /= nv, tcoord[2] /= nv;
-    WRITE_T(pbuf0, tcoord, double, ndim);
-    WRITE_T(pbuf0, &gid, int, 1);
-  }
-
-  MPI_Status st;
-  err = MPI_File_write_ordered(file, pbuf, wsize, MPI_BYTE, &st);
-  parrsb_check_error(err, comm);
-
-  err += MPI_File_close(&file);
-  parrsb_check_error(err, comm);
-
-  free(pbuf);
-
-  return err;
-}
-
 #undef check_call
 #undef check_mpi_call
 

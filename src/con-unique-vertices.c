@@ -441,9 +441,9 @@ static slong number_segments(struct array *local, struct array *shared,
   return st + lt;
 }
 
-static int number_points(struct array *elems, const struct array *local,
-                         const struct array *shared, const struct comm *c,
-                         buffer *bfr) {
+static void number_points(struct array *elems, const struct array *local,
+                          const struct array *shared, const struct comm *c,
+                          buffer *bfr) {
   // First number local points and then number shared points.
   slong out[2][1], wrk[2][1], in = local->n;
   comm_scan(out, c, gs_long, gs_add, &in, 1, wrk);
