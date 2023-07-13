@@ -120,13 +120,13 @@ struct cmp_t {
 };
 
 static sint find_or_insert(struct array *cids, struct cmp_t *t) {
-  // If there are no elements in the array, insert and exit
+  // If there are no elements in the array, insert and exit.
   if (cids->n == 0) {
     array_cat(struct cmp_t, cids, t, 1);
     return -1;
   }
 
-  // Otherwise, we will do a binary search
+  // Otherwise, we will do a binary search.
   struct cmp_t *pc = (struct cmp_t *)cids->ptr;
   sint s = 0, e = cids->n - 1, mid = 0;
   while (s <= e) {
@@ -139,7 +139,7 @@ static sint find_or_insert(struct array *cids, struct cmp_t *t) {
       s = mid + 1;
   }
 
-  // Okay, not found -- insert at `mid` or `mid + 1`
+  // Okay, not found -- insert at `mid` or `mid + 1`.
   uint max = cids->max;
   if (max == cids->n) {
     max += max / 2 + 1;
@@ -158,7 +158,7 @@ static sint find_or_insert(struct array *cids, struct cmp_t *t) {
   }
   pc[n] = t0, cids->n++;
 
-  // Sanity check
+  // Sanity check.
   for (unsigned i = 1; i < cids->n; i++)
     assert(pc[i - 1].c < pc[i].c);
 
@@ -177,8 +177,9 @@ uint get_components_v2(sint *component, struct array *elems, unsigned nv,
   if (nelg == 0)
     return 0;
 
-  uint nev = nelt * nv;
-  sint *p0 = tcalloc(sint, 2 * nev), *p = p0 + nev;
+  const uint nev = nelt * nv;
+  sint *p0 = tcalloc(sint, nev);
+  sint *p = tcalloc(sint, nev);
   slong *ids = tcalloc(slong, nev);
   uint *inds = tcalloc(uint, nev);
 
@@ -192,7 +193,7 @@ uint get_components_v2(sint *component, struct array *elems, unsigned nv,
   struct comm c;
   slong nmkd = 0, nc = 0;
   do {
-    // Copy unmarked elements to ids
+    // Copy unmarked elements to ids.
     uint unmkd = 0;
     for (uint e = 0; e < nelt; e++) {
       if (component[e] == -1) {
@@ -206,28 +207,30 @@ uint get_components_v2(sint *component, struct array *elems, unsigned nv,
     int bin = (unmkd > 0);
     comm_split(ci, bin, ci->id, &c);
 
-    slong nnzg = 0, nnzg0 = 0, ncg = 0;
+    slong nnzg = 0, ncg = 0;
     if (bin == 1) {
-      // Setup gs
-      struct gs_data *gsh = gs_setup(ids, unmkd * nv, &c, 0, gs_pairwise, 0);
-
-      // Mark the first unmarked element as seed for the component c.id
+      // Mark the first unmarked element as seed for the component c.id.
       for (uint v = 0; v < nv; v++)
         p[0 * nv + v] = c.id;
 
-      // Initialize the rest of p
+      // Initialize the rest of p.
       for (uint e = 1; e < unmkd; e++)
         for (uint v = 0; v < nv; v++)
           p[e * nv + v] = -1;
 
-      sint nnz, changed;
+      // Setup gather-scatter to do BFS.
+      struct gs_data *gsh = gs_setup(ids, unmkd * nv, &c, 0, gs_pairwise, 0);
+
+      // Perform BFS.
+      sint changed;
       do {
         for (uint i = 0; i < unmkd * nv; i++)
           p0[i] = p[i];
 
         gs(p, gs_int, gs_max, 0, gsh, bfr);
 
-        nnz = changed = 0;
+        changed = 0;
+        sint nnz = 0;
         for (uint e = 0; e < unmkd; e++) {
           sint v0 = -1;
           for (uint v = 0; v < nv; v++) {
@@ -239,7 +242,8 @@ uint get_components_v2(sint *component, struct array *elems, unsigned nv,
             }
           }
 
-          // There was one non-zero vertex in the element
+          // If there was at least one non-zero vertex in the element, we mark
+          // the element with that value.
           if (v0 > -1) {
             sint c = p[e * nv + v0];
             for (uint v = 0; v < nv; v++)
@@ -247,6 +251,7 @@ uint get_components_v2(sint *component, struct array *elems, unsigned nv,
             nnz++;
           }
 
+          // Check if the component id changed.
           for (uint v = 0; v < nv; v++) {
             if (p[e * nv + v] != p0[e * nv + v]) {
               changed = 1;
@@ -255,14 +260,15 @@ uint get_components_v2(sint *component, struct array *elems, unsigned nv,
           }
         }
 
-        nnzg0 = nnzg, nnzg = nnz;
+        nnzg = nnz;
         comm_allreduce(&c, gs_long, gs_add, &nnzg, 1, wrk);
         comm_allreduce(&c, gs_int, gs_add, &changed, 1, wrk);
       } while (changed);
+
       gs_free(gsh);
 
       // Find unique local components and then use them to find unique
-      // global components
+      // global components.
       struct array cids;
       array_init(struct cmp_t, &cids, 100);
 
@@ -276,10 +282,13 @@ uint get_components_v2(sint *component, struct array *elems, unsigned nv,
 
       struct crystal cr;
       crystal_init(&cr, &c);
-      sarray_transfer(struct cmp_t, &cids, p, 1, &cr);
 
-      // find unique components and number them
+      // Send the component id `C` to `C % P` where `P` is the number of
+      // processors.
+      sarray_transfer(struct cmp_t, &cids, p, 1, &cr);
       sarray_sort(struct cmp_t, cids.ptr, cids.n, c, 0, bfr);
+
+      // Find unique components and number them globally.
       uint cnt = 0;
       if (cids.n > 0) {
         cnt++;
@@ -307,8 +316,9 @@ uint get_components_v2(sint *component, struct array *elems, unsigned nv,
 
       sarray_transfer(struct cmp_t, &cids, p, 0, &cr);
       crystal_free(&cr);
-
       sarray_sort(struct cmp_t, cids.ptr, cids.n, c, 0, bfr);
+
+      // Now assign the global component id to the marked elements.
       for (uint e = 0; e < unmkd; e++) {
         if (p[e * nv + 0] > -1) {
           t.c = p[e * nv + 0];
@@ -328,9 +338,9 @@ uint get_components_v2(sint *component, struct array *elems, unsigned nv,
     nc += ncg;
   } while (nmkd < nelg);
 
-  free(p0), free(ids), free(inds);
   if (null_input == 1)
     free(component);
+  free(p0), free(p), free(ids), free(inds);
 
   return nc;
 }

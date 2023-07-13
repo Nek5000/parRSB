@@ -9,7 +9,7 @@ extern int fiedler(struct array *elements, int nv, parrsb_options *options,
 
 static void test_component_versions(struct array *elements, struct comm *lc,
                                     unsigned nv, unsigned lvl, buffer *bfr) {
-  // Send elements to % P processor to test disconnected components
+  // Send elements to % P processor to create disconnected components.
   struct crystal cr;
   crystal_init(&cr, lc);
 
@@ -19,29 +19,24 @@ static void test_component_versions(struct array *elements, struct comm *lc,
 
   sarray_transfer(struct rsb_element, elements, proc, 1, &cr);
 
-  MPI_Comm tmp;
-  int color = (lc->id < lc->np / 2);
-  MPI_Comm_split(lc->c, color, lc->id, &tmp);
-
   struct comm tc0;
-  comm_init(&tc0, tmp);
+  int color = (lc->id < lc->np / 2);
+  comm_split(lc, color, lc->id, &tc0);
 
   sint nc1 = get_components(NULL, elements, nv, &tc0, bfr, 0);
   sint nc2 = get_components_v2(NULL, elements, nv, &tc0, bfr, 0);
   if (nc1 != nc2) {
     if (tc0.id == 0)
-      printf("lvl = %u SS BFS != MS BFS: %d %d\n", lvl, nc1, nc2);
-    fflush(stdout);
+      fprintf(stderr, "level = %u SS BFS != MS BFS: %d %d\n", lvl, nc1, nc2);
+    fflush(stderr);
   }
   if (nc1 > 1) {
     if (tc0.id == 0)
-      printf("lvl = %u: %d disconnected componets were present.\n", lvl, nc1);
-    fflush(stdout);
+      fprintf(stderr, "level = %u: %d disconnected components.\n", lvl, nc1);
+    fflush(stderr);
   }
 
   comm_free(&tc0);
-  MPI_Comm_free(&tmp);
-
   sarray_transfer(struct rsb_element, elements, proc, 0, &cr);
   crystal_free(&cr);
 }
