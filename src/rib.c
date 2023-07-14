@@ -96,23 +96,16 @@ int rib(struct array *elements, size_t unit_size, int ndim, struct comm *ci,
   struct comm c;
   comm_dup(&c, ci);
 
-  int size = c.np;
-  int rank = c.id;
-
+  uint size = c.np, rank = c.id;
   while (size > 1) {
     rib_level(elements, unit_size, ndim, &c, bfr);
 
-    int p = (size + 1) / 2;
-    int bin = (rank >= p);
+    struct comm t;
+    const int bin = ((rank >= (size + 1) / 2) ? 1 : 0);
+    comm_split(&c, bin, rank, &t);
+    comm_free(&c), comm_dup(&c, &t), comm_free(&t);
 
-    MPI_Comm comm_rib;
-    MPI_Comm_split(c.c, bin, rank, &comm_rib);
-    comm_free(&c);
-    comm_init(&c, comm_rib);
-    MPI_Comm_free(&comm_rib);
-
-    size = c.np;
-    rank = c.id;
+    size = c.np, rank = c.id;
   }
   comm_free(&c);
 

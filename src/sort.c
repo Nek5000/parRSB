@@ -205,6 +205,12 @@ void parallel_sort_(struct array *arr, size_t usize, size_t align,
   }
   va_end(vargs);
 
+  // If there is only a single MPI process, just sort locally and return.
+  if (c->np == 1) {
+    sort_local(&sd);
+    return;
+  }
+
   switch (algo) {
   case 0:
     parallel_bin_sort(&sd, c);

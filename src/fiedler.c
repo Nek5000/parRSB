@@ -620,6 +620,10 @@ static int lanczos(scalar *fiedler, struct array *elements, int nv,
 
 int fiedler(struct array *elements, int nv, parrsb_options *opts,
             struct comm *gsc, buffer *buf, int verbose) {
+  // Return if the number of processes is equal to 1.
+  if (gsc->np == 1)
+    return 0;
+
   metric_tic(gsc, RSB_FIEDLER_SETUP);
   uint lelt = elements->n;
   slong out[2][1], wrk[2][1], in = lelt;

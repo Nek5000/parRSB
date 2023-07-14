@@ -117,6 +117,10 @@ static int check_bin_val(int bin, struct comm *c) {
 
 static int balance_partitions(struct array *elements, int nv, struct comm *lc,
                               struct comm *gc, int bin, buffer *bfr) {
+  // Return if there is only one processor.
+  if (gc->np == 1)
+    return 0;
+
   assert(check_bin_val(bin, gc) == 0);
 
   struct ielem_t {
@@ -146,12 +150,13 @@ static int balance_partitions(struct array *elements, int nv, struct comm *lc,
   struct gs_data *gsh = gs_setup(ids, size, gc, 0, gs_pairwise, 0);
 
   sint *input = (sint *)ids;
-  if (send_cnt > 0)
+  if (send_cnt > 0) {
     for (e = 0; e < size; e++)
       input[e] = 0;
-  else
+  } else {
     for (e = 0; e < size; e++)
       input[e] = 1;
+  }
 
   gs(input, gs_int, gs_add, 0, gsh, bfr);
 
@@ -220,7 +225,6 @@ static int balance_partitions(struct array *elements, int nv, struct comm *lc,
                   bfr);
   } else {
     // Forget about disconnected components, just do a load balanced partition
-    // TODO: Need to change how parallel_sort load balance
     parallel_sort(struct rsb_element, elements, fiedler, gs_double, 0, 1, gc,
                   bfr);
   }
@@ -378,13 +382,6 @@ int rsb(struct array *elements, int nv, int check, parrsb_options *options,
     const uint ncomp = get_components_v2(NULL, elements, nv, &tc, bfr, 0);
     metric_acc(RSB_COMPONENTS_NCOMP, ncomp);
     metric_toc(&lc, RSB_COMPONENTS);
-
-    // Attempt to repair if there are disconnected components.
-    debug_print(&lc, verbose, "\tRepair ...\n");
-    metric_tic(&lc, RSB_REPAIR);
-    if (options->repair)
-      repair_partitions_v2(elements, nv, &tc, &lc, bin, options->rsb_pre, bfr);
-    metric_toc(&lc, RSB_REPAIR);
 
     // Bisect and balance.
     debug_print(&lc, verbose, "\tBalance ...\n");
