@@ -26,14 +26,17 @@ static void test_component_versions(struct array *elements, struct comm *lc,
   sint nc1 = get_components(NULL, elements, nv, &tc0, bfr, 0);
   sint nc2 = get_components_v2(NULL, elements, nv, &tc0, bfr, 0);
   if (nc1 != nc2) {
-    if (tc0.id == 0)
-      fprintf(stderr, "level = %u SS BFS != MS BFS: %d %d\n", lvl, nc1, nc2);
-    fflush(stderr);
+    if (tc0.id == 0) {
+      fprintf(stderr, "Error: Level = %u SS BFS != MS BFS: %d %d\n", lvl, nc1,
+              nc2);
+      fflush(stderr);
+    }
+    exit(EXIT_FAILURE);
   }
   if (nc1 > 1) {
     if (tc0.id == 0)
-      fprintf(stderr, "level = %u: %d disconnected components.\n", lvl, nc1);
-    fflush(stderr);
+      printf("Warning: Level = %u has %d disconnected components.\n", lvl, nc1);
+    fflush(stdout);
   }
 
   comm_free(&tc0);
@@ -269,8 +272,9 @@ static int repair_partitions_v2(struct array *elems, unsigned nv,
   return 0;
 }
 
-static void get_part(sint *np, sint *nid, int two_lvl, struct comm *lc,
-                     struct comm *nc) {
+static void get_partition_size(sint *np, sint *nid, const uint two_lvl,
+                               const struct comm *const lc,
+                               const struct comm *const nc) {
   if (two_lvl) {
     sint out[2][1], wrk[2][1], in = (nc->id == 0);
     comm_scan(out, lc, gs_int, gs_add, &in, 1, &wrk);
@@ -281,38 +285,48 @@ static void get_part(sint *np, sint *nid, int two_lvl, struct comm *lc,
   }
 }
 
+static uint get_rsb_depth(const uint n, const struct comm *const gc,
+                          const uint verbose) {
+  uint depth = 0, pow2 = 1;
+  while (pow2 < n)
+    pow2 <<= 1, depth++;
+
+  debug_print(gc, verbose, "n=%u, depth=%u\n", n, depth);
+  return depth;
+}
+
 int rsb(struct array *elements, int nv, int check, parrsb_options *options,
         struct comm *gc, buffer *bfr) {
-  // `gc` is the global communicator. We make a duplicate of it in `lc` and
-  // keep splitting it. `nc` is the communicator for the two level partitioning.
-  struct comm lc, nc;
-
-  // Duplicate the global communicator to `lc`.
-  comm_dup(&lc, gc);
-
-  // Initialize `nc` based on `lc`.
-  if (options->two_level) {
+  // `nc` is the communicator for the two level partitioning. Initialize `nc`
+  // based on `lc`.
+  struct comm nc;
 #ifdef MPI
-    MPI_Comm node;
-    MPI_Comm_split_type(lc.c, MPI_COMM_TYPE_SHARED, lc.id, MPI_INFO_NULL,
-                        &node);
-    comm_init(&nc, node);
-    MPI_Comm_free(&node);
+  MPI_Comm node;
+  MPI_Comm_split_type(gc->c, MPI_COMM_TYPE_SHARED, gc->id, MPI_INFO_NULL,
+                      &node);
+  comm_init(&nc, node);
+  MPI_Comm_free(&node);
 #else
-    comm_init(&nc, 1);
+  comm_init(&nc, 1);
 #endif
-  }
 
-  // Get number of partitions we are going to perform RSB on first level.
+  // Get number of partitions we are going to perform RSB on the first level.
   sint np, nid;
-  get_part(&np, &nid, options->two_level, &lc, &nc);
+  get_partition_size(&np, &nid, options->two_level, gc, &nc);
   debug_print(gc, options->two_level && options->verbose_level > 0,
               "Number of nodes = %d\n", np);
 
-  int verbose = options->verbose_level > 4;
-  struct comm tc;
-  unsigned ndim = (nv == 8) ? 3 : 2;
-  while (np > 1) {
+  // Find the maximum number of RSB levels (first level + second level).
+  const uint max_levels = get_rsb_depth(np, gc, options->verbose_level);
+
+  // `gc` is the global communicator. We make a duplicate of it in `lc` and
+  // keep splitting it.
+  struct comm lc;
+  comm_dup(&lc, gc);
+
+  const uint verbose = options->verbose_level > 4;
+  const unsigned ndim = (nv == 8) ? 3 : 2;
+  for (uint level = 0; level < max_levels; level++) {
     // Run the pre-partitioner.
     debug_print(&lc, verbose, "\tPre-partitioner: ...\n");
     metric_tic(&lc, RSB_PRE);
@@ -335,7 +349,7 @@ int rsb(struct array *elements, int nv, int check, parrsb_options *options,
     }
     metric_toc(&lc, RSB_PRE);
 
-    struct rsb_element *pe = (struct rsb_element *)elements->ptr;
+    struct rsb_element *const pe = (struct rsb_element *const)elements->ptr;
     for (unsigned i = 0; i < elements->n; i++)
       pe[i].proc = lc.id;
 
@@ -352,12 +366,15 @@ int rsb(struct array *elements, int nv, int check, parrsb_options *options,
                   bfr);
     metric_toc(&lc, RSB_SORT);
 
-    unsigned bin = (nid >= (np + 1) / 2);
+    // `tc` is the new communicator for newly found partitions.
+    struct comm tc;
+    const unsigned bin = (nid >= (np + 1) / 2);
     comm_split(&lc, bin, lc.id, &tc);
 
     // Find the number of disconnected components.
     debug_print(&lc, verbose, "\tComponents ...\n");
     metric_tic(&lc, RSB_COMPONENTS);
+    test_component_versions(elements, &tc, nv, level, bfr);
     const uint ncomp = get_components_v2(NULL, elements, nv, &tc, bfr, 0);
     metric_acc(RSB_COMPONENTS_NCOMP, ncomp);
     metric_toc(&lc, RSB_COMPONENTS);
@@ -378,7 +395,7 @@ int rsb(struct array *elements, int nv, int check, parrsb_options *options,
     // Split the communicator and recurse on the sub-problems.
     debug_print(&lc, verbose, "\tBisect ...\n");
     comm_free(&lc), comm_dup(&lc, &tc), comm_free(&tc);
-    get_part(&np, &nid, options->two_level, &lc, &nc);
+    get_partition_size(&np, &nid, options->two_level, &lc, &nc);
     metric_push_level();
   }
   comm_free(&lc);
@@ -387,8 +404,8 @@ int rsb(struct array *elements, int nv, int check, parrsb_options *options,
   if (options->two_level) {
     options->two_level = 0;
     rsb(elements, nv, 0, options, &nc, bfr);
-    comm_free(&nc);
   }
+  comm_free(&nc);
 
   if (check)
     check_rsb_partition(gc, options);

@@ -15,7 +15,8 @@ static uint get_partition(const struct comm *gc, const struct comm *lc) {
 }
 
 uint get_neighbors(const struct array *const elems, const unsigned nv,
-                   const struct comm *gc, const struct comm *lc, buffer *bfr) {
+                   const struct comm *const gc, const struct comm *const lc,
+                   buffer *bfr) {
   const uint n = elems->n;
   const uint size = elems->n * nv;
 
