@@ -50,6 +50,9 @@ struct rsb_element {
   slong vertices[MAXNV];
 };
 
+int rsb(struct array *elements, int nv, parrsb_options *options,
+        struct comm *gc, buffer *bfr);
+
 //------------------------------------------------------------------------------
 // Find number of components.
 //
@@ -61,12 +64,16 @@ uint get_components_v2(sint *component, struct array *elems, unsigned nv,
 //------------------------------------------------------------------------------
 // Dump partition statistics.
 //
-void parrsb_dump_stats_start(const struct comm *const gc, const uint nv);
+void parrsb_dump_stats_start(const uint nv_);
 
-void parrsb_dump_stats(const struct comm *const lc,
+void parrsb_dump_stats(const struct comm *const gc, const struct comm *const lc,
                        const struct array *const elems, buffer *bfr);
 
-void parrsb_dump_stats_end(const char *prefix);
+void parrsb_dump_stats_end(const struct comm *const gc, const char *prefix);
+
+uint parrsb_get_neighbors(const struct array *const elems, const unsigned nv,
+                          const struct comm *const gc,
+                          const struct comm *const lc, buffer *bfr);
 
 //------------------------------------------------------------------------------
 // Laplacian.

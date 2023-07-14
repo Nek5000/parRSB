@@ -100,6 +100,8 @@ void metric_rsb_print(struct comm *c, int profile_level) {
              SUMMARY(i, RSB_COMPONENTS));
       printf("    RSB_COMPONENTS_NCOMP     : %e/%e/%e\n",
              SUMMARY(i, RSB_COMPONENTS_NCOMP));
+      printf("  RSB_NEIGHBORS              : %e/%e/%e\n",
+             SUMMARY(i, RSB_NEIGHBORS));
       printf("  RSB_BALANCE                : %e/%e/%e\n",
              SUMMARY(i, RSB_BALANCE));
     }

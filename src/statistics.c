@@ -1,21 +1,17 @@
-#include "metrics.h"
 #include "parrsb-impl.h"
 
-static uint get_partition(const struct comm *gc, const struct comm *lc) {
+static uint get_partition(const struct comm *const gc,
+                          const struct comm *const lc) {
   // Find the partition id. A partition is a group of processors sharing the
   // same local communicator.
   sint out[2][1], wrk[2][1], root = (lc->id == 0);
   comm_scan(out, gc, gs_int, gs_add, &root, 1, wrk);
-
-  sint smin = out[0][0], smax = out[0][0];
-  comm_allreduce(lc, gs_int, gs_min, &smin, 1, wrk);
-  comm_allreduce(lc, gs_int, gs_max, &smax, 1, wrk);
-  assert(smin == smax && "MPI processes in a partition must have the same id.");
-
-  return smin;
+  sint part = out[0][0] * (lc->id == 0);
+  comm_allreduce(lc, gs_int, gs_max, &part, 1, wrk);
+  return part;
 }
 
-static uint get_neighbors(const struct array *const elems, const unsigned nv,
+uint parrsb_get_neighbors(const struct array *const elems, const unsigned nv,
                           const struct comm *const gc,
                           const struct comm *const lc, buffer *bfr) {
   const uint n = elems->n;
@@ -55,7 +51,7 @@ static uint get_neighbors(const struct array *const elems, const unsigned nv,
     while (e < vertices.n && pv[s].v == pv[e].v)
       e++;
     for (uint i = s; i < e; i++) {
-      struct vertex_t vt = pv[s];
+      struct vertex_t vt = pv[i];
       for (uint j = s; j < e; j++) {
         vt.partition = pv[j].partition;
         array_cat(struct vertex_t, &neighbors, &vt, 1);
@@ -69,22 +65,52 @@ static uint get_neighbors(const struct array *const elems, const unsigned nv,
   crystal_free(&cr);
   sarray_sort(struct vertex_t, neighbors.ptr, neighbors.n, partition, 0, bfr);
 
-  uint nneighbors = 0;
+  // Now, extract out different partition ids found locally into an array.
+  struct unique_t {
+    uint p, partition;
+  };
+
+  struct array unique;
+  array_init(struct unique_t, &unique, 27);
+
   if (neighbors.n > 0) {
-    nneighbors = 1;
     const struct vertex_t *const pn =
         (const struct vertex_t *const)neighbors.ptr;
+    struct unique_t ut = {.partition = pn[0].partition,
+                          .p = pn[0].partition % lc->np};
+    array_cat(struct unique_t, &unique, &ut, 1);
     for (uint i = 1; i < neighbors.n; i++) {
-      if (pn[i].partition > pn[i - 1].partition)
-        nneighbors++;
+      if (pn[i].partition > pn[i - 1].partition) {
+        ut.partition = pn[i].partition, ut.p = ut.partition % lc->np;
+        array_cat(struct unique_t, &unique, &ut, 1);
+      }
     }
   }
-
   array_free(&neighbors);
-  return nneighbors;
+
+  crystal_init(&cr, lc);
+  sarray_transfer(struct unique_t, &unique, p, 0, &cr);
+  crystal_free(&cr);
+
+  sarray_sort(struct unique_t, unique.ptr, unique.n, partition, 0, bfr);
+  sint un = 0;
+  if (unique.n > 0) {
+    un = 1;
+    struct unique_t *pu = (struct unique_t *)unique.ptr;
+    for (uint i = 1; i < unique.n; i++) {
+      if (pu[i].partition > pu[un - 1].partition)
+        pu[un] = pu[i], un++;
+    }
+  }
+  array_free(&unique);
+
+  sint wrk;
+  comm_allreduce(lc, gs_int, gs_add, &un, 1, &wrk);
+  assert(un >= 1);
+
+  return un - 1;
 }
 
-static struct comm comm;
 static struct array pgeom;
 static buffer bfr;
 static uint pgeom_initialized = 0;
@@ -97,20 +123,19 @@ struct pgeom_t {
   uint p;
 };
 
-void parrsb_dump_stats_start(const struct comm *const gc, const uint nv_) {
+void parrsb_dump_stats_start(const uint nv_) {
   if (pgeom_initialized)
     return;
 
   nv = nv_;
-
-  comm_dup(&comm, gc);
+  level = 0;
   array_init(struct pgeom_t, &pgeom, 1024);
   buffer_init(&bfr, 1024);
 
   pgeom_initialized = 1;
 }
 
-void parrsb_dump_stats(const struct comm *const lc,
+void parrsb_dump_stats(const struct comm *const gc, const struct comm *const lc,
                        const struct array *const elems, buffer *bfr) {
   assert(pgeom_initialized && "Partition geometry is not initialized.");
 
@@ -143,21 +168,17 @@ void parrsb_dump_stats(const struct comm *const lc,
 
   // Partition root accumulates the partition geometry.
   level++;
-  if (lc->id == 0) {
-    struct pgeom_t pg = {.partition = get_partition(&comm, lc),
-                         .level = level,
-                         .centroid = {centroid[0], centroid[1], centroid[2]},
-                         .max = {max[0], max[1], max[2]},
-                         .min = {min[0], min[1], min[2]},
-                         .p = 0};
+  struct pgeom_t pg = {.partition = get_partition(gc, lc),
+                       .level = level,
+                       .centroid = {centroid[0], centroid[1], centroid[2]},
+                       .max = {max[0], max[1], max[2]},
+                       .min = {min[0], min[1], min[2]},
+                       .p = 0};
+  if (lc->id == 0)
     array_cat(struct pgeom_t, &pgeom, &pg, 1);
-  }
-
-  const uint nneighbors = get_neighbors(elems, nv, &comm, lc, bfr);
-  metric_acc(RSB_NEIGHBORS, nneighbors);
 }
 
-void parrsb_dump_stats_end(const char *prefix) {
+void parrsb_dump_stats_end(const struct comm *const gc, const char *prefix) {
   if (!pgeom_initialized)
     return;
 
@@ -166,7 +187,7 @@ void parrsb_dump_stats_end(const char *prefix) {
 
   // Send all the data to global root.
   struct crystal cr;
-  crystal_init(&cr, &comm);
+  crystal_init(&cr, gc);
   sarray_transfer(struct pgeom_t, &pgeom, p, 0, &cr);
   crystal_free(&cr);
 
@@ -174,9 +195,10 @@ void parrsb_dump_stats_end(const char *prefix) {
   sarray_sort_2(struct pgeom_t, pgeom.ptr, pgeom.n, level, 0, partition, 0,
                 &bfr);
 
-  if (comm.id == 0) {
+  if (gc->id == 0) {
     const char name[BUFSIZ];
-    snprintf((char *)name, BUFSIZ, "%s_partition_geom.txt", prefix);
+    snprintf((char *)name, BUFSIZ, "%s_partition_geom_p%06d.txt", prefix,
+             gc->np);
 
     FILE *fp = fopen(name, "w");
     if (!fp) {
@@ -197,7 +219,6 @@ void parrsb_dump_stats_end(const char *prefix) {
     fclose(fp);
   }
 
-  comm_free(&comm);
   array_free(&pgeom);
   buffer_free(&bfr);
 

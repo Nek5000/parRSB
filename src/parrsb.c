@@ -6,11 +6,6 @@
 #include <string.h>
 #include <time.h>
 
-extern int rsb(struct array *elements, int nv, int check,
-               parrsb_options *options, struct comm *gc, buffer *bfr);
-extern int rcb(struct array *elements, size_t unit_size, int ndim,
-               struct comm *ci, buffer *bfr);
-
 parrsb_options parrsb_default_options = {
     // General options
     .partitioner = 0,
@@ -208,7 +203,7 @@ int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
     int ndim = (nv == 8) ? 3 : 2;
     switch (options.partitioner) {
     case 0:
-      rsb(&elist, nv, 1, &options, &ca, &bfr);
+      rsb(&elist, nv, &options, &ca, &bfr);
       break;
     case 1:
       rcb(&elist, esize, ndim, &ca, &bfr);

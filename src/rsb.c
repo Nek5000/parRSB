@@ -2,8 +2,6 @@
 #include "parrsb-impl.h"
 #include "sort.h"
 
-static unsigned disconnected = 0;
-
 extern int fiedler(struct array *elements, int nv, parrsb_options *options,
                    struct comm *gsc, buffer *buf, int verbose);
 
@@ -269,8 +267,6 @@ static int repair_partitions_v2(struct array *elems, unsigned nv,
     // isconnected = 1
     nc = get_components_v2(NULL, elems, nv, tc, bfr, 0);
     comm_allreduce(lc, gs_int, gs_max, &nc, 1, &ibuf);
-    if (nc > 1)
-      disconnected = 1;
   }
 
   return 0;
@@ -289,8 +285,8 @@ static void get_partition_size(sint *np, sint *nid, const uint two_lvl,
   }
 }
 
-static uint get_rsb_depth(const uint n, const struct comm *const gc,
-                          const uint verbose) {
+static uint get_rsb_cuts(const uint n, const struct comm *const gc,
+                         const uint verbose) {
   uint depth = 0, pow2 = 1;
   while (pow2 < n)
     pow2 <<= 1, depth++;
@@ -299,10 +295,20 @@ static uint get_rsb_depth(const uint n, const struct comm *const gc,
   return depth;
 }
 
-int rsb(struct array *elements, int nv, int check, parrsb_options *options,
+static unsigned rsb_level = 0;
+static struct comm comm;
+
+int rsb(struct array *elements, int nv, parrsb_options *options,
         struct comm *gc, buffer *bfr) {
-  // `nc` is the communicator for the two level partitioning. Initialize `nc`
-  // based on `lc`.
+  // Check if it is the first level of the partitioning in case of two
+  // level partitioning.
+  if (rsb_level == 0) {
+    comm_dup(&comm, gc);
+    parrsb_dump_stats_start(nv);
+  }
+
+  // `nc` is the communicator for the first level of two level partitioning.
+  // Initialize `nc` based on `gc`.
   struct comm nc;
 #ifdef MPI
   MPI_Comm node;
@@ -314,40 +320,35 @@ int rsb(struct array *elements, int nv, int check, parrsb_options *options,
   comm_init(&nc, 1);
 #endif
 
-  // Start dumping partition information.
-  parrsb_dump_stats_start(gc, nv);
-
-  // Get number of partitions we are going to perform RSB on the first level.
-  sint np, nid;
-  get_partition_size(&np, &nid, options->two_level, gc, &nc);
-  debug_print(gc, options->two_level && options->verbose_level > 0,
-              "Number of nodes = %d\n", np);
-
-  // Find the maximum number of RSB levels (first level + second level).
-  const uint max_levels = get_rsb_depth(np, gc, options->verbose_level);
-
-  // `gc` is the global communicator. We make a duplicate of it in `lc` and
-  // keep splitting it.
+  // We make a duplicate of it in `lc` and keep splitting it.
   struct comm lc;
   comm_dup(&lc, gc);
 
-  const uint verbose = options->verbose_level > 4;
+  // Get number of partitions we are going to perform RSB on the first level.
+  const int two_level = (rsb_level == 0) && options->two_level;
+  sint np, nid;
+  get_partition_size(&np, &nid, two_level, gc, &nc);
+
+  // Find the maximum number of RSB cuts in current levels.
+  sint max_cuts = get_rsb_cuts(np, gc, options->verbose_level), wrk;
+  comm_allreduce(&comm, gs_int, gs_max, &max_cuts, 1, &wrk);
+
+  const uint verbose = options->verbose_level;
+  debug_print(&comm, verbose, "Number of nodes=%d, Level=%d\n", np, rsb_level);
+
   const unsigned ndim = (nv == 8) ? 3 : 2;
-  for (uint level = 0; level < max_levels; level++) {
+  for (uint cut = 0; cut < max_cuts; cut++) {
     // Run the pre-partitioner.
-    debug_print(&lc, verbose, "\tPre-partitioner: ...\n");
+    debug_print(&comm, verbose - 1, "\tPre-partition: cut=%d\n", cut);
     metric_tic(&lc, RSB_PRE);
     switch (options->rsb_pre) {
-    // Sort by global id.
     case 0:
       parallel_sort(struct rsb_element, elements, globalId, gs_long, 0, 1, &lc,
                     bfr);
       break;
-    // RCB.
     case 1:
       rcb(elements, sizeof(struct rsb_element), ndim, &lc, bfr);
       break;
-    // RIB.
     case 2:
       rib(elements, sizeof(struct rsb_element), ndim, &lc, bfr);
       break;
@@ -361,13 +362,13 @@ int rsb(struct array *elements, int nv, int check, parrsb_options *options,
       pe[i].proc = lc.id;
 
     // Find the Fiedler vector.
-    debug_print(&lc, verbose, "\tFiedler ... \n");
+    debug_print(&comm, verbose - 1, "\tFiedler ... \n");
     metric_tic(&lc, RSB_FIEDLER);
     fiedler(elements, nv, options, &lc, bfr, gc->id == 0);
     metric_toc(&lc, RSB_FIEDLER);
 
     // Sort by Fiedler vector.
-    debug_print(&lc, verbose, "\tSort ...\n");
+    debug_print(&comm, verbose - 1, "\tSort ...\n");
     metric_tic(&lc, RSB_SORT);
     parallel_sort(struct rsb_element, elements, fiedler, gs_double, 0, 1, &lc,
                   bfr);
@@ -379,41 +380,45 @@ int rsb(struct array *elements, int nv, int check, parrsb_options *options,
     comm_split(&lc, bin, lc.id, &tc);
 
     // Find the number of disconnected components.
-    debug_print(&lc, verbose, "\tComponents ...\n");
+    debug_print(&comm, verbose - 1, "\tComponents ...\n");
     metric_tic(&lc, RSB_COMPONENTS);
-    test_component_versions(elements, &tc, nv, level, bfr);
-    const uint ncomp = get_components_v2(NULL, elements, nv, &tc, bfr, 0);
-    metric_acc(RSB_COMPONENTS_NCOMP, ncomp);
+    test_component_versions(elements, &tc, nv, cut, bfr);
+    metric_acc(RSB_COMPONENTS_NCOMP,
+               get_components_v2(NULL, elements, nv, &tc, bfr, 0));
     metric_toc(&lc, RSB_COMPONENTS);
 
     // Bisect and balance.
-    debug_print(&lc, verbose, "\tBalance ...\n");
+    debug_print(&comm, verbose - 1, "\tBalance ...\n");
     metric_tic(&lc, RSB_BALANCE);
     balance_partitions(elements, nv, &tc, &lc, bin, bfr);
     metric_toc(&lc, RSB_BALANCE);
 
     // Split the communicator and recurse on the sub-problems.
-    debug_print(&lc, verbose, "\tBisect ...\n");
+    debug_print(&comm, verbose - 1, "\tBisect ...\n");
     comm_free(&lc), comm_dup(&lc, &tc), comm_free(&tc);
-    get_partition_size(&np, &nid, options->two_level, &lc, &nc);
+    get_partition_size(&np, &nid, two_level, &lc, &nc);
 
     // Dump the partition statistics, append to partition metrics.
-    parrsb_dump_stats(&tc, elements, bfr);
+    parrsb_dump_stats(&comm, &lc, elements, bfr);
+    metric_acc(RSB_NEIGHBORS,
+               parrsb_get_neighbors(elements, nv, &comm, &lc, bfr));
     metric_push_level();
   }
   comm_free(&lc);
 
   // Partition within the node.
-  if (options->two_level) {
-    options->two_level = 0;
-    rsb(elements, nv, 0, options, &nc, bfr);
+  if (two_level) {
+    rsb_level = 1;
+    rsb(elements, nv, options, &nc, bfr);
+    rsb_level = 0;
   }
   comm_free(&nc);
 
-  parrsb_dump_stats_end("parrsb");
-
-  if (check)
-    check_rsb_partition(gc, options);
+  if (rsb_level == 0) {
+    parrsb_dump_stats_end(&comm, "parrsb");
+    check_rsb_partition(&comm, options);
+    comm_free(&comm);
+  }
 
   return 0;
 }
