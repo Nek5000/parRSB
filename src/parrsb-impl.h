@@ -22,13 +22,13 @@
 #define SCALAR_MAX DBL_MAX
 #define SCALAR_TOL 1e-12
 
-#define MAXDIM 3 // Maximum dimension of the mesh
-#define MAXNV 8  // Maximum number of vertices per element
+#define MAXDIM 3 // Maximum dimension of the mesh.
+#define MAXNV 8  // Maximum number of vertices per element.
 
 //------------------------------------------------------------------------------
-// RCB / RIB
+// RCB / RIB.
 // `struct rcb_element` is used for RCB and RIB partitioning.
-// `struct rsb_element` should be a superset of `struct rcb_element`
+// `struct rsb_element` should be a superset of `struct rcb_element`.
 struct rcb_element {
   uint proc, origin, seq;
   ulong globalId;
@@ -41,7 +41,7 @@ int rib(struct array *elements, size_t unit_size, int ndim, struct comm *c,
         buffer *bfr);
 
 //------------------------------------------------------------------------------
-// RSB
+// RSB.
 //
 struct rsb_element {
   uint proc, origin, seq;
@@ -51,7 +51,7 @@ struct rsb_element {
 };
 
 //------------------------------------------------------------------------------
-// Find number of components
+// Find number of components.
 //
 uint get_components(sint *component, struct array *elems, unsigned nv,
                     struct comm *c, buffer *buf, int verbose);
@@ -59,7 +59,17 @@ uint get_components_v2(sint *component, struct array *elems, unsigned nv,
                        const struct comm *ci, buffer *bfr, int verbose);
 
 //------------------------------------------------------------------------------
-// Laplacian
+// Dump partition statistics.
+//
+void parrsb_dump_stats_start(const struct comm *const gc, const uint nv);
+
+void parrsb_dump_stats(const struct comm *const lc,
+                       const struct array *const elems, buffer *bfr);
+
+void parrsb_dump_stats_end(const char *prefix);
+
+//------------------------------------------------------------------------------
+// Laplacian.
 //
 #define GS 1
 #define CSR 2
@@ -72,7 +82,7 @@ int laplacian(scalar *v, struct laplacian *l, scalar *u, buffer *buf);
 void laplacian_free(struct laplacian *l);
 
 //------------------------------------------------------------------------------
-// Misc
+// Misc.
 //
 int log2ll(long long n);
 

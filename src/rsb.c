@@ -314,6 +314,9 @@ int rsb(struct array *elements, int nv, int check, parrsb_options *options,
   comm_init(&nc, 1);
 #endif
 
+  // Start dumping partition information.
+  parrsb_dump_stats_start(gc, nv);
+
   // Get number of partitions we are going to perform RSB on the first level.
   sint np, nid;
   get_partition_size(&np, &nid, options->two_level, gc, &nc);
@@ -393,6 +396,9 @@ int rsb(struct array *elements, int nv, int check, parrsb_options *options,
     debug_print(&lc, verbose, "\tBisect ...\n");
     comm_free(&lc), comm_dup(&lc, &tc), comm_free(&tc);
     get_partition_size(&np, &nid, options->two_level, &lc, &nc);
+
+    // Dump the partition statistics, append to partition metrics.
+    parrsb_dump_stats(&tc, elements, bfr);
     metric_push_level();
   }
   comm_free(&lc);
@@ -403,6 +409,8 @@ int rsb(struct array *elements, int nv, int check, parrsb_options *options,
     rsb(elements, nv, 0, options, &nc, bfr);
   }
   comm_free(&nc);
+
+  parrsb_dump_stats_end("parrsb");
 
   if (check)
     check_rsb_partition(gc, options);

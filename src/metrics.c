@@ -98,8 +98,8 @@ void metric_rsb_print(struct comm *c, int profile_level) {
       printf("  RSB_SORT                   : %e/%e/%e\n", SUMMARY(i, RSB_SORT));
       printf("  RSB_COMPONENTS             : %e/%e/%e\n",
              SUMMARY(i, RSB_COMPONENTS));
-      printf("  RSB_REPAIR                 : %e/%e/%e\n",
-             SUMMARY(i, RSB_REPAIR));
+      printf("    RSB_COMPONENTS_NCOMP     : %e/%e/%e\n",
+             SUMMARY(i, RSB_COMPONENTS_NCOMP));
       printf("  RSB_BALANCE                : %e/%e/%e\n",
              SUMMARY(i, RSB_BALANCE));
     }

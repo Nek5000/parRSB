@@ -1,3 +1,4 @@
+#include "metrics.h"
 #include "parrsb-impl.h"
 
 static uint get_partition(const struct comm *gc, const struct comm *lc) {
@@ -14,9 +15,9 @@ static uint get_partition(const struct comm *gc, const struct comm *lc) {
   return smin;
 }
 
-uint get_neighbors(const struct array *const elems, const unsigned nv,
-                   const struct comm *const gc, const struct comm *const lc,
-                   buffer *bfr) {
+static uint get_neighbors(const struct array *const elems, const unsigned nv,
+                          const struct comm *const gc,
+                          const struct comm *const lc, buffer *bfr) {
   const uint n = elems->n;
   const uint size = elems->n * nv;
 
@@ -83,10 +84,12 @@ uint get_neighbors(const struct array *const elems, const unsigned nv,
   return nneighbors;
 }
 
-static struct array pgeom;
 static struct comm comm;
+static struct array pgeom;
+static buffer bfr;
 static uint pgeom_initialized = 0;
-static uint ndim = 0;
+static uint nv = 0;
+static uint level = 0;
 
 struct pgeom_t {
   uint partition, level;
@@ -94,17 +97,21 @@ struct pgeom_t {
   uint p;
 };
 
-void dump_part_start(const struct comm *gc, const uint nv) {
-  assert(!pgeom_initialized && "Partition geometry is already initialized.");
+void parrsb_dump_stats_start(const struct comm *const gc, const uint nv_) {
+  if (pgeom_initialized)
+    return;
+
+  nv = nv_;
 
   comm_dup(&comm, gc);
-  ndim = (nv == 8) ? 3 : 2;
   array_init(struct pgeom_t, &pgeom, 1024);
+  buffer_init(&bfr, 1024);
+
   pgeom_initialized = 1;
 }
 
-void dump_part_geom(const struct comm *lc, const struct array *const elems,
-                    const int level, buffer *bfr) {
+void parrsb_dump_stats(const struct comm *const lc,
+                       const struct array *const elems, buffer *bfr) {
   assert(pgeom_initialized && "Partition geometry is not initialized.");
 
   const struct rsb_element *const pe =
@@ -115,6 +122,7 @@ void dump_part_geom(const struct comm *lc, const struct array *const elems,
   double max[3] = {-DBL_MAX, -DBL_MAX, -DBL_MAX};
   double min[3] = {DBL_MAX, DBL_MAX, DBL_MAX};
   const uint n = elems->n;
+  const unsigned ndim = (nv == 8) ? 3 : 2;
   for (uint e = 0; e < n; e++) {
     for (uint d = 0; d < ndim; d++) {
       double c = pe[e].coord[d];
@@ -134,6 +142,7 @@ void dump_part_geom(const struct comm *lc, const struct array *const elems,
     centroid[d] /= lc->np;
 
   // Partition root accumulates the partition geometry.
+  level++;
   if (lc->id == 0) {
     struct pgeom_t pg = {.partition = get_partition(&comm, lc),
                          .level = level,
@@ -143,10 +152,14 @@ void dump_part_geom(const struct comm *lc, const struct array *const elems,
                          .p = 0};
     array_cat(struct pgeom_t, &pgeom, &pg, 1);
   }
+
+  const uint nneighbors = get_neighbors(elems, nv, &comm, lc, bfr);
+  metric_acc(RSB_NEIGHBORS, nneighbors);
 }
 
-void dump_part_end(const char *prefix) {
-  assert(pgeom_initialized && "Partition geometry is not initialized.");
+void parrsb_dump_stats_end(const char *prefix) {
+  if (!pgeom_initialized)
+    return;
 
   const uint size = strnlen(prefix, 64);
   assert(size < 64 && "Prefix must be less than 64 characters.");
@@ -156,6 +169,10 @@ void dump_part_end(const char *prefix) {
   crystal_init(&cr, &comm);
   sarray_transfer(struct pgeom_t, &pgeom, p, 0, &cr);
   crystal_free(&cr);
+
+  // Sort by level first, then by partition id.
+  sarray_sort_2(struct pgeom_t, pgeom.ptr, pgeom.n, level, 0, partition, 0,
+                &bfr);
 
   if (comm.id == 0) {
     const char name[BUFSIZ];
@@ -167,12 +184,9 @@ void dump_part_end(const char *prefix) {
       exit(EXIT_FAILURE);
     }
 
-    buffer bfr;
-    buffer_init(&bfr, 1024);
-    sarray_sort_2(struct pgeom_t, pgeom.ptr, pgeom.n, level, 0, partition, 0,
-                  &bfr);
-    buffer_free(&bfr);
-
+    fprintf(fp, "%zu\n", pgeom.n);
+    fprintf(fp, "level partition centroid[0] centroid[1] centroid[2] min[0] "
+                "min[1] min[2] max[0] max[1] max[2]\n");
     const struct pgeom_t *const pg = (const struct pgeom_t *const)pgeom.ptr;
     for (uint i = 0; i < pgeom.n; i++) {
       fprintf(fp, "%u %u %lf %lf %lf %lf %lf %lf %lf %lf %lf\n", pg[i].level,
@@ -185,5 +199,7 @@ void dump_part_end(const char *prefix) {
 
   comm_free(&comm);
   array_free(&pgeom);
-  ndim = pgeom_initialized = 0;
+  buffer_free(&bfr);
+
+  pgeom_initialized = nv = level = 0;
 }
