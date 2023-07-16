@@ -50,8 +50,8 @@ struct rsb_element {
   slong vertices[MAXNV];
 };
 
-int rsb(struct array *elements, int nv, parrsb_options *options,
-        struct comm *gc, buffer *bfr);
+void rsb(struct array *elements, int nv, parrsb_options *options,
+         struct comm *gc, buffer *bfr);
 
 //------------------------------------------------------------------------------
 // Find number of components.

@@ -20,17 +20,18 @@ extern "C" {
 //
 typedef struct {
   // General options
-  int partitioner;   // Partition algo: 0 - RSB, 1 - RCB, 2 - RIB (Default: 0)
+  int partitioner; // Partition algo: 0 - RSB, 1 - RCB, 2 - RIB (Default: 0)
+  int levels;      // Number of levels (levels: 1, 2, 3)
+  int repair; // Repair disconnected components: 0 - No, 1 - Yes (Default: 0)
   int verbose_level; // Verbose level: 0, 1, 2, .. etc (Default: 1)
   int profile_level; // Profile level: 0, 1, 2, .. etc (Default: 1)
-  int two_level;     // Enable two level partitioning (Default: 0)
-  int repair; // Repair disconnected components: 0 - No, 1 - Yes (Default: 0)
-  // RSB common (Lanczos + MG) options
+  // RSB common (Lanczos and MG) options
   int rsb_algo; // RSB algo: 0 - Lanczos, 1 - MG (Default: 0)
   int rsb_pre;  // RSB pre-partition : 0 - None, 1 - RCB , 2 - RIB (Default: 1)
   int rsb_max_iter;   // Max iterations in Lanczos / MG (Default: 50)
   int rsb_max_passes; // Max Lanczos restarts / Inverse iterations (Default: 50)
   double rsb_tol;     // Tolerance for Lanczos or RQI (Default: 1e-5)
+  int rsb_dump_stats; // Dump partition statistics to a text file.
   // RSB MG specific options
   int rsb_mg_grammian; // MG Grammian: 0 or 1 (Default: 0)
   int rsb_mg_factor;   // MG Coarsening factor (Default: 2, should be > 1)

@@ -9,16 +9,17 @@
 parrsb_options parrsb_default_options = {
     // General options
     .partitioner = 0,
+    .levels = 2,
+    .repair = 0,
     .verbose_level = 0,
     .profile_level = 0,
-    .two_level = 1,
-    .repair = 0,
     // RSB common (Lanczos and MG) options
     .rsb_algo = 0,
     .rsb_pre = 1,
     .rsb_max_iter = 50,
     .rsb_max_passes = 50,
     .rsb_tol = 1e-5,
+    .rsb_dump_stats = 0,
     // RSB MG specific options
     .rsb_mg_grammian = 0,
     .rsb_mg_factor = 2,
@@ -39,15 +40,16 @@ static void update_options(parrsb_options *options) {
   } while (0)
 
   UPDATE_OPTION(partitioner, "PARRSB_PARTITIONER", 1);
+  UPDATE_OPTION(levels, "PARRSB_LEVELS", 1);
+  UPDATE_OPTION(repair, "PARRSB_REPAIR", 1);
   UPDATE_OPTION(verbose_level, "PARRSB_VERBOSE_LEVEL", 1);
   UPDATE_OPTION(profile_level, "PARRSB_PROFILE_LEVEL", 1);
-  UPDATE_OPTION(two_level, "PARRSB_TWO_LEVEL", 1);
-  UPDATE_OPTION(repair, "PARRSB_REPAIR", 1);
   UPDATE_OPTION(rsb_algo, "PARRSB_RSB_ALGO", 1);
   UPDATE_OPTION(rsb_pre, "PARRSB_RSB_PRE", 1);
   UPDATE_OPTION(rsb_max_iter, "PARRSB_RSB_MAX_ITER", 1);
   UPDATE_OPTION(rsb_max_passes, "PARRSB_RSB_MAX_PASSES", 1);
   UPDATE_OPTION(rsb_tol, "PARRSB_RSB_TOL", 0);
+  UPDATE_OPTION(rsb_dump_stats, "PARRSB_DUMP_STATS", 1);
   UPDATE_OPTION(rsb_mg_grammian, "PARRSB_RSB_MG_GRAMMIAN", 1);
   UPDATE_OPTION(rsb_mg_factor, "PARRSB_RSB_MG_FACTOR", 1);
   UPDATE_OPTION(rsb_mg_sagg, "PARRSB_RSB_MG_SMOOTH_AGGREGATION", 1);
@@ -60,15 +62,16 @@ static void print_options(const struct comm *c, parrsb_options *options) {
   debug_print(c, options->verbose_level, "%s = " FMT "\n", STR, options->OPT)
 
   PRINT_OPTION(partitioner, "PARRSB_PARTITIONER", "%d");
+  PRINT_OPTION(levels, "PARRSB_LEVELS", "%d");
+  PRINT_OPTION(repair, "PARRSB_REPAIR", "%d");
   PRINT_OPTION(verbose_level, "PARRSB_VERBOSE_LEVEL", "%d");
   PRINT_OPTION(profile_level, "PARRSB_PROFILE_LEVEL", "%d");
-  PRINT_OPTION(two_level, "PARRSB_TWO_LEVEL", "%d");
-  PRINT_OPTION(repair, "PARRSB_REPAIR", "%d");
   PRINT_OPTION(rsb_algo, "PARRSB_RSB_ALGO", "%d");
   PRINT_OPTION(rsb_pre, "PARRSB_RSB_PRE", "%d");
   PRINT_OPTION(rsb_max_iter, "PARRSB_RSB_MAX_ITER", "%d");
   PRINT_OPTION(rsb_max_passes, "PARRSB_RSB_MAX_PASSES", "%d");
   PRINT_OPTION(rsb_tol, "PARRSB_RSB_TOL", "%lf");
+  PRINT_OPTION(rsb_dump_stats, "PARRSB_DUMP_STATS", "%d");
   PRINT_OPTION(rsb_mg_grammian, "PARRSB_RSB_MG_GRAMMIAN", "%d");
   PRINT_OPTION(rsb_mg_factor, "PARRSB_RSB_MG_FACTOR", "%d");
   PRINT_OPTION(rsb_mg_sagg, "PARRSB_RSB_MG_SMOOTH_AGGREGATION", "%d");
