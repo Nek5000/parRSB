@@ -339,18 +339,18 @@ void rsb(struct array *elements, int nv, parrsb_options *options,
   // Node level communicator is the last level communicator.
   initialize_node_level_comm(&comms[levels - 1], gc);
 
-  const sint verbose = options->verbose_level;
+  const sint verbose = options->verbose_level - 1;
   const uint ndim = (nv == 8) ? 3 : 2;
   for (uint level = 0; level < levels; level++) {
     // Find the maximum number of RSB cuts in current level.
     sint cuts = get_level_cuts(level, levels, comms);
-    debug_print(gc, verbose - 1, "Level=%u, cuts=%u\n", level + 1, cuts);
+    debug_print(gc, verbose, "Level=%u, cuts=%u\n", level + 1, cuts);
 
     struct comm lc;
     comm_dup(&lc, &comms[level]);
     for (uint cut = 0; cut < cuts; cut++) {
       // Run the pre-partitioner.
-      debug_print(gc, verbose - 2, "\tPre-partition: cut=%d\n", cut);
+      debug_print(gc, verbose - 1, "\tPre-partition: cut=%d\n", cut);
 
       metric_tic(&lc, RSB_PRE);
       switch (options->rsb_pre) {
@@ -374,13 +374,13 @@ void rsb(struct array *elements, int nv, parrsb_options *options,
         pe[i].proc = lc.id;
 
       // Find the Fiedler vector.
-      debug_print(gc, verbose - 2, "\tFiedler ... \n");
+      debug_print(gc, verbose - 1, "\tFiedler ... \n");
       metric_tic(&lc, RSB_FIEDLER);
       fiedler(elements, nv, options, &lc, bfr, gc->id == 0);
       metric_toc(&lc, RSB_FIEDLER);
 
       // Sort by Fiedler vector.
-      debug_print(gc, verbose - 2, "\tSort ...\n");
+      debug_print(gc, verbose - 1, "\tSort ...\n");
       metric_tic(&lc, RSB_SORT);
       parallel_sort(struct rsb_element, elements, fiedler, gs_double, 0, 1, &lc,
                     bfr);
@@ -391,21 +391,20 @@ void rsb(struct array *elements, int nv, parrsb_options *options,
       sint bin = get_bisect_comm(&tc, &lc, level, levels, comms);
 
       // Find the number of disconnected components.
-      debug_print(gc, verbose - 2, "\tComponents ...\n");
+      debug_print(gc, verbose - 1, "\tComponents ...\n");
       metric_tic(&lc, RSB_COMPONENTS);
-      test_component_versions(elements, &tc, nv, cut, bfr);
-      metric_acc(RSB_COMPONENTS_NCOMP,
-                 get_components_v2(NULL, elements, nv, &tc, bfr, 0));
+      const uint ncomp = get_components_v2(NULL, elements, nv, &tc, bfr, 0);
+      metric_acc(RSB_COMPONENTS_NCOMP, ncomp);
       metric_toc(&lc, RSB_COMPONENTS);
 
       // Bisect and balance.
-      debug_print(gc, verbose - 2, "\tBalance ...\n");
+      debug_print(gc, verbose - 1, "\tBalance ...\n");
       metric_tic(&lc, RSB_BALANCE);
       balance_partitions(elements, nv, &tc, &lc, bin, bfr);
       metric_toc(&lc, RSB_BALANCE);
 
       // Split the communicator and recurse on the sub-problems.
-      debug_print(gc, verbose - 2, "\tBisect ...\n");
+      debug_print(gc, verbose - 1, "\tBisect ...\n");
       comm_free(&lc), comm_dup(&lc, &tc), comm_free(&tc);
 
       // Dump the partition statistics, append to partition metrics.

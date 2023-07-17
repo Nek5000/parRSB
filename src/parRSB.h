@@ -40,12 +40,26 @@ typedef struct {
 
 extern parrsb_options parrsb_default_options;
 
-int parrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
-                     int nel, int nv, parrsb_options options, MPI_Comm comm);
+int parrsb_part_mesh(int *part, int *seq, const long long *const vtx,
+                     const double *const coord, const int nel, const int nv,
+                     parrsb_options options, MPI_Comm comm);
+
+int parrsb_part_mesh_v2(int *part, const long long *const vtx,
+                        const double *const coord, int nel, int nv,
+                        const int *const tag, parrsb_options options,
+                        MPI_Comm comm);
 
 #define fparrsb_part_mesh FORTRAN_UNPREFIXED(fparrsb_partmesh, FPARRSB_PARTMESH)
-void fparrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
-                       int *nel, int *nve, int *options, int *comm, int *err);
+void fparrsb_partmesh(int *part, int *seq, long long *vtx, double *coord,
+                      int *nel, int *nve, int *options, int *comm, int *err);
+
+#define fparrsb_partmesh_v2                                                    \
+  FORTRAN_UNPREFIXED(fparrsb_partmesh_v2, FPARRSB_PARTMESH_v2)
+void fparrsb_partmesh_v2(int *part, const long long *const vtx,
+                         const double *const coord, const int *const nel,
+                         const int *const nv, const int *const tag,
+                         const int *const options, const int *const comm,
+                         int *err);
 
 //==============================================================================
 // Connectivity
