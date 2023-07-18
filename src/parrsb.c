@@ -242,18 +242,10 @@ int parrsb_part_mesh(int *part, int *seq, const long long *const vtx,
   return 0;
 }
 
-void fparrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
-                       int *nel, int *nv, int *options, int *comm, int *err) {
-  *err = 1;
-  MPI_Comm c = MPI_Comm_f2c(*comm);
-  parrsb_options opt = parrsb_default_options;
-  *err = parrsb_part_mesh(part, seq, vtx, coord, *nel, *nv, &opt, c);
-}
-
-int parrsb_part_mesh_v2(int *part, const long long *const vtx,
-                        const double *const coord, const int nel, const int nv,
-                        const int *const tag, parrsb_options *const options,
-                        MPI_Comm comm) {
+int parrsb_part_mesh_v2(int *part, const int *const tag,
+                        const long long *const vtx, const double *const coord,
+                        const int nel, const int nv,
+                        parrsb_options *const options, MPI_Comm comm) {
   struct comm c;
   comm_init(&c, comm);
 
@@ -449,15 +441,4 @@ int parrsb_part_mesh_v2(int *part, const long long *const vtx,
   buffer_free(&bfr), crystal_free(&cr), comm_free(&c);
 
   return 0;
-}
-
-void fparrsb_partmesh_v2(int *part, const long long *const vtx,
-                         const double *const coord, const int *const nel,
-                         const int *const nv, const int *const tag,
-                         const int *const options, const int *const comm,
-                         int *err) {
-  *err = 1;
-  MPI_Comm c = MPI_Comm_f2c(*comm);
-  parrsb_options opt = parrsb_default_options;
-  *err = parrsb_part_mesh_v2(part, vtx, coord, *nel, *nv, tag, &opt, c);
 }
