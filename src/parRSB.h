@@ -42,11 +42,11 @@ extern parrsb_options parrsb_default_options;
 
 int parrsb_part_mesh(int *part, int *seq, const long long *const vtx,
                      const double *const coord, const int nel, const int nv,
-                     parrsb_options options, MPI_Comm comm);
+                     parrsb_options *const options, MPI_Comm comm);
 
 int parrsb_part_mesh_v2(int *part, const long long *const vtx,
                         const double *const coord, int nel, int nv,
-                        const int *const tag, parrsb_options options,
+                        const int *const tag, parrsb_options *const options,
                         MPI_Comm comm);
 
 #define fparrsb_part_mesh FORTRAN_UNPREFIXED(fparrsb_partmesh, FPARRSB_PARTMESH)

@@ -618,7 +618,7 @@ static int lanczos(scalar *fiedler, struct array *elements, int nv,
   return (ipass - 1) * miter + iter;
 }
 
-int fiedler(struct array *elements, int nv, parrsb_options *opts,
+int fiedler(struct array *elements, int nv, const parrsb_options *const opts,
             struct comm *gsc, buffer *buf, int verbose) {
   // Return if the number of processes is equal to 1.
   if (gsc->np == 1)

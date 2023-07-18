@@ -126,7 +126,7 @@ int parrsb_setup_mesh(unsigned *nelt, unsigned *nv, long long **vl,
   parrsb_check_error(err, comm);
 
   parrsb_options opt = parrsb_default_options;
-  err = parrsb_part_mesh(part, NULL, *vl, *coord, *nelt, *nv, opt, comm);
+  err = parrsb_part_mesh(part, NULL, *vl, *coord, *nelt, *nv, &opt, comm);
   parrsb_check_error(err, comm);
 
   // Redistribute data based on identified partitions

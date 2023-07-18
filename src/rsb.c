@@ -2,8 +2,9 @@
 #include "parrsb-impl.h"
 #include "sort.h"
 
-extern int fiedler(struct array *elements, int nv, parrsb_options *options,
-                   struct comm *gsc, buffer *buf, int verbose);
+extern int fiedler(struct array *elements, int nv,
+                   const parrsb_options *const options, struct comm *gsc,
+                   buffer *buf, int verbose);
 
 static void test_component_versions(struct array *elements, struct comm *lc,
                                     unsigned nv, unsigned lvl, buffer *bfr) {
@@ -42,7 +43,8 @@ static void test_component_versions(struct array *elements, struct comm *lc,
   crystal_free(&cr);
 }
 
-static void check_rsb_partition(struct comm *gc, parrsb_options *opts) {
+static void check_rsb_partition(struct comm *gc,
+                                const parrsb_options *const opts) {
   int max_levels = log2ll(gc->np);
   int miter = opts->rsb_max_iter, mpass = opts->rsb_max_passes;
 
@@ -324,7 +326,7 @@ static void initialize_node_level_comm(struct comm *c,
 #endif
 }
 
-void rsb(struct array *elements, int nv, parrsb_options *options,
+void rsb(struct array *elements, int nv, const parrsb_options *const options,
          struct comm *gc, buffer *bfr) {
   // Communicator for each level of the partitioning. Right now we support a
   // maximum of two levels.inter Inter node level (level = 1) and a node level

@@ -27,7 +27,7 @@ parrsb_options parrsb_default_options = {
 
 static char *ALGO[3] = {"RSB", "RCB", "RIB"};
 
-static void update_options(parrsb_options *options) {
+static void update_options(parrsb_options *const options) {
 #define UPDATE_OPTION(OPT, STR, IS_INT)                                        \
   do {                                                                         \
     const char *val = getenv(STR);                                             \
@@ -57,7 +57,8 @@ static void update_options(parrsb_options *options) {
 #undef UPDATE_OPTION
 }
 
-static void print_options(const struct comm *c, parrsb_options *options) {
+static void print_options(const struct comm *c,
+                          const parrsb_options *const options) {
 #define PRINT_OPTION(OPT, STR, FMT)                                            \
   debug_print(c, options->verbose_level, "%s = " FMT "\n", STR, options->OPT)
 
@@ -167,14 +168,14 @@ static void restore_original(int *part, int *seq, struct crystal *cr,
 
 int parrsb_part_mesh(int *part, int *seq, const long long *const vtx,
                      const double *const coord, const int nel, const int nv,
-                     parrsb_options options, MPI_Comm comm) {
+                     parrsb_options *const options, MPI_Comm comm) {
   struct comm c;
   comm_init(&c, comm);
 
-  print_options(&c, &options);
-  update_options(&options);
+  print_options(&c, options);
+  update_options(options);
 
-  const int verbose = options.verbose_level;
+  const int verbose = options->verbose_level;
   {
     slong nelg = nel, wrk;
     comm_allreduce(&c, gs_long, gs_add, &nelg, 1, &wrk);
@@ -182,7 +183,7 @@ int parrsb_part_mesh(int *part, int *seq, const long long *const vtx,
                 nelg);
   }
 
-  print_options(&c, &options);
+  print_options(&c, options);
 
   parrsb_barrier(&c);
   double t = comm_time();
@@ -210,9 +211,9 @@ int parrsb_part_mesh(int *part, int *seq, const long long *const vtx,
     slong nelg = out[1][0];
 
     int ndim = (nv == 8) ? 3 : 2;
-    switch (options.partitioner) {
+    switch (options->partitioner) {
     case 0:
-      rsb(&elist, nv, &options, &ca, &bfr);
+      rsb(&elist, nv, options, &ca, &bfr);
       break;
     case 1:
       rcb(&elist, esize, ndim, &ca, &bfr);
@@ -224,7 +225,7 @@ int parrsb_part_mesh(int *part, int *seq, const long long *const vtx,
       break;
     }
 
-    metric_rsb_print(&ca, options.profile_level);
+    metric_rsb_print(&ca, options->profile_level);
   }
   metric_finalize(), comm_free(&ca);
   debug_print(&c, verbose - 1, "Running partitioner: done.\n");
@@ -235,7 +236,7 @@ int parrsb_part_mesh(int *part, int *seq, const long long *const vtx,
 
   // Report time and finish
   debug_print(&c, verbose, "par%s finished in %g seconds.\n",
-              ALGO[options.partitioner], comm_time() - t);
+              ALGO[options->partitioner], comm_time() - t);
 
   array_free(&elist), buffer_free(&bfr), crystal_free(&cr), comm_free(&c);
 
@@ -247,28 +248,28 @@ void fparrsb_part_mesh(int *part, int *seq, long long *vtx, double *coord,
   *err = 1;
   MPI_Comm c = MPI_Comm_f2c(*comm);
   parrsb_options opt = parrsb_default_options;
-  *err = parrsb_part_mesh(part, seq, vtx, coord, *nel, *nv, opt, c);
+  *err = parrsb_part_mesh(part, seq, vtx, coord, *nel, *nv, &opt, c);
 }
 
 int parrsb_part_mesh_v2(int *part, const long long *const vtx,
                         const double *const coord, const int nel, const int nv,
-                        const int *const tag, parrsb_options options,
+                        const int *const tag, parrsb_options *const options,
                         MPI_Comm comm) {
   struct comm c;
   comm_init(&c, comm);
 
-  update_options(&options);
+  update_options(options);
 
-  const int verbose = options.verbose_level;
+  const int verbose = options->verbose_level;
   {
     slong nelg = nel, wrk;
     comm_allreduce(&c, gs_long, gs_add, &nelg, 1, &wrk);
-    const int verbose = options.verbose_level;
+    const int verbose = options->verbose_level;
     debug_print(&c, verbose, "Running parRSB v2..., nv = %d, nelg = %lld\n", nv,
                 nelg);
   }
 
-  print_options(&c, &options);
+  print_options(&c, options);
 
   struct tag_t {
     uint p, tag, seq, tagn;
@@ -413,8 +414,8 @@ int parrsb_part_mesh_v2(int *part, const long long *const vtx,
 
     MPI_Comm local;
     MPI_Comm_split(comm, c.id / chunk_size, c.id, &local);
-    options.verbose_level = 1;
-    options.profile_level = 0;
+    options->verbose_level = 1;
+    options->profile_level = 0;
     parrsb_part_mesh(lpart, NULL, lvtx, lcoord, elements.n, nv, options, local);
     MPI_Comm_free(&local);
 
@@ -450,5 +451,5 @@ void fparrsb_partmesh_v2(int *part, const long long *const vtx,
   *err = 1;
   MPI_Comm c = MPI_Comm_f2c(*comm);
   parrsb_options opt = parrsb_default_options;
-  *err = parrsb_part_mesh_v2(part, vtx, coord, *nel, *nv, tag, opt, c);
+  *err = parrsb_part_mesh_v2(part, vtx, coord, *nel, *nv, tag, &opt, c);
 }

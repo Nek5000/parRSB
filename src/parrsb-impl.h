@@ -50,7 +50,7 @@ struct rsb_element {
   slong vertices[MAXNV];
 };
 
-void rsb(struct array *elements, int nv, parrsb_options *options,
+void rsb(struct array *elements, int nv, const parrsb_options *const options,
          struct comm *gc, buffer *bfr);
 
 //------------------------------------------------------------------------------

@@ -51,7 +51,7 @@ int main(int argc, char *argv[]) {
     parrsb_check_error(part == NULL, comm);
 
     parrsb_options options = parrsb_default_options;
-    err = parrsb_part_mesh(part, NULL, vl, coord, nelt, nv, options, comm);
+    err = parrsb_part_mesh(part, NULL, vl, coord, nelt, nv, &options, comm);
     parrsb_check_error(err, comm);
 
     // Redistribute data based on identified partitions
