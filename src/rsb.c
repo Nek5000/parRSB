@@ -352,7 +352,7 @@ void rsb(struct array *elements, int nv, const parrsb_options *const options,
     comm_dup(&lc, &comms[level]);
     for (uint cut = 0; cut < cuts; cut++) {
       // Run the pre-partitioner.
-      debug_print(gc, verbose - 1, "\tPre-partition: cut=%d\n", cut);
+      debug_print(gc, verbose - 1, "\tPre-partition ...\n");
 
       metric_tic(&lc, RSB_PRE);
       switch (options->rsb_pre) {
@@ -409,15 +409,12 @@ void rsb(struct array *elements, int nv, const parrsb_options *const options,
       debug_print(gc, verbose - 1, "\tBisect ...\n");
       comm_free(&lc), comm_dup(&lc, &tc), comm_free(&tc);
 
-      // Dump the partition statistics, append to partition metrics.
-      parrsb_dump_stats(gc, &lc, elements, bfr);
-      metric_acc(RSB_NEIGHBORS,
-                 parrsb_get_neighbors(elements, nv, gc, &lc, bfr));
+      const uint nbrs = parrsb_get_neighbors(elements, nv, gc, &lc, bfr);
+      metric_acc(RSB_NEIGHBORS, nbrs);
       metric_push_level();
     }
     comm_free(&lc);
   }
 
-  parrsb_dump_stats_end(gc, "parrsb");
   check_rsb_partition(gc, options);
 }

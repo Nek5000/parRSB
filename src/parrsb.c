@@ -172,7 +172,6 @@ int parrsb_part_mesh(int *part, int *seq, const long long *const vtx,
   struct comm c;
   comm_init(&c, comm);
 
-  print_options(&c, options);
   update_options(options);
 
   const int verbose = options->verbose_level;
@@ -325,7 +324,7 @@ int parrsb_part_mesh_v2(int *part, const long long *const vtx,
   }
   const uint num_tags = out[1][0], tag_start = out[0][0];
 
-  debug_print(&c, 1, "\tNum tags: %d\n", num_tags);
+  debug_print(&c, verbose, "\tNum tags: %d\n", num_tags);
   if (c.np % num_tags != 0) {
     if (c.id == 0) {
       fprintf(stderr,
@@ -353,6 +352,7 @@ int parrsb_part_mesh_v2(int *part, const long long *const vtx,
   }
 
   const uint chunk_size = c.np / num_tags;
+  debug_print(&c, verbose, "\tProcesses per tag: %d\n", chunk_size);
   {
     struct tag_t *const pt = (struct tag_t *const)tags.ptr;
     const struct tag_t *const pu = (const struct tag_t *const)unique.ptr;
@@ -371,15 +371,19 @@ int parrsb_part_mesh_v2(int *part, const long long *const vtx,
 
   struct element_t {
     uint proc, part, seq;
-    scalar coord[MAXDIM];
+    scalar coord[MAXDIM * MAXNV];
     slong vertices[MAXNV];
   };
 
   struct array elements;
   array_init(struct element_t, &elements, nel);
 
+  debug_print(&c, verbose - 1,
+              "\tPack element data for transfer. tags.n=%u, nel=%u\n", tags.n,
+              nel);
   const int ndim = (nv == 8) ? 3 : 2;
   {
+    assert(tags.n == nel);
     const struct tag_t *const pt = (const struct tag_t *const)tags.ptr;
     struct element_t et;
     for (uint i = 0; i < tags.n; i++) {
@@ -395,6 +399,7 @@ int parrsb_part_mesh_v2(int *part, const long long *const vtx,
     sarray_transfer(struct element_t, &elements, proc, 1, &cr);
   }
 
+  debug_print(&c, verbose - 1, "\tCopy element data for feeding to parRSB.\n");
   long long *lvtx = tcalloc(long long, (elements.n + 1) * nv);
   double *lcoord = tcalloc(double, (elements.n + 1) * nv * ndim);
   {
@@ -409,19 +414,22 @@ int parrsb_part_mesh_v2(int *part, const long long *const vtx,
     }
   }
 
+  debug_print(&c, verbose - 1, "\tRun parRSB locally in a tag now.\n");
   {
     int *lpart = tcalloc(int, elements.n + 1);
 
     MPI_Comm local;
     MPI_Comm_split(comm, c.id / chunk_size, c.id, &local);
-    options->verbose_level = 1;
+    options->verbose_level = 0;
     options->profile_level = 0;
     parrsb_part_mesh(lpart, NULL, lvtx, lcoord, elements.n, nv, options, local);
     MPI_Comm_free(&local);
 
     struct element_t *const pe = (struct element_t *const)elements.ptr;
-    for (uint e = 0; e < elements.n; e++)
+    for (uint e = 0; e < elements.n; e++) {
       pe[e].part = lpart[e] + (c.id / chunk_size) * chunk_size;
+      assert(pe[e].part >= 0 && pe[e].part < c.np);
+    }
     free(lpart);
 
     sarray_transfer(struct element_t, &elements, proc, 0, &cr);
