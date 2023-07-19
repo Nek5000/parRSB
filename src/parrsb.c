@@ -60,7 +60,7 @@ static void update_options(parrsb_options *const options) {
 static void print_options(const struct comm *c,
                           const parrsb_options *const options) {
 #define PRINT_OPTION(OPT, STR, FMT)                                            \
-  debug_print(c, options->verbose_level, "%s = " FMT "\n", STR, options->OPT)
+  parrsb_print(c, options->verbose_level, "%s = " FMT "\n", STR, options->OPT)
 
   PRINT_OPTION(partitioner, "PARRSB_PARTITIONER", "%d");
   PRINT_OPTION(levels, "PARRSB_LEVELS", "%d");
@@ -164,12 +164,12 @@ void parrsb_part_mesh_v1(int *part, const long long *const vtx,
                          const struct comm *const c, struct crystal *const cr,
                          buffer *const bfr) {
   const int verbose = options->verbose_level - 1;
-  debug_print(c, verbose, "Load balance ...\n");
+  parrsb_print(c, verbose, "Load balance ...\n");
 
   struct array elist;
   size_t esize = load_balance(&elist, nel, nv, xyz, vtx, cr, bfr);
 
-  debug_print(c, verbose, "Running partitioner ...\n");
+  parrsb_print(c, verbose, "Running partitioner ...\n");
   struct comm ca;
   comm_split(c, elist.n > 0, c->id, &ca);
   if (elist.n > 0) {
@@ -194,7 +194,7 @@ void parrsb_part_mesh_v1(int *part, const long long *const vtx,
   }
   comm_free(&ca);
 
-  debug_print(c, verbose, "Restore original input: ...\n");
+  parrsb_print(c, verbose, "Restore original input: ...\n");
   restore_original(part, cr, &elist, esize, bfr);
 
   array_free(&elist);
@@ -293,7 +293,7 @@ void parrsb_part_mesh_v2(int *part, const long long *const vtx,
                          const struct comm *const c, struct crystal *const cr,
                          buffer *const bfr) {
   const int verbose = options->verbose_level - 1;
-  debug_print(c, verbose, "Find number of tags in the mesh ...\n");
+  parrsb_print(c, verbose, "Find number of tags in the mesh ...\n");
 
   struct tag_t {
     uint p, tag, seq, tagn;
@@ -343,7 +343,7 @@ void parrsb_part_mesh_v2(int *part, const long long *const vtx,
   }
   const uint num_tags = out[1][0], tag_start = out[0][0];
 
-  debug_print(c, verbose, "Num tags: %d\n", num_tags);
+  parrsb_print(c, verbose, "Num tags: %d\n", num_tags);
   if (c->np % num_tags != 0) {
     if (c->id == 0) {
       fprintf(stderr,
@@ -371,7 +371,7 @@ void parrsb_part_mesh_v2(int *part, const long long *const vtx,
   }
 
   const uint chunk_size = c->np / num_tags;
-  debug_print(c, verbose, "Processes per tag: %d\n", chunk_size);
+  parrsb_print(c, verbose, "Processes per tag: %d\n", chunk_size);
   {
     struct tag_t *const pt = (struct tag_t *const)tags.ptr;
     const struct tag_t *const pu = (const struct tag_t *const)unique.ptr;
@@ -398,9 +398,9 @@ void parrsb_part_mesh_v2(int *part, const long long *const vtx,
   struct array elements;
   array_init(struct element_t, &elements, nel);
 
-  debug_print(c, verbose,
-              "Pack element data for transfering. tags.n=%u, nel=%u\n", tags.n,
-              nel);
+  parrsb_print(c, verbose,
+               "Pack element data for transfering. tags.n=%u, nel=%u\n", tags.n,
+               nel);
   const int ndim = (nv == 8) ? 3 : 2;
   {
     assert(tags.n == nel);
@@ -420,7 +420,7 @@ void parrsb_part_mesh_v2(int *part, const long long *const vtx,
   }
   array_free(&tags);
 
-  debug_print(c, verbose, "Copy element data for feeding to parRSB.\n");
+  parrsb_print(c, verbose, "Copy element data for feeding to parRSB.\n");
   long long *lvtx = tcalloc(long long, (elements.n + 1) * nv);
   double *lxyz = tcalloc(double, (elements.n + 1) * nv * ndim);
   {
@@ -435,7 +435,7 @@ void parrsb_part_mesh_v2(int *part, const long long *const vtx,
     }
   }
 
-  debug_print(c, verbose, "Run parRSB locally within a tag now.\n");
+  parrsb_print(c, verbose, "Run parRSB locally within a tag now.\n");
   {
     int *lpart = tcalloc(int, elements.n + 1);
 
@@ -487,8 +487,8 @@ int parrsb_part_mesh(int *part, const long long *const vtx,
   {
     slong nelg = nel, wrk;
     comm_allreduce(&c, gs_long, gs_add, &nelg, 1, &wrk);
-    debug_print(&c, verbose, "Running parRSB ..., nv = %d, nelg = %lld\n", nv,
-                nelg);
+    parrsb_print(&c, verbose, "Running parRSB ..., nv = %d, nelg = %lld\n", nv,
+                 nelg);
   }
 
   print_options(&c, options);
@@ -511,8 +511,8 @@ int parrsb_part_mesh(int *part, const long long *const vtx,
   metric_rsb_print(&c, profile_level);
   metric_finalize();
 
-  debug_print(&c, verbose, "par%s finished in %g seconds.\n",
-              ALGO[options->partitioner], comm_time() - t);
+  parrsb_print(&c, verbose, "par%s finished in %g seconds.\n",
+               ALGO[options->partitioner], comm_time() - t);
 
   crystal_free(&cr);
   buffer_free(&bfr);

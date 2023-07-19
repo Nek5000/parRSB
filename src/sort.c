@@ -2,8 +2,8 @@
 #include <float.h>
 #include <math.h>
 
-extern void debug_print(const struct comm *c, int verbose, const char *fmt,
-                        ...);
+extern void parrsb_print(const struct comm *c, int verbose, const char *fmt,
+                         ...);
 
 double get_scalar(struct array *a, uint i, uint offset, uint usize,
                   gs_dom type) {
@@ -116,7 +116,7 @@ static int load_balance(struct array *a, size_t size, const struct comm *c) {
   comm_scan(out, c, gs_long, gs_add, &in, 1, wrk);
   slong start = out[0][0], nelem = out[1][0];
 
-  debug_print(c, 0, "\t\t\tstart = %lld, nelem = %lld\n", start, nelem);
+  parrsb_print(c, 0, "\t\t\tstart = %lld, nelem = %lld\n", start, nelem);
   uint *proc = set_proc_from_idx(a->n, c->np, start, nelem);
   sarray_transfer_chunk(a, size, proc, c);
   free(proc);
@@ -147,7 +147,7 @@ void sarray_transfer_chunk(struct array *arr, const size_t usize,
   // transfers.
   slong msg_size = 9 * (INT_MAX / 10);
   uint nt = (ng * usize + msg_size - 1) / msg_size;
-  debug_print(c, 0, "\t\t\tmsg_size = %lld, nt = %u\n", msg_size, nt);
+  parrsb_print(c, 0, "\t\t\tmsg_size = %lld, nt = %u\n", msg_size, nt);
   uint tsize = (arr->n + nt - 1) / nt;
 
   struct array brr, crr;
@@ -176,9 +176,9 @@ void sarray_transfer_chunk(struct array *arr, const size_t usize,
     comm_allreduce(c, gs_long, gs_max, &bmax, 1, wrk);
     comm_allreduce(c, gs_long, gs_min, &cmin, 1, wrk);
     comm_allreduce(c, gs_long, gs_min, &bmin, 1, wrk);
-    debug_print(c, 0,
-                "\t\t\t %d/%d brr.n = %u/%lld/%lld crr.n = %u/%lld/%lld\n", t,
-                nt, brr.n, bmin, bmax, crr.n, cmin, cmax);
+    parrsb_print(c, 0,
+                 "\t\t\t %d/%d brr.n = %u/%lld/%lld crr.n = %u/%lld/%lld\n", t,
+                 nt, brr.n, bmin, bmax, crr.n, cmin, cmax);
   }
   array_free(&brr);
 
