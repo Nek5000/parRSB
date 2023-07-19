@@ -293,11 +293,10 @@ static sint get_bisect_comm(struct comm *const tc, const struct comm *const lc,
 
 static uint get_level_cuts(const uint level, const uint levels,
                            const struct comm comms[3]) {
-  const struct comm *gc = &comms[levels - 1];
   uint n;
   if (level < levels - 1) {
     sint lvl2 = (comms[level + 1].id == 0), wrk;
-    comm_allreduce(gc, gs_int, gs_add, &lvl2, 1, &wrk);
+    comm_allreduce(&comms[level], gs_int, gs_add, &lvl2, 1, &wrk);
     n = lvl2;
   } else {
     n = comms[level].np;
@@ -309,7 +308,7 @@ static uint get_level_cuts(const uint level, const uint levels,
     pow2 <<= 1, cuts++;
 
   sint wrk;
-  comm_allreduce(gc, gs_int, gs_max, &cuts, 1, &wrk);
+  comm_allreduce(&comms[0], gs_int, gs_max, &cuts, 1, &wrk);
 
   return cuts;
 }
@@ -340,7 +339,8 @@ void rsb(struct array *elements, int nv, const parrsb_options *const options,
   // Level 1 communicator is the global communicator.
   comm_dup(&comms[0], gc);
   // Node level communicator is the last level communicator.
-  initialize_node_level_comm(&comms[levels - 1], gc);
+  if (levels > 1)
+    initialize_node_level_comm(&comms[levels - 1], gc);
 
   const sint verbose = options->verbose_level - 1;
   const uint ndim = (nv == 8) ? 3 : 2;
@@ -416,6 +416,9 @@ void rsb(struct array *elements, int nv, const parrsb_options *const options,
     }
     comm_free(&lc);
   }
+  comm_free(&comms[0]);
+  if (levels > 1)
+    comm_free(&comms[levels - 1]);
 
   check_rsb_partition(gc, options);
 }
