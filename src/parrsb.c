@@ -81,9 +81,8 @@ static void print_options(const struct comm *c,
 }
 
 static size_t load_balance(struct array *elist, uint nel, int nv,
-                           const double *const coord,
-                           const long long *const vtx, struct crystal *cr,
-                           buffer *bfr) {
+                           const double *const xyz, const long long *const vtx,
+                           struct crystal *cr, buffer *bfr) {
   struct comm *c = &cr->comm;
   slong out[2][1], wrk[2][1], in = nel;
   comm_scan(out, c, gs_long, gs_add, &in, 1, wrk);
@@ -116,7 +115,7 @@ static size_t load_balance(struct array *elist, uint nel, int nv,
     pe->coord[0] = pe->coord[1] = pe->coord[2] = 0.0;
     for (int v = 0; v < nv; v++)
       for (int n = 0; n < ndim; n++)
-        pe->coord[n] += coord[e * ndim * nv + v * ndim + n];
+        pe->coord[n] += xyz[e * ndim * nv + v * ndim + n];
     for (int n = 0; n < ndim; n++)
       pe->coord[n] /= nv;
 
@@ -141,8 +140,8 @@ static size_t load_balance(struct array *elist, uint nel, int nv,
   return unit_size;
 }
 
-static void restore_original(int *part, int *seq, struct crystal *cr,
-                             struct array *elist, size_t usize, buffer *bfr) {
+static void restore_original(int *part, struct crystal *cr, struct array *elist,
+                             size_t usize, buffer *bfr) {
   sarray_transfer_(elist, usize, offsetof(struct rcb_element, origin), 1, cr);
   uint nel = elist->n;
 
@@ -157,53 +156,22 @@ static void restore_original(int *part, int *seq, struct crystal *cr,
     element = (struct rcb_element *)((char *)elist->ptr + e * usize);
     part[e] = element->origin; // element[e].origin;
   }
-
-  if (seq != NULL) {
-    for (e = 0; e < nel; e++) {
-      element = (struct rcb_element *)((char *)elist->ptr + e * usize);
-      seq[e] = element->seq; // element[e].seq;
-    }
-  }
 }
 
-int parrsb_part_mesh(int *part, int *seq, const long long *const vtx,
-                     const double *const coord, const int nel, const int nv,
-                     parrsb_options *const options, MPI_Comm comm) {
-  struct comm c;
-  comm_init(&c, comm);
+void parrsb_part_mesh_v1(int *part, const long long *const vtx,
+                         const double *const xyz, const int nel, const int nv,
+                         const parrsb_options *const options,
+                         const struct comm *const c, struct crystal *const cr,
+                         buffer *const bfr) {
+  const int verbose = options->verbose_level - 1;
+  debug_print(c, verbose, "Load balance ...\n");
 
-  update_options(options);
-
-  const int verbose = options->verbose_level;
-  {
-    slong nelg = nel, wrk;
-    comm_allreduce(&c, gs_long, gs_add, &nelg, 1, &wrk);
-    debug_print(&c, verbose, "Running parRSB ..., nv = %d, nelg = %lld\n", nv,
-                nelg);
-  }
-
-  print_options(&c, options);
-
-  parrsb_barrier(&c);
-  double t = comm_time();
-
-  struct crystal cr;
-  crystal_init(&cr, &c);
-
-  buffer bfr;
-  buffer_init(&bfr, (nel + 1) * sizeof(struct rsb_element));
-
-  // Load balance input data
-  debug_print(&c, verbose - 1, "Load balance: ...\n");
   struct array elist;
-  size_t esize = load_balance(&elist, nel, nv, coord, vtx, &cr, &bfr);
-  debug_print(&c, verbose - 1, "Load balance: done.\n");
+  size_t esize = load_balance(&elist, nel, nv, xyz, vtx, cr, bfr);
 
-  // Run RSB now
-  debug_print(&c, verbose - 1, "Running partitioner: ...\n");
+  debug_print(c, verbose, "Running partitioner ...\n");
   struct comm ca;
-  comm_split(&c, elist.n > 0, c.id, &ca);
-  metric_init();
+  comm_split(c, elist.n > 0, c->id, &ca);
   if (elist.n > 0) {
     slong out[2][1], wrk[2][1], in = elist.n;
     comm_scan(out, &ca, gs_long, gs_add, &in, 1, wrk);
@@ -212,55 +180,34 @@ int parrsb_part_mesh(int *part, int *seq, const long long *const vtx,
     int ndim = (nv == 8) ? 3 : 2;
     switch (options->partitioner) {
     case 0:
-      rsb(&elist, nv, options, &ca, &bfr);
+      rsb(&elist, nv, options, &ca, bfr);
       break;
     case 1:
-      rcb(&elist, esize, ndim, &ca, &bfr);
+      rcb(&elist, esize, ndim, &ca, bfr);
       break;
     case 2:
-      rib(&elist, esize, ndim, &ca, &bfr);
+      rib(&elist, esize, ndim, &ca, bfr);
       break;
     default:
       break;
     }
-
-    metric_rsb_print(&ca, options->profile_level);
   }
-  metric_finalize(), comm_free(&ca);
-  debug_print(&c, verbose - 1, "Running partitioner: done.\n");
+  comm_free(&ca);
 
-  debug_print(&c, verbose - 1, "Restore original input: ...\n");
-  restore_original(part, seq, &cr, &elist, esize, &bfr);
-  debug_print(&c, verbose - 1, "Restore original input: done.\n");
+  debug_print(c, verbose, "Restore original input: ...\n");
+  restore_original(part, cr, &elist, esize, bfr);
 
-  // Report time and finish
-  debug_print(&c, verbose, "par%s finished in %g seconds.\n",
-              ALGO[options->partitioner], comm_time() - t);
-
-  array_free(&elist), buffer_free(&bfr), crystal_free(&cr), comm_free(&c);
-
-  return 0;
+  array_free(&elist);
 }
 
-int parrsb_part_mesh_v2(int *part, const int *const tag,
-                        const long long *const vtx, const double *const coord,
-                        const int nel, const int nv,
-                        parrsb_options *const options, MPI_Comm comm) {
-  struct comm c;
-  comm_init(&c, comm);
-
-  update_options(options);
-
-  const int verbose = options->verbose_level;
-  {
-    slong nelg = nel, wrk;
-    comm_allreduce(&c, gs_long, gs_add, &nelg, 1, &wrk);
-    const int verbose = options->verbose_level;
-    debug_print(&c, verbose, "Running parRSB v2..., nv = %d, nelg = %lld\n", nv,
-                nelg);
-  }
-
-  print_options(&c, options);
+void parrsb_part_mesh_v2(int *part, const long long *const vtx,
+                         const double *const xyz, const int *const tag,
+                         const int nel, const int nv,
+                         parrsb_options *const options,
+                         const struct comm *const c, struct crystal *const cr,
+                         buffer *const bfr) {
+  const int verbose = options->verbose_level - 1;
+  debug_print(c, verbose, "Find number of tags in the mesh ...\n");
 
   struct tag_t {
     uint p, tag, seq, tagn;
@@ -269,16 +216,13 @@ int parrsb_part_mesh_v2(int *part, const int *const tag,
   struct array tags;
   array_init(struct tag_t, &tags, nel);
 
-  buffer bfr;
-  buffer_init(&bfr, nel * sizeof(struct tag_t));
-
   {
     struct tag_t tt;
     for (uint i = 0; i < nel; i++) {
-      tt.seq = i, tt.tag = tag[i], tt.p = tt.tag % c.np;
+      tt.seq = i, tt.tag = tag[i], tt.p = tt.tag % c->np;
       array_cat(struct tag_t, &tags, &tt, 1);
     }
-    sarray_sort(struct tag_t, tags.ptr, tags.n, tag, 0, &bfr);
+    sarray_sort(struct tag_t, tags.ptr, tags.n, tag, 0, bfr);
   }
 
   struct array unique;
@@ -293,13 +237,10 @@ int parrsb_part_mesh_v2(int *part, const int *const tag,
     }
   }
 
-  struct crystal cr;
-  crystal_init(&cr, &c);
-
   sint out[2][1];
   {
-    sarray_transfer(struct tag_t, &unique, p, 1, &cr);
-    sarray_sort(struct tag_t, unique.ptr, unique.n, tag, 0, &bfr);
+    sarray_transfer(struct tag_t, &unique, p, 1, cr);
+    sarray_sort(struct tag_t, unique.ptr, unique.n, tag, 0, bfr);
 
     const struct tag_t *const pu = (const struct tag_t *const)unique.ptr;
     sint in = 0;
@@ -312,17 +253,17 @@ int parrsb_part_mesh_v2(int *part, const int *const tag,
     }
 
     sint wrk[2][1];
-    comm_scan(out, &c, gs_int, gs_add, &in, 1, wrk);
+    comm_scan(out, c, gs_int, gs_add, &in, 1, wrk);
   }
   const uint num_tags = out[1][0], tag_start = out[0][0];
 
-  debug_print(&c, verbose, "\tNum tags: %d\n", num_tags);
-  if (c.np % num_tags != 0) {
-    if (c.id == 0) {
+  debug_print(c, verbose, "Num tags: %d\n", num_tags);
+  if (c->np % num_tags != 0) {
+    if (c->id == 0) {
       fprintf(stderr,
               "Number of processes must be a multiple of number of tags: "
               "processes = %d, tags = %d.\n",
-              c.np, num_tags);
+              c->np, num_tags);
     }
     exit(EXIT_FAILURE);
   }
@@ -339,12 +280,12 @@ int parrsb_part_mesh_v2(int *part, const int *const tag,
       }
     }
 
-    sarray_transfer(struct tag_t, &unique, p, 0, &cr);
-    sarray_sort(struct tag_t, unique.ptr, unique.n, tag, 0, &bfr);
+    sarray_transfer(struct tag_t, &unique, p, 0, cr);
+    sarray_sort(struct tag_t, unique.ptr, unique.n, tag, 0, bfr);
   }
 
-  const uint chunk_size = c.np / num_tags;
-  debug_print(&c, verbose, "\tProcesses per tag: %d\n", chunk_size);
+  const uint chunk_size = c->np / num_tags;
+  debug_print(c, verbose, "Processes per tag: %d\n", chunk_size);
   {
     struct tag_t *const pt = (struct tag_t *const)tags.ptr;
     const struct tag_t *const pu = (const struct tag_t *const)unique.ptr;
@@ -358,20 +299,21 @@ int parrsb_part_mesh_v2(int *part, const int *const tag,
       s = e;
     }
 
-    sarray_sort(struct tag_t, tags.ptr, tags.n, seq, 0, &bfr);
+    sarray_sort(struct tag_t, tags.ptr, tags.n, seq, 0, bfr);
   }
+  array_free(&unique);
 
   struct element_t {
     uint proc, part, seq;
-    scalar coord[MAXDIM * MAXNV];
+    scalar xyz[MAXDIM * MAXNV];
     slong vertices[MAXNV];
   };
 
   struct array elements;
   array_init(struct element_t, &elements, nel);
 
-  debug_print(&c, verbose - 1,
-              "\tPack element data for transfer. tags.n=%u, nel=%u\n", tags.n,
+  debug_print(c, verbose,
+              "Pack element data for transfering. tags.n=%u, nel=%u\n", tags.n,
               nel);
   const int ndim = (nv == 8) ? 3 : 2;
   {
@@ -383,17 +325,18 @@ int parrsb_part_mesh_v2(int *part, const int *const tag,
       for (uint j = 0; j < nv; j++) {
         et.vertices[j] = vtx[i * nv + j];
         for (uint k = 0; k < ndim; k++)
-          et.coord[j * ndim + k] = coord[i * nv * ndim + j * ndim + k];
+          et.xyz[j * ndim + k] = xyz[i * nv * ndim + j * ndim + k];
       }
       array_cat(struct element_t, &elements, &et, 1);
     }
 
-    sarray_transfer(struct element_t, &elements, proc, 1, &cr);
+    sarray_transfer(struct element_t, &elements, proc, 1, cr);
   }
+  array_free(&tags);
 
-  debug_print(&c, verbose - 1, "\tCopy element data for feeding to parRSB.\n");
+  debug_print(c, verbose, "Copy element data for feeding to parRSB.\n");
   long long *lvtx = tcalloc(long long, (elements.n + 1) * nv);
-  double *lcoord = tcalloc(double, (elements.n + 1) * nv * ndim);
+  double *lxyz = tcalloc(double, (elements.n + 1) * nv * ndim);
   {
     const struct element_t *const pe =
         (const struct element_t *const)elements.ptr;
@@ -401,44 +344,91 @@ int parrsb_part_mesh_v2(int *part, const int *const tag,
       for (uint j = 0; j < nv; j++) {
         lvtx[e * nv + j] = pe[e].vertices[j];
         for (uint k = 0; k < ndim; k++)
-          lcoord[e * nv * ndim + j * ndim + k] = pe[e].coord[j * ndim + k];
+          lxyz[e * nv * ndim + j * ndim + k] = pe[e].xyz[j * ndim + k];
       }
     }
   }
 
-  debug_print(&c, verbose - 1, "\tRun parRSB locally in a tag now.\n");
+  debug_print(c, verbose, "Run parRSB locally within a tag now.\n");
   {
     int *lpart = tcalloc(int, elements.n + 1);
 
-    MPI_Comm local;
-    MPI_Comm_split(comm, c.id / chunk_size, c.id, &local);
+    struct comm lc;
+    comm_split(c, c->id / chunk_size, c->id, &lc);
+
+    struct crystal lcr;
+    crystal_init(&lcr, &lc);
+
     options->verbose_level = 0;
     options->profile_level = 0;
-    parrsb_part_mesh(lpart, NULL, lvtx, lcoord, elements.n, nv, options, local);
-    MPI_Comm_free(&local);
+    parrsb_part_mesh_v1(lpart, lvtx, lxyz, elements.n, nv, options, &lc, &lcr,
+                        bfr);
+    crystal_free(&lcr), comm_free(&lc);
 
     struct element_t *const pe = (struct element_t *const)elements.ptr;
     for (uint e = 0; e < elements.n; e++) {
-      pe[e].part = lpart[e] + (c.id / chunk_size) * chunk_size;
-      assert(pe[e].part >= 0 && pe[e].part < c.np);
+      pe[e].part = lpart[e] + (c->id / chunk_size) * chunk_size;
+      assert(pe[e].part >= 0 && pe[e].part < c->np);
     }
     free(lpart);
 
-    sarray_transfer(struct element_t, &elements, proc, 0, &cr);
+    sarray_transfer(struct element_t, &elements, proc, 0, cr);
     assert(nel == elements.n);
   }
-  free(lvtx), free(lcoord);
+  free(lvtx), free(lxyz);
 
   {
-    sarray_sort(struct element_t, elements.ptr, elements.n, seq, 0, &bfr);
+    sarray_sort(struct element_t, elements.ptr, elements.n, seq, 0, bfr);
     const struct element_t *const pe =
         (const struct element_t *const)elements.ptr;
     for (uint i = 0; i < nel; i++)
       part[i] = pe[i].part;
   }
 
-  array_free(&elements), array_free(&unique), array_free(&tags);
-  buffer_free(&bfr), crystal_free(&cr), comm_free(&c);
+  array_free(&elements);
+}
 
-  return 0;
+int parrsb_part_mesh(int *part, const long long *const vtx,
+                     const double *const xyz, const int *const tag,
+                     const int nel, const int nv, parrsb_options *const options,
+                     MPI_Comm comm) {
+  struct comm c;
+  comm_init(&c, comm);
+
+  update_options(options);
+
+  const int verbose = options->verbose_level;
+  {
+    slong nelg = nel, wrk;
+    comm_allreduce(&c, gs_long, gs_add, &nelg, 1, &wrk);
+    debug_print(&c, verbose, "Running parRSB ..., nv = %d, nelg = %lld\n", nv,
+                nelg);
+  }
+
+  print_options(&c, options);
+
+  buffer bfr;
+  buffer_init(&bfr, (nel + 1) * 72);
+
+  struct crystal cr;
+  crystal_init(&cr, &c);
+
+  parrsb_barrier(&c);
+  const double t = comm_time();
+
+  metric_init();
+  const uint profile_level = options->profile_level;
+  if (tag != NULL)
+    parrsb_part_mesh_v2(part, vtx, xyz, tag, nel, nv, options, &c, &cr, &bfr);
+  else
+    parrsb_part_mesh_v1(part, vtx, xyz, nel, nv, options, &c, &cr, &bfr);
+  metric_rsb_print(&c, profile_level);
+  metric_finalize();
+
+  debug_print(&c, verbose, "par%s finished in %g seconds.\n",
+              ALGO[options->partitioner], comm_time() - t);
+
+  crystal_free(&cr);
+  buffer_free(&bfr);
+  comm_free(&c);
 }

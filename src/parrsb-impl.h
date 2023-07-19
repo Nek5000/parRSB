@@ -28,9 +28,8 @@
 //------------------------------------------------------------------------------
 // RCB / RIB.
 // `struct rcb_element` is used for RCB and RIB partitioning.
-// `struct rsb_element` should be a superset of `struct rcb_element`.
 struct rcb_element {
-  uint proc, origin, seq;
+  uint proc, origin;
   ulong globalId;
   scalar coord[MAXDIM], fiedler;
 };
@@ -42,9 +41,9 @@ int rib(struct array *elements, size_t unit_size, int ndim, struct comm *c,
 
 //------------------------------------------------------------------------------
 // RSB.
-//
+// `struct rsb_element` = `struct rcb_element` + vertices. Order is important.
 struct rsb_element {
-  uint proc, origin, seq;
+  uint proc, origin;
   ulong globalId;
   scalar coord[MAXDIM], fiedler;
   slong vertices[MAXNV];
@@ -52,6 +51,21 @@ struct rsb_element {
 
 void rsb(struct array *elements, int nv, const parrsb_options *const options,
          struct comm *gc, buffer *bfr);
+
+//==============================================================================
+// Partitioning
+//
+void parrsb_part_mesh_v1(int *part, const long long *const vtx,
+                         const double *const xyz, const int nel, const int nv,
+                         const parrsb_options *const options,
+                         const struct comm *const c, struct crystal *const cr,
+                         buffer *const bfr);
+
+void parrsb_part_mesh_v2(int *part, const long long *const vtx,
+                         const double *const xyz, const int *const tag, int nel,
+                         int nv, parrsb_options *const options,
+                         const struct comm *const c, struct crystal *const cr,
+                         buffer *const bfr);
 
 //------------------------------------------------------------------------------
 // Find number of components.

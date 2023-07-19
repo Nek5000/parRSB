@@ -40,14 +40,10 @@ typedef struct {
 
 extern parrsb_options parrsb_default_options;
 
-int parrsb_part_mesh(int *part, int *seq, const long long *const vtx,
-                     const double *const coord, const int nel, const int nv,
-                     parrsb_options *const options, MPI_Comm comm);
-
-int parrsb_part_mesh_v2(int *part, const int *const tag,
-                        const long long *const vtx, const double *const coord,
-                        int nel, int nv, parrsb_options *const options,
-                        MPI_Comm comm);
+int parrsb_part_mesh(int *part, const long long *const vtx,
+                     const double *const xyz, const int *const tag,
+                     const int nel, const int nv, parrsb_options *const options,
+                     MPI_Comm comm);
 
 //==============================================================================
 // Connectivity
