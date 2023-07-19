@@ -200,6 +200,92 @@ void parrsb_part_mesh_v1(int *part, const long long *const vtx,
   array_free(&elist);
 }
 
+void parrsb_check_tagged_partitions(const long long *const eids,
+                                    const long long *const vtx, const int nel,
+                                    const int nv, const int ntags,
+                                    const struct comm *const c) {
+  // Check if the input elements are sorted by global id.
+  {
+    sint sorted = 1;
+    for (uint i = 1; i < nel; i++) {
+      if (eids[i] < eids[i - 1]) {
+        sorted = 0;
+        break;
+      }
+    }
+
+    sint wrk;
+    comm_allreduce(c, gs_int, gs_min, &sorted, 1, &wrk);
+    if (!sorted) {
+      if (c->id == 0) {
+        fprintf(stderr, "Input elements are not sorted.\n");
+        fflush(stderr);
+      }
+      exit(EXIT_FAILURE);
+    }
+  }
+
+  // Number the elements within the each tag id and setup a gs handle based on
+  // 2D element id.
+  const uint tag_id = c->id / ntags;
+  struct comm lc;
+  struct gs_data *gse = NULL;
+  {
+    comm_split(c, tag_id, c->id, &lc);
+
+    slong out[2][1], wrk[2][1], in = nel;
+    comm_scan(out, &lc, gs_long, gs_add, &in, 1, wrk);
+    slong start = out[0][0];
+
+    slong *lids = tcalloc(slong, nel);
+    for (uint i = 0; i < nel; i++)
+      lids[i] = start + i;
+
+    gse = gs_setup(lids, nel, c, 0, gs_pairwise, 0);
+    free(lids);
+  }
+
+  // Setup a local gs handle based on the original gs vertex ids.
+  const size_t size = nel * nv;
+  buffer bfr;
+  buffer_init(&bfr, size);
+  sint *mul = tcalloc(sint, size);
+  {
+    struct gs_data *gsl = gs_setup(vtx, size, &lc, 0, gs_pairwise, 0);
+    for (uint i = 0; i < size; i++)
+      mul[i] = 1;
+    gs(mul, gs_int, gs_add, 0, gsl, &bfr);
+    gs_free(gsl);
+  }
+
+  // Now let's compare the multiplicity across the layers.
+  {
+    sint *lmin = tcalloc(sint, nel);
+    sint *lmax = tcalloc(sint, nel);
+    for (uint v = 0; v < nv; v++) {
+      for (uint e = 0; e < nel; e++) {
+        lmin[e] = mul[e * nv + v];
+        lmax[e] = mul[e * nv + v];
+      }
+
+      gs(lmin, gs_int, gs_min, 0, gse, &bfr);
+      gs(lmax, gs_int, gs_max, 0, gse, &bfr);
+
+      for (uint e = 0; e < nel; e++)
+        assert(lmin[e] == lmax[e]);
+    }
+
+    free(lmin), free(lmax);
+  }
+
+  free(mul);
+  buffer_free(&bfr);
+  gs_free(gse);
+  comm_free(&lc);
+
+  return;
+}
+
 void parrsb_part_mesh_v2(int *part, const long long *const vtx,
                          const double *const xyz, const int *const tag,
                          const int nel, const int nv,
