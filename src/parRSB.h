@@ -45,6 +45,11 @@ int parrsb_part_mesh(int *part, const long long *const vtx,
                      const int nel, const int nv, parrsb_options *const options,
                      MPI_Comm comm);
 
+void parrsb_check_tagged_partitions(const long long *const eids,
+                                    const long long *const vtx, const int nel,
+                                    const int nv, const int ntags,
+                                    const struct comm *const c,
+                                    const int verbose);
 //==============================================================================
 // Connectivity
 //

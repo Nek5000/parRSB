@@ -203,8 +203,9 @@ void parrsb_part_mesh_v1(int *part, const long long *const vtx,
 void parrsb_check_tagged_partitions(const long long *const eids,
                                     const long long *const vtx, const int nel,
                                     const int nv, const int ntags,
-                                    const struct comm *const c) {
-  // Check if the input elements are sorted by global id.
+                                    const struct comm *const c,
+                                    const int verbose) {
+  parrsb_print(c, verbose, "Check if the input elements are sorted locally.\n");
   {
     sint sorted = 1;
     for (uint i = 1; i < nel; i++) {
@@ -225,6 +226,7 @@ void parrsb_check_tagged_partitions(const long long *const eids,
     }
   }
 
+  parrsb_print(c, verbose, "Number elements within each layer.\n");
   // Number the elements within the each tag id and setup a gs handle based on
   // 2D element id.
   const uint tag_id = c->id / ntags;
@@ -245,6 +247,7 @@ void parrsb_check_tagged_partitions(const long long *const eids,
     free(lids);
   }
 
+  parrsb_print(c, verbose, "Setup multiplicity.\n");
   // Setup a local gs handle based on the original gs vertex ids.
   const size_t size = nel * nv;
   buffer bfr;
@@ -258,6 +261,7 @@ void parrsb_check_tagged_partitions(const long long *const eids,
     gs_free(gsl);
   }
 
+  parrsb_print(c, verbose, "Check multiplicity across the layers.\n");
   // Now let's compare the multiplicity across the layers.
   {
     sint *lmin = tcalloc(sint, nel);
