@@ -55,13 +55,13 @@ void rsb(struct array *elements, int nv, const parrsb_options *const options,
 //==============================================================================
 // Partitioning
 //
-void parrsb_part_mesh_v1(int *part, const long long *const vtx,
+void parrsb_part_mesh_v0(int *part, const long long *const vtx,
                          const double *const xyz, const int nel, const int nv,
                          const parrsb_options *const options,
                          const struct comm *const c, struct crystal *const cr,
                          buffer *const bfr);
 
-void parrsb_part_mesh_v2(int *part, const long long *const vtx,
+void parrsb_part_mesh_v1(int *part, const long long *const vtx,
                          const double *const xyz, const int *const tag, int nel,
                          int nv, parrsb_options *const options,
                          const struct comm *const c, struct crystal *const cr,

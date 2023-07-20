@@ -158,7 +158,7 @@ static void restore_original(int *part, struct crystal *cr, struct array *elist,
   }
 }
 
-void parrsb_part_mesh_v1(int *part, const long long *const vtx,
+void parrsb_part_mesh_v0(int *part, const long long *const vtx,
                          const double *const xyz, const int nel, const int nv,
                          const parrsb_options *const options,
                          const struct comm *const c, struct crystal *const cr,
@@ -205,6 +205,13 @@ void parrsb_check_tagged_partitions(const long long *const eids,
                                     const int nv, const int ntags,
                                     const struct comm *const c,
                                     const int verbose) {
+  int v = 0;
+  const char *version = getenv("PARRSB_VERSION");
+  if (version)
+    v = atoi(version);
+  if (v == 0)
+    return;
+
   parrsb_print(c, verbose, "Check if the input elements are sorted locally.\n");
   {
     sint sorted = 1;
@@ -290,7 +297,7 @@ void parrsb_check_tagged_partitions(const long long *const eids,
   return;
 }
 
-void parrsb_part_mesh_v2(int *part, const long long *const vtx,
+void parrsb_part_mesh_v1(int *part, const long long *const vtx,
                          const double *const xyz, const int *const tag,
                          const int nel, const int nv,
                          parrsb_options *const options,
@@ -451,7 +458,7 @@ void parrsb_part_mesh_v2(int *part, const long long *const vtx,
 
     options->verbose_level = 0;
     options->profile_level = 0;
-    parrsb_part_mesh_v1(lpart, lvtx, lxyz, elements.n, nv, options, &lc, &lcr,
+    parrsb_part_mesh_v0(lpart, lvtx, lxyz, elements.n, nv, options, &lc, &lcr,
                         bfr);
     crystal_free(&lcr), comm_free(&lc);
 
@@ -508,10 +515,22 @@ int parrsb_part_mesh(int *part, const long long *const vtx,
 
   metric_init();
   const uint profile_level = options->profile_level;
-  if (tag != NULL)
-    parrsb_part_mesh_v2(part, vtx, xyz, tag, nel, nv, options, &c, &cr, &bfr);
-  else
-    parrsb_part_mesh_v1(part, vtx, xyz, nel, nv, options, &c, &cr, &bfr);
+
+  int v = (tag != NULL);
+  const char *version = getenv("PARRSB_VERSION");
+  if (version)
+    v = atoi(version);
+
+  if (v == 1 && !tag) {
+    fprintf(stderr, "parRSB v1 expects tags to be non-NULL.\n");
+    exit(EXIT_FAILURE);
+  }
+
+  if (v == 1)
+    parrsb_part_mesh_v1(part, vtx, xyz, tag, nel, nv, options, &c, &cr, &bfr);
+  else if (v == 0)
+    parrsb_part_mesh_v0(part, vtx, xyz, nel, nv, options, &c, &cr, &bfr);
+
   metric_rsb_print(&c, profile_level);
   metric_finalize();
 
