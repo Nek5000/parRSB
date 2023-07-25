@@ -158,20 +158,58 @@ static void restore_original(int *part, struct crystal *cr, struct array *elist,
   }
 }
 
+static void initialize_node_level(struct comm *c, const struct comm *const gc) {
+#ifdef MPI
+  MPI_Comm node;
+  MPI_Comm_split_type(gc->c, MPI_COMM_TYPE_SHARED, gc->id, MPI_INFO_NULL,
+                      &node);
+  comm_init(c, node);
+  MPI_Comm_free(&node);
+#else
+  comm_init(1, 1);
+#endif
+}
+
+static void initialize_levels(struct comm comms[3], const int levels,
+                              const struct comm *const c) {
+  assert(levels >= 1 && levels <= 3);
+  // Level 1 communicator is the global communicator.
+  comm_dup(&comms[0], c);
+  // Node level communicator is the last level communicator.
+  if (levels > 1)
+    initialize_node_level(&comms[levels - 1], c);
+  // Check if there is a custom level specified by the user.
+  if (levels == 3) {
+    uint size = 64;
+    const char *val = getenv("PARRSB_LEVEL2_SIZE");
+    if (val)
+      size = atoi(val);
+    comm_split(&comms[0], comms[0].id / size, comms[0].id, &comms[1]);
+  }
+}
+
 void parrsb_part_mesh_v0(int *part, const long long *const vtx,
                          const double *const xyz, const int nel, const int nv,
                          const parrsb_options *const options,
                          const struct comm *const c, struct crystal *const cr,
                          buffer *const bfr) {
   const int verbose = options->verbose_level - 1;
-  parrsb_print(c, verbose, "Load balance ...\n");
 
+  parrsb_print(c, verbose, "Load balance ...\n");
   struct array elist;
   size_t esize = load_balance(&elist, nel, nv, xyz, vtx, cr, bfr);
 
-  parrsb_print(c, verbose, "Running partitioner ...\n");
   struct comm ca;
   comm_split(c, elist.n > 0, c->id, &ca);
+
+  // Setup communicators for each level of the partitioning. Right now we
+  // support a maximum of three levels.
+  const int levels = options->levels;
+  parrsb_print(c, verbose, "Setup partition levels=%d ...\n", levels);
+  struct comm comms[3];
+  initialize_levels(comms, levels, &ca);
+
+  parrsb_print(c, verbose, "Running partitioner ...\n");
   if (elist.n > 0) {
     slong out[2][1], wrk[2][1], in = elist.n;
     comm_scan(out, &ca, gs_long, gs_add, &in, 1, wrk);
@@ -180,7 +218,7 @@ void parrsb_part_mesh_v0(int *part, const long long *const vtx,
     int ndim = (nv == 8) ? 3 : 2;
     switch (options->partitioner) {
     case 0:
-      rsb(&elist, nv, options, &ca, bfr);
+      rsb(&elist, nv, options, comms, bfr);
       break;
     case 1:
       rcb(&elist, esize, ndim, &ca, bfr);
@@ -193,6 +231,9 @@ void parrsb_part_mesh_v0(int *part, const long long *const vtx,
     }
   }
   comm_free(&ca);
+
+  for (uint l = 0; l < levels; l++)
+    comm_free(&comms[l]);
 
   parrsb_print(c, verbose, "Restore original input: ...\n");
   restore_original(part, cr, &elist, esize, bfr);

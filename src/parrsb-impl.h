@@ -50,7 +50,7 @@ struct rsb_element {
 };
 
 void rsb(struct array *elements, int nv, const parrsb_options *const options,
-         struct comm *gc, buffer *bfr);
+         const struct comm comms[3], buffer *bfr);
 
 //==============================================================================
 // Partitioning

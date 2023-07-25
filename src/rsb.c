@@ -43,7 +43,7 @@ static void test_component_versions(struct array *elements, struct comm *lc,
   crystal_free(&cr);
 }
 
-static void check_rsb_partition(struct comm *gc,
+static void check_rsb_partition(const struct comm *gc,
                                 const parrsb_options *const opts) {
   int max_levels = log2ll(gc->np);
   int miter = opts->rsb_max_iter, mpass = opts->rsb_max_passes;
@@ -286,7 +286,7 @@ static sint get_bisect_comm(struct comm *const tc, const struct comm *const lc,
     psize = lc->np, pid = lc->id;
   }
 
-  const int bin = (pid >= (psize + 1) / 2);
+  const sint bin = (pid >= (psize + 1) / 2);
   comm_split(lc, bin, lc->id, tc);
   return bin;
 }
@@ -295,13 +295,12 @@ static uint get_level_cuts(const uint level, const uint levels,
                            const struct comm comms[3]) {
   uint n;
   if (level < levels - 1) {
-    sint lvl2 = (comms[level + 1].id == 0), wrk;
-    comm_allreduce(&comms[level], gs_int, gs_add, &lvl2, 1, &wrk);
-    n = lvl2;
+    sint size = (comms[level + 1].id == 0), wrk;
+    comm_allreduce(&comms[level], gs_int, gs_add, &size, 1, &wrk);
+    n = size;
   } else {
     n = comms[level].np;
   }
-  parrsb_print(&comms[0], 1, "\tLevel=%d,n=%u\n", level + 1, n);
 
   sint cuts = 0, pow2 = 1;
   while (pow2 < n)
@@ -313,37 +312,12 @@ static uint get_level_cuts(const uint level, const uint levels,
   return cuts;
 }
 
-static void initialize_node_level_comm(struct comm *c,
-                                       const struct comm *const gc) {
-#ifdef MPI
-  MPI_Comm node;
-  MPI_Comm_split_type(gc->c, MPI_COMM_TYPE_SHARED, gc->id, MPI_INFO_NULL,
-                      &node);
-  comm_init(c, node);
-  MPI_Comm_free(&node);
-#else
-  comm_init(1, 1);
-#endif
-}
-
 void rsb(struct array *elements, int nv, const parrsb_options *const options,
-         struct comm *gc, buffer *bfr) {
-  // Communicator for each level of the partitioning. Right now we support a
-  // maximum of two levels.inter Inter node level (level = 1) and a node level
-  // (level = 2).
-  struct comm comms[3];
-
+         const struct comm comms[3], buffer *bfr) {
   const int levels = options->levels;
-  assert(levels >= 1 && levels <= 2);
-
-  // Level 1 communicator is the global communicator.
-  comm_dup(&comms[0], gc);
-  // Node level communicator is the last level communicator.
-  if (levels > 1)
-    initialize_node_level_comm(&comms[levels - 1], gc);
-
   const sint verbose = options->verbose_level - 1;
   const uint ndim = (nv == 8) ? 3 : 2;
+  const struct comm *gc = &comms[0];
   for (uint level = 0; level < levels; level++) {
     // Find the maximum number of RSB cuts in current level.
     sint cuts = get_level_cuts(level, levels, comms);
@@ -379,7 +353,7 @@ void rsb(struct array *elements, int nv, const parrsb_options *const options,
       // Find the Fiedler vector.
       parrsb_print(gc, verbose - 1, "\tFiedler ... \n");
       metric_tic(&lc, RSB_FIEDLER);
-      fiedler(elements, nv, options, &lc, bfr, gc->id == 0);
+      fiedler(elements, nv, options, &lc, bfr, verbose - 2);
       metric_toc(&lc, RSB_FIEDLER);
 
       // Sort by Fiedler vector.
@@ -396,7 +370,8 @@ void rsb(struct array *elements, int nv, const parrsb_options *const options,
       // Find the number of disconnected components.
       parrsb_print(gc, verbose - 1, "\tComponents ...\n");
       metric_tic(&lc, RSB_COMPONENTS);
-      const uint ncomp = get_components_v2(NULL, elements, nv, &tc, bfr, 0);
+      const uint ncomp =
+          get_components_v2(NULL, elements, nv, &tc, bfr, verbose - 2);
       metric_acc(RSB_COMPONENTS_NCOMP, ncomp);
       metric_toc(&lc, RSB_COMPONENTS);
 
@@ -416,9 +391,6 @@ void rsb(struct array *elements, int nv, const parrsb_options *const options,
     }
     comm_free(&lc);
   }
-  comm_free(&comms[0]);
-  if (levels > 1)
-    comm_free(&comms[levels - 1]);
 
   check_rsb_partition(gc, options);
 }
