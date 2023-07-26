@@ -1,10 +1,13 @@
 #include "metrics.h"
 #include "parrsb-impl.h"
 #include <ctype.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
 
 parrsb_options parrsb_default_options = {
     // General options
@@ -526,6 +529,223 @@ void parrsb_part_mesh_v1(int *part, const long long *const vtx,
   array_free(&elements);
 }
 
+static void update_frontier(sint *const target, sint *const hop,
+                            sint *const frontier, const unsigned nv,
+                            const unsigned hid, buffer *const bfr) {
+  // If target is already set, we don't update either target or hop.
+  // We simply update frontier to previous target value and return.
+  if (*target >= 0) {
+    // Check invariant: *hop < INT_MAX
+    assert(*hop < INT_MAX);
+    for (uint i = 0; i < nv; i++)
+      frontier[i] = *target;
+    return;
+  }
+
+  struct dest_t {
+    uint target;
+  };
+
+  struct array dests;
+  array_init(struct dest_t, &dests, nv);
+  {
+    struct dest_t dt;
+    for (uint i = 0; i < nv; i++) {
+      if (frontier[i] >= 0) {
+        dt.target = frontier[i];
+        array_cat(struct dest_t, &dests, &dt, 1);
+      }
+    }
+  }
+
+  if (dests.n > 0) {
+    sarray_sort(struct dest_t, dests.ptr, dests.n, target, 0, bfr);
+
+    const struct dest_t *const pd = (const struct dest_t *const)dests.ptr;
+    uint current_target = pd[0].target, current_count = 1;
+    uint final_target = current_target, final_count = 1;
+    for (uint i = 1; i < dests.n; i++) {
+      if (pd[i].target == current_target) {
+        current_count++;
+      } else {
+        if (current_count > final_count)
+          final_count = current_count, final_target = current_target;
+        current_target = pd[i].target, current_count = 1;
+      }
+    }
+    if (current_count > final_count)
+      final_target = current_target;
+    for (uint j = 0; j < nv; j++)
+      frontier[j] = final_target;
+
+    // Update target and hop.
+    *target = final_target, *hop = hid + 1;
+  }
+
+  array_free(&dests);
+}
+
+void parrsb_part_mesh_v2(int *part, const long long *const vtx1, const int nel1,
+                         const long long *const vtx2, const int nel2,
+                         const int nv, const struct comm *const c) {
+  for (uint i = 0; i < nel2; i++)
+    part[i] = -1;
+
+  buffer bfr;
+  buffer_init(&bfr, 1024);
+
+  struct crystal cr;
+  crystal_init(&cr, c);
+
+  const size_t size1 = nel1 * nv;
+  const size_t size2 = nel2 * nv;
+  const size_t size = size1 + size2;
+
+  // Setup the gather-scatter handle to find connectivity through BFS.
+  struct gs_data *gsh = NULL;
+  {
+    long long *vtx = tcalloc(slong, size);
+    for (size_t i = 0; i < size1; i++)
+      vtx[i] = vtx1[i];
+    for (size_t i = 0; i < size2; i++)
+      vtx[size1 + i] = vtx2[i];
+
+    gsh = gs_setup(vtx, size, c, 0, gs_pairwise, 0);
+    free(vtx);
+  }
+
+  // Initialize array of elements to be sent to each partition.
+  struct elem_t {
+    sint part;
+    uint target, hop, sequence;
+  };
+
+  struct array arr;
+  array_init(struct elem_t, &arr, nel2);
+
+  // Allocate space for work arrays: frontier, target, and hop.
+  sint *const frontier = tcalloc(sint, size);
+  sint *const target2 = tcalloc(sint, nel2);
+  sint *const hop2 = tcalloc(sint, nel2);
+
+  // Calculate the global number of elements in solid mesh and expected number
+  // of elements in each partition.
+  slong nelgt2 = nel2;
+  uint nexp2;
+  {
+    slong wrk;
+    comm_allreduce(c, gs_long, gs_add, &nelgt2, 1, &wrk);
+    nexp2 = nelgt2 / c->np;
+    nexp2 += (c->id < (nelgt2 - nexp2 * c->np));
+    // Check for invariant: (min(nexp2) -  max(nexp2)) <= 1.
+    slong nexp2_min = nexp2, nexp2_max = nexp2;
+    comm_allreduce(c, gs_long, gs_min, &nexp2_min, 1, &wrk);
+    comm_allreduce(c, gs_long, gs_max, &nexp2_max, 1, &wrk);
+    assert(nexp2_max - nexp2_min <= 1);
+    // Check for invariant: (sum(nexp2) == nelgt2).
+    slong nexp2_sum = nexp2;
+    comm_allreduce(c, gs_long, gs_add, &nexp2_sum, 1, &wrk);
+    assert(nexp2_sum == nelgt2);
+  }
+
+  uint nrecv2 = 0;
+  slong nrem2 = nelgt2;
+  while (nrem2 > 0) {
+    // Check for invariant: nrecv2 <= nexp2.
+    assert(nrecv2 <= nexp2);
+
+    // If the partition does not have enough elements, we keep it under
+    // consideration for accepting new solid elements. If the partition
+    // already has enough elements, we take that partition out of
+    // consideration (by setting the frontier to -1). We always initialize solid
+    // elements as unassigned (-1) although they may be already assigned. We
+    // check for that later.
+    {
+      sint id = c->id;
+      if (nrecv2 == nexp2)
+        id = -1;
+      for (uint i = 0; i < size1; i++)
+        frontier[i] = id;
+      for (uint i = size1; i < size; i++)
+        frontier[i] = -1;
+    }
+
+    // Initialize target, and hop.
+    {
+      for (uint i = 0; i < nel2; i++)
+        target2[i] = -1, hop2[i] = INT_MAX;
+    }
+
+    // Then perform a BFS till we assign all the elements in the solid mesh with
+    // a potential partition id.
+    {
+      bool set = false;
+      for (uint hid = 0; !set; hid++) {
+        gs(frontier, gs_int, gs_max, 0, gsh, &bfr);
+        set = true;
+        for (uint i = 0; i < nel2; i++) {
+          update_frontier(&target2[i], &hop2[i], &frontier[size1 + i * nv], nv,
+                          hid, &bfr);
+          set = set && (target2[i] >= 0) && (hop2[i] < INT_MAX);
+        }
+      }
+    }
+
+    // Now, pack unassigned solid elements to be sent to the potential
+    // partition.
+    arr.n = 0;
+    {
+      struct elem_t et = {.part = -1};
+      for (uint i = 0; i < nel2; i++) {
+        if (part[i] >= 0)
+          continue;
+        et.sequence = i, et.target = target2[i], et.hop = hop2[i];
+        array_cat(struct elem_t, &arr, &et, 1);
+      }
+    }
+
+    // Send the solid elements to potential partition.
+    sarray_transfer(struct elem_t, &arr, target, 1, &cr);
+
+    // Assign elements if the partition still doesn't have enough elements.
+    if (nrecv2 < nexp2) {
+      // We sort by hop value. Elements with lower hop value are assigned first
+      // since they are technically closer to the partition.
+      sarray_sort(struct elem_t, arr.ptr, arr.n, hop, 1, &bfr);
+      struct elem_t *const pa = (struct elem_t *const)arr.ptr;
+      uint keep = MIN(nexp2 - nrecv2, arr.n);
+      for (uint i = 0; i < keep; i++)
+        pa[i].part = c->id;
+      nrecv2 += keep;
+      // Check for invariant: nrecv2 <= nexp2.
+      assert(nrecv2 <= nexp2);
+    }
+
+    // Send everything back with updated partition id.
+    sarray_transfer(struct elem_t, &arr, target, 0, &cr);
+
+    // Update the part array.
+    {
+      const struct elem_t *const pa = (const struct elem_t *const)arr.ptr;
+      for (uint j = 0; j < arr.n; j++)
+        part[pa[j].sequence] = pa[j].part;
+      arr.n = 0;
+    }
+
+    {
+      slong wrk;
+      nrem2 = nexp2 - nrecv2;
+      comm_allreduce(c, gs_long, gs_add, &nrem2, 1, &wrk);
+    }
+  }
+
+  gs_free(gsh);
+  free(frontier), free(target2), free(hop2);
+  array_free(&arr);
+  crystal_free(&cr);
+  buffer_free(&bfr);
+}
+
 int parrsb_part_mesh(int *part, const long long *const vtx,
                      const double *const xyz, const int *const tag,
                      const int nel, const int nv, parrsb_options *const options,
@@ -582,3 +802,5 @@ int parrsb_part_mesh(int *part, const long long *const vtx,
   buffer_free(&bfr);
   comm_free(&c);
 }
+
+#undef MIN
