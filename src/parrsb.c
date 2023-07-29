@@ -14,7 +14,7 @@ parrsb_options parrsb_default_options = {
     .partitioner = 0,
     .levels = 2,
     .repair = 0,
-    .verbose_level = 0,
+    .verbose_level = 1,
     .profile_level = 0,
     // RSB common (Lanczos and MG) options
     .rsb_algo = 0,

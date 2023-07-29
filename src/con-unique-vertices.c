@@ -504,31 +504,31 @@ int find_unique_vertices(Mesh mesh, struct comm *c, scalar tol, int verbose,
       parrsb_print(c, verbose, "\tlocglob: %d %d", t + 1, d + 1);
 
       // Sort both local and shared segments.
+      parrsb_print(c, verbose - 1, "\t\tsort_shared_segments ...\n");
       sort_segments_shared(&shared, d, c, verbose - 1, bfr);
-      parrsb_print(c, verbose - 1, "\t\tsort_shared_segments: done.\n");
+      parrsb_print(c, verbose - 1, "\t\tsort_local_segments ...\n");
       sort_segments_local(&local, d);
-      parrsb_print(c, verbose - 1, "\t\tsort_local_segments: done.\n");
 
       // Find segments in local and shared segments now.
+      parrsb_print(c, verbose - 1, "\t\tfind_shared_segments ...\n");
       find_segments(&shared, d, tol2, c);
-      parrsb_print(c, verbose - 1, "\t\tfind_shared_segments: done.\n");
+      parrsb_print(c, verbose - 1, "\t\tfind_local_segments ...\n");
       find_segments(&local, d, tol2, &COMM_NULL);
-      parrsb_print(c, verbose - 1, "\t\tfind_local_segments: done.\n");
 
       // Separate local segments from the shared segments.
+      parrsb_print(c, verbose - 1, "\t\tseparate_local_segments ...\n");
       separate_local_segments(&local, &shared, c);
-      parrsb_print(c, verbose - 1, "\t\tseparate_local_segments: done.\n");
 
       // Number the segments.
+      parrsb_print(c, verbose - 1, "\t\tnumber_segments ...\n");
       slong nseg = number_segments(&local, &shared, c);
-      parrsb_print(c, verbose - 1, "\t\tnumber_segments: done.\n");
       parrsb_print(c, verbose, " %lld %lld\n", nseg, npts);
     }
   }
   // Number points consecutively -- shared points after local and then load
   // balance.
+  parrsb_print(c, verbose - 1, "\tnumber_points_and_load_balance ...\n");
   number_points(elems, &local, &shared, c, bfr);
-  parrsb_print(c, verbose, "\tnumber_points_and_load_balance: done.\n");
   array_free(&shared), array_free(&local);
 
   return 0;

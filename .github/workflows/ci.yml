@@ -57,6 +57,7 @@ jobs:
         shell: bash
         run: |
           export PARRSB_RSB_ALGO=0
+          export PARRSB_VERBOSE_LEVEL=2
 
           cp ${EXAMPLESDIR}/genmap ${CIDIR}/${{ matrix.test }}
           cd ${CIDIR}/${{ matrix.test }}
@@ -70,6 +71,7 @@ jobs:
         run: |
           export PARRSB_RSB_ALGO=1
           export PARRSB_RSB_MG_FACTOR=2
+          export PARRSB_VERBOSE_LEVEL=2
 
           cp ${EXAMPLESDIR}/genmap ${CIDIR}/${{ matrix.test }}
           cd ${CIDIR}/${{ matrix.test }}
@@ -83,6 +85,7 @@ jobs:
         run: |
           export PARRSB_RSB_ALGO=1
           export PARRSB_RSB_MG_FACTOR=4
+          export PARRSB_VERBOSE_LEVEL=2
 
           cp ${EXAMPLESDIR}/genmap ${CIDIR}/${{ matrix.test }}
           cd ${CIDIR}/${{ matrix.test }}
@@ -97,6 +100,7 @@ jobs:
           export PARRSB_RSB_ALGO=1
           export PARRSB_RSB_MG_FACTOR=4
           export PARRSB_RSB_MG_SMOOTH_AGGREGATION=1
+          export PARRSB_VERBOSE_LEVEL=2
 
           cp ${EXAMPLESDIR}/genmap ${CIDIR}/${{ matrix.test }}
           cd ${CIDIR}/${{ matrix.test }}
