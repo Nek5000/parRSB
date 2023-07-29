@@ -161,7 +161,7 @@ static void restore_original(int *part, struct crystal *cr, struct array *elist,
   }
 }
 
-static void initialize_node_level(struct comm *c, const struct comm *const gc) {
+static void initiailize_node_aux(struct comm *c, const struct comm *const gc) {
 #ifdef MPI
   MPI_Comm node;
   MPI_Comm_split_type(gc->c, MPI_COMM_TYPE_SHARED, gc->id, MPI_INFO_NULL,
@@ -173,27 +173,69 @@ static void initialize_node_level(struct comm *c, const struct comm *const gc) {
 #endif
 }
 
-static void initialize_levels(struct comm comms[3], const int levels,
+static void initialize_levels(struct comm *const comms, int *const levels,
                               const struct comm *const c) {
-  assert(levels >= 1 && levels <= 3);
   // Level 1 communicator is the global communicator.
   comm_dup(&comms[0], c);
   // Node level communicator is the last level communicator.
-  if (levels > 1)
-    initialize_node_level(&comms[levels - 1], c);
-  // Check if there is a custom level specified by the user.
-  if (levels == 3) {
-    uint size = 64;
-    const char *val = getenv("PARRSB_LEVEL2_SIZE");
-    if (val)
-      size = atoi(val);
-    comm_split(&comms[0], comms[0].id / size, comms[0].id, &comms[1]);
+  struct comm nc;
+  initiailize_node_aux(&nc, c);
+
+  // Find the number of nodes under the global communicator and number of MPI
+  // ranks in the node level communicator.
+  uint nnodes, nranks_per_node;
+  {
+    sint in = nc.id == 0, wrk;
+    comm_allreduce(&nc, gs_int, gs_add, &in, 1, &wrk);
+    nnodes = in;
+
+    nranks_per_node = nc.np;
+    // Check invariant: nranks_per_node should be the same across all the nodes.
+    sint nranks_max = nranks_per_node, nranks_min = nranks_per_node;
+    comm_allreduce(&comms[0], gs_int, gs_max, &nranks_max, 1, &wrk);
+    comm_allreduce(&comms[0], gs_int, gs_min, &nranks_min, 1, &wrk);
+    assert(nranks_max == nranks_min);
+    // Check invariant: nranks_per_node must be larger than 0.
+    assert(nranks_per_node > 0);
   }
+
+  // Check if there are custom levels specified by the user. Size of the
+  // partition (in terms of number of nodes) in a given level must be a
+  // multiple of the partition size of the next level. Currently, hard coded
+  // for Frontier.
+  uint sizes[9] = {nnodes, 128, 64, 32, 16, 8, 4, 2, 1};
+  {
+    const uint size_max = sizeof(sizes) / sizeof(sizes[0]);
+    uint start = 1;
+    while (start < size_max && sizes[start] >= sizes[0])
+      start++;
+    while (start < size_max && sizes[0] % sizes[start])
+      ++start;
+
+    uint level = 1;
+    for (; start < size_max; ++start, ++level)
+      sizes[level] = sizes[start];
+    // Set the size of the last partition to 1 (since it is the node level
+    // partitioner).
+    sizes[level - 1] = 1;
+
+    *levels = level;
+  }
+
+  for (uint level = 1; level < *levels - 1; ++level) {
+    comm_split(&comms[level - 1],
+               comms[level - 1].id / (sizes[level] * nranks_per_node),
+               comms[level - 1].id, &comms[level]);
+  }
+  if (*levels > 1)
+    comm_dup(&comms[*levels - 1], &nc);
+
+  comm_free(&nc);
 }
 
 void parrsb_part_mesh_v0(int *part, const long long *const vtx,
                          const double *const xyz, const int nel, const int nv,
-                         const parrsb_options *const options,
+                         parrsb_options *const options,
                          const struct comm *const c, struct crystal *const cr,
                          buffer *const bfr) {
   const int verbose = options->verbose_level - 1;
@@ -205,12 +247,16 @@ void parrsb_part_mesh_v0(int *part, const long long *const vtx,
   struct comm ca;
   comm_split(c, elist.n > 0, c->id, &ca);
 
-  // Setup communicators for each level of the partitioning. Right now we
-  // support a maximum of three levels.
+  // Check invariant: levels > 0 and levels <= sizeof(comms) / sizeof(comms[0]).
+  struct comm comms[9];
   const int levels = options->levels;
-  parrsb_print(c, verbose, "Setup partition levels=%d ...\n", levels);
-  struct comm comms[3];
-  initialize_levels(comms, levels, &ca);
+  assert((levels > 0) && (levels <= sizeof(comms) / sizeof(comms[0])));
+
+  // Setup communicators for each level of the partitioning.
+  initialize_levels(comms, &options->levels, &ca);
+  parrsb_print(c, verbose,
+               "Setup partition levels:  requested = %d, enabled = %d\n",
+               levels, options->levels);
 
   parrsb_print(c, verbose, "Running partitioner ...\n");
   if (elist.n > 0) {
@@ -235,7 +281,7 @@ void parrsb_part_mesh_v0(int *part, const long long *const vtx,
   }
   comm_free(&ca);
 
-  for (uint l = 0; l < levels; l++)
+  for (uint l = 0; l < options->levels; l++)
     comm_free(&comms[l]);
 
   parrsb_print(c, verbose, "Restore original input: ...\n");

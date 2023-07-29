@@ -57,7 +57,7 @@ void rsb(struct array *elements, int nv, const parrsb_options *const options,
 //
 void parrsb_part_mesh_v0(int *part, const long long *const vtx,
                          const double *const xyz, const int nel, const int nv,
-                         const parrsb_options *const options,
+                         parrsb_options *const options,
                          const struct comm *const c, struct crystal *const cr,
                          buffer *const bfr);
 
