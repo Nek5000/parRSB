@@ -10,7 +10,10 @@ int NEIGHBOR_MAP[GC_MAX_VERTICES][GC_MAX_NEIGHBORS] = {
     {0, 5, 6}, {1, 4, 7}, {2, 4, 7}, {3, 5, 6}};
 
 void parrsb_print(const struct comm *c, int verbose, const char *fmt, ...) {
+  if (c == NULL)
+    return;
   comm_barrier(c);
+
   va_list vargs;
   if (c->id == 0 && verbose > 0) {
     va_start(vargs, fmt);
