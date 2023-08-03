@@ -642,6 +642,8 @@ void parrsb_part_solid(int *part, const long long *const vtx2, const int nel2,
                        const int nv, const MPI_Comm comm) {
   struct comm c;
   comm_init(&c, comm);
+  parrsb_print(&c, 1, "Running greedy solid ... nel1 = %d nel2 = %d\n", nel1,
+               nel2);
 
   for (uint i = 0; i < nel2; i++)
     part[i] = -1;
@@ -657,6 +659,7 @@ void parrsb_part_solid(int *part, const long long *const vtx2, const int nel2,
   const size_t size = size1 + size2;
 
   // Setup the gather-scatter handle to find connectivity through BFS.
+  parrsb_print(&c, 1, "Setup gather-scatter handle ...\n");
   struct gs_data *gsh = NULL;
   {
     long long *vtx = tcalloc(slong, size);
@@ -683,6 +686,7 @@ void parrsb_part_solid(int *part, const long long *const vtx2, const int nel2,
   sint *const target2 = tcalloc(sint, nel2);
   sint *const hop2 = tcalloc(sint, nel2);
 
+  parrsb_print(&c, 1, "Calculate expected number of elements ...\n");
   // Calculate the global number of elements in solid mesh and expected number
   // of elements in each partition.
   slong nelgt2 = nel2;
@@ -706,6 +710,8 @@ void parrsb_part_solid(int *part, const long long *const vtx2, const int nel2,
   uint nrecv2 = 0;
   slong nrem2 = nelgt2;
   while (nrem2 > 0) {
+    parrsb_print(&c, 1, "nrem2 = %lld\n", nrem2);
+
     // Check for invariant: nrecv2 <= nexp2.
     assert(nrecv2 <= nexp2);
 
@@ -733,6 +739,7 @@ void parrsb_part_solid(int *part, const long long *const vtx2, const int nel2,
 
     // Then perform a BFS till we assign all the elements in the solid mesh with
     // a potential partition id.
+    parrsb_print(&c, 1, "Assign partition id ...\n");
     {
       bool set = false;
       for (uint hid = 0; !set; hid++) {
@@ -760,6 +767,7 @@ void parrsb_part_solid(int *part, const long long *const vtx2, const int nel2,
     }
 
     // Send the solid elements to potential partition.
+    parrsb_print(&c, 1, "Send elemenets to the target partition ...\n");
     sarray_transfer(struct elem_t, &arr, target, 1, &cr);
 
     // Assign elements if the partition still doesn't have enough elements.
@@ -777,6 +785,7 @@ void parrsb_part_solid(int *part, const long long *const vtx2, const int nel2,
     }
 
     // Send everything back with updated partition id.
+    parrsb_print(&c, 1, "Send everything back ...\n");
     sarray_transfer(struct elem_t, &arr, target, 0, &cr);
 
     // Update the part array.
