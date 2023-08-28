@@ -24,8 +24,11 @@ int main(int argc, char *argv[]) {
                         .pivot = in->ilu_pivot,
                         .verbose = in->verbose,
                         .nnz_per_row = 0};
-  struct ilu *ilu = ilu_setup(nelt, nv, vl, &iluopt, comm);
+  buffer bfr;
+  buffer_init(&bfr, 1024);
+  struct ilu *ilu = ilu_setup(nelt, nv, vl, &iluopt, comm, &bfr);
   ilu_free(ilu);
+  buffer_free(&bfr);
 
   // Free resources
   free(vl), free(coord);

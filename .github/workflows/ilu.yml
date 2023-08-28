@@ -1,8 +1,8 @@
 name: ILU tests
 on:
-  push:
-    branch: [main]
   pull_request:
+    branch: [main]
+  push:
     branch: [main]
 env:
   GITHUB.TOKEN: ${{ secrets.token }}
