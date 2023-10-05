@@ -30,7 +30,7 @@ static uint *set_proc_from_val(struct sort *s, uint field,
     id++;
   } while (id < np && index < size);
   for (; index < size; index++)
-    proc[index] = (sint)np - 1;
+    proc[index] = np - 1;
 
   return proc;
 }

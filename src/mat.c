@@ -16,44 +16,48 @@
 // and the array is modified in place. Also, the diagonal entries are modified
 // to ensure all the
 int compress_nbrs(struct array *eij, struct array *nbr, buffer *bfr) {
-  array_init(struct mij, eij, nbr->n);
   if (nbr->n == 0)
     return 1;
 
   sarray_sort_2(struct nbr, nbr->ptr, nbr->n, r, 1, c, 1, bfr);
-  struct nbr *ptr = (struct nbr *)nbr->ptr;
+  array_init(struct mij, eij, nbr->n);
 
-  struct mij m;
-  m.idx = 0;
+  // Set off diagonal entries.
+  {
+    const struct nbr *const ptr = (const struct nbr *const)nbr->ptr;
+    struct mij m = {.idx = 0};
+    uint i = 0;
+    while (i < nbr->n) {
+      m.r = ptr[i].r, m.c = ptr[i].c;
 
-  sint i = 0;
-  while (i < nbr->n) {
-    m.r = ptr[i].r, m.c = ptr[i].c;
+      uint j = i + 1;
+      while (j < nbr->n && ptr[j].r == ptr[i].r && ptr[j].c == ptr[i].c)
+        j++;
 
-    sint j = i + 1;
-    while (j < nbr->n && ptr[j].r == ptr[i].r && ptr[j].c == ptr[i].c)
-      j++;
-
-    m.v = i - j; // = - (j - i)
-    array_cat(struct mij, eij, &m, 1);
-    i = j;
+      m.v = -(j - i);
+      array_cat(struct mij, eij, &m, 1);
+      i = j;
+    }
   }
 
   // Now make sure the row sum is zero
-  struct mij *pe = (struct mij *)eij->ptr;
-  i = 0;
-  while (i < eij->n) {
-    sint j = i, k = -1, s = 0;
-    while (j < eij->n && pe[j].r == pe[i].r) {
-      if (pe[j].r == pe[j].c)
-        k = j;
-      else
-        s += pe[j].v;
-      j++;
+  {
+    struct mij *const pe = (struct mij *const)eij->ptr;
+    uint i = 0;
+    while (i < eij->n) {
+      uint j = i;
+      sint k = -1, s = 0;
+      while (j < eij->n && pe[j].r == pe[i].r) {
+        if (pe[j].r == pe[j].c)
+          k = j;
+        else
+          s += pe[j].v;
+        j++;
+      }
+      assert(k >= 0);
+      pe[k].v = -s;
+      i = j;
     }
-    assert(k >= 0);
-    pe[k].v = -s;
-    i = j;
   }
 
   return 0;
@@ -201,42 +205,48 @@ int mat_free(struct mat *mat) {
 // Find neighbors in the graph
 //
 void find_nbrs(struct array *arr, const ulong *eid, const slong *vtx,
-               const uint nelt, const int nv, struct crystal *cr, buffer *buf) {
-  struct array vertices;
-  array_init(struct nbr, &vertices, nelt * nv);
-
+               const uint nelt, const unsigned nv, struct crystal *cr,
+               buffer *buf) {
   struct comm *c = &cr->comm;
-  struct nbr v = {.r = 0, .c = 0, .proc = 0};
-  uint i, j;
-  for (i = 0; i < nelt; i++) {
-    v.r = eid[i];
-    assert(v.r > 0);
-    for (j = 0; j < nv; j++) {
-      v.c = vtx[i * nv + j], v.proc = v.c % c->np;
-      array_cat(struct nbr, &vertices, &v, 1);
+
+  struct array vertices;
+  {
+    array_init(struct nbr, &vertices, nelt * nv);
+    struct nbr v = {.r = 0, .c = 0, .proc = 0};
+    uint i, j;
+    for (i = 0; i < nelt; i++) {
+      v.r = eid[i];
+      assert(v.r > 0);
+      for (j = 0; j < nv; j++) {
+        v.c = vtx[i * nv + j], v.proc = v.c % c->np;
+        array_cat(struct nbr, &vertices, &v, 1);
+      }
     }
   }
 
   sarray_transfer(struct nbr, &vertices, proc, 1, cr);
   sarray_sort(struct nbr, vertices.ptr, vertices.n, c, 1, buf);
 
-  // FIXME: Assumes quads or hexes
-  struct nbr *pv = (struct nbr *)vertices.ptr, t = {.r = 0, .c = 0, .proc = 0};
   array_init(struct nbr, arr, vertices.n * 10 + 1);
-  uint s = 0, e;
-  while (s < vertices.n) {
-    e = s + 1;
-    while (e < vertices.n && pv[s].c == pv[e].c)
-      e++;
-    for (i = s; i < e; i++) {
-      t = pv[i];
-      for (j = s; j < e; j++) {
-        t.c = pv[j].r;
-        assert(t.r > 0 && t.c > 0);
-        array_cat(struct nbr, arr, &t, 1);
+  // FIXME: Assumes quads or hexes
+  {
+    const struct nbr *const pv = (const struct nbr *const)vertices.ptr;
+    struct nbr t = {.r = 0, .c = 0, .proc = 0};
+    uint s = 0, e;
+    while (s < vertices.n) {
+      e = s + 1;
+      while (e < vertices.n && pv[s].c == pv[e].c)
+        e++;
+      for (uint i = s; i < e; i++) {
+        t = pv[i];
+        for (uint j = s; j < e; j++) {
+          t.c = pv[j].r;
+          assert(t.r > 0 && t.c > 0);
+          array_cat(struct nbr, arr, &t, 1);
+        }
       }
+      s = e;
     }
-    s = e;
   }
 
   sarray_transfer(struct nbr, arr, proc, 1, cr);

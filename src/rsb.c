@@ -304,7 +304,8 @@ static uint get_level_cuts(const uint level, const uint levels,
     n = comms[level].np;
   }
 
-  uint cuts = 0, pow2 = 1;
+  sint cuts = 0;
+  uint pow2 = 1;
   while (pow2 < n)
     pow2 <<= 1, cuts++;
 
