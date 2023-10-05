@@ -175,7 +175,7 @@ static void initialize_node_aux(struct comm *c, const struct comm *const gc) {
 #endif
 }
 
-static void initialize_levels(struct comm *const comms, int *const levels,
+static void initialize_levels(struct comm *const comms, int *const levels_,
                               const struct comm *const c, const int verbose) {
   // Level 1 communicator is the global communicator.
   comm_dup(&comms[0], c);
@@ -207,6 +207,7 @@ static void initialize_levels(struct comm *const comms, int *const levels,
   // partition (in terms of number of nodes) in a given level must be a
   // multiple of the partition size of the next level. Currently, hard coded
   // for Frontier.
+  uint levels;
   uint sizes[9] = {nnodes, 128, 64, 32, 16, 8, 4, 2, 1};
   {
     const uint size_max = sizeof(sizes) / sizeof(sizes[0]);
@@ -227,16 +228,17 @@ static void initialize_levels(struct comm *const comms, int *const levels,
     for (uint i = 1; i < level; i++)
       assert(sizes[i - 1] > sizes[i]);
 
-    *levels = level;
+    levels = level;
   }
 
-  for (uint level = 1; level < *levels - 1; ++level) {
+  for (uint level = 1; level < levels - 1; ++level) {
     comm_split(&comms[level - 1],
                comms[level - 1].id / (sizes[level] * nranks_per_node),
                comms[level - 1].id, &comms[level]);
   }
-  if (*levels > 1)
-    comm_dup(&comms[*levels - 1], &nc);
+  if (levels > 1)
+    comm_dup(&comms[levels - 1], &nc);
+  *levels_ = levels;
 
   comm_free(&nc);
 }
