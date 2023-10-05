@@ -96,7 +96,7 @@ static size_t load_balance(struct array *elist, uint nel, int nv,
   size_t unit_size;
   if (vtx == NULL) // RCB
     unit_size = sizeof(struct rcb_element);
-  else // RSB
+  else             // RSB
     unit_size = sizeof(struct rsb_element);
 
   array_init_(elist, nel, unit_size, __FILE__, __LINE__);
@@ -135,7 +135,7 @@ static size_t load_balance(struct array *elist, uint nel, int nv,
   sarray_transfer_(elist, unit_size, offsetof(struct rcb_element, proc), 1, cr);
   if (vtx == NULL) // RCB
     sarray_sort(struct rcb_element, elist->ptr, elist->n, globalId, 1, bfr);
-  else // RSB
+  else             // RSB
     sarray_sort(struct rsb_element, elist->ptr, elist->n, globalId, 1, bfr);
 
   free(pe);
@@ -147,7 +147,7 @@ static void restore_original(int *part, struct crystal *cr, struct array *elist,
   sarray_transfer_(elist, usize, offsetof(struct rcb_element, origin), 1, cr);
   uint nel = elist->n;
 
-  if (usize == sizeof(struct rsb_element)) // RSB
+  if (usize == sizeof(struct rsb_element))      // RSB
     sarray_sort(struct rsb_element, elist->ptr, nel, globalId, 1, bfr);
   else if (usize == sizeof(struct rcb_element)) // RCB
     sarray_sort(struct rcb_element, elist->ptr, nel, globalId, 1, bfr);

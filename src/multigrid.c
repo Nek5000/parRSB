@@ -4,10 +4,10 @@
 struct mg_lvl {
   uint npres, nposts;
   scalar over;
-  struct gs_data *J; // Interpolation from level l to l + 1
+  struct gs_data *J;        // Interpolation from level l to l + 1
 
-  struct gs_data *Q; // gs handle for matrix vector product
-  struct par_mat *M; // Operator
+  struct gs_data *Q;        // gs handle for matrix vector product
+  struct par_mat *M;        // Operator
 
   struct gs_data *Qs, *Qst; // gs handle for matrix vector product
   struct par_mat *S, *St;   // Smooth aggregation
@@ -46,9 +46,79 @@ static void inline set_proc(struct mij *m, uint nelt, uint nrem, uint np) {
   assert(m->p >= 0 && m->p < np);
 }
 
-extern int sparse_gemm(struct par_mat *WG, const struct par_mat *W,
+static int sparse_gemm(struct par_mat *WG, const struct par_mat *W,
                        const struct par_mat *G, int diag_wg, struct crystal *cr,
-                       buffer *bfr);
+                       buffer *bfr) {
+  // W is in CSR, G is in CSC; we multiply rows of W by shifting
+  // the columns of G from processor to processor. This is not scalable
+  // at all -- need to do a 2D partition of the matrices W and G.
+  assert(IS_CSR(W) && !IS_DIAG(W));
+  assert(IS_CSC(G));
+
+  // Put G into an array to transfer from processor to processor
+  struct array gij, sij;
+  array_init(struct mij, &gij, 100);
+  array_init(struct mij, &sij, 100);
+
+  struct mij m = {.r = 0, .c = 0, .idx = 0, .p = cr->comm.id, .v = 0};
+  uint i, j, je;
+  for (i = 0; i < G->cn; i++) {
+    m.c = G->cols[i];
+    for (j = G->adj_off[i], je = G->adj_off[i + 1]; j != je; j++) {
+      m.r = G->rows[G->adj_idx[j]];
+      m.v = G->adj_val[j];
+      array_cat(struct mij, &gij, &m, 1);
+    }
+  }
+  if (IS_DIAG(G)) {
+    for (i = 0; i < G->cn; i++) {
+      m.c = m.r = G->cols[i];
+      m.v = G->diag_val[i];
+      array_cat(struct mij, &gij, &m, 1);
+    }
+  }
+
+  sarray_sort_2(struct mij, gij.ptr, gij.n, c, 1, r, 1, bfr);
+  struct mij *pg = (struct mij *)gij.ptr;
+  for (i = 0; i < gij.n; i++)
+    pg[i].idx = i;
+
+  for (uint p = 0; p < cr->comm.np; p++) {
+    // Calculate dot product of each row of W with columns of G
+    for (i = 0; i < W->rn; i++) {
+      m.r = W->rows[i];
+      uint s = 0, e = 0;
+      while (s < gij.n) {
+        m.c = pg[s].c, m.v = 0;
+        for (j = W->adj_off[i], je = W->adj_off[i + 1]; j < je; j++) {
+          ulong k = W->cols[W->adj_idx[j]];
+          while (e < gij.n && pg[s].c == pg[e].c && pg[e].r < k)
+            e++;
+          if (e < gij.n && pg[s].c == pg[e].c && pg[e].r == k)
+            m.v += W->adj_val[j] * pg[e].v;
+        }
+        while (e < gij.n && pg[s].c == pg[e].c)
+          e++;
+        if (fabs(m.v) > 1e-12)
+          array_cat(struct mij, &sij, &m, 1);
+        s = e;
+      }
+    }
+
+    sint next = (cr->comm.id + 1) % cr->comm.np;
+    for (i = 0; i < gij.n; i++)
+      pg[i].p = next;
+    sarray_transfer(struct mij, &gij, p, 0, cr);
+
+    sarray_sort(struct mij, gij.ptr, gij.n, idx, 0, bfr);
+    pg = gij.ptr;
+  }
+
+  par_csr_setup(WG, &sij, diag_wg, bfr);
+  array_free(&gij), array_free(&sij);
+
+  return 0;
+}
 
 static uint mg_setup_aux(struct mg *d, const int factor, const int sagg,
                          struct crystal *cr, struct array *mijs, buffer *bfr) {
