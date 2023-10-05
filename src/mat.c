@@ -16,11 +16,11 @@
 // and the array is modified in place. Also, the diagonal entries are modified
 // to ensure all the
 int compress_nbrs(struct array *eij, struct array *nbr, buffer *bfr) {
+  array_init(struct mij, eij, nbr->n);
   if (nbr->n == 0)
     return 1;
 
   sarray_sort_2(struct nbr, nbr->ptr, nbr->n, r, 1, c, 1, bfr);
-  array_init(struct mij, eij, nbr->n);
 
   // Set off diagonal entries.
   {
@@ -34,7 +34,7 @@ int compress_nbrs(struct array *eij, struct array *nbr, buffer *bfr) {
       while (j < nbr->n && ptr[j].r == ptr[i].r && ptr[j].c == ptr[i].c)
         j++;
 
-      m.v = -(j - i);
+      m.v = j - i, m.v = -m.v;
       array_cat(struct mij, eij, &m, 1);
       i = j;
     }
@@ -720,38 +720,42 @@ static int compress_mij(struct array *eij, struct array *entries, buffer *bfr) {
     return 1;
 
   sarray_sort_2(struct mij, entries->ptr, entries->n, r, 1, c, 1, bfr);
-  struct mij *ptr = (struct mij *)entries->ptr;
 
-  struct mij m;
-  m.idx = 0;
+  {
+    struct mij m = {.idx = 0};
 
-  uint i = 0;
-  while (i < entries->n) {
-    m = ptr[i];
-    uint j = i + 1;
-    while (j < entries->n && ptr[j].r == ptr[i].r && ptr[j].c == ptr[i].c)
-      m.v += ptr[j].v, j++;
+    const struct mij *const ptr = (const struct mij *const)entries->ptr;
+    uint i = 0;
+    while (i < entries->n) {
+      m = ptr[i];
+      uint j = i + 1;
+      while (j < entries->n && ptr[j].r == ptr[i].r && ptr[j].c == ptr[i].c)
+        m.v += ptr[j].v, j++;
 
-    array_cat(struct mij, eij, &m, 1);
-    i = j;
+      array_cat(struct mij, eij, &m, 1);
+      i = j;
+    }
   }
 
   // Now make sure the row sum is zero
-  struct mij *pe = (struct mij *)eij->ptr;
-  i = 0;
-  while (i < eij->n) {
-    sint j = i, k = -1;
-    scalar s = 0;
-    while (j < eij->n && pe[j].r == pe[i].r) {
-      if (pe[j].r == pe[j].c)
-        k = j;
-      else
-        s += pe[j].v;
-      j++;
+  {
+    struct mij *const pe = (struct mij *const)eij->ptr;
+    uint i = 0;
+    while (i < eij->n) {
+      uint j = i;
+      sint k = -1;
+      scalar s = 0;
+      while (j < eij->n && pe[j].r == pe[i].r) {
+        if (pe[j].r == pe[j].c)
+          k = j;
+        else
+          s += pe[j].v;
+        j++;
+      }
+      assert(k >= 0);
+      pe[k].v = -s;
+      i = j;
     }
-    assert(k >= 0);
-    pe[k].v = -s;
-    i = j;
   }
 
   return 0;
