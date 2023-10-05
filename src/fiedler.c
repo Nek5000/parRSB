@@ -3,6 +3,9 @@
 #include "parrsb-impl.h"
 #include "sort.h"
 
+#include <math.h>
+#include <time.h>
+
 #define MM 500
 
 extern void matrix_inverse(int N, double *A);

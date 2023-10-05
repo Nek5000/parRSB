@@ -9,8 +9,6 @@ struct hypercube {
 };
 
 static void init_probes(struct hypercube *data, const struct comm *c) {
-  struct sort *input = data->data;
-
   // Allocate space for probes and counts.
   int nprobes = data->nprobes = 3;
   if (!data->probes)
@@ -52,11 +50,12 @@ static void update_probe_counts(struct hypercube *data, const struct comm *c) {
 
 static void update_probes(slong nelem, double *probes, ulong *probe_cnt,
                           uint threshold) {
+  assert(nelem >= 0);
   slong expected = nelem / 2;
   if (llabs(expected - (slong)probe_cnt[1]) < threshold)
     return;
 
-  if (probe_cnt[1] < expected)
+  if (probe_cnt[1] < (ulong)expected)
     probes[0] = probes[1];
   else
     probes[2] = probes[1];
@@ -101,12 +100,10 @@ static void parallel_hypercube_sort_aux(struct hypercube *data,
                                         const struct comm *c) {
   struct sort *input = data->data;
   struct array *a = input->a;
-  gs_dom t = input->t[0];
-  uint offset = input->offset[0];
 
+  // FIXME: Replace comm_scan() by comm_allreduce().
   slong out[2][1], buf[2][1], in = a->n;
   comm_scan(out, c, gs_long, gs_add, &in, 1, buf);
-  slong start = out[0][0];
   slong nelem = out[1][0];
 
   uint threshold = nelem / (10 * c->np);

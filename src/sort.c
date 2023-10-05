@@ -21,6 +21,8 @@ double get_scalar(struct array *a, uint i, uint offset, uint usize,
     data = *((double *)v);
     break;
   default:
+    fprintf(stderr, "Error: Unknown type %d\n", type);
+    exit(EXIT_FAILURE);
     break;
   }
 
@@ -56,7 +58,7 @@ uint *set_proc_from_idx(uint size, sint np_, slong start, slong nelem) {
 
   ulong np = np_;
   ulong nelt = nelem / np, nrem = nelem - np * nelt;
-  assert(nrem >= 0 && nrem < np);
+  assert(nrem < np);
   if (nrem == 0) {
     for (uint i = 0; i < size; i++)
       proc[i] = (uint)((start + i) / nelt);
@@ -192,7 +194,7 @@ void sarray_transfer_chunk(struct array *arr, const size_t usize,
 
 void parallel_sort_(struct array *arr, size_t usize, size_t align,
                     unsigned algo, unsigned balance, const struct comm *c,
-                    buffer *bfr, int nfields, ...) {
+                    buffer *bfr, unsigned nfields, ...) {
   struct sort sd = {.a = arr, .unit_size = usize, .align = align};
   sd.buf = bfr;
   sd.nfields = nfields;

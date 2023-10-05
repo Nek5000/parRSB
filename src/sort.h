@@ -6,7 +6,7 @@
 
 void parallel_sort_(struct array *arr, size_t usize, size_t align,
                     unsigned algo, unsigned balance, const struct comm *c,
-                    buffer *bfr, int nfields, ...);
+                    buffer *bfr, unsigned nfields, ...);
 
 #define parallel_sort(T, A, field, type, algo, balance, c, bfr)                \
   parallel_sort_(A, sizeof(T), ALIGNOF(T), algo, balance, c, bfr, 1, type,     \

@@ -115,8 +115,9 @@ static int check_bin_val(int bin, struct comm *c) {
   return 0;
 }
 
-static int balance_partitions(struct array *elements, int nv, struct comm *lc,
-                              struct comm *gc, int bin, buffer *bfr) {
+static int balance_partitions(struct array *elements, unsigned nv,
+                              struct comm *lc, struct comm *gc, int bin,
+                              buffer *bfr) {
   // Return if there is only one processor.
   if (gc->np == 1)
     return 0;
@@ -140,7 +141,8 @@ static int balance_partitions(struct array *elements, int nv, struct comm *lc,
   slong send_cnt = nelgt - nelgt_exp > 0 ? nelgt - nelgt_exp : 0;
 
   // Setup gather-scatter.
-  uint size = ne * nv, e, v;
+  size_t size = ne * nv;
+  uint e, v;
   slong *ids = tcalloc(slong, size);
   struct rsb_element *elems = (struct rsb_element *)elements->ptr;
   for (e = 0; e < ne; e++) {
@@ -302,7 +304,7 @@ static uint get_level_cuts(const uint level, const uint levels,
     n = comms[level].np;
   }
 
-  sint cuts = 0, pow2 = 1;
+  uint cuts = 0, pow2 = 1;
   while (pow2 < n)
     pow2 <<= 1, cuts++;
 
@@ -314,13 +316,13 @@ static uint get_level_cuts(const uint level, const uint levels,
 
 void rsb(struct array *elements, int nv, const parrsb_options *const options,
          const struct comm comms[3], buffer *bfr) {
-  const int levels = options->levels;
+  const unsigned levels = options->levels;
   const sint verbose = options->verbose_level - 1;
   const uint ndim = (nv == 8) ? 3 : 2;
   const struct comm *gc = &comms[0];
   for (uint level = 0; level < levels; level++) {
     // Find the maximum number of RSB cuts in current level.
-    sint ncuts = get_level_cuts(level, levels, comms);
+    uint ncuts = get_level_cuts(level, levels, comms);
     parrsb_print(gc, verbose, "Level=%u, ncuts=%u\n", level + 1, ncuts);
 
     struct comm lc;

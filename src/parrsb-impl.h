@@ -1,7 +1,10 @@
 #ifndef _PARRSB_IMPL_H_
 #define _PARRSB_IMPL_H_
 
+#define _POSIX_C_SOURCE 200809L
+
 #include <stdlib.h>
+#include <float.h>
 
 #include "parRSB.h"
 

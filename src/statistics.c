@@ -1,7 +1,7 @@
+#include "parrsb-impl.h"
+
 #include <float.h>
 #include <string.h>
-
-#include "parrsb-impl.h"
 
 static uint get_partition(const struct comm *const gc,
                           const struct comm *const lc) {
