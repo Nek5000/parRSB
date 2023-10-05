@@ -1,3 +1,6 @@
+#include <float.h>
+#include <string.h>
+
 #include "parrsb-impl.h"
 #include "sort.h"
 

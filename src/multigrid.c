@@ -1,6 +1,10 @@
 #include "multigrid.h"
 #include <math.h>
 
+#ifndef M_PI
+#define M_PI 3.141592653589793
+#endif
+
 struct mg_lvl {
   uint npres, nposts;
   scalar over;
@@ -29,7 +33,7 @@ static scalar sigma_cheb(int k, int n, scalar lmin, scalar lmax) {
   return 1 / lamk;
 }
 
-static void inline set_proc(struct mij *m, uint nelt, uint nrem, uint np) {
+inline static void set_proc(struct mij *m, uint nelt, uint nrem, uint np) {
   assert(m->r > 0);
 
   if (nrem == 0) {
@@ -43,7 +47,7 @@ static void inline set_proc(struct mij *m, uint nelt, uint nrem, uint np) {
       m->p = s + (m->r - (t + 1)) / (nelt + 1);
   }
 
-  assert(m->p >= 0 && m->p < np);
+  assert(m->p < np);
 }
 
 static int sparse_gemm(struct par_mat *WG, const struct par_mat *W,
@@ -366,7 +370,7 @@ void mg_vcycle(scalar *u1, scalar *rhs, struct mg *d, struct comm *c,
   scalar *s = r + nnz, *Gs = s + nnz, *u = Gs + nnz, *wrk = u + nnz;
 
   uint i, j, n, off;
-  for (int lvl = 0; lvl < d->nlevels - 1; lvl++) {
+  for (uint lvl = 0; lvl < d->nlevels - 1; lvl++) {
     off = lvl_off[lvl];
     n = lvl_off[lvl + 1] - off;
 
@@ -412,7 +416,6 @@ void mg_vcycle(scalar *u1, scalar *rhs, struct mg *d, struct comm *c,
   // Coarsest level
   off = lvl_off[d->nlevels - 1];
   n = lvl_off[d->nlevels] - off;
-
   if (n == 1) {
     struct mg_lvl *l = d->levels[d->nlevels - 1];
     struct par_mat *M = l->M;
@@ -423,7 +426,7 @@ void mg_vcycle(scalar *u1, scalar *rhs, struct mg *d, struct comm *c,
     r[off] = u[off];
   }
 
-  for (int lvl = d->nlevels - 2; lvl >= 0; lvl--) {
+  for (int lvl = (int)d->nlevels - 2; lvl >= 0; lvl--) {
     struct mg_lvl *l = d->levels[lvl];
     off = lvl_off[lvl];
     // J*e
