@@ -42,25 +42,24 @@ int power_serial(double *y, uint N, double *A, int verbose) {
   time_t t;
   srand((unsigned)time(&t));
 
-  int i;
   scalar norm = 0.0;
-  for (i = 0; i < N; i++) {
+  for (uint i = 0; i < N; i++) {
     y[i] = (rand() % 50) / 50.0;
     norm += y[i] * y[i];
   }
 
   scalar normi = 1.0 / sqrt(norm);
-  for (i = 0; i < N; i++)
+  for (uint i = 0; i < N; i++)
     y[i] *= normi;
 
   double *Ay = tcalloc(double, N);
-  int j, k, l;
   scalar err = 1.0, lambda;
+  unsigned i;
   for (i = 0; i < 100; i++) {
     norm = 0.0;
-    for (j = 0; j < N; j++) {
+    for (uint j = 0; j < N; j++) {
       Ay[j] = 0.0;
-      for (k = 0; k < N; k++) {
+      for (uint k = 0; k < N; k++) {
         Ay[j] += A[j * N + k] * y[k];
       }
       norm += Ay[j] * Ay[j];
@@ -71,10 +70,10 @@ int power_serial(double *y, uint N, double *A, int verbose) {
     lambda = sqrt(norm);
 
     normi = 1.0 / sqrt(norm);
-    for (j = 0; j < N; j++)
+    for (uint j = 0; j < N; j++)
       y[j] = Ay[j] * normi;
 
-    if (fabs(err) < 1.e-12)
+    if (fabs(err) < 1e-12)
       break;
   }
   free(Ay);
@@ -84,16 +83,16 @@ int power_serial(double *y, uint N, double *A, int verbose) {
 
 int inv_power_serial(double *y, uint N, double *A, int verbose) {
   double *Ainv = tcalloc(double, N *N);
-  int j, k;
-  for (j = 0; j < N; j++) {
-    for (k = 0; k < N; k++)
+  for (uint j = 0; j < N; j++) {
+    for (uint k = 0; k < N; k++)
       Ainv[j * N + k] = A[k * N + j];
   }
 
   matrix_inverse(N, Ainv);
 
+  uint j;
   for (j = 0; j < N; j++) {
-    for (k = 0; k < N; k++)
+    for (uint k = 0; k < N; k++)
       A[j * N + k] = Ainv[k * N + j];
   }
   j = power_serial(y, N, Ainv, verbose);
@@ -104,7 +103,7 @@ int inv_power_serial(double *y, uint N, double *A, int verbose) {
 }
 
 static int project(scalar *x, uint n, scalar *b, struct laplacian *L,
-                   struct mg *d, struct comm *c, int miter, double tol,
+                   struct mg *d, struct comm *c, unsigned miter, double tol,
                    int null_space, int verbose, buffer *bfr) {
   slong out[2][1], buf[2][1], in = n;
   comm_scan(out, c, gs_long, gs_add, &in, 1, buf);
@@ -214,8 +213,8 @@ static int project(scalar *x, uint n, scalar *b, struct laplacian *L,
 
 // Input z should be orthogonal to 1-vector, have unit norm.
 // inverse iteration should not change z.
-static int inverse(scalar *y, struct array *elements, int nv, scalar *z,
-                   struct comm *gsc, int miter, int mpass, double tol,
+static int inverse(scalar *y, struct array *elements, unsigned nv, scalar *z,
+                   struct comm *gsc, unsigned miter, unsigned mpass, double tol,
                    int factor, int sagg, int grammian, slong nelg,
                    buffer *buf) {
   metric_tic(gsc, RSB_INVERSE_SETUP);
@@ -278,7 +277,7 @@ static int inverse(scalar *y, struct array *elements, int nv, scalar *z,
 
     ortho(z, lelt, nelg, gsc);
 
-    int N = i + 1;
+    uint N = i + 1;
     if (grammian == 1) {
       // if k>1;
       //  Z(:,k)=z-Z(:,1:k-1)*(Z(:,1:k-1)'*z);
@@ -381,12 +380,12 @@ static int tqli(scalar *eVectors, scalar *eValues, sint n, scalar *diagonal,
   e[n - 1] = 0.0;
 
   for (i = 0; i < n; i++) {
-    for (uint j = 0; j < n; j++)
+    for (sint j = 0; j < n; j++)
       eVectors[i * n + j] = 0;
     eVectors[i * n + i] = 1;
   }
 
-  int j, k, l, iter, m;
+  sint j, k, l, iter, m;
   for (l = 0; l < n; l++) {
     iter = 0;
     do {
@@ -466,12 +465,12 @@ static int tqli(scalar *eVectors, scalar *eValues, sint n, scalar *diagonal,
 
   for (k = 0; k < n; k++) {
     e[k] = 0;
-    for (uint i = 0; i < n; i++)
+    for (sint i = 0; i < n; i++)
       e[k] += eVectors[k * n + i] * eVectors[k * n + i];
     if (e[k] > 0.0)
       e[k] = sqrt(fabs(e[k]));
     scalar scale = 1.0 / e[k];
-    for (uint i = 0; i < n; i++)
+    for (sint i = 0; i < n; i++)
       eVectors[k * n + i] *= scale;
   }
 
@@ -569,9 +568,9 @@ static int lanczos_aux(scalar *diag, scalar *upper, scalar *rr, uint lelt,
   return iter;
 }
 
-static int lanczos(scalar *fiedler, struct array *elements, int nv,
-                   scalar *initv, struct comm *gsc, int miter, int mpass,
-                   double tol, slong nelg, buffer *bfr) {
+static int lanczos(scalar *fiedler, struct array *elements, unsigned nv,
+                   scalar *initv, struct comm *gsc, unsigned miter,
+                   unsigned mpass, double tol, slong nelg, buffer *bfr) {
   metric_tic(gsc, RSB_LANCZOS_SETUP);
   uint lelt = elements->n;
   struct rsb_element *elems = (struct rsb_element *)elements->ptr;
@@ -585,7 +584,7 @@ static int lanczos(scalar *fiedler, struct array *elements, int nv,
   scalar *rr = tcalloc(scalar, (miter + 1) * lelt);
   scalar *eVectors = tcalloc(scalar, miter * miter);
   scalar *eValues = tcalloc(scalar, miter);
-  int iter = miter, ipass;
+  uint iter = miter, ipass;
   for (ipass = 0; iter == miter && ipass < mpass; ipass++) {
     double t = comm_time();
     iter = lanczos_aux(alpha, beta, rr, lelt, nelg, miter, tol, initv, wl, gsc,
