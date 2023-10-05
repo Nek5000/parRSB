@@ -320,12 +320,12 @@ void rsb(struct array *elements, int nv, const parrsb_options *const options,
   const struct comm *gc = &comms[0];
   for (uint level = 0; level < levels; level++) {
     // Find the maximum number of RSB cuts in current level.
-    sint cuts = get_level_cuts(level, levels, comms);
-    parrsb_print(gc, verbose, "Level=%u, cuts=%u\n", level + 1, cuts);
+    sint ncuts = get_level_cuts(level, levels, comms);
+    parrsb_print(gc, verbose, "Level=%u, ncuts=%u\n", level + 1, ncuts);
 
     struct comm lc;
     comm_dup(&lc, &comms[level]);
-    for (uint cut = 0; cut < cuts; cut++) {
+    for (uint cut = 0; cut < ncuts; cut++) {
       // Run the pre-partitioner.
       parrsb_print(gc, verbose - 1, "\tPre-partition ...\n");
 

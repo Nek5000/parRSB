@@ -11,6 +11,7 @@
 parrsb_options parrsb_default_options = {
     // General options
     .partitioner = 0,
+    .tagged = 0,
     .levels = 2,
     .repair = 0,
     .verbose_level = 1,
@@ -42,6 +43,7 @@ static void update_options(parrsb_options *const options) {
   } while (0)
 
   UPDATE_OPTION(partitioner, "PARRSB_PARTITIONER", 1);
+  UPDATE_OPTION(levels, "PARRSB_TAGGED", 1);
   UPDATE_OPTION(levels, "PARRSB_LEVELS", 1);
   UPDATE_OPTION(repair, "PARRSB_REPAIR", 1);
   UPDATE_OPTION(verbose_level, "PARRSB_VERBOSE_LEVEL", 1);
@@ -65,6 +67,7 @@ static void print_options(const struct comm *c,
   parrsb_print(c, options->verbose_level, "%s = " FMT "\n", STR, options->OPT)
 
   PRINT_OPTION(partitioner, "PARRSB_PARTITIONER", "%d");
+  PRINT_OPTION(levels, "PARRSB_TAGGED", "%d");
   PRINT_OPTION(levels, "PARRSB_LEVELS", "%d");
   PRINT_OPTION(repair, "PARRSB_REPAIR", "%d");
   PRINT_OPTION(verbose_level, "PARRSB_VERBOSE_LEVEL", "%d");
@@ -252,16 +255,18 @@ void parrsb_part_mesh_v0(int *part, const long long *const vtx,
   struct comm ca;
   comm_split(c, elist.n > 0, c->id, &ca);
 
-  // Check invariant: levels > 0 and levels <= sizeof(comms) / sizeof(comms[0]).
-  struct comm comms[9];
-  const int levels = options->levels;
-  assert((levels > 0) && (levels <= sizeof(comms) / sizeof(comms[0])));
-
   // Setup communicators for each level of the partitioning.
-  initialize_levels(comms, &options->levels, &ca, verbose);
-  parrsb_print(c, verbose,
-               "Setup partition levels:  requested = %d, enabled = %d\n",
-               levels, options->levels);
+  struct comm comms[9];
+  {
+    // Check invariant: levels > 0 and levels <= sizeof(comms) /
+    // sizeof(comms[0]).
+    const int levels = options->levels;
+    assert((levels > 0) && (levels <= sizeof(comms) / sizeof(comms[0])));
+    initialize_levels(comms, &options->levels, &ca, verbose);
+    parrsb_print(c, verbose,
+                 "Setup partition levels:  requested = %d, enabled = %d\n",
+                 levels, options->levels);
+  }
 
   parrsb_print(c, verbose, "Running partitioner ...\n");
   if (elist.n > 0) {
@@ -897,6 +902,7 @@ int parrsb_part_mesh(int *part, const long long *const vtx,
 
   update_options(options);
 
+  // Check verboity and print a message.
   const int verbose = options->verbose_level;
   {
     slong nelg = nel, wrk;
@@ -907,38 +913,33 @@ int parrsb_part_mesh(int *part, const long long *const vtx,
 
   print_options(&c, options);
 
+  if (options->tagged && !tag) {
+    parrsb_print(&c, verbose,
+                 "Tagged partitioning requested but tag array is NULL..\n");
+    MPI_Abort(comm, EXIT_FAILURE);
+  }
+
   buffer bfr;
   buffer_init(&bfr, (nel + 1) * 72);
 
   struct crystal cr;
   crystal_init(&cr, &c);
 
+  metric_init();
+
   parrsb_barrier(&c);
   const double t = comm_time();
 
-  metric_init();
-  const uint profile_level = options->profile_level;
-
-  int v = (tag != NULL);
-  const char *version = getenv("PARRSB_VERSION");
-  if (version)
-    v = atoi(version);
-
-  if (v == 1 && !tag) {
-    fprintf(stderr, "parRSB v1 expects tags to be non-NULL.\n");
-    exit(EXIT_FAILURE);
-  }
-
-  if (v == 1)
+  if (options->tagged == 1)
     parrsb_part_mesh_v1(part, vtx, xyz, tag, nel, nv, options, &c, &cr, &bfr);
-  else if (v == 0)
+  if (options->tagged == 0)
     parrsb_part_mesh_v0(part, vtx, xyz, nel, nv, options, &c, &cr, &bfr);
-
-  metric_rsb_print(&c, profile_level);
-  metric_finalize();
 
   parrsb_print(&c, verbose, "par%s finished in %g seconds.\n",
                ALGO[options->partitioner], comm_time() - t);
+
+  metric_rsb_print(&c, options->profile_level);
+  metric_finalize();
 
   crystal_free(&cr);
   buffer_free(&bfr);

@@ -21,6 +21,7 @@ extern "C" {
 typedef struct {
   // General options
   int partitioner; // Partition algo: 0 - RSB, 1 - RCB, 2 - RIB (Default: 0)
+  int tagged;      // Tagged partitioning: 0 - No, 1 - Yes (Default: 0)
   int levels;      // Number of levels (levels: 1, 2, 3)
   int repair; // Repair disconnected components: 0 - No, 1 - Yes (Default: 0)
   int verbose_level; // Verbose level: 0, 1, 2, .. etc (Default: 1)
