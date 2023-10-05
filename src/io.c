@@ -1,5 +1,7 @@
 #include "parrsb-impl.h"
 
+#include <math.h>
+
 #define READ_T(coords, buf, T, nv)                                             \
   { memcpy((coords), buf, sizeof(T) * nv); }
 
@@ -62,17 +64,12 @@ static void re2_header(unsigned *nelt_, unsigned *nv_, ulong *nelgt_,
 
 static void re2_coord(double **coord_, unsigned int nelt, int nv, MPI_File file,
                       struct comm *c) {
-  uint rank = c->id, size = c->np;
-
-  slong out[2][1], bfr[2][1], in = nelt;
-  comm_scan(out, c, gs_long, gs_add, &in, 1, bfr);
-  slong start = out[0][0];
-
-  int ndim = (nv == 4) ? 2 : 3;
+  unsigned ndim = (nv == 4) ? 2 : 3;
   size_t elem_size = nv * ndim * sizeof(double) + sizeof(double);
   size_t header_size = GC_RE2_HEADER_LEN + sizeof(float);
 
   // Calculate read size for element data on each MPI rank.
+  uint rank = c->id;
   size_t read_size = nelt * elem_size + (rank == 0) * header_size;
   char *buf = (char *)calloc(read_size, sizeof(char));
   MPI_Status st;
@@ -220,8 +217,6 @@ static void re2_boundary(unsigned int *nbcs_, long long **bcs_,
 static void read_geometry(unsigned *nelt, unsigned *nv, double **coord,
                           unsigned *nbcs, long long **bcs, char *fname,
                           struct comm *c) {
-  uint rank = c->id, size = c->np;
-
   MPI_Info info;
   check_mpi_call(MPI_Info_create(&info), "MPI_Info_create", c);
 
@@ -258,12 +253,12 @@ static int read_connectivity(unsigned int *nelt_, unsigned *nv_,
   err = MPI_File_read_all(file, buf, GC_CO2_HEADER_LEN, MPI_BYTE, &st);
 
   long long nelgt, nelgv;
-  int nv;
+  unsigned nv;
   char version[6];
-  sscanf(buf, "%5s %12lld %12lld %d", version, &nelgt, &nelgv, &nv);
+  sscanf(buf, "%5s %12lld %12lld %u", version, &nelgt, &nelgv, &nv);
 
   // TODO: Assert version
-  int nelt = nelgt / size, nrem = nelgt - nelt * size;
+  uint nelt = nelgt / size, nrem = nelgt - nelt * size;
   nelt += (rank > (size - 1 - nrem) ? 1 : 0);
 
   if (*nv_ != 0) {
@@ -303,10 +298,6 @@ static int read_connectivity(unsigned int *nelt_, unsigned *nv_,
     MPI_Abort(comm, 911);
   }
 
-  slong out[2][1], bfr[2][1], in = nelt;
-  comm_scan(out, c, gs_long, gs_add, &in, 1, bfr);
-  slong start = out[0][0];
-
   size_t read_size = nelt * (nv + 1) * sizeof(int);
   size_t header_size = GC_CO2_HEADER_LEN + sizeof(float);
   if (rank == 0)
@@ -318,19 +309,18 @@ static int read_connectivity(unsigned int *nelt_, unsigned *nv_,
 
   char *buf0 = buf + (rank == 0) * header_size;
   long long *vl = *vl_ = tcalloc(long long, nv *nelt);
-  int j, tmp1, tmp2;
+  int tmp1, tmp2;
   for (uint i = 0; i < nelt; i++) {
     READ_T(&tmp1, buf0, int, 1);
     buf0 += sizeof(int);
-    for (j = 0; j < nv; j++) {
+    for (unsigned j = 0; j < nv; j++) {
       READ_T(&tmp2, buf0, int, 1);
       buf0 += sizeof(int);
       vl[i * nv + j] = tmp2;
     }
   }
 
-  if (buf)
-    free(buf);
+  free(buf);
 
   return 0;
 }
@@ -347,7 +337,7 @@ int parrsb_read_mesh(unsigned *nel, unsigned *nv, long long **vl,
 
   // Read geometry from .re2 file
   if (read & 1) {
-    char geom_name[BUFSIZ];
+    char geom_name[BUFSIZ + 1];
     strncpy(geom_name, name, BUFSIZ);
     strncat(geom_name, ".re2", 5);
     read_geometry(nel, nv, coord, nbcs, bcs, geom_name, &c);
@@ -355,7 +345,7 @@ int parrsb_read_mesh(unsigned *nel, unsigned *nv, long long **vl,
 
   // Read connectivity from .co2 file if the user asks us to read it.
   if (read & 2) {
-    char conn_name[BUFSIZ];
+    char conn_name[BUFSIZ + 1];
     strncpy(conn_name, name, BUFSIZ);
     strncat(conn_name, ".co2", 5);
     read_connectivity(nel, nv, vl, conn_name, &c);
@@ -375,7 +365,7 @@ int parrsb_dump_con(char *name, unsigned nelt, unsigned nv, long long *vl,
   comm_init(&c, comm);
   uint id = c.id;
 
-  char co2_name[BUFSIZ];
+  char co2_name[BUFSIZ + 1];
   strncpy(co2_name, name, BUFSIZ);
   strncat(co2_name, ".co2", 5);
 
@@ -413,12 +403,11 @@ int parrsb_dump_con(char *name, unsigned nelt, unsigned nv, long long *vl,
     buf0 += sizeof(float);
   }
 
-  int i, j, temp;
-  for (i = 0; i < nelt; i++) {
-    temp = start + i + 1;
+  for (unsigned i = 0; i < nelt; i++) {
+    int temp = start + i + 1;
     WRITE_INT(buf0, temp);
     buf0 += sizeof(int);
-    for (j = 0; j < nv; j++) {
+    for (unsigned j = 0; j < nv; j++) {
       temp = vl[i * nv + j];
       WRITE_INT(buf0, temp);
       buf0 += sizeof(int);
@@ -442,7 +431,7 @@ int parrsb_dump_map(char *name, unsigned nelt, unsigned nv, long long *vtx,
   char version[6] = "#v001";
   float test = 6.54321;
 
-  char ma2_name[BUFSIZ];
+  char ma2_name[BUFSIZ + 1];
   strncpy(ma2_name, name, BUFSIZ);
   strncat(ma2_name, ".ma2", 5);
 
@@ -514,8 +503,7 @@ int parrsb_dump_map(char *name, unsigned nelt, unsigned nv, long long *vtx,
   errs += (err != 0);
 
   MPI_Info_free(&infoIn);
-  if (buf)
-    free(buf);
+  free(buf);
 
   return errs;
 }
