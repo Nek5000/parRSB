@@ -1,6 +1,7 @@
 #include "parrsb-impl.h"
 #include "sort.h"
 
+#include <float.h>
 #include <string.h>
 
 static void get_axis_len(double *length, size_t unit_size, char *elems,

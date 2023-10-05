@@ -46,13 +46,13 @@ int parrsb_part_mesh(int *part, const long long *const vtx,
                      const int nel, const int nv, parrsb_options *const options,
                      MPI_Comm comm);
 
-void parrsb_part_solid(int *part, const long long *const vtx2, const int nel2,
-                       const long long *const vtx1, const int nel1,
-                       const int nv, const MPI_Comm comm);
+void parrsb_part_solid(int *part, const long long *vtx2, unsigned nel2,
+                       const long long *vtx1, unsigned nel1, unsigned nv,
+                       MPI_Comm comm);
 
 void parrsb_check_tagged_partitions(const long long *const eids,
-                                    const long long *const vtx, const int nel,
-                                    const int nv, const int ntags,
+                                    const long long *const vtx, const uint nel,
+                                    const unsigned nv, const uint ntags,
                                     const struct comm *const c,
                                     const int verbose);
 //==============================================================================

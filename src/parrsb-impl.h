@@ -3,8 +3,8 @@
 
 #define _POSIX_C_SOURCE 200809L
 
-#include <stdlib.h>
 #include <float.h>
+#include <stdlib.h>
 
 #include "parRSB.h"
 
@@ -48,21 +48,6 @@ struct rsb_element {
 
 void rsb(struct array *elements, int nv, const parrsb_options *const options,
          const struct comm comms[3], buffer *bfr);
-
-//==============================================================================
-// Partitioning
-//
-void parrsb_part_mesh_v0(int *part, const long long *const vtx,
-                         const double *const xyz, const int nel, const int nv,
-                         parrsb_options *const options,
-                         const struct comm *const c, struct crystal *const cr,
-                         buffer *const bfr);
-
-void parrsb_part_mesh_v1(int *part, const long long *const vtx,
-                         const double *const xyz, const int *const tag, int nel,
-                         int nv, parrsb_options *const options,
-                         const struct comm *const c, struct crystal *const cr,
-                         buffer *const bfr);
 
 //------------------------------------------------------------------------------
 // Find number of components.
