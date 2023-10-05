@@ -10,10 +10,15 @@
 void parrsb_print_stack(void) {
   void *bt[50];
   int bt_size = backtrace(bt, 50);
+  if (bt_size == 0) {
+    fprintf(stderr, "backtrace(): Obtained 0 stack frames.\n");
+    return;
+  }
+
   char **symbols = backtrace_symbols(bt, bt_size);
-  printf("backtrace(): obtained %d stack frames.\n", bt_size);
-  for (unsigned i = 0; i < bt_size; i++)
-    printf("%s\n", symbols[i]);
+  fprintf(stderr, "backtrace(): obtained %d stack frames.\n", bt_size);
+  for (unsigned i = 0; i < (unsigned)bt_size; i++)
+    fprintf(stderr, "%s\n", symbols[i]);
   free(symbols);
 }
 #else
@@ -38,7 +43,7 @@ int log2ll(long long n) {
 }
 
 int parrsb_dist_mesh(unsigned int *nelt_, long long **vl_, double **coord_,
-                     int *part, int nv, MPI_Comm comm) {
+                     int *part, unsigned nv, MPI_Comm comm) {
   typedef struct {
     int proc;
     long long vtx[MAXNV];
@@ -60,7 +65,7 @@ int parrsb_dist_mesh(unsigned int *nelt_, long long **vl_, double **coord_,
   }
   assert(elements.n == nelt);
 
-  int ndim = (nv == 8) ? 3 : 2;
+  unsigned ndim = (nv == 8) ? 3 : 2;
   elem_data *ed = elements.ptr;
   double *coord = (coord_ == NULL ? NULL : *coord_);
   if (coord != NULL) {
@@ -143,16 +148,13 @@ void parrsb_get_part_stat(int *nc, int *ns, int *nss, int *nel, long long *vtx,
   struct comm comm;
   comm_init(&comm, ce);
 
-  int np = comm.np;
-  int id = comm.id;
-
+  uint np = comm.np;
   if (np == 1)
     return;
 
-  int Npts = nelt * nv;
-  int i;
+  size_t Npts = nelt * nv;
   slong *data = (slong *)malloc((Npts + 1) * sizeof(slong));
-  for (i = 0; i < Npts; i++)
+  for (size_t i = 0; i < Npts; i++)
     data[i] = vtx[i];
   struct gs_data *gsh = gs_setup(data, Npts, &comm, 0, gs_pairwise, 0);
 
@@ -165,11 +167,11 @@ void parrsb_get_part_stat(int *nc, int *ns, int *nss, int *nel, long long *vtx,
   gs_free(gsh);
   free(data);
 
-  int nelMin, nelMax, nelSum;
-  int ncMin, ncMax, ncSum;
-  int nsMin, nsMax, nsSum;
-  int nssMin, nssMax, nssSum;
-  int b;
+  sint nelMin, nelMax, nelSum;
+  sint ncMin, ncMax, ncSum;
+  sint nsMin, nsMax, nsSum;
+  sint nssMin, nssMax, nssSum;
+  sint b;
 
   ncMax = Nmsg;
   ncMin = Nmsg;
@@ -181,7 +183,7 @@ void parrsb_get_part_stat(int *nc, int *ns, int *nss, int *nel, long long *vtx,
   nsMax = Ncomm[0];
   nsMin = Ncomm[0];
   nsSum = Ncomm[0];
-  for (i = 1; i < Nmsg; ++i) {
+  for (int i = 1; i < Nmsg; ++i) {
     nsMax = Ncomm[i] > Ncomm[i - 1] ? Ncomm[i] : Ncomm[i - 1];
     nsMin = Ncomm[i] < Ncomm[i - 1] ? Ncomm[i] : Ncomm[i - 1];
     nsSum += Ncomm[i];
@@ -400,7 +402,7 @@ int parrsb_vector_dump(const char *fname, scalar *y, struct rsb_element *elm,
 
   slong out[2][1], in = nelt;
   comm_scan(out, c, gs_long, gs_add, &in, 1, wrk);
-  slong start = out[0][0], nelgt = out[1][0];
+  slong nelgt = out[1][0];
 
   int ndim = (nv == 8) ? 3 : 2;
   uint write_size = ((ndim + 1) * sizeof(double) + sizeof(slong)) * nelt;
