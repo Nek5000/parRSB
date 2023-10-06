@@ -24,8 +24,8 @@ typedef struct {
 } ProcID;
 
 static VToEMap *getVToEMap(Mesh m, struct comm *c, buffer *bfr) {
-  sint nelt = m->nelt;
-  sint nv = m->nv;
+  uint nelt = m->nelt;
+  uint nv = m->nv;
 
   slong out[2][1], buf[2][1], in = nelt;
   comm_scan(out, c, gs_long, gs_add, &in, 1, buf);
@@ -38,7 +38,7 @@ static VToEMap *getVToEMap(Mesh m, struct comm *c, buffer *bfr) {
 
   // Create (globalId, elementId) pairs and send them to globalId % np
   Point ptr = m->elements.ptr;
-  sint i, j;
+  uint i, j;
   for (i = 0; i < nelt; i++) {
     for (j = 0; j < nv; j++) {
       ulong globalId = ptr[i * nv + j].globalId + 1;
@@ -90,7 +90,7 @@ static VToEMap *getVToEMap(Mesh m, struct comm *c, buffer *bfr) {
   array_init(ProcID, &procs, 10);
 
   vPtr = vtcsCmpct.ptr;
-  sint s = 0, e;
+  uint s = 0, e;
   vertex t;
   ProcID p;
   while (s < vtcsCmpct.n) {
@@ -200,8 +200,8 @@ static void freeVToEMap(VToEMap *map) {
 int faceCheck(Mesh mesh, struct comm *c, buffer *bfr) {
   VToEMap *map = getVToEMap(mesh, c, bfr);
 
-  sint nelt = mesh->nelt;
-  sint ndim = mesh->ndim;
+  uint nelt = mesh->nelt;
+  uint ndim = mesh->ndim;
 
   int faces[GC_MAX_FACES][GC_MAX_FACE_VERTICES];
   if (ndim == 3)
@@ -210,16 +210,16 @@ int faceCheck(Mesh mesh, struct comm *c, buffer *bfr) {
     memcpy(faces, faces2D, GC_MAX_FACES * GC_MAX_FACE_VERTICES * sizeof(int));
 
   Point ptr = mesh->elements.ptr;
-  int nf = (ndim == 3) ? 6 : 4;
-  int nfv = (ndim == 3) ? 4 : 2;
-  int nv = (ndim == 3) ? 8 : 4;
+  uint nf = (ndim == 3) ? 6 : 4;
+  uint nfv = (ndim == 3) ? 4 : 2;
+  uint nv = (ndim == 3) ? 8 : 4;
 
   struct array shared;
   array_init(LongID, &shared, 200);
 
   int err = 0;
 
-  int i, j, k, l;
+  uint i, j, k, l;
   for (i = 0; i < nelt && err == 0; i++) {
     for (j = 0; j < nf && err == 0; j++) {
       shared.n = 0;
@@ -268,7 +268,7 @@ int faceCheck(Mesh mesh, struct comm *c, buffer *bfr) {
 int elementCheck(Mesh mesh, struct comm *c, buffer *bfr) {
   uint nelt = mesh->nelt;
   uint ndim = mesh->ndim;
-  int nv = (ndim == 3) ? 8 : 4;
+  uint nv = (ndim == 3) ? 8 : 4;
 
   LongID globalIds[8];
   Point ptr = mesh->elements.ptr;
