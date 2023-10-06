@@ -105,7 +105,7 @@ parrsb_cmd_line_opts *parrsb_parse_cmd_opts(int argc, char *argv[]);
 void parrsb_cmd_opts_free(parrsb_cmd_line_opts *opts);
 
 int parrsb_dist_mesh(unsigned *nelt, long long **vl, double **coord, int *part,
-                     int nv, MPI_Comm comm);
+                     unsigned nv, MPI_Comm comm);
 
 int parrsb_setup_mesh(unsigned *nelt, unsigned *nv, long long **vl,
                       double **coord, parrsb_cmd_line_opts *opts,
