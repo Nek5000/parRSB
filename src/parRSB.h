@@ -58,7 +58,7 @@ void parrsb_check_tagged_partitions(const long long *const eids,
 //==============================================================================
 // Connectivity
 //
-int parrsb_conn_mesh(long long *vtx, double *coord, int nel, int nDim,
+int parrsb_conn_mesh(long long *vtx, double *coord, uint nel, unsigned nDim,
                      long long *periodicInfo, int nPeriodicFaces, double tol,
                      MPI_Comm comm);
 

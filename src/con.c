@@ -28,8 +28,8 @@ double diff_sqr(double x, double y) { return (x - y) * (x - y); }
 //==============================================================================
 // Mesh struct
 //
-static struct mesh_t *mesh_init(int nelt, int ndim, double *coord,
-                                long long *pinfo, int npinfo,
+static struct mesh_t *mesh_init(uint nelt, unsigned ndim, double *coord,
+                                long long *pinfo, uint npinfo,
                                 const struct comm *c) {
   struct mesh_t *m = tcalloc(struct mesh_t, 1);
   m->nelt = nelt, m->ndim = ndim, m->nnbrs = ndim;
@@ -40,7 +40,7 @@ static struct mesh_t *mesh_init(int nelt, int ndim, double *coord,
   ulong start = out[0][0];
   m->nelgt = out[1][0];
 
-  int nv = m->nv;
+  uint nv = m->nv;
   array_init(struct point_t, &m->elements, nelt * nv);
   struct point_t p = {.origin = c->id};
   for (uint i = 0; i < nelt; i++) {
@@ -84,37 +84,37 @@ static inline double distance_3d(struct point_t *a, struct point_t *b) {
 
 int findMinNeighborDistance(Mesh mesh) {
   struct point_t *p = (struct point_t *)mesh->elements.ptr;
-  int ndim = mesh->ndim;
-  int nv = mesh->nv;
+  uint ndim = mesh->ndim;
+  uint nv = mesh->nv;
 
-  uint i, j, k;
-  int neighbor;
-  scalar d;
+  if (ndim < 2 || ndim > 3)
+    return 1;
 
+  uint i, j, k, neighbor;
   if (ndim == 3) {
     for (i = 0; i < mesh->elements.n; i += nv) {
       for (j = 0; j < nv; j++) {
         p[i + j].dx = SCALAR_MAX;
         for (k = 0; k < mesh->nnbrs; k++) {
           neighbor = NEIGHBOR_MAP[j][k];
-          d = distance_3d(&p[i + j], &p[i + neighbor]);
+          scalar d = distance_3d(&p[i + j], &p[i + neighbor]);
           p[i + j].dx = MIN(p[i + j].dx, d);
         }
       }
     }
-  } else if (ndim == 2) {
+  }
+
+  if (ndim == 2) {
     for (i = 0; i < mesh->elements.n; i += nv) {
       for (j = 0; j < nv; j++) {
         p[i + j].dx = SCALAR_MAX;
         for (k = 0; k < mesh->nnbrs; k++) {
           neighbor = NEIGHBOR_MAP[j][k];
-          d = distance_2d(&p[i + j], &p[i + neighbor]);
+          scalar d = distance_2d(&p[i + j], &p[i + neighbor]);
           p[i + j].dx = MIN(p[i + j].dx, d);
         }
       }
     }
-  } else {
-    return 1;
   }
 
   return 0;
@@ -130,9 +130,6 @@ static int setGlobalID(Mesh mesh, struct comm *c) {
   sint bin = (nPoints > 0);
   struct comm nonZeroRanks;
   comm_split(c, bin, c->id, &nonZeroRanks);
-
-  sint rank = nonZeroRanks.id;
-  sint size = nonZeroRanks.np;
 
   if (bin == 1) {
     slong count = 0;
@@ -220,7 +217,7 @@ static int transferBoundaryFaces(Mesh mesh, struct comm *c) {
 //     ordering, nv = 8 if ndim == 3 (Hex) or nv = 4 if ndim = 2 (Quad).
 // Output:
 //   vtx[nelt, nv]: Global numbering of vertices of elements
-int parrsb_conn_mesh(long long *vtx, double *coord, int nelt, int ndim,
+int parrsb_conn_mesh(long long *vtx, double *coord, uint nelt, unsigned ndim,
                      long long *pinfo, int npinfo, double tol, MPI_Comm comm) {
   struct comm c;
   comm_init(&c, comm);
