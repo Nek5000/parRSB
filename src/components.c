@@ -36,7 +36,8 @@ uint get_components(sint *component, struct array *elems, unsigned nv,
 
   struct comm cc;
   uint count = 0;
-  slong nnz1, nnzg, nnzg0, nnzb, nmarked = 0;
+  slong nnz1, nnzg, nnzg0, nnzb;
+  ulong nmarked = 0;
   do {
     // Count unmarked elements
     arr.n = 0;
@@ -191,7 +192,8 @@ uint get_components_v2(sint *component, struct array *elems, unsigned nv,
     component[e] = -1;
 
   struct comm c;
-  slong nmkd = 0, nc = 0;
+  ulong nmkd = 0;
+  slong nc = 0;
   do {
     // Copy unmarked elements to ids.
     uint unmkd = 0;
