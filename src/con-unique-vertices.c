@@ -63,10 +63,12 @@ static void tuple_sort_(void *ra, uint n, uint usize, uint offset) {
   tuple_sort_((void *)arr, n, sizeof(T), offsetof(T, index))
 
 static void sort_segments_local(struct array *local, int dim) {
-  sint npts = local->n;
-  struct point_t *pts = (struct point_t *)local->ptr;
+  uint npts = local->n;
+  if (npts == 0)
+    return;
 
-  sint s = 0, e;
+  struct point_t *const pts = (struct point_t *const)local->ptr;
+  uint s = 0, e;
   while (s < npts) {
     for (e = s + 1; e < npts && pts[e].ifSegment == 0; e++)
       ;
@@ -118,15 +120,15 @@ static void sort_segments_shared_aux(struct array *arr, int dim, struct comm *c,
 
   // Mark the first point of the segment to have ifSegment = 1 and zero out
   // everything else.
-  struct point_t *pts = (struct point_t *)arr->ptr;
+  struct point_t *const pts = (struct point_t *const)arr->ptr;
   for (uint i = 0; i < arr->n; i++)
     pts[i].ifSegment = 0;
 
+  sint wrk;
   sint rank = (arr->n > 0) ? c->id : c->np;
-  sint wrk[2];
-  comm_allreduce(c, gs_int, gs_min, &rank, 1, wrk);
+  comm_allreduce(c, gs_int, gs_min, &rank, 1, &wrk);
 
-  if (c->id == rank)
+  if ((sint)c->id == rank)
     pts[0].ifSegment = 1;
 
   parrsb_print(c, verbose, "\t\t\t\tsss_aux_mark_first_point: done.\n");
@@ -260,7 +262,7 @@ static void sort_segments_shared(struct array *shared, int dim, struct comm *c,
       parrsb_print(&active, verbose,
                    "\t\t\tsss_find_bin_algo_%d_parity_%d: done.\n", algo,
                    parity);
-      assert(bin >= 0 && bin <= active.np);
+      assert(bin >= 0 && bin <= (sint)active.np);
 
       // index >= 0 --> gids[index] >= 0 --> segments[index].n > 0
       comm_split(&active, bin, active.id, &seg);
@@ -300,7 +302,7 @@ static int talk_to_neighbor(struct point_t *pnt, const struct array *arr,
 
   struct point_t *pts = (struct point_t *)arr->ptr;
   sint dest = (sint)c->id + dir;
-  if (dest >= 0 && dest < c->np) {
+  if (dest >= 0 && dest < (sint)c->np) {
     struct point_t p = (dir == 1) ? pts[arr->n - 1] : pts[0];
     p.proc = dest;
     array_cat(struct point_t, &tmp, &p, 1);
@@ -378,8 +380,8 @@ static void separate_local_segments(struct array *local, struct array *shared,
     s = e;
   }
 
-  sint check = lcheck, wrk[2];
-  comm_allreduce(c, gs_int, gs_add, &check, 1, wrk);
+  sint check = lcheck, wrk;
+  comm_allreduce(c, gs_int, gs_add, &check, 1, &wrk);
   if (check) {
     // Bring the first point from next process. Check if `ifSegment` value
     // of that point is a 1 or a 0. If it is a 1, add the current range to
@@ -485,8 +487,8 @@ int find_unique_vertices(Mesh mesh, struct comm *c, scalar tol, int verbose,
   for (uint i = 0; i < elems->n; i++)
     pts[i].ifSegment = pts[i].globalId = 0;
 
-  slong npts = elems->n, wrk[2];
-  comm_allreduce(c, gs_long, gs_add, &npts, 1, wrk);
+  slong npts = elems->n, wrk;
+  comm_allreduce(c, gs_long, gs_add, &npts, 1, &wrk);
 
   // Initialize shared and local arrays and then copy all points in `elems`
   // array to shared array first. Shared array contains only the segments which
