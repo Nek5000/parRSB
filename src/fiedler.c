@@ -215,8 +215,7 @@ static int project(scalar *x, uint n, scalar *b, struct laplacian *L,
 // inverse iteration should not change z.
 static int inverse(scalar *y, struct array *elements, unsigned nv, scalar *z,
                    struct comm *gsc, unsigned miter, unsigned mpass, double tol,
-                   int factor, int sagg, int grammian, slong nelg,
-                   buffer *buf) {
+                   int factor, int grammian, slong nelg, buffer *buf) {
   metric_tic(gsc, RSB_INVERSE_SETUP);
   uint lelt = elements->n;
   struct rsb_element *elems = (struct rsb_element *)elements->ptr;
@@ -243,7 +242,7 @@ static int inverse(scalar *y, struct array *elements, unsigned nv, scalar *z,
   struct crystal cr;
   crystal_init(&cr, gsc);
   struct par_mat *L = par_csr_setup_con(lelt, eid, vtx, nv, 1, gsc, &cr, buf);
-  struct mg *d = mg_setup(L, factor, sagg, &cr, buf);
+  struct mg *d = mg_setup(L, factor, &cr, buf);
   crystal_free(&cr);
   metric_toc(gsc, RSB_INVERSE_SETUP);
 
@@ -659,7 +658,7 @@ int fiedler(struct array *elements, int nv, const parrsb_options *const opts,
   case 1:
     iter = inverse(f, elements, nv, initv, gsc, opts->rsb_max_iter,
                    opts->rsb_max_passes, opts->rsb_tol, opts->rsb_mg_factor,
-                   opts->rsb_mg_sagg, opts->rsb_mg_grammian, nelg, buf);
+                   opts->rsb_mg_grammian, nelg, buf);
     break;
   default:
     break;

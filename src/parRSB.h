@@ -36,7 +36,6 @@ typedef struct {
   // RSB MG specific options
   int rsb_mg_grammian; // MG Grammian: 0 or 1 (Default: 0)
   int rsb_mg_factor;   // MG Coarsening factor (Default: 2, should be > 1)
-  int rsb_mg_sagg;     // MG smooth aggregation: 0 or 1 (Default: 0)
 } parrsb_options;
 
 extern parrsb_options parrsb_default_options;

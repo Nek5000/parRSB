@@ -25,8 +25,7 @@ parrsb_options parrsb_default_options = {
     .rsb_dump_stats = 0,
     // RSB MG specific options
     .rsb_mg_grammian = 0,
-    .rsb_mg_factor = 2,
-    .rsb_mg_sagg = 0};
+    .rsb_mg_factor = 2};
 
 static char *ALGO[3] = {"RSB", "RCB", "RIB"};
 
@@ -56,7 +55,6 @@ static void update_options(parrsb_options *const options) {
   UPDATE_OPTION(rsb_dump_stats, "PARRSB_DUMP_STATS", 1);
   UPDATE_OPTION(rsb_mg_grammian, "PARRSB_RSB_MG_GRAMMIAN", 1);
   UPDATE_OPTION(rsb_mg_factor, "PARRSB_RSB_MG_FACTOR", 1);
-  UPDATE_OPTION(rsb_mg_sagg, "PARRSB_RSB_MG_SMOOTH_AGGREGATION", 1);
 
 #undef UPDATE_OPTION
 }
@@ -80,7 +78,6 @@ static void print_options(const struct comm *c,
   PRINT_OPTION(rsb_dump_stats, "PARRSB_DUMP_STATS", "%d");
   PRINT_OPTION(rsb_mg_grammian, "PARRSB_RSB_MG_GRAMMIAN", "%d");
   PRINT_OPTION(rsb_mg_factor, "PARRSB_RSB_MG_FACTOR", "%d");
-  PRINT_OPTION(rsb_mg_sagg, "PARRSB_RSB_MG_SMOOTH_AGGREGATION", "%d");
 
 #undef PRINT_OPTION
 }
