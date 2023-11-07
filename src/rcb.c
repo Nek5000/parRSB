@@ -1,8 +1,11 @@
 #include "parrsb-impl.h"
 #include "sort.h"
 
+#include <float.h>
+#include <string.h>
+
 static void get_axis_len(double *length, size_t unit_size, char *elems,
-                         uint nel, int ndim, struct comm *c) {
+                         uint nel, uint ndim, struct comm *c) {
   double min[3] = {DBL_MAX, DBL_MAX, DBL_MAX},
          max[3] = {-DBL_MAX, -DBL_MAX, -DBL_MAX};
 
@@ -140,23 +143,17 @@ static int rcb_level(struct array *a, size_t unit_size, int ndim,
 
 int rcb(struct array *elements, size_t unit_size, int ndim, struct comm *ci,
         buffer *bfr) {
-  struct comm c, t;
+  struct comm c;
   comm_dup(&c, ci);
 
-  int size = c.np;
-  int rank = c.id;
-
+  uint size = c.np, rank = c.id;
   while (size > 1) {
     rcb_level(elements, unit_size, ndim, &c, bfr);
 
-    int bin = 1;
-    if (rank < (size + 1) / 2)
-      bin = 0;
-
+    struct comm t;
+    const int bin = ((rank >= (size + 1) / 2) ? 1 : 0);
     comm_split(&c, bin, rank, &t);
-    comm_free(&c);
-    comm_dup(&c, &t);
-    comm_free(&t);
+    comm_free(&c), comm_dup(&c, &t), comm_free(&t);
 
     size = c.np, rank = c.id;
   }
