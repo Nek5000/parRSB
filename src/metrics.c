@@ -33,9 +33,9 @@ void metric_toc(struct comm *c, metric m) {
 }
 
 double metric_get_value(int level, metric m) {
-  if (level == -1)
+  if (level < 0)
     return metrics[m];
-  if (level >= 0 && level < stack_size)
+  if ((uint)level < stack_size)
     return stack[level * MAXMETS + m];
   return 0.0;
 }
@@ -93,22 +93,19 @@ void metric_rsb_print(struct comm *c, int profile_level) {
              SUMMARY(i, RSB_LANCZOS));
       printf("      RSB_LANCZOS_TQLI       : %e/%e/%e\n",
              SUMMARY(i, RSB_LANCZOS_TQLI));
-      printf("      RSB_INVERSE_SETUP      : %e/%e/%e\n",
-             SUMMARY(i, RSB_INVERSE_SETUP));
-      printf("      RSB_INVERSE            : %e/%e/%e\n",
-             SUMMARY(i, RSB_INVERSE));
-      printf("      RSB_PROJECT_AX         : %e/%e/%e\n",
-             SUMMARY(i, RSB_PROJECT_AX));
-      printf("      RSB_PROJECT_MG         : %e/%e/%e\n",
-             SUMMARY(i, RSB_PROJECT_MG));
       printf("    RSB_FIEDLER_CALC_NITER   : %e/%e/%e\n",
              SUMMARY(i, RSB_FIEDLER_CALC_NITER));
       printf("  RSB_SORT                   : %e/%e/%e\n", SUMMARY(i, RSB_SORT));
-      printf("  RSB_REPAIR                 : %e/%e/%e\n",
-             SUMMARY(i, RSB_REPAIR));
+      printf("  RSB_COMPONENTS             : %e/%e/%e\n",
+             SUMMARY(i, RSB_COMPONENTS));
+      printf("    RSB_COMPONENTS_NCOMP     : %e/%e/%e\n",
+             SUMMARY(i, RSB_COMPONENTS_NCOMP));
+      printf("  RSB_NEIGHBORS              : %e/%e/%e\n",
+             SUMMARY(i, RSB_NEIGHBORS));
       printf("  RSB_BALANCE                : %e/%e/%e\n",
              SUMMARY(i, RSB_BALANCE));
     }
+    fflush(stdout);
   }
 
   if (wrk)
@@ -148,6 +145,7 @@ void metric_crs_print(struct comm *c, int profile_level) {
       printf("  SCHUR_SOLVE_CHOL2                  : %e/%e/%e\n",
              SUMMARY(i, SCHUR_SOLVE_CHOL2));
     }
+    fflush(stdout);
   }
 
   if (wrk)

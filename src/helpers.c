@@ -10,25 +10,21 @@
 void parrsb_print_stack(void) {
   void *bt[50];
   int bt_size = backtrace(bt, 50);
+  if (bt_size == 0) {
+    fprintf(stderr, "backtrace(): Obtained 0 stack frames.\n");
+    return;
+  }
+
   char **symbols = backtrace_symbols(bt, bt_size);
-  printf("backtrace(): obtained %d stack frames.\n", bt_size);
-  for (unsigned i = 0; i < bt_size; i++)
-    printf("%s\n", symbols[i]);
+  fprintf(stderr, "backtrace(): obtained %d stack frames.\n", bt_size);
+  for (unsigned i = 0; i < (unsigned)bt_size; i++)
+    fprintf(stderr, "%s\n", symbols[i]);
   free(symbols);
 }
 #else
-void parrsb_print_stack(){};
+void parrsb_print_stack() {}
 #endif // defined __GLIBC__
 
-double parrsb_get_max_rss() {
-  struct rusage r_usage;
-  getrusage(RUSAGE_SELF, &r_usage);
-#if defined(__APPLE__) && defined(__MACH__)
-  return (double)r_usage.ru_maxrss;
-#else
-  return (double)(r_usage.ru_maxrss * 1024L);
-#endif
-}
 int log2ll(long long n) {
   int k = 0;
   while (n > 1)
@@ -38,7 +34,7 @@ int log2ll(long long n) {
 }
 
 int parrsb_dist_mesh(unsigned int *nelt_, long long **vl_, double **coord_,
-                     int *part, int nv, MPI_Comm comm) {
+                     int *part, unsigned nv, MPI_Comm comm) {
   typedef struct {
     int proc;
     long long vtx[MAXNV];
@@ -60,7 +56,7 @@ int parrsb_dist_mesh(unsigned int *nelt_, long long **vl_, double **coord_,
   }
   assert(elements.n == nelt);
 
-  int ndim = (nv == 8) ? 3 : 2;
+  unsigned ndim = (nv == 8) ? 3 : 2;
   elem_data *ed = elements.ptr;
   double *coord = (coord_ == NULL ? NULL : *coord_);
   if (coord != NULL) {
@@ -126,7 +122,7 @@ int parrsb_setup_mesh(unsigned *nelt, unsigned *nv, long long **vl,
   parrsb_check_error(err, comm);
 
   parrsb_options opt = parrsb_default_options;
-  err = parrsb_part_mesh(part, NULL, *vl, *coord, *nelt, *nv, opt, comm);
+  err = parrsb_part_mesh(part, *vl, *coord, NULL, *nelt, *nv, &opt, comm);
   parrsb_check_error(err, comm);
 
   // Redistribute data based on identified partitions
@@ -143,16 +139,13 @@ void parrsb_get_part_stat(int *nc, int *ns, int *nss, int *nel, long long *vtx,
   struct comm comm;
   comm_init(&comm, ce);
 
-  int np = comm.np;
-  int id = comm.id;
-
+  uint np = comm.np;
   if (np == 1)
     return;
 
-  int Npts = nelt * nv;
-  int i;
+  size_t Npts = nelt * nv;
   slong *data = (slong *)malloc((Npts + 1) * sizeof(slong));
-  for (i = 0; i < Npts; i++)
+  for (size_t i = 0; i < Npts; i++)
     data[i] = vtx[i];
   struct gs_data *gsh = gs_setup(data, Npts, &comm, 0, gs_pairwise, 0);
 
@@ -165,11 +158,11 @@ void parrsb_get_part_stat(int *nc, int *ns, int *nss, int *nel, long long *vtx,
   gs_free(gsh);
   free(data);
 
-  int nelMin, nelMax, nelSum;
-  int ncMin, ncMax, ncSum;
-  int nsMin, nsMax, nsSum;
-  int nssMin, nssMax, nssSum;
-  int b;
+  sint nelMin, nelMax, nelSum;
+  sint ncMin, ncMax, ncSum;
+  sint nsMin, nsMax, nsSum;
+  sint nssMin, nssMax, nssSum;
+  sint b;
 
   ncMax = Nmsg;
   ncMin = Nmsg;
@@ -181,7 +174,7 @@ void parrsb_get_part_stat(int *nc, int *ns, int *nss, int *nel, long long *vtx,
   nsMax = Ncomm[0];
   nsMin = Ncomm[0];
   nsSum = Ncomm[0];
-  for (i = 1; i < Nmsg; ++i) {
+  for (int i = 1; i < Nmsg; ++i) {
     nsMax = Ncomm[i] > Ncomm[i - 1] ? Ncomm[i] : Ncomm[i - 1];
     nsMin = Ncomm[i] < Ncomm[i - 1] ? Ncomm[i] : Ncomm[i - 1];
     nsSum += Ncomm[i];
@@ -265,23 +258,15 @@ parrsb_cmd_line_opts *parrsb_parse_cmd_opts(int argc, char *argv[]) {
 
   in->mesh = NULL, in->tol = 2e-1;
   in->test = 0, in->dump = 0, in->verbose = 0, in->nactive = INT_MAX;
-  in->ilu_type = 0, in->ilu_tol = 1e-1, in->ilu_pivot = 0;
-  in->crs_type = 0, in->crs_tol = 1e-3;
 
-  static struct option long_options[] = {
-      {"mesh", required_argument, 0, 0},
-      {"tol", optional_argument, 0, 1},
-      {"test", optional_argument, 0, 2},
-      {"dump", optional_argument, 0, 3},
-      {"nactive", optional_argument, 0, 4},
-      {"verbose", optional_argument, 0, 5},
-      {"ilu_type", optional_argument, 0, 10},
-      {"ilu_tol", optional_argument, 0, 11},
-      {"ilu_pivot", optional_argument, 0, 12},
-      {"crs_type", optional_argument, 0, 20},
-      {"crs_tol", optional_argument, 0, 21},
-      {"help", optional_argument, 0, 91},
-      {0, 0, 0, 0}};
+  static struct option long_options[] = {{"mesh", required_argument, 0, 0},
+                                         {"tol", optional_argument, 0, 10},
+                                         {"test", optional_argument, 0, 20},
+                                         {"dump", optional_argument, 0, 30},
+                                         {"nactive", optional_argument, 0, 40},
+                                         {"verbose", optional_argument, 0, 50},
+                                         {"help", optional_argument, 0, 99},
+                                         {0, 0, 0, 0}};
 
   size_t len;
   for (;;) {
@@ -295,37 +280,22 @@ parrsb_cmd_line_opts *parrsb_parse_cmd_opts(int argc, char *argv[]) {
       in->mesh = tcalloc(char, len + 1);
       strncpy(in->mesh, optarg, len);
       break;
-    case 1:
+    case 10:
       in->tol = atof(optarg);
       break;
-    case 2:
+    case 20:
       in->test = 1;
       break;
-    case 3:
+    case 30:
       in->dump = 1;
       break;
-    case 4:
+    case 40:
       in->nactive = atoi(optarg);
       break;
-    case 5:
+    case 50:
       in->verbose = atoi(optarg);
       break;
-    case 10:
-      in->ilu_type = atoi(optarg);
-      break;
-    case 11:
-      in->ilu_tol = atof(optarg);
-      break;
-    case 12:
-      in->ilu_pivot = atoi(optarg);
-      break;
-    case 20:
-      in->crs_type = atoi(optarg);
-      break;
-    case 21:
-      in->crs_tol = atof(optarg);
-      break;
-    case 91:
+    case 99:
       print_help();
       break;
     default:
@@ -400,7 +370,7 @@ int parrsb_vector_dump(const char *fname, scalar *y, struct rsb_element *elm,
 
   slong out[2][1], in = nelt;
   comm_scan(out, c, gs_long, gs_add, &in, 1, wrk);
-  slong start = out[0][0], nelgt = out[1][0];
+  slong nelgt = out[1][0];
 
   int ndim = (nv == 8) ? 3 : 2;
   uint write_size = ((ndim + 1) * sizeof(double) + sizeof(slong)) * nelt;
