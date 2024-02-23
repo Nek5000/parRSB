@@ -11,7 +11,7 @@ static double metrics[MAXMETS];
 static double *stack;
 static uint stack_size;
 
-void metric_init() {
+void metric_init(void) {
   for (uint i = 0; i < MAXMETS; i++)
     metrics[i] = 0.0;
   stack = tcalloc(double, MAXSIZE);
@@ -40,7 +40,7 @@ double metric_get_value(int level, metric m) {
   return 0.0;
 }
 
-void metric_push_level() {
+void metric_push_level(void) {
   assert(stack_size < MAXLVLS && "stack_size >= MAXLVLS");
 
   for (unsigned i = 0; i < MAXMETS; i++) {
@@ -50,7 +50,7 @@ void metric_push_level() {
   stack_size++;
 }
 
-uint metric_get_levels() { return stack_size; }
+uint metric_get_levels(void) { return stack_size; }
 
 static void metric_print_aux(double *wrk, struct comm *c) {
   double *min = wrk, *max = min + MAXSIZE, *sum = max + MAXSIZE;
@@ -154,7 +154,7 @@ void metric_crs_print(struct comm *c, int profile_level) {
 
 #undef SUMMARY
 
-void metric_finalize() {
+void metric_finalize(void) {
   if (stack != NULL)
     free(stack), stack = NULL;
 }

@@ -22,7 +22,7 @@ void parrsb_print_stack(void) {
   free(symbols);
 }
 #else
-void parrsb_print_stack() {}
+void parrsb_print_stack(void) {}
 #endif // defined __GLIBC__
 
 int log2ll(long long n) {
@@ -251,7 +251,8 @@ void parrsb_print_part_stat(long long *vtx, unsigned nelt, unsigned nv,
   }
 }
 
-static void print_help() {}
+// TODO: Print options supported by parRSB.
+static void print_help(void) {}
 
 parrsb_cmd_line_opts *parrsb_parse_cmd_opts(int argc, char *argv[]) {
   parrsb_cmd_line_opts *in = tcalloc(parrsb_cmd_line_opts, 1);

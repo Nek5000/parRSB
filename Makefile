@@ -1,5 +1,5 @@
 CC ?= mpicc
-CFLAGS ?= -Wall -Wextra -Wpedantic -Wno-unused-function -Wno-unused-parameter -std=c99
+CFLAGS ?= -Wall -Wextra -Wpedantic -Wno-unused-function -Wno-unused-parameter -std=c99 -g
 LDFLAGS ?=
 DEBUG ?= 0
 MPI ?= 1
