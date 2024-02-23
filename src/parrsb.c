@@ -257,8 +257,7 @@ static void initialize_levels(struct comm *const comms, int *const levels_,
                comms[level - 1].id, &comms[level]);
   }
   levels = MIN(levels, *levels_);
-  if (levels > 1)
-    comm_dup(&comms[levels - 1], &nc);
+  if (levels > 1) comm_dup(&comms[levels - 1], &nc);
   *levels_ = levels;
   parrsb_print(c, verbose, "initialize_levels: levels = %u", levels);
 
@@ -279,8 +278,7 @@ static void parrsb_part_mesh_v0(int *part, const long long *const vtx,
         "parrsb_part_mesh_v0: Both vertices and coordinates can't be NULL");
     MPI_Abort(c->c, EXIT_FAILURE);
   }
-  if (xyz == NULL)
-    options->rsb_pre = 0;
+  if (xyz == NULL) options->rsb_pre = 0;
 
   struct array elist;
   size_t esize = load_balance(&elist, nel, nv, xyz, vtx, verbose, cr, bfr);
@@ -466,8 +464,7 @@ static void parrsb_part_mesh_v1(int *part, const long long *const vtx,
     if (unique.n > 0) {
       in = 1;
       for (uint i = 1; i < unique.n; i++) {
-        if (pu[i].tag > pu[i - 1].tag)
-          in++;
+        if (pu[i].tag > pu[i - 1].tag) in++;
       }
     }
 
@@ -493,8 +490,7 @@ static void parrsb_part_mesh_v1(int *part, const long long *const vtx,
     if (unique.n > 0) {
       pu[0].tagn = start;
       for (uint i = 1; i < unique.n; i++) {
-        if (pu[i].tag > pu[i - 1].tag)
-          start++;
+        if (pu[i].tag > pu[i - 1].tag) start++;
         pu[i].tagn = start;
       }
     }
@@ -652,8 +648,7 @@ static void update_frontier(sint *const target, sint *const hop,
         current_target = pd[i].target, current_count = 1;
       }
     }
-    if (current_count > final_count)
-      final_target = current_target;
+    if (current_count > final_count) final_target = current_target;
 
     // Update frontier, target and hop.
     for (uint j = 0; j < nv; j++)
@@ -814,8 +809,7 @@ void parrsb_part_solid(int *part, const long long *const vtx2,
     // check for that later when we actually assign the elements to partitions.
     {
       sint id = c.id, hid = 0;
-      if (nrecv2 == nexp2)
-        id = -1, hid = INT_MAX;
+      if (nrecv2 == nexp2) id = -1, hid = INT_MAX;
 
       // Max id should be >= 0;
       sint wrk, idmax = id;
@@ -863,8 +857,7 @@ void parrsb_part_solid(int *part, const long long *const vtx2,
     {
       struct elem_t et = {.part = -1};
       for (uint i = 0; i < nel2; i++) {
-        if (part[i] >= 0)
-          continue;
+        if (part[i] >= 0) continue;
         et.sequence = i, et.target = target[nel1 + i], et.hop = hop[nel1 + i];
         array_cat(struct elem_t, &arr, &et, 1);
       }

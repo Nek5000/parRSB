@@ -127,8 +127,7 @@ static VToEMap *getVToEMap(Mesh m, struct comm *c, buffer *bfr) {
   crystal_free(&cr);
 
   // create the map
-  if (a.n == 0)
-    return NULL;
+  if (a.n == 0) return NULL;
 
   VToEMap *map = calloc(1, sizeof(VToEMap));
   map->elements = calloc(a.n, sizeof(ulong));
@@ -136,8 +135,7 @@ static VToEMap *getVToEMap(Mesh m, struct comm *c, buffer *bfr) {
   uint nGIds = 1, prev = 0;
   vertex *aPtr = (vertex *)a.ptr;
   for (i = 1; i < a.n; i++) {
-    if (aPtr[i].vertexId != aPtr[prev].vertexId)
-      nGIds++;
+    if (aPtr[i].vertexId != aPtr[prev].vertexId) nGIds++;
     prev = i;
   }
 
@@ -185,8 +183,7 @@ static uint getPosition(VToEMap *map, ulong key) {
       begin = mid;
   };
 
-  if (globalIds[mid] != key)
-    return UINT_MAX;
+  if (globalIds[mid] != key) return UINT_MAX;
   return mid;
 }
 

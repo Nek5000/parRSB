@@ -100,8 +100,7 @@ static int sparse_gemm(struct par_mat *WG, const struct par_mat *W,
         }
         while (e < gij.n && pg[s].c == pg[e].c)
           e++;
-        if (fabs(m.v) > 1e-12)
-          array_cat(struct mij, &sij, &m, 1);
+        if (fabs(m.v) > 1e-12) array_cat(struct mij, &sij, &m, 1);
         s = e;
       }
     }
@@ -248,8 +247,7 @@ struct mg *mg_setup(const struct par_mat *M, const int factor,
 //
 void mg_vcycle(scalar *u1, scalar *rhs, struct mg *d, struct comm *c,
                buffer *bfr) {
-  if (d->nlevels == 0)
-    return;
+  if (d->nlevels == 0) return;
 
   uint *lvl_off = d->level_off, nnz = lvl_off[d->nlevels];
   scalar *r = d->buf;
@@ -334,22 +332,15 @@ void mg_free(struct mg *d) {
   if (d != NULL) {
     struct mg_lvl **l = d->levels;
     for (uint i = 0; i < d->nlevels; i++) {
-      if (i > 0 && l[i]->M != NULL)
-        par_mat_free(l[i]->M), free(l[i]->M);
-      if (l[i]->J != NULL)
-        gs_free(l[i]->J), l[i]->J = NULL;
-      if (l[i]->Q != NULL)
-        gs_free(l[i]->Q), l[i]->Q = NULL;
-      if (l[i] != NULL)
-        free(l[i]), l[i] = NULL;
+      if (i > 0 && l[i]->M != NULL) par_mat_free(l[i]->M), free(l[i]->M);
+      if (l[i]->J != NULL) gs_free(l[i]->J), l[i]->J = NULL;
+      if (l[i]->Q != NULL) gs_free(l[i]->Q), l[i]->Q = NULL;
+      if (l[i] != NULL) free(l[i]), l[i] = NULL;
     }
 
-    if (d->levels != NULL)
-      free(d->levels), d->levels = NULL;
-    if (d->level_off != NULL)
-      free(d->level_off), d->level_off = NULL;
-    if (d->buf != NULL)
-      free(d->buf), d->buf = NULL;
+    if (d->levels != NULL) free(d->levels), d->levels = NULL;
+    if (d->level_off != NULL) free(d->level_off), d->level_off = NULL;
+    if (d->buf != NULL) free(d->buf), d->buf = NULL;
     free(d);
   }
 }

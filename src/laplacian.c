@@ -184,8 +184,7 @@ static int gs_weighted_init(struct laplacian *l, struct rsb_element *elems,
       gl->diag[i] += gl->u[nv * i + j];
   }
 
-  if (vertices != NULL)
-    free(vertices);
+  if (vertices != NULL) free(vertices);
 
   return 0;
 }
@@ -213,10 +212,8 @@ static int gs_weighted(scalar *v, struct laplacian *l, scalar *u, buffer *bfr) {
 
 static int gs_weighted_free(struct laplacian *l) {
   struct gs_laplacian *gl = l->data;
-  if (gl->u != NULL)
-    free(gl->u);
-  if (gl->diag != NULL)
-    free(gl->diag);
+  if (gl->u != NULL) free(gl->u);
+  if (gl->diag != NULL) free(gl->diag);
   gs_free(gl->gsh);
   free(l->data);
   return 0;

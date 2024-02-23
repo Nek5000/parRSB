@@ -5,8 +5,7 @@
 
 #define FREE(ptr, x)                                                           \
   {                                                                            \
-    if (ptr->x != NULL)                                                        \
-      free(ptr->x);                                                            \
+    if (ptr->x != NULL) free(ptr->x);                                          \
   }
 
 //------------------------------------------------------------------------------
@@ -17,8 +16,7 @@
 // to ensure all the
 int compress_nbrs(struct array *eij, struct array *nbr, buffer *bfr) {
   array_init(struct mij, eij, nbr->n);
-  if (nbr->n == 0)
-    return 1;
+  if (nbr->n == 0) return 1;
 
   sarray_sort_2(struct nbr, nbr->ptr, nbr->n, r, 1, c, 1, bfr);
 
@@ -112,8 +110,7 @@ int csr_setup(struct mat *mat, struct array *entries, int sep, buffer *buf) {
   uint i, j;
   for (nr = 1, i = 1, j = 0; i < nnz; i++) {
     if ((unique[j].r != ptr[i].r) || (unique[j].c != ptr[i].c)) {
-      if (unique[j].r != ptr[i].r)
-        Lp[nr] = j + 1 - sep * nr, nr++;
+      if (unique[j].r != ptr[i].r) Lp[nr] = j + 1 - sep * nr, nr++;
       unique[++j] = ptr[i];
     } else
       unique[j].v += ptr[i].v;
@@ -716,8 +713,7 @@ int par_mat_free(struct par_mat *A) {
 //
 static int compress_mij(struct array *eij, struct array *entries, buffer *bfr) {
   eij->n = 0;
-  if (entries->n == 0)
-    return 1;
+  if (entries->n == 0) return 1;
 
   sarray_sort_2(struct mij, entries->ptr, entries->n, r, 1, c, 1, bfr);
 

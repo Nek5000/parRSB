@@ -52,11 +52,9 @@ static void check_rsb_partition(const struct comm *gc,
     sint converged = 1;
     int val = (int)metric_get_value(i, RSB_FIEDLER_CALC_NITER);
     if (opts->rsb_algo == 0) {
-      if (val == miter * mpass)
-        converged = 0;
+      if (val == miter * mpass) converged = 0;
     } else if (opts->rsb_algo == 1) {
-      if (val == mpass)
-        converged = 0;
+      if (val == mpass) converged = 0;
     }
 
     struct comm c;
@@ -119,8 +117,7 @@ static int balance_partitions(struct array *elements, unsigned nv,
                               struct comm *lc, struct comm *gc, int bin,
                               buffer *bfr) {
   // Return if there is only one processor.
-  if (gc->np == 1)
-    return 0;
+  if (gc->np == 1) return 0;
 
   assert(check_bin_val(bin, gc) == 0);
 
@@ -209,8 +206,7 @@ static int balance_partitions(struct array *elements, unsigned nv,
 
       ptr = ielems.ptr;
       for (e = 0; e < ielems.n; e++)
-        if (ptr[e].dest != -1)
-          elems[ptr[e].index].proc = ptr[e].dest;
+        if (ptr[e].dest != -1) elems[ptr[e].index].proc = ptr[e].dest;
     }
 
     array_free(&ielems);

@@ -52,8 +52,7 @@ void get_extrema(void *extrema_, struct sort *data, uint field,
 }
 
 uint *set_proc_from_idx(uint size, sint np_, slong start, slong nelem) {
-  if (nelem == 0)
-    return NULL;
+  if (nelem == 0) return NULL;
   uint *proc = tcalloc(uint, size + 1);
 
   ulong np = np_;
@@ -131,8 +130,7 @@ void sarray_transfer_chunk(struct array *arr, const size_t usize,
   // Calculate the global array size. If it is zero, nothing to do, just return.
   slong ng = arr->n, wrk[2];
   comm_allreduce(c, gs_long, gs_add, &ng, 1, wrk);
-  if (ng == 0)
-    return;
+  if (ng == 0) return;
 
   // Initialize the crystal router.
   struct crystal cr;

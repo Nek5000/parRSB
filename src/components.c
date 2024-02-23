@@ -12,16 +12,14 @@ uint get_components(sint *component, struct array *elems, unsigned nv,
   comm_scan(out, c, gs_long, gs_add, &in, 1, wrk);
   ulong nelg = out[1][0], start = out[0][0];
 
-  if (nelg == 0)
-    return 0;
+  if (nelg == 0) return 0;
 
   uint nev = nelt * nv;
   slong *p = tcalloc(slong, nev);
   slong *ids = tcalloc(slong, nev);
 
   int null_input = (component == NULL);
-  if (null_input)
-    component = tcalloc(sint, nelt);
+  if (null_input) component = tcalloc(sint, nelt);
 
   for (uint e = 0; e < nelt; e++)
     component[e] = -1;
@@ -110,8 +108,7 @@ uint get_components(sint *component, struct array *elems, unsigned nv,
   array_free(&arr);
 
   free(p), free(ids);
-  if (null_input == 1)
-    free(component);
+  if (null_input == 1) free(component);
 
   return count;
 }
@@ -148,8 +145,7 @@ static sint find_or_insert(struct array *cids, struct cmp_t *t) {
   }
 
   uint n = mid;
-  if (t->c > pc[mid].c)
-    n = mid + 1;
+  if (t->c > pc[mid].c) n = mid + 1;
 
   struct cmp_t t0 = *t, t1;
   for (; n < cids->n; n++) {
@@ -175,8 +171,7 @@ uint get_components_v2(sint *component, struct array *elems, unsigned nv,
   comm_scan(out, ci, gs_long, gs_add, &in, 1, wrk);
   ulong nelg = out[1][0];
 
-  if (nelg == 0)
-    return 0;
+  if (nelg == 0) return 0;
 
   const uint nev = nelt * nv;
   sint *p0 = tcalloc(sint, nev);
@@ -185,8 +180,7 @@ uint get_components_v2(sint *component, struct array *elems, unsigned nv,
   uint *inds = tcalloc(uint, nev);
 
   int null_input = (component == NULL);
-  if (null_input)
-    component = tcalloc(sint, nelt);
+  if (null_input) component = tcalloc(sint, nelt);
 
   for (uint e = 0; e < nelt; e++)
     component[e] = -1;
@@ -296,8 +290,7 @@ uint get_components_v2(sint *component, struct array *elems, unsigned nv,
         cnt++;
         struct cmp_t *pc = (struct cmp_t *)cids.ptr;
         for (uint i = 1; i < cids.n; i++) {
-          if (pc[i].c > pc[i - 1].c)
-            cnt++;
+          if (pc[i].c > pc[i - 1].c) cnt++;
         }
       }
 
@@ -310,8 +303,7 @@ uint get_components_v2(sint *component, struct array *elems, unsigned nv,
         struct cmp_t *pc = (struct cmp_t *)cids.ptr;
         pc[0].uid = s;
         for (uint i = 1; i < cids.n; i++) {
-          if (pc[i].c > pc[i - 1].c)
-            s++;
+          if (pc[i].c > pc[i - 1].c) s++;
           pc[i].uid = s;
         }
       }
@@ -340,8 +332,7 @@ uint get_components_v2(sint *component, struct array *elems, unsigned nv,
     nc += ncg;
   } while (nmkd < nelg);
 
-  if (null_input == 1)
-    free(component);
+  if (null_input == 1) free(component);
   free(p0), free(p), free(ids), free(inds);
 
   return nc;

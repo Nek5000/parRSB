@@ -98,8 +98,7 @@ int main(int argc, char *argv[]) {
   }
 
   // Turns on testing if test is on
-  if (in->test)
-    test_parcon(nelt, vl, in->mesh, world);
+  if (in->test) test_parcon(nelt, vl, in->mesh, world);
 
   // Free resources
   free(vl), free(coord), free(bcs);

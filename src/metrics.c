@@ -33,10 +33,8 @@ void metric_toc(struct comm *c, metric m) {
 }
 
 double metric_get_value(int level, metric m) {
-  if (level < 0)
-    return metrics[m];
-  if ((uint)level < stack_size)
-    return stack[level * MAXMETS + m];
+  if (level < 0) return metrics[m];
+  if ((uint)level < stack_size) return stack[level * MAXMETS + m];
   return 0.0;
 }
 
@@ -108,8 +106,7 @@ void metric_rsb_print(struct comm *c, int profile_level) {
     fflush(stdout);
   }
 
-  if (wrk)
-    free(wrk);
+  if (wrk) free(wrk);
 }
 
 void metric_crs_print(struct comm *c, int profile_level) {
@@ -148,15 +145,13 @@ void metric_crs_print(struct comm *c, int profile_level) {
     fflush(stdout);
   }
 
-  if (wrk)
-    free(wrk);
+  if (wrk) free(wrk);
 }
 
 #undef SUMMARY
 
 void metric_finalize(void) {
-  if (stack != NULL)
-    free(stack), stack = NULL;
+  if (stack != NULL) free(stack), stack = NULL;
 }
 
 #undef MAXMETS

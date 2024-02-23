@@ -65,16 +65,14 @@ int power_serial(double *y, uint N, double *A, int verbose) {
       norm += Ay[j] * Ay[j];
     }
 
-    if (i > 0)
-      err = (sqrt(norm) - lambda) / lambda;
+    if (i > 0) err = (sqrt(norm) - lambda) / lambda;
     lambda = sqrt(norm);
 
     normi = 1.0 / sqrt(norm);
     for (uint j = 0; j < N; j++)
       y[j] = Ay[j] * normi;
 
-    if (fabs(err) < 1e-12)
-      break;
+    if (fabs(err) < 1e-12) break;
   }
   free(Ay);
 
@@ -109,8 +107,7 @@ static int project(scalar *x, uint n, scalar *b, struct laplacian *L,
   comm_scan(out, c, gs_long, gs_add, &in, 1, buf);
   ulong ng = out[1][0];
 
-  if (ng == 0)
-    return 0;
+  if (ng == 0) return 0;
 
   scalar *z = (scalar *)tcalloc(scalar, 6 * n);
   scalar *w = z + n, *r = w + n, *p = r + n, *z0 = p + n, *dz = z0 + n;
@@ -127,8 +124,7 @@ static int project(scalar *x, uint n, scalar *b, struct laplacian *L,
 
   for (i = 0; i < n; i++)
     z[i] = r[i];
-  if (null_space)
-    ortho(z, n, ng, c);
+  if (null_space) ortho(z, n, ng, c);
   scalar rz1 = dot(z, z, n);
   comm_allreduce(c, gs_double, gs_add, &rz1, 1, buf);
 
@@ -158,8 +154,7 @@ static int project(scalar *x, uint n, scalar *b, struct laplacian *L,
     rr = dot(r, r, n);
     comm_allreduce(c, gs_double, gs_add, &rr, 1, buf);
 
-    if (rr < rtol || sqrt(rr) < tol)
-      break;
+    if (rr < rtol || sqrt(rr) < tol) break;
 
     for (j = 0; j < n; j++)
       z0[j] = z[j];
@@ -169,8 +164,7 @@ static int project(scalar *x, uint n, scalar *b, struct laplacian *L,
     metric_toc(c, RSB_PROJECT_MG);
 
     rzt = rz1;
-    if (null_space)
-      ortho(z, n, ng, c);
+    if (null_space) ortho(z, n, ng, c);
     rz1 = dot(r, z, n);
     comm_allreduce(c, gs_double, gs_add, &rz1, 1, buf);
 
@@ -343,8 +337,7 @@ static int inverse(scalar *y, struct array *elements, unsigned nv, scalar *z,
       }
     }
 
-    if (ppfi == 1)
-      break;
+    if (ppfi == 1) break;
   }
   metric_toc(gsc, RSB_INVERSE);
 
@@ -354,8 +347,7 @@ static int inverse(scalar *y, struct array *elements, unsigned nv, scalar *z,
     free(L);
   }
   mg_free(d);
-  if (err)
-    free(err);
+  if (err) free(err);
 
   return iters;
 }
@@ -367,8 +359,7 @@ static double sign(scalar a, scalar b) {
 
 static int tqli(scalar *eVectors, scalar *eValues, sint n, scalar *diagonal,
                 scalar *upper, int id) {
-  if (n == 0)
-    return 0;
+  if (n == 0) return 0;
 
   scalar *d = tcalloc(scalar, 2 * n), *e = d + n;
   sint i;
@@ -391,14 +382,12 @@ static int tqli(scalar *eVectors, scalar *eValues, sint n, scalar *diagonal,
       for (m = l; m < n - 1; m++) {
         scalar dd = fabs(d[m]) + fabs(d[m + 1]);
         /* Should use a tolerance for this check */
-        if (fabs(e[m]) / dd < SCALAR_TOL)
-          break;
+        if (fabs(e[m]) / dd < SCALAR_TOL) break;
       }
 
       if (m != l) {
         if (iter++ == 30) {
-          if (id == 0)
-            printf("Too many iterations.\n");
+          if (id == 0) printf("Too many iterations.\n");
           // vec_copy(*eValues, d);
           for (i = 0; i < n; i++)
             eValues[i] = d[i];
@@ -443,8 +432,7 @@ static int tqli(scalar *eVectors, scalar *eValues, sint n, scalar *diagonal,
           /* Done with eigenvectors */
         }
 
-        if (r < SCALAR_TOL && i >= l)
-          continue;
+        if (r < SCALAR_TOL && i >= l) continue;
 
         d[l] -= p;
         e[l] = g;
@@ -466,8 +454,7 @@ static int tqli(scalar *eVectors, scalar *eValues, sint n, scalar *diagonal,
     e[k] = 0;
     for (sint i = 0; i < n; i++)
       e[k] += eVectors[k * n + i] * eVectors[k * n + i];
-    if (e[k] > 0.0)
-      e[k] = sqrt(fabs(e[k]));
+    if (e[k] > 0.0) e[k] = sqrt(fabs(e[k]));
     scalar scale = 1.0 / e[k];
     for (sint i = 0; i < n; i++)
       eVectors[k * n + i] *= scale;
@@ -511,8 +498,7 @@ static int lanczos_aux(scalar *diag, scalar *upper, scalar *rr, uint lelt,
   for (iter = 0; iter < niter; iter++) {
     rtz2 = rtz1, rtz1 = rtr;
     beta = rtz1 / rtz2;
-    if (iter == 0)
-      beta = 0.0;
+    if (iter == 0) beta = 0.0;
 
     // add2s1(p,r,beta,n)
     for (i = 0; i < lelt; i++)
@@ -576,8 +562,7 @@ static int lanczos(scalar *fiedler, struct array *elements, unsigned nv,
   struct laplacian *wl = laplacian_init(elems, lelt, nv, GS, gsc, bfr);
   metric_toc(gsc, RSB_LANCZOS_SETUP);
 
-  if (nelg < miter)
-    miter = nelg;
+  if (nelg < miter) miter = nelg;
 
   scalar *alpha = tcalloc(scalar, 2 * miter - 1), *beta = alpha + miter;
   scalar *rr = tcalloc(scalar, (miter + 1) * lelt);
@@ -622,8 +607,7 @@ static int lanczos(scalar *fiedler, struct array *elements, unsigned nv,
 int fiedler(struct array *elements, int nv, const parrsb_options *const opts,
             struct comm *gsc, buffer *buf, int verbose) {
   // Return if the number of processes is equal to 1.
-  if (gsc->np == 1)
-    return 0;
+  if (gsc->np == 1) return 0;
 
   metric_tic(gsc, RSB_FIEDLER_SETUP);
   uint lelt = elements->n;
@@ -634,8 +618,7 @@ int fiedler(struct array *elements, int nv, const parrsb_options *const opts,
   scalar *initv = tcalloc(scalar, lelt);
   for (uint i = 0; i < lelt; i++) {
     initv[i] = start + i + 1.0;
-    if (start + i < nelg / 2)
-      initv[i] += 1000 * nelg;
+    if (start + i < nelg / 2) initv[i] += 1000 * nelg;
   }
 
   ortho(initv, lelt, nelg, gsc);
@@ -681,9 +664,7 @@ int fiedler(struct array *elements, int nv, const parrsb_options *const opts,
   for (uint i = 0; i < lelt; i++)
     elems[i].fiedler = f[i];
 
-  if (initv)
-    free(initv);
-  if (f)
-    free(f);
+  if (initv) free(initv);
+  if (f) free(f);
   return 0;
 }

@@ -58,8 +58,7 @@ static int compressPeriodicVertices(Mesh mesh, struct comm *c, buffer *bfr) {
 static ulong findMinBelowI(ulong min, uint I, struct array *arr) {
   struct mpair_t *ptr = (struct mpair_t *)arr->ptr;
   for (uint i = 0; i < I; i++)
-    if (ptr[i].orig == min)
-      return ptr[i].min;
+    if (ptr[i].orig == min) return ptr[i].min;
   return min;
 }
 
@@ -229,13 +228,11 @@ static int gatherMatchingPeriodicFaces(Mesh mesh, struct comm *c) {
 static int setPeriodicFaceCoordinates(Mesh mesh, struct comm *c, buffer *buf) {
   BoundaryFace bPtr = mesh->boundary.ptr;
   sint bSize = mesh->boundary.n;
-  if (bSize == 0)
-    return 0;
+  if (bSize == 0) return 0;
 
   Point ePtr = mesh->elements.ptr;
   sint eSize = mesh->elements.n;
-  if (eSize == 0)
-    return 0;
+  if (eSize == 0) return 0;
 
   /* Need boundary array to be sorted by elementId */
   sarray_sort(struct boundary_t, bPtr, bSize, elementId, 1, buf);

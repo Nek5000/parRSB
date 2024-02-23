@@ -140,8 +140,7 @@ void parrsb_get_part_stat(int *nc, int *ns, int *nss, int *nel, long long *vtx,
   comm_init(&comm, ce);
 
   uint np = comm.np;
-  if (np == 1)
-    return;
+  if (np == 1) return;
 
   size_t Npts = nelt * nv;
   slong *data = (slong *)malloc((Npts + 1) * sizeof(slong));
@@ -272,8 +271,7 @@ parrsb_cmd_line_opts *parrsb_parse_cmd_opts(int argc, char *argv[]) {
   size_t len;
   for (;;) {
     int c = getopt_long(argc, argv, "", long_options, NULL);
-    if (c == -1)
-      break;
+    if (c == -1) break;
 
     switch (c) {
     case 0:
@@ -314,8 +312,7 @@ parrsb_cmd_line_opts *parrsb_parse_cmd_opts(int argc, char *argv[]) {
 
 void parrsb_cmd_opts_free(parrsb_cmd_line_opts *opts) {
   if (opts) {
-    if (opts->mesh)
-      free(opts->mesh);
+    if (opts->mesh) free(opts->mesh);
     free(opts);
   }
 }
@@ -375,8 +372,7 @@ int parrsb_vector_dump(const char *fname, scalar *y, struct rsb_element *elm,
 
   int ndim = (nv == 8) ? 3 : 2;
   uint write_size = ((ndim + 1) * sizeof(double) + sizeof(slong)) * nelt;
-  if (rank == 0)
-    write_size += sizeof(long) + sizeof(int); // for nelgt and ndim
+  if (rank == 0) write_size += sizeof(long) + sizeof(int); // for nelgt and ndim
 
   char *bfr, *bfr0;
   bfr = bfr0 = (char *)calloc(write_size, sizeof(char));
