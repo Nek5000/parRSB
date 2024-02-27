@@ -122,7 +122,7 @@ static int balance_partitions(struct array *elements, unsigned nv,
   };
 
   // Calculate expected # of elements per processor.
-  uint ne = elements->n;
+  size_t ne = elements->n;
   slong nelgt = ne, nglob = ne, wrk;
   comm_allreduce(lc, gs_long, gs_add, &nelgt, 1, &wrk);
   comm_allreduce(gc, gs_long, gs_add, &nglob, 1, &wrk);
@@ -133,27 +133,26 @@ static int balance_partitions(struct array *elements, unsigned nv,
 
   // Setup gather-scatter.
   size_t size = ne * nv;
-  uint e, v;
   slong *ids = tcalloc(slong, size);
   struct rsb_element *elems = (struct rsb_element *)elements->ptr;
-  for (e = 0; e < ne; e++) {
-    for (v = 0; v < nv; v++)
+  for (uint e = 0; e < ne; e++) {
+    for (uint v = 0; v < nv; v++)
       ids[e * nv + v] = elems[e].vertices[v];
   }
   struct gs_data *gsh = gs_setup(ids, size, gc, 0, gs_pairwise, 0);
 
   sint *input = (sint *)ids;
   if (send_cnt > 0) {
-    for (e = 0; e < size; e++)
+    for (uint e = 0; e < size; e++)
       input[e] = 0;
   } else {
-    for (e = 0; e < size; e++)
+    for (uint e = 0; e < size; e++)
       input[e] = 1;
   }
 
   gs(input, gs_int, gs_add, 0, gsh, bfr);
 
-  for (e = 0; e < ne; e++)
+  for (uint e = 0; e < ne; e++)
     elems[e].proc = gc->id;
 
   sint sid = (send_cnt == 0) ? gc->id : INT_MAX;
@@ -168,8 +167,8 @@ static int balance_partitions(struct array *elements, unsigned nv,
 
     struct ielem_t ielem = {.orig = lc->id, .dest = -1};
     int mul = (sid == 0) ? 1 : -1;
-    for (e = 0; e < ne; e++) {
-      for (v = 0; v < nv; v++) {
+    for (uint e = 0; e < ne; e++) {
+      for (uint v = 0; v < nv; v++) {
         if (input[e * nv + v] > 0) {
           ielem.index = e, ielem.fiedler = mul * elems[e].fiedler;
           array_cat(struct ielem_t, &ielems, &ielem, 1);
@@ -191,7 +190,7 @@ static int balance_partitions(struct array *elements, unsigned nv,
     if (out[1][0] >= send_cnt) {
       balanced = 1;
       struct ielem_t *ptr = ielems.ptr;
-      for (e = 0; start + e < send_cnt && e < ielems.n; e++)
+      for (uint e = 0; start + e < send_cnt && e < ielems.n; e++)
         ptr[e].dest = sid + (start + e) / part_size;
 
       crystal_init(&cr, lc);
@@ -199,7 +198,7 @@ static int balance_partitions(struct array *elements, unsigned nv,
       crystal_free(&cr);
 
       ptr = ielems.ptr;
-      for (e = 0; e < ielems.n; e++)
+      for (uint e = 0; e < ielems.n; e++)
         if (ptr[e].dest != -1) elems[ptr[e].index].proc = ptr[e].dest;
     }
 
@@ -222,46 +221,6 @@ static int balance_partitions(struct array *elements, unsigned nv,
   }
 
   free(ids), gs_free(gsh);
-  return 0;
-}
-
-static int repair_partitions_v2(struct array *elems, unsigned nv,
-                                struct comm *tc, struct comm *lc, unsigned bin,
-                                unsigned algo, buffer *bfr) {
-  assert(check_bin_val(bin, lc) == 0);
-
-  sint nc = get_components_v2(NULL, elems, nv, tc, bfr, 0), wrk;
-  comm_allreduce(lc, gs_int, gs_max, &nc, 1, &wrk);
-  if (nc > 1) {
-    // If nc > 1, send elements back and do RCBx, RCBy and RCBz
-    struct crystal cr;
-    crystal_init(&cr, lc);
-    sarray_transfer(struct rsb_element, elems, proc, 0, &cr);
-    crystal_free(&cr);
-
-    // Do rcb or rib
-    unsigned ndim = (nv == 8) ? 3 : 2;
-    switch (algo) {
-    case 0:
-      parallel_sort(struct rsb_element, elems, globalId, gs_long, 0, 1, lc,
-                    bfr);
-      break;
-    case 1:
-      rcb(elems, sizeof(struct rsb_element), ndim, lc, bfr);
-      break;
-    case 2:
-      rib(elems, sizeof(struct rsb_element), ndim, lc, bfr);
-      break;
-    default:
-      break;
-    }
-
-    // And count number of components again. If nc > 1 still, set
-    // isconnected = 1
-    nc = get_components_v2(NULL, elems, nv, tc, bfr, 0);
-    comm_allreduce(lc, gs_int, gs_max, &nc, 1, &wrk);
-  }
-
   return 0;
 }
 
