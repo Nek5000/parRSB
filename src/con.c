@@ -275,8 +275,7 @@ int parrsb_conn_mesh(long long *vtx, double *coord, uint nelt, unsigned ndim,
   // Report timing info and finish
   {
     double gmin[8], gmax[8], buf[8];
-    for (unsigned i = 0; i < 8; i++)
-      gmax[i] = gmin[i] = duration[i];
+    for (unsigned i = 0; i < 8; i++) gmax[i] = gmin[i] = duration[i];
     comm_allreduce(&c, gs_double, gs_min, gmin, 8, buf);
     comm_allreduce(&c, gs_double, gs_max, gmax, 8, buf);
 

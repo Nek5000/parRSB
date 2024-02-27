@@ -30,8 +30,7 @@ static void update_probe_counts(struct hypercube *data, const struct comm *c) {
   gs_dom t = input->t[0];
 
   uint nprobes = data->nprobes;
-  for (uint i = 0; i < nprobes; i++)
-    data->probe_cnt[i] = 0;
+  for (uint i = 0; i < nprobes; i++) data->probe_cnt[i] = 0;
 
   struct array *a = input->a;
   for (uint e = 0; e < a->n; e++) {
@@ -84,8 +83,7 @@ static void transfer_elem(const struct hypercube *data, const struct comm *c) {
   uint *proc1 = set_proc_from_idx(lnp, lstart, lown, lelem);
   uint *proc2 = set_proc_from_idx(np - lnp, ustart, uppern, uelem);
   proc1 = trealloc(uint, proc1, size);
-  for (uint e = lown; e < size; e++)
-    proc1[e] = proc2[e - lown] + lnp;
+  for (uint e = lown; e < size; e++) proc1[e] = proc2[e - lown] + lnp;
 
   sarray_transfer_chunk(a, usize, proc1, c);
   free(proc1), free(proc2);

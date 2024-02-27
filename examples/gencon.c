@@ -21,8 +21,7 @@ static void test_parcon(unsigned int neltp, long long *vlp, char *name,
   struct gs_data *gsh = gs_setup(vls, size, &c, 0, gs_pairwise, 0);
 
   uint i;
-  for (i = 0; i < size; i++)
-    minp[i] = maxp[i] = vlp[i];
+  for (i = 0; i < size; i++) minp[i] = maxp[i] = vlp[i];
 
   buffer bfr;
   buffer_init(&bfr, 1024);
@@ -40,8 +39,7 @@ static void test_parcon(unsigned int neltp, long long *vlp, char *name,
 
   gsh = gs_setup(vlp, size, &c, 0, gs_pairwise, 0);
 
-  for (i = 0; i < size; i++)
-    minp[i] = maxp[i] = vls[i];
+  for (i = 0; i < size; i++) minp[i] = maxp[i] = vls[i];
 
   gs(minp, gs_long, gs_min, 0, gsh, &bfr);
   gs(maxp, gs_long, gs_max, 0, gsh, &bfr);

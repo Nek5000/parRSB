@@ -486,8 +486,7 @@ int parrsb_dump_map(char *name, unsigned nelt, unsigned nv, long long *vtx,
     memcpy(buf0, &rank, sizeof(int));
     buf0 += sizeof(int);
 
-    for (unsigned j = 0; j < nv; j++)
-      ivtx[j] = vtx[i * nv + j];
+    for (unsigned j = 0; j < nv; j++) ivtx[j] = vtx[i * nv + j];
     memcpy(buf0, ivtx, sizeof(int) * nv);
     buf0 += nv * sizeof(int);
   }

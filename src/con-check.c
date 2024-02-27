@@ -272,8 +272,7 @@ int element_check(Mesh mesh, struct comm *c, buffer *bfr) {
   uint i, j;
   int err = 0;
   for (i = 0; i < nelt && err == 0; i++) {
-    for (j = 0; j < nv; j++)
-      globalIds[j].id = ptr[i * nv + j].globalId + 1;
+    for (j = 0; j < nv; j++) globalIds[j].id = ptr[i * nv + j].globalId + 1;
 
     sarray_sort(LongID, globalIds, nv, id, 1, bfr);
 

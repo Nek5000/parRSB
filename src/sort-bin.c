@@ -28,8 +28,7 @@ static uint *set_proc_from_val(struct sort *s, uint field,
     }
     id++;
   } while (id < np && index < size);
-  for (; index < size; index++)
-    proc[index] = np - 1;
+  for (; index < size; index++) proc[index] = np - 1;
 
   return proc;
 }

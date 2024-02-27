@@ -21,8 +21,7 @@ uint get_components(sint *component, struct array *elems, unsigned nv,
   int null_input = (component == NULL);
   if (null_input) component = tcalloc(sint, nelt);
 
-  for (uint e = 0; e < nelt; e++)
-    component[e] = -1;
+  for (uint e = 0; e < nelt; e++) component[e] = -1;
 
   struct unmarked {
     uint index;
@@ -53,8 +52,7 @@ uint get_components(sint *component, struct array *elems, unsigned nv,
     if (bin == 1) {
       // Initialize p
       for (uint e = 0; e < arr.n; e++)
-        for (uint d = 0; d < nv; d++)
-          p[e * nv + d] = 0;
+        for (uint d = 0; d < nv; d++) p[e * nv + d] = 0;
 
       // Mark the first non-marked element as seed
       struct unmarked *ptr = (struct unmarked *)arr.ptr;
@@ -63,8 +61,7 @@ uint get_components(sint *component, struct array *elems, unsigned nv,
       comm_allreduce(&cc, gs_long, gs_min, &mfirst, 1, wrk);
 
       if (mfirst == first) {
-        for (uint d = 0; d < nv; d++)
-          p[0 * nv + d] = 1;
+        for (uint d = 0; d < nv; d++) p[0 * nv + d] = 1;
       }
 
       // Setup gs
@@ -89,8 +86,7 @@ uint get_components(sint *component, struct array *elems, unsigned nv,
           }
           // There was one non-zero vertex in the element
           if (d < nv) {
-            for (d = 0; d < nv; d++)
-              p[e * nv + d] = 1;
+            for (d = 0; d < nv; d++) p[e * nv + d] = 1;
           }
         }
 
@@ -156,8 +152,7 @@ static sint find_or_insert(struct array *cids, struct cmp_t *t) {
   pc[n] = t0, cids->n++;
 
   // Sanity check.
-  for (unsigned i = 1; i < cids->n; i++)
-    assert(pc[i - 1].c < pc[i].c);
+  for (unsigned i = 1; i < cids->n; i++) assert(pc[i - 1].c < pc[i].c);
 
   return -1;
 }
@@ -182,8 +177,7 @@ uint get_components_v2(sint *component, struct array *elems, unsigned nv,
   int null_input = (component == NULL);
   if (null_input) component = tcalloc(sint, nelt);
 
-  for (uint e = 0; e < nelt; e++)
-    component[e] = -1;
+  for (uint e = 0; e < nelt; e++) component[e] = -1;
 
   struct comm c;
   ulong nmkd = 0;
@@ -194,8 +188,7 @@ uint get_components_v2(sint *component, struct array *elems, unsigned nv,
     for (uint e = 0; e < nelt; e++) {
       if (component[e] == -1) {
         inds[unmkd] = e;
-        for (uint v = 0; v < nv; v++)
-          ids[unmkd * nv + v] = pe[e].vertices[v];
+        for (uint v = 0; v < nv; v++) ids[unmkd * nv + v] = pe[e].vertices[v];
         unmkd++;
       }
     }
@@ -206,13 +199,11 @@ uint get_components_v2(sint *component, struct array *elems, unsigned nv,
     slong nnzg = 0, ncg = 0;
     if (bin == 1) {
       // Mark the first unmarked element as seed for the component c.id.
-      for (uint v = 0; v < nv; v++)
-        p[0 * nv + v] = c.id;
+      for (uint v = 0; v < nv; v++) p[0 * nv + v] = c.id;
 
       // Initialize the rest of p.
       for (uint e = 1; e < unmkd; e++)
-        for (uint v = 0; v < nv; v++)
-          p[e * nv + v] = -1;
+        for (uint v = 0; v < nv; v++) p[e * nv + v] = -1;
 
       // Setup gather-scatter to do BFS.
       struct gs_data *gsh = gs_setup(ids, unmkd * nv, &c, 0, gs_pairwise, 0);
@@ -220,8 +211,7 @@ uint get_components_v2(sint *component, struct array *elems, unsigned nv,
       // Perform BFS.
       sint changed;
       do {
-        for (uint i = 0; i < unmkd * nv; i++)
-          p0[i] = p[i];
+        for (uint i = 0; i < unmkd * nv; i++) p0[i] = p[i];
 
         gs(p, gs_int, gs_max, 0, gsh, bfr);
 
@@ -242,8 +232,7 @@ uint get_components_v2(sint *component, struct array *elems, unsigned nv,
           // the element with that value.
           if (v0 > -1) {
             sint c = p[e * nv + v0];
-            for (uint v = 0; v < nv; v++)
-              p[e * nv + v] = c;
+            for (uint v = 0; v < nv; v++) p[e * nv + v] = c;
             nnz++;
           }
 

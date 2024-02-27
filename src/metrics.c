@@ -12,8 +12,7 @@ static double *stack;
 static uint stack_size;
 
 void metric_init(void) {
-  for (uint i = 0; i < MAXMETS; i++)
-    metrics[i] = 0.0;
+  for (uint i = 0; i < MAXMETS; i++) metrics[i] = 0.0;
   stack = tcalloc(double, MAXSIZE);
   stack_size = 0;
 }
@@ -55,15 +54,12 @@ static void metric_print_aux(double *wrk, struct comm *c) {
   double *buf = sum + MAXSIZE;
 
   uint max_size = stack_size * MAXMETS;
-  for (uint i = 0; i < max_size; i++) {
-    min[i] = max[i] = sum[i] = stack[i];
-  }
+  for (uint i = 0; i < max_size; i++) { min[i] = max[i] = sum[i] = stack[i]; }
 
   comm_allreduce(c, gs_double, gs_min, min, MAXSIZE, buf); // min
   comm_allreduce(c, gs_double, gs_max, max, MAXSIZE, buf); // max
   comm_allreduce(c, gs_double, gs_add, sum, MAXSIZE, buf); // sum
-  for (uint i = 0; i < max_size; i++)
-    sum[i] /= c->np;
+  for (uint i = 0; i < max_size; i++) sum[i] /= c->np;
 }
 
 #define SUMMARY(i, m)                                                          \

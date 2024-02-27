@@ -136,24 +136,20 @@ static int balance_partitions(struct array *elements, unsigned nv,
   slong *ids = tcalloc(slong, size);
   struct rsb_element *elems = (struct rsb_element *)elements->ptr;
   for (uint e = 0; e < ne; e++) {
-    for (uint v = 0; v < nv; v++)
-      ids[e * nv + v] = elems[e].vertices[v];
+    for (uint v = 0; v < nv; v++) ids[e * nv + v] = elems[e].vertices[v];
   }
   struct gs_data *gsh = gs_setup(ids, size, gc, 0, gs_pairwise, 0);
 
   sint *input = (sint *)ids;
   if (send_cnt > 0) {
-    for (uint e = 0; e < size; e++)
-      input[e] = 0;
+    for (uint e = 0; e < size; e++) input[e] = 0;
   } else {
-    for (uint e = 0; e < size; e++)
-      input[e] = 1;
+    for (uint e = 0; e < size; e++) input[e] = 1;
   }
 
   gs(input, gs_int, gs_add, 0, gsh, bfr);
 
-  for (uint e = 0; e < ne; e++)
-    elems[e].proc = gc->id;
+  for (uint e = 0; e < ne; e++) elems[e].proc = gc->id;
 
   sint sid = (send_cnt == 0) ? gc->id : INT_MAX;
   comm_allreduce(gc, gs_int, gs_min, &sid, 1, &wrk);
@@ -248,8 +244,7 @@ static uint get_level_cuts(const uint level, const uint levels,
 
   sint cuts = 0;
   uint pow2 = 1;
-  while (pow2 < n)
-    pow2 <<= 1, cuts++;
+  while (pow2 < n) pow2 <<= 1, cuts++;
 
   sint wrk;
   comm_allreduce(&comms[0], gs_int, gs_max, &cuts, 1, &wrk);
@@ -282,20 +277,14 @@ void rsb(struct array *elements, int nv, const parrsb_options *const options,
         parallel_sort(struct rsb_element, elements, globalId, gs_long, 0, 1,
                       &lc, bfr);
         break;
-      case 1:
-        rcb(elements, sizeof(struct rsb_element), ndim, &lc, bfr);
-        break;
-      case 2:
-        rib(elements, sizeof(struct rsb_element), ndim, &lc, bfr);
-        break;
-      default:
-        break;
+      case 1: rcb(elements, sizeof(struct rsb_element), ndim, &lc, bfr); break;
+      case 2: rib(elements, sizeof(struct rsb_element), ndim, &lc, bfr); break;
+      default: break;
       }
       metric_toc(&lc, RSB_PRE);
 
       struct rsb_element *const pe = (struct rsb_element *const)elements->ptr;
-      for (unsigned i = 0; i < elements->n; i++)
-        pe[i].proc = lc.id;
+      for (unsigned i = 0; i < elements->n; i++) pe[i].proc = lc.id;
 
       // Find the Fiedler vector.
       parrsb_print(gc, verbose - 1, "\trsb: level = %d, cut = %d, Fiedler ... ",

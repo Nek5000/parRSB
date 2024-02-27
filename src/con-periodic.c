@@ -49,8 +49,7 @@ static int compressPeriodicVertices(Mesh mesh, struct comm *c, buffer *bfr) {
   comm_scan(out, c, gs_long, gs_add, in, 1, buf);
   slong start = out[0][0];
 
-  for (i = 0; i < npoints; i++)
-    points[i].globalId += start;
+  for (i = 0; i < npoints; i++) points[i].globalId += start;
 
   return 0;
 }
@@ -70,43 +69,34 @@ static int renumberPeriodicVertices(Mesh mesh, struct comm *c,
         *mcur = tcalloc(slong, size1);
 
   struct point_t *pe = (struct point_t *)mesh->elements.ptr;
-  for (uint i = 0; i < size1; i++)
-    mids[i] = pe[i].globalId;
+  for (uint i = 0; i < size1; i++) mids[i] = pe[i].globalId;
   struct mpair_t *pm = (struct mpair_t *)matched->ptr;
-  for (uint i = 0; i < size2; i++)
-    mids[size1 + i] = pm[i].orig;
+  for (uint i = 0; i < size2; i++) mids[size1 + i] = pm[i].orig;
   struct gs_data *gsh = gs_setup(mids, size1 + size2, c, 0, gs_pairwise, 0);
 
-  for (uint i = 0; i < size1; i++)
-    mnew[i] = pe[i].globalId;
-  for (uint i = 0; i < size2; i++)
-    mnew[size1 + i] = pm[i].min;
+  for (uint i = 0; i < size1; i++) mnew[i] = pe[i].globalId;
+  for (uint i = 0; i < size2; i++) mnew[size1 + i] = pm[i].min;
   gs(mnew, gs_long, gs_min, 0, gsh, bfr);
 
   sint changed, wrk;
   do {
-    for (uint i = 0; i < size1; i++)
-      mcur[i] = mnew[i];
-    for (uint i = 0; i < size2; i++)
-      mids[size1 + size2 + i] = -mnew[size1 + i];
+    for (uint i = 0; i < size1; i++) mcur[i] = mnew[i];
+    for (uint i = 0; i < size2; i++) mids[size1 + size2 + i] = -mnew[size1 + i];
     struct gs_data *gsh1 =
         gs_setup(mids, size1 + 2 * size2, c, 0, gs_pairwise, 0);
 
     gs(mnew, gs_long, gs_min, 0, gsh1, bfr);
     gs_free(gsh1);
 
-    for (uint i = 0; i < size2; i++)
-      mnew[size1 + i] = mnew[size1 + size2 + i];
+    for (uint i = 0; i < size2; i++) mnew[size1 + i] = mnew[size1 + size2 + i];
     gs(mnew, gs_long, gs_min, 0, gsh, bfr);
 
     changed = 0;
-    for (uint i = 0; i < size1; i++)
-      changed += (mnew[i] != mcur[i]);
+    for (uint i = 0; i < size1; i++) changed += (mnew[i] != mcur[i]);
     comm_allreduce(c, gs_int, gs_max, &changed, 1, &wrk);
   } while (changed);
 
-  for (uint i = 0; i < size1; i++)
-    pe[i].globalId = mcur[i];
+  for (uint i = 0; i < size1; i++) pe[i].globalId = mcur[i];
 
   gs_free(gsh);
   free(mids), free(mnew), free(mcur);
@@ -249,8 +239,7 @@ static int setPeriodicFaceCoordinates(Mesh mesh, struct comm *c, buffer *buf) {
   sint i = 0, k = 0;
   int nv = mesh->nv, nvf = mesh->nv / 2, j;
   while (i < bSize) {
-    while (k < eSize && ePtr[k].elementId < bPtr[i].elementId)
-      k += nv;
+    while (k < eSize && ePtr[k].elementId < bPtr[i].elementId) k += nv;
     // copy vertices to boundary face
     if (k < eSize && ePtr[k].elementId == bPtr[i].elementId) {
       int faceId = bPtr[i].faceId;

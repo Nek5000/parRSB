@@ -50,8 +50,7 @@ static void find_nbrs_rsb(struct array *arr, const struct rsb_element *elems,
   array_init(struct nbr, arr, vertices.n * 10);
   while (s < vn) {
     e = s + 1;
-    while (e < vn && vptr[s].c == vptr[e].c)
-      e++;
+    while (e < vn && vptr[s].c == vptr[e].c) e++;
     for (i = s; i < e; i++) {
       t = vptr[i];
       for (j = s; j < e; j++) {
@@ -165,14 +164,12 @@ static int gs_weighted_init(struct laplacian *l, struct rsb_element *elems,
   slong *vertices = tcalloc(slong, npts);
   uint i, j;
   for (i = 0; i < lelt; i++)
-    for (j = 0; j < nv; j++)
-      vertices[i * nv + j] = elems[i].vertices[j];
+    for (j = 0; j < nv; j++) vertices[i * nv + j] = elems[i].vertices[j];
 
   struct gs_laplacian *gl = l->data = tcalloc(struct gs_laplacian, 1);
   gl->u = tcalloc(scalar, npts);
   for (i = 0; i < lelt; i++)
-    for (j = 0; j < nv; j++)
-      gl->u[nv * i + j] = 1.0;
+    for (j = 0; j < nv; j++) gl->u[nv * i + j] = 1.0;
 
   gl->gsh = gs_setup(vertices, npts, c, 0, gs_crystal_router, 0);
   gs(gl->u, gs_double, gs_add, 0, gl->gsh, buf);
@@ -180,8 +177,7 @@ static int gs_weighted_init(struct laplacian *l, struct rsb_element *elems,
   gl->diag = tcalloc(scalar, lelt);
   for (i = 0; i < lelt; i++) {
     gl->diag[i] = 0.0;
-    for (j = 0; j < nv; j++)
-      gl->diag[i] += gl->u[nv * i + j];
+    for (j = 0; j < nv; j++) gl->diag[i] += gl->u[nv * i + j];
   }
 
   if (vertices != NULL) free(vertices);
@@ -196,15 +192,13 @@ static int gs_weighted(scalar *v, struct laplacian *l, scalar *u, buffer *bfr) {
 
   uint i, j;
   for (i = 0; i < lelt; i++)
-    for (j = 0; j < nv; j++)
-      gl->u[nv * i + j] = u[i];
+    for (j = 0; j < nv; j++) gl->u[nv * i + j] = u[i];
 
   gs(gl->u, gs_double, gs_add, 0, gl->gsh, bfr);
 
   for (i = 0; i < lelt; i++) {
     v[i] = gl->diag[i] * u[i];
-    for (j = 0; j < nv; j++)
-      v[i] -= gl->u[nv * i + j];
+    for (j = 0; j < nv; j++) v[i] -= gl->u[nv * i + j];
   }
 
   return 0;
@@ -258,9 +252,7 @@ void laplacian_free(struct laplacian *l) {
   if (l) {
     if (l->type & CSR)
       par_csr_free(l);
-    else if (l->type & GS) {
-      gs_weighted_free(l);
-    }
+    else if (l->type & GS) { gs_weighted_free(l); }
     free(l);
   }
 }

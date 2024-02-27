@@ -51,8 +51,7 @@ uint parrsb_get_neighbors(const struct array *const elems, const unsigned nv,
   uint s = 0;
   while (s < vertices.n) {
     uint e = s + 1;
-    while (e < vertices.n && pv[s].v == pv[e].v)
-      e++;
+    while (e < vertices.n && pv[s].v == pv[e].v) e++;
     for (uint i = s; i < e; i++) {
       struct vertex_t vt = pv[i];
       for (uint j = s; j < e; j++) {
@@ -157,15 +156,13 @@ void parrsb_dump_stats(const struct comm *const gc, const struct comm *const lc,
       min[d] = (min[d] > c) ? c : min[d];
     }
   }
-  for (uint d = 0; d < ndim; d++)
-    centroid[d] /= n;
+  for (uint d = 0; d < ndim; d++) centroid[d] /= n;
 
   double wrk[3];
   comm_allreduce(lc, gs_double, gs_min, min, ndim, wrk);
   comm_allreduce(lc, gs_double, gs_max, max, ndim, wrk);
   comm_allreduce(lc, gs_double, gs_add, centroid, ndim, wrk);
-  for (uint d = 0; d < ndim; d++)
-    centroid[d] /= lc->np;
+  for (uint d = 0; d < ndim; d++) centroid[d] /= lc->np;
 
   // Partition root accumulates the partition geometry.
   level++;

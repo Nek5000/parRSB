@@ -28,8 +28,7 @@ static void get_rib_axis(char *elems, uint nel, size_t unit_size, int ndim,
   avg[2] /= nelg;
 
   double I[3][3];
-  for (i = 0; i < 3; i++)
-    I[i][0] = I[i][1] = I[i][2] = 0.0;
+  for (i = 0; i < 3; i++) I[i][0] = I[i][1] = I[i][2] = 0.0;
 
   double x, y, z;
   for (i = 0; i < nel; i++) {

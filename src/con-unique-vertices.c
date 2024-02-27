@@ -72,23 +72,15 @@ static void sort_segments_local(struct array *local, int dim) {
 
     if (s < npts - 1 && e - s > 1) {
       switch (dim) {
-      case 0:
-        tuple_sort(struct point_t, &pts[s], e - s, x[0]);
-        break;
-      case 1:
-        tuple_sort(struct point_t, &pts[s], e - s, x[1]);
-        break;
-      case 2:
-        tuple_sort(struct point_t, &pts[s], e - s, x[2]);
-        break;
-      default:
-        break;
+      case 0: tuple_sort(struct point_t, &pts[s], e - s, x[0]); break;
+      case 1: tuple_sort(struct point_t, &pts[s], e - s, x[1]); break;
+      case 2: tuple_sort(struct point_t, &pts[s], e - s, x[2]); break;
+      default: break;
       }
     }
 
     uint sum = 0;
-    for (uint i = s; i < e; i++)
-      sum += pts[i].ifSegment, pts[i].ifSegment = 0;
+    for (uint i = s; i < e; i++) sum += pts[i].ifSegment, pts[i].ifSegment = 0;
 
     if (sum > 0) pts[s].ifSegment = 1;
 
@@ -109,16 +101,14 @@ static void sort_segments_shared_aux(struct array *arr, int dim, struct comm *c,
   case 2:
     parallel_sort(struct point_t, arr, x[2], gs_double, 0, 1, c, bfr);
     break;
-  default:
-    break;
+  default: break;
   }
   parrsb_print(c, verbose, "\t\t\t\tsss_aux_parallel_sort: done.\n");
 
   // Mark the first point of the segment to have ifSegment = 1 and zero out
   // everything else.
   struct point_t *const pts = (struct point_t *const)arr->ptr;
-  for (uint i = 0; i < arr->n; i++)
-    pts[i].ifSegment = 0;
+  for (uint i = 0; i < arr->n; i++) pts[i].ifSegment = 0;
 
   sint wrk;
   sint rank = (arr->n > 0) ? c->id : c->np;
@@ -171,8 +161,7 @@ static uint find_bin_cr(const slong id, const struct comm *c, const int verbose,
     uint s = 0;
     while (s < arr.n) {
       uint e = s + 1;
-      for (; e < arr.n && pa[s].id == pa[e].id; e++)
-        pa[e].procm = pa[s].procm;
+      for (; e < arr.n && pa[s].id == pa[e].id; e++) pa[e].procm = pa[s].procm;
       s = e;
     }
   }
@@ -435,16 +424,14 @@ static void number_points(struct array *elems, const struct array *local,
   slong s = out[0][0], nl = out[1][0];
 
   struct point_t *pts = (struct point_t *)local->ptr;
-  for (uint i = 0; i < local->n; i++)
-    pts[i].pntid = s + i;
+  for (uint i = 0; i < local->n; i++) pts[i].pntid = s + i;
 
   in = shared->n;
   comm_scan(out, c, gs_long, gs_add, &in, 1, wrk);
   s = out[0][0] + nl;
 
   pts = (struct point_t *)shared->ptr;
-  for (uint i = 0; i < shared->n; i++)
-    pts[i].pntid = s + i;
+  for (uint i = 0; i < shared->n; i++) pts[i].pntid = s + i;
 
   // Copy everything back to elements array.
   elems->n = 0;
@@ -467,8 +454,7 @@ int find_unique_vertices(Mesh mesh, struct comm *c, scalar tol, int verbose,
   // points are a single segment.
   struct array *elems = &mesh->elements;
   struct point_t *pts = (struct point_t *)elems->ptr;
-  for (uint i = 0; i < elems->n; i++)
-    pts[i].ifSegment = pts[i].globalId = 0;
+  for (uint i = 0; i < elems->n; i++) pts[i].ifSegment = pts[i].globalId = 0;
 
   slong npts = elems->n, wrk;
   comm_allreduce(c, gs_long, gs_add, &npts, 1, &wrk);

@@ -139,8 +139,7 @@ static size_t load_balance(struct array *elist, uint nel, int nv,
       for (int v = 0; v < nv; v++)
         for (int n = 0; n < ndim; n++)
           pe->coord[n] += xyz[e * ndim * nv + v * ndim + n];
-      for (int n = 0; n < ndim; n++)
-        pe->coord[n] /= nv;
+      for (int n = 0; n < ndim; n++) pe->coord[n] /= nv;
     }
 
     array_cat_(unit_size, elist, pe, 1, __FILE__, __LINE__);
@@ -149,8 +148,7 @@ static size_t load_balance(struct array *elist, uint nel, int nv,
   if (vtx != NULL) { // RSB
     struct rsb_element *pr = (struct rsb_element *)elist->ptr;
     for (uint e = 0; e < nel; e++) {
-      for (int v = 0; v < nv; v++)
-        pr[e].vertices[v] = vtx[e * nv + v];
+      for (int v = 0; v < nv; v++) pr[e].vertices[v] = vtx[e * nv + v];
     }
   }
 
@@ -275,23 +273,15 @@ static void parrsb_part_mesh_v0(int *part, const long long *const vtx,
   if (elist.n > 0) {
     int ndim = (nv == 8) ? 3 : 2;
     switch (options->partitioner) {
-    case 0:
-      rsb(&elist, nv, options, comms, bfr);
-      break;
-    case 1:
-      rcb(&elist, esize, ndim, &ca, bfr);
-      break;
-    case 2:
-      rib(&elist, esize, ndim, &ca, bfr);
-      break;
-    default:
-      break;
+    case 0: rsb(&elist, nv, options, comms, bfr); break;
+    case 1: rcb(&elist, esize, ndim, &ca, bfr); break;
+    case 2: rib(&elist, esize, ndim, &ca, bfr); break;
+    default: break;
     }
   }
   comm_free(&ca);
 
-  for (uint l = 0; l < (uint)options->levels; l++)
-    comm_free(&comms[l]);
+  for (uint l = 0; l < (uint)options->levels; l++) comm_free(&comms[l]);
 
   parrsb_print(c, verbose, "parrsb_part_mesh_v0: restore original input");
   restore_original(part, cr, &elist, esize, bfr);
@@ -339,8 +329,7 @@ void parrsb_check_tagged_partitions(const long long *const eids,
     slong start = out[0][0];
 
     slong *lids = tcalloc(slong, nel);
-    for (uint i = 0; i < nel; i++)
-      lids[i] = start + i;
+    for (uint i = 0; i < nel; i++) lids[i] = start + i;
 
     gse = gs_setup(lids, nel, c, 0, gs_pairwise, 0);
     free(lids);
@@ -354,8 +343,7 @@ void parrsb_check_tagged_partitions(const long long *const eids,
   sint *mul = tcalloc(sint, size);
   {
     struct gs_data *gsl = gs_setup(vtx, size, &lc, 0, gs_pairwise, 0);
-    for (uint i = 0; i < size; i++)
-      mul[i] = 1;
+    for (uint i = 0; i < size; i++) mul[i] = 1;
     gs(mul, gs_int, gs_add, 0, gsl, &bfr);
     gs_free(gsl);
   }
@@ -374,8 +362,7 @@ void parrsb_check_tagged_partitions(const long long *const eids,
       gs(lmin, gs_int, gs_min, 0, gse, &bfr);
       gs(lmax, gs_int, gs_max, 0, gse, &bfr);
 
-      for (uint e = 0; e < nel; e++)
-        assert(lmin[e] == lmax[e]);
+      for (uint e = 0; e < nel; e++) assert(lmin[e] == lmax[e]);
     }
 
     free(lmin), free(lmax);
@@ -479,8 +466,7 @@ static void parrsb_part_mesh_v1(int *part, const long long *const vtx,
     for (uint i = 0, s = 0; i < unique.n; i++) {
       uint e = s + 1;
       assert(pt[s].tag == pu[i].tag);
-      while (e < tags.n && pt[e].tag == pu[i].tag)
-        e++;
+      while (e < tags.n && pt[e].tag == pu[i].tag) e++;
       for (uint j = s; j < e; j++)
         pt[j].p = chunk_size * pu[i].tagn + pt[i].seq % chunk_size;
       s = e;
@@ -568,8 +554,7 @@ static void parrsb_part_mesh_v1(int *part, const long long *const vtx,
     sarray_sort(struct element_t, elements.ptr, elements.n, seq, 0, bfr);
     const struct element_t *const pe =
         (const struct element_t *const)elements.ptr;
-    for (uint i = 0; i < nel; i++)
-      part[i] = pe[i].part;
+    for (uint i = 0; i < nel; i++) part[i] = pe[i].part;
   }
 
   array_free(&elements);
@@ -584,8 +569,7 @@ static void update_frontier(sint *const target, sint *const hop,
   if (*target >= 0) {
     // Check invariant: *hop < INT_MAX
     assert(*hop < INT_MAX);
-    for (uint i = 0; i < nv; i++)
-      frontier[i] = *target;
+    for (uint i = 0; i < nv; i++) frontier[i] = *target;
     return;
   }
 
@@ -623,8 +607,7 @@ static void update_frontier(sint *const target, sint *const hop,
     if (current_count > final_count) final_target = current_target;
 
     // Update frontier, target and hop.
-    for (uint j = 0; j < nv; j++)
-      frontier[j] = final_target;
+    for (uint j = 0; j < nv; j++) frontier[j] = final_target;
     *target = final_target, *hop = hid + 1;
   }
 
@@ -640,8 +623,7 @@ void parrsb_part_solid(int *part, const long long *const vtx2,
   parrsb_print(&c, 1, "Running greedy solid ... nel1 = %d nel2 = %d", nel1,
                nel2);
 
-  for (uint i = 0; i < nel2; i++)
-    part[i] = -1;
+  for (uint i = 0; i < nel2; i++) part[i] = -1;
 
   buffer bfr;
   buffer_init(&bfr, 1024);
@@ -673,10 +655,8 @@ void parrsb_part_solid(int *part, const long long *const vtx2,
   struct gs_data *gsh = NULL;
   {
     slong *vtx = tcalloc(slong, size);
-    for (size_t i = 0; i < size1; i++)
-      vtx[i] = vtx1[i];
-    for (size_t i = 0; i < size2; i++)
-      vtx[size1 + i] = vtx2[i];
+    for (size_t i = 0; i < size1; i++) vtx[i] = vtx1[i];
+    for (size_t i = 0; i < size2; i++) vtx[size1 + i] = vtx2[i];
 
     gsh = gs_setup(vtx, size, &c, 0, gs_pairwise, 0);
     free(vtx);
@@ -693,8 +673,7 @@ void parrsb_part_solid(int *part, const long long *const vtx2,
 
     sint *const component = tcalloc(sint, size);
     if (c.id + 1 == (uint)idmin) {
-      for (uint i = 0; i < nv; i++)
-        component[i] = 1;
+      for (uint i = 0; i < nv; i++) component[i] = 1;
     }
 
     slong marked0 = 0, marked1 = 1;
@@ -705,11 +684,9 @@ void parrsb_part_solid(int *part, const long long *const vtx2,
       marked0 = marked1, marked1 = 0;
       for (uint i = 0; i < nel1 + nel2; i++) {
         sint v = 0;
-        for (uint j = 0; j < nv; j++)
-          v += component[i * nv + j];
+        for (uint j = 0; j < nv; j++) v += component[i * nv + j];
         if (v > 0) {
-          for (uint j = 0; j < nv; j++)
-            component[i * nv + j] = 1;
+          for (uint j = 0; j < nv; j++) component[i * nv + j] = 1;
           marked1 += 1;
         }
       }
@@ -789,14 +766,10 @@ void parrsb_part_solid(int *part, const long long *const vtx2,
       assert(idmax >= 0);
 
       // Initialize frontier, target, and hop.
-      for (uint i = 0; i < size1; i++)
-        frontier[i] = id;
-      for (uint i = size1; i < size; i++)
-        frontier[i] = -1;
-      for (uint i = 0; i < nel1; i++)
-        target[i] = id, hop[i] = hid;
-      for (uint i = nel1; i < nelt; i++)
-        target[i] = -1, hop[i] = INT_MAX;
+      for (uint i = 0; i < size1; i++) frontier[i] = id;
+      for (uint i = size1; i < size; i++) frontier[i] = -1;
+      for (uint i = 0; i < nel1; i++) target[i] = id, hop[i] = hid;
+      for (uint i = nel1; i < nelt; i++) target[i] = -1, hop[i] = INT_MAX;
     }
 
     // Then perform a BFS till we assign all the elements in the solid mesh with
@@ -845,8 +818,7 @@ void parrsb_part_solid(int *part, const long long *const vtx2,
       sarray_sort(struct elem_t, arr.ptr, arr.n, hop, 1, &bfr);
       struct elem_t *const pa = (struct elem_t *const)arr.ptr;
       uint keep = MIN(nexp2 - nrecv2, arr.n);
-      for (uint i = 0; i < keep; i++)
-        pa[i].part = c.id;
+      for (uint i = 0; i < keep; i++) pa[i].part = c.id;
       nrecv2 += keep;
       // Check for invariant: nrecv2 <= nexp2.
       assert(nrecv2 <= nexp2);
@@ -858,8 +830,7 @@ void parrsb_part_solid(int *part, const long long *const vtx2,
       sarray_transfer(struct elem_t, &arr, target, 0, &cr);
 
       const struct elem_t *const pa = (const struct elem_t *const)arr.ptr;
-      for (uint j = 0; j < arr.n; j++)
-        part[pa[j].sequence] = pa[j].part;
+      for (uint j = 0; j < arr.n; j++) part[pa[j].sequence] = pa[j].part;
       arr.n = 0;
     }
 
