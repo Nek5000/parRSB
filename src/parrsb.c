@@ -195,7 +195,7 @@ static void initialize_node_aux(struct comm *c, const struct comm *const gc) {
 #endif
 }
 
-static void initialize_levels(struct comm *const comms, int *const levels_,
+static void initialize_levels(struct comm *const comms, int *const levels_in,
                               const struct comm *const c, const int verbose) {
   // Level 1 communicator is the global communicator.
   comm_dup(&comms[0], c);
@@ -205,11 +205,11 @@ static void initialize_levels(struct comm *const comms, int *const levels_,
 
   // Find the number of nodes under the global communicator and number of MPI
   // ranks in the node level communicator.
-  uint nnodes, nranks_per_node;
+  uint num_nodes, nranks_per_node;
   {
     sint in = (nc.id == 0), wrk;
     comm_allreduce(c, gs_int, gs_add, &in, 1, &wrk);
-    nnodes = in;
+    num_nodes = in;
 
     nranks_per_node = nc.np;
     // Check invariant: nranks_per_node should be the same across all the nodes.
@@ -221,47 +221,19 @@ static void initialize_levels(struct comm *const comms, int *const levels_,
     assert(nranks_per_node > 0);
     parrsb_print(c, verbose,
                  "initialize_levels: num_nodes = %u, num_ranks_per_node = %u",
-                 nnodes, nranks_per_node);
+                 num_nodes, nranks_per_node);
   }
 
-  // Check if there are custom levels specified by the user. Size of the
-  // partition (in terms of number of nodes) in a given level must be a
-  // multiple of the partition size of the next level.
-  sint levels;
-  uint sizes[2] = {nnodes, 1};
-  {
-    const uint size_max = sizeof(sizes) / sizeof(sizes[0]);
-    uint start = 1;
-    while (start < size_max && sizes[start] >= sizes[0])
-      start++;
-    while (start < size_max && sizes[0] % sizes[start])
-      ++start;
+  // Hardcode the maximum number of levels to two for now.
+  sint levels = 2;
+  uint sizes[2] = {num_nodes, 1};
 
-    uint level = 1;
-    for (; start < size_max; ++start, ++level)
-      sizes[level] = sizes[start];
-    // Set the size of the last partition to 1 (since it is the node level
-    // partitioner).
-    sizes[level - 1] = 1;
+  *levels_in = levels = MIN(levels, *levels_in);
 
-    // Check assert: sizes should be strictly decreasing.
-    for (uint i = 1; i < level; i++)
-      assert(sizes[i - 1] > sizes[i]);
-
-    levels = level;
-  }
-
-  for (sint level = 1; level < levels - 1; ++level) {
-    comm_split(&comms[level - 1],
-               comms[level - 1].id / (sizes[level] * nranks_per_node),
-               comms[level - 1].id, &comms[level]);
-  }
-  levels = MIN(levels, *levels_);
   if (levels > 1) comm_dup(&comms[levels - 1], &nc);
-  *levels_ = levels;
-  parrsb_print(c, verbose, "initialize_levels: levels = %u", levels);
-
   comm_free(&nc);
+
+  parrsb_print(c, verbose, "initialize_levels: levels = %u", levels);
 }
 
 static void parrsb_part_mesh_v0(int *part, const long long *const vtx,
