@@ -28,8 +28,7 @@ static void get_rib_axis(char *elems, uint nel, size_t unit_size, int ndim,
   avg[2] /= nelg;
 
   double I[3][3];
-  for (i = 0; i < 3; i++)
-    I[i][0] = I[i][1] = I[i][2] = 0.0;
+  for (i = 0; i < 3; i++) I[i][0] = I[i][1] = I[i][2] = 0.0;
 
   double x, y, z;
   for (i = 0; i < nel; i++) {
@@ -42,8 +41,7 @@ static void get_rib_axis(char *elems, uint nel, size_t unit_size, int ndim,
     I[2][0] += z * x, I[2][1] += z * y, I[2][2] += z * z;
   }
 
-  if (c != NULL)
-    comm_allreduce(c, gs_double, gs_add, I, 9, buf);
+  if (c != NULL) comm_allreduce(c, gs_double, gs_add, I, 9, buf);
 
   double ev[3];                           // ev[2] = 0 if 2D
   power_serial(ev, ndim, (double *)I, 0); // FIXME: 2D does not work
@@ -60,8 +58,7 @@ static void get_rib_axis(char *elems, uint nel, size_t unit_size, int ndim,
 void rib_local(struct array *a, size_t unit_size, uint start, uint end,
                int ndim, buffer *buf) {
   sint size = end - start;
-  if (size <= 1)
-    return;
+  if (size <= 1) return;
 
   char *st = (char *)a->ptr + unit_size * start;
   get_rib_axis(st, size, unit_size, ndim, NULL);
@@ -78,8 +75,7 @@ void rib_local(struct array *a, size_t unit_size, uint start, uint end,
 
 static int rib_level(struct array *a, size_t unit_size, int ndim,
                      struct comm *c, buffer *bfr) {
-  if (c->np == 1)
-    return 0;
+  if (c->np == 1) return 0;
 
   get_rib_axis((char *)a->ptr, a->n, unit_size, ndim, c);
 

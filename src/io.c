@@ -300,8 +300,7 @@ static int read_connectivity(unsigned int *nelt_, unsigned *nv_,
 
   size_t read_size = nelt * (nv + 1) * sizeof(int);
   size_t header_size = GC_CO2_HEADER_LEN + sizeof(float);
-  if (rank == 0)
-    read_size += header_size;
+  if (rank == 0) read_size += header_size;
 
   buf = (char *)realloc(buf, read_size * sizeof(char));
   err = MPI_File_read_ordered(file, buf, read_size, MPI_BYTE, &st);
@@ -388,8 +387,7 @@ int parrsb_dump_con(char *name, unsigned nelt, unsigned nv, long long *vl,
 
   int write_size = nelt * (nv + 1) * sizeof(int);
   int header_size = GC_CO2_HEADER_LEN + sizeof(float);
-  if (id == 0)
-    write_size += header_size;
+  if (id == 0) write_size += header_size;
 
   char *buf = (char *)calloc(write_size, sizeof(char));
   char *buf0 = buf;
@@ -471,8 +469,7 @@ int parrsb_dump_map(char *name, unsigned nelt, unsigned nv, long long *vtx,
   }
 
   int writeSize = 0;
-  if (rank == 0)
-    writeSize = HEADER_LEN * sizeof(char) + sizeof(float);
+  if (rank == 0) writeSize = HEADER_LEN * sizeof(char) + sizeof(float);
   writeSize += (nv + 1) * nelt * sizeof(int);
 
   char *buf = (char *)calloc(writeSize, sizeof(char));
@@ -489,8 +486,7 @@ int parrsb_dump_map(char *name, unsigned nelt, unsigned nv, long long *vtx,
     memcpy(buf0, &rank, sizeof(int));
     buf0 += sizeof(int);
 
-    for (unsigned j = 0; j < nv; j++)
-      ivtx[j] = vtx[i * nv + j];
+    for (unsigned j = 0; j < nv; j++) ivtx[j] = vtx[i * nv + j];
     memcpy(buf0, ivtx, sizeof(int) * nv);
     buf0 += nv * sizeof(int);
   }

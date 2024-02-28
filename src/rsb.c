@@ -52,11 +52,9 @@ static void check_rsb_partition(const struct comm *gc,
     sint converged = 1;
     int val = (int)metric_get_value(i, RSB_FIEDLER_CALC_NITER);
     if (opts->rsb_algo == 0) {
-      if (val == miter * mpass)
-        converged = 0;
+      if (val == miter * mpass) converged = 0;
     } else if (opts->rsb_algo == 1) {
-      if (val == mpass)
-        converged = 0;
+      if (val == mpass) converged = 0;
     }
 
     struct comm c;
@@ -104,25 +102,18 @@ static void check_rsb_partition(const struct comm *gc,
   }
 }
 
-static int check_bin_val(int bin, struct comm *c) {
-  if (bin < 0 || bin > 1) {
-    if (c->id == 0) {
-      printf("%s:%d bin value out of range: %d\n", __FILE__, __LINE__, bin);
-      fflush(stdout);
-    }
-    return 1;
-  }
+static inline int check_bin_val(int bin) {
+  if (bin < 0 || bin > 1) return 1;
   return 0;
 }
 
 static int balance_partitions(struct array *elements, unsigned nv,
                               struct comm *lc, struct comm *gc, int bin,
                               buffer *bfr) {
-  // Return if there is only one processor.
-  if (gc->np == 1)
-    return 0;
+  // Return if there is only one processor (or partition).
+  if (gc->np == 1 || gc->np == lc->np) return 0;
 
-  assert(check_bin_val(bin, gc) == 0);
+  assert(check_bin_val(bin) == 0 && "Invalid bin value !");
 
   struct ielem_t {
     uint index, orig;
@@ -131,54 +122,49 @@ static int balance_partitions(struct array *elements, unsigned nv,
   };
 
   // Calculate expected # of elements per processor.
-  uint ne = elements->n;
+  size_t ne = elements->n;
   slong nelgt = ne, nglob = ne, wrk;
   comm_allreduce(lc, gs_long, gs_add, &nelgt, 1, &wrk);
   comm_allreduce(gc, gs_long, gs_add, &nglob, 1, &wrk);
 
   sint ne_ = nglob / gc->np, nrem = nglob - ne_ * gc->np;
   slong nelgt_exp = ne_ * lc->np + nrem / 2 + (nrem % 2) * (1 - bin);
-  slong send_cnt = nelgt - nelgt_exp > 0 ? nelgt - nelgt_exp : 0;
+  slong send_cnt = (nelgt - nelgt_exp) > 0 ? (nelgt - nelgt_exp) : 0;
 
   // Setup gather-scatter.
   size_t size = ne * nv;
-  uint e, v;
   slong *ids = tcalloc(slong, size);
   struct rsb_element *elems = (struct rsb_element *)elements->ptr;
-  for (e = 0; e < ne; e++) {
-    for (v = 0; v < nv; v++)
-      ids[e * nv + v] = elems[e].vertices[v];
+  for (uint e = 0; e < ne; e++) {
+    for (uint v = 0; v < nv; v++) ids[e * nv + v] = elems[e].vertices[v];
   }
   struct gs_data *gsh = gs_setup(ids, size, gc, 0, gs_pairwise, 0);
 
   sint *input = (sint *)ids;
   if (send_cnt > 0) {
-    for (e = 0; e < size; e++)
-      input[e] = 0;
+    for (uint e = 0; e < size; e++) input[e] = 0;
   } else {
-    for (e = 0; e < size; e++)
-      input[e] = 1;
+    for (uint e = 0; e < size; e++) input[e] = 1;
   }
 
   gs(input, gs_int, gs_add, 0, gsh, bfr);
 
-  for (e = 0; e < ne; e++)
-    elems[e].proc = gc->id;
+  for (uint e = 0; e < ne; e++) elems[e].proc = gc->id;
 
-  sint sid = (send_cnt == 0) ? gc->id : INT_MAX, balanced = 0;
+  sint sid = (send_cnt == 0) ? gc->id : INT_MAX;
   comm_allreduce(gc, gs_int, gs_min, &sid, 1, &wrk);
 
   struct crystal cr;
+  sint balanced = 0;
 
   if (send_cnt > 0) {
     struct array ielems;
     array_init(struct ielem_t, &ielems, 10);
 
-    struct ielem_t ielem = {
-        .index = 0, .orig = lc->id, .dest = -1, .fiedler = 0};
+    struct ielem_t ielem = {.orig = lc->id, .dest = -1};
     int mul = (sid == 0) ? 1 : -1;
-    for (e = 0; e < ne; e++) {
-      for (v = 0; v < nv; v++) {
+    for (uint e = 0; e < ne; e++) {
+      for (uint v = 0; v < nv; v++) {
         if (input[e * nv + v] > 0) {
           ielem.index = e, ielem.fiedler = mul * elems[e].fiedler;
           array_cat(struct ielem_t, &ielems, &ielem, 1);
@@ -200,7 +186,7 @@ static int balance_partitions(struct array *elements, unsigned nv,
     if (out[1][0] >= send_cnt) {
       balanced = 1;
       struct ielem_t *ptr = ielems.ptr;
-      for (e = 0; start + e < send_cnt && e < ielems.n; e++)
+      for (uint e = 0; start + e < send_cnt && e < ielems.n; e++)
         ptr[e].dest = sid + (start + e) / part_size;
 
       crystal_init(&cr, lc);
@@ -208,9 +194,8 @@ static int balance_partitions(struct array *elements, unsigned nv,
       crystal_free(&cr);
 
       ptr = ielems.ptr;
-      for (e = 0; e < ielems.n; e++)
-        if (ptr[e].dest != -1)
-          elems[ptr[e].index].proc = ptr[e].dest;
+      for (uint e = 0; e < ielems.n; e++)
+        if (ptr[e].dest != -1) elems[ptr[e].index].proc = ptr[e].dest;
     }
 
     array_free(&ielems);
@@ -235,83 +220,34 @@ static int balance_partitions(struct array *elements, unsigned nv,
   return 0;
 }
 
-static int repair_partitions_v2(struct array *elems, unsigned nv,
-                                struct comm *tc, struct comm *lc, unsigned bin,
-                                unsigned algo, buffer *bfr) {
-  assert(check_bin_val(bin, lc) == 0);
-
-  sint nc = get_components_v2(NULL, elems, nv, tc, bfr, 0), wrk;
-  comm_allreduce(lc, gs_int, gs_max, &nc, 1, &wrk);
-  if (nc > 1) {
-    // If nc > 1, send elements back and do RCBx, RCBy and RCBz
-    struct crystal cr;
-    crystal_init(&cr, lc);
-    sarray_transfer(struct rsb_element, elems, proc, 0, &cr);
-    crystal_free(&cr);
-
-    // Do rcb or rib
-    unsigned ndim = (nv == 8) ? 3 : 2;
-    switch (algo) {
-    case 0:
-      parallel_sort(struct rsb_element, elems, globalId, gs_long, 0, 1, lc,
-                    bfr);
-      break;
-    case 1:
-      rcb(elems, sizeof(struct rsb_element), ndim, lc, bfr);
-      break;
-    case 2:
-      rib(elems, sizeof(struct rsb_element), ndim, lc, bfr);
-      break;
-    default:
-      break;
-    }
-
-    // And count number of components again. If nc > 1 still, set
-    // isconnected = 1
-    nc = get_components_v2(NULL, elems, nv, tc, bfr, 0);
-    comm_allreduce(lc, gs_int, gs_max, &nc, 1, &wrk);
-  }
-
-  return 0;
-}
-
-static sint get_bisect_comm(struct comm *const tc, const struct comm *const lc,
-                            const uint level, const uint levels,
-                            const struct comm comms[3]) {
-  sint pid, psize;
+static sint get_bin(const struct comm *const lc, const uint level,
+                    const uint levels, const struct comm comms[3]) {
+  sint psize = lc->np, pid = lc->id;
   if (level < levels - 1) {
     sint out[2][1], wrk[2][1], in = (comms[level + 1].id == 0);
-    comm_scan(out, &comms[level], gs_int, gs_add, &in, 1, wrk);
+    comm_scan(out, lc, gs_int, gs_add, &in, 1, wrk);
     psize = out[1][0], pid = (comms[level + 1].id == 0) * out[0][0];
     comm_allreduce(&comms[level + 1], gs_int, gs_max, &pid, 1, wrk);
-  } else {
-    psize = lc->np, pid = lc->id;
   }
 
-  const sint bin = (pid >= (psize + 1) / 2);
-  comm_split(lc, bin, lc->id, tc);
-  return bin;
+  return (pid >= (psize + 1) / 2);
 }
 
 static uint get_level_cuts(const uint level, const uint levels,
                            const struct comm comms[3]) {
-  uint n;
+  uint n = comms[level].np;
   if (level < levels - 1) {
     sint size = (comms[level + 1].id == 0), wrk;
     comm_allreduce(&comms[level], gs_int, gs_add, &size, 1, &wrk);
     n = size;
-  } else {
-    n = comms[level].np;
   }
 
   sint cuts = 0;
   uint pow2 = 1;
-  while (pow2 < n)
-    pow2 <<= 1, cuts++;
+  while (pow2 < n) pow2 <<= 1, cuts++;
 
   sint wrk;
   comm_allreduce(&comms[0], gs_int, gs_max, &cuts, 1, &wrk);
-
   return cuts;
 }
 
@@ -331,7 +267,9 @@ void rsb(struct array *elements, int nv, const parrsb_options *const options,
     comm_dup(&lc, &comms[level]);
     for (uint cut = 0; cut < ncuts; cut++) {
       // Run the pre-partitioner.
-      parrsb_print(gc, verbose - 1, "\trsb: Pre-partition ...");
+      parrsb_print(gc, verbose - 1,
+                   "\trsb: level = %d, cut = %d, Pre-partition ...", level + 1,
+                   cut + 1);
 
       metric_tic(&lc, RSB_PRE);
       switch (options->rsb_pre) {
@@ -339,40 +277,41 @@ void rsb(struct array *elements, int nv, const parrsb_options *const options,
         parallel_sort(struct rsb_element, elements, globalId, gs_long, 0, 1,
                       &lc, bfr);
         break;
-      case 1:
-        rcb(elements, sizeof(struct rsb_element), ndim, &lc, bfr);
-        break;
-      case 2:
-        rib(elements, sizeof(struct rsb_element), ndim, &lc, bfr);
-        break;
-      default:
-        break;
+      case 1: rcb(elements, sizeof(struct rsb_element), ndim, &lc, bfr); break;
+      case 2: rib(elements, sizeof(struct rsb_element), ndim, &lc, bfr); break;
+      default: break;
       }
       metric_toc(&lc, RSB_PRE);
 
       struct rsb_element *const pe = (struct rsb_element *const)elements->ptr;
-      for (unsigned i = 0; i < elements->n; i++)
-        pe[i].proc = lc.id;
+      for (unsigned i = 0; i < elements->n; i++) pe[i].proc = lc.id;
 
       // Find the Fiedler vector.
-      parrsb_print(gc, verbose - 1, "\trsb: Fiedler ... ");
+      parrsb_print(gc, verbose - 1, "\trsb: level = %d, cut = %d, Fiedler ... ",
+                   level + 1, cut + 1);
       metric_tic(&lc, RSB_FIEDLER);
       fiedler(elements, nv, options, &lc, bfr, verbose - 2);
       metric_toc(&lc, RSB_FIEDLER);
 
-      // Sort by Fiedler vector.
-      parrsb_print(gc, verbose - 1, "\trsb: Sort ...");
+      // Sort by Fiedler value.
+      parrsb_print(gc, verbose - 1, "\trsb: level = %d, cut = %d, Sort ...",
+                   level + 1, cut + 1);
       metric_tic(&lc, RSB_SORT);
       parallel_sort(struct rsb_element, elements, fiedler, gs_double, 0, 1, &lc,
                     bfr);
       metric_toc(&lc, RSB_SORT);
 
-      // `tc` is the new communicator in newly found partitions.
+      // Get the bin of the current process.
+      sint bin = get_bin(&lc, level, levels, comms);
+
+      // Create the new communicator `tc`.
       struct comm tc;
-      sint bin = get_bisect_comm(&tc, &lc, level, levels, comms);
+      comm_split(&lc, bin, lc.id, &tc);
 
       // Find the number of disconnected components.
-      parrsb_print(gc, verbose - 1, "\trsb: Components ...");
+      parrsb_print(gc, verbose - 1,
+                   "\trsb: level = %d, cut = %d, Components ...", level + 1,
+                   cut + 1);
       metric_tic(&lc, RSB_COMPONENTS);
       const uint ncomp =
           get_components_v2(NULL, elements, nv, &tc, bfr, verbose - 2);
@@ -380,13 +319,15 @@ void rsb(struct array *elements, int nv, const parrsb_options *const options,
       metric_toc(&lc, RSB_COMPONENTS);
 
       // Bisect and balance.
-      parrsb_print(gc, verbose - 1, "\trsb: Balance ...");
+      parrsb_print(gc, verbose - 1, "\trsb: level = %d, cut = %d, Balance ...",
+                   level + 1, cut + 1);
       metric_tic(&lc, RSB_BALANCE);
       balance_partitions(elements, nv, &tc, &lc, bin, bfr);
       metric_toc(&lc, RSB_BALANCE);
 
       // Split the communicator and recurse on the sub-problems.
-      parrsb_print(gc, verbose - 1, "\trsb: Bisect ...");
+      parrsb_print(gc, verbose - 1, "\trsb: level = %d, cut = %d, Bisect ...",
+                   level + 1, cut + 1);
       comm_free(&lc), comm_dup(&lc, &tc), comm_free(&tc);
 
       const uint nbrs = parrsb_get_neighbors(elements, nv, gc, &lc, bfr);

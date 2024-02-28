@@ -17,8 +17,7 @@ static void tuple_sort_(void *ra, uint n, uint usize, uint offset) {
 
 #define get(ra_, l_) (*((double *)((char *)ra_ + (l_ - 1) * usize + offset)))
 
-  if (n < 2)
-    return;
+  if (n < 2) return;
   l = n / 2 + 1;
   ir = n;
 
@@ -38,8 +37,7 @@ static void tuple_sort_(void *ra, uint n, uint usize, uint offset) {
     i = l;
     j = l + l;
     while (j <= ir) {
-      if (j < ir && get(ra, j) < get(ra, j + 1))
-        j++;
+      if (j < ir && get(ra, j) < get(ra, j + 1)) j++;
       assert(j >= 1 && j <= n && "j2");
       assert(i >= 1 && i <= n && "i");
       if (get(rra, 1) < get(ra, j)) {
@@ -64,8 +62,7 @@ static void tuple_sort_(void *ra, uint n, uint usize, uint offset) {
 
 static void sort_segments_local(struct array *local, int dim) {
   uint npts = local->n;
-  if (npts == 0)
-    return;
+  if (npts == 0) return;
 
   struct point_t *const pts = (struct point_t *const)local->ptr;
   uint s = 0, e;
@@ -75,26 +72,17 @@ static void sort_segments_local(struct array *local, int dim) {
 
     if (s < npts - 1 && e - s > 1) {
       switch (dim) {
-      case 0:
-        tuple_sort(struct point_t, &pts[s], e - s, x[0]);
-        break;
-      case 1:
-        tuple_sort(struct point_t, &pts[s], e - s, x[1]);
-        break;
-      case 2:
-        tuple_sort(struct point_t, &pts[s], e - s, x[2]);
-        break;
-      default:
-        break;
+      case 0: tuple_sort(struct point_t, &pts[s], e - s, x[0]); break;
+      case 1: tuple_sort(struct point_t, &pts[s], e - s, x[1]); break;
+      case 2: tuple_sort(struct point_t, &pts[s], e - s, x[2]); break;
+      default: break;
       }
     }
 
     uint sum = 0;
-    for (uint i = s; i < e; i++)
-      sum += pts[i].ifSegment, pts[i].ifSegment = 0;
+    for (uint i = s; i < e; i++) sum += pts[i].ifSegment, pts[i].ifSegment = 0;
 
-    if (sum > 0)
-      pts[s].ifSegment = 1;
+    if (sum > 0) pts[s].ifSegment = 1;
 
     s = e;
   }
@@ -113,23 +101,20 @@ static void sort_segments_shared_aux(struct array *arr, int dim, struct comm *c,
   case 2:
     parallel_sort(struct point_t, arr, x[2], gs_double, 0, 1, c, bfr);
     break;
-  default:
-    break;
+  default: break;
   }
   parrsb_print(c, verbose, "\t\t\t\tsss_aux_parallel_sort: done.\n");
 
   // Mark the first point of the segment to have ifSegment = 1 and zero out
   // everything else.
   struct point_t *const pts = (struct point_t *const)arr->ptr;
-  for (uint i = 0; i < arr->n; i++)
-    pts[i].ifSegment = 0;
+  for (uint i = 0; i < arr->n; i++) pts[i].ifSegment = 0;
 
   sint wrk;
   sint rank = (arr->n > 0) ? c->id : c->np;
   comm_allreduce(c, gs_int, gs_min, &rank, 1, &wrk);
 
-  if ((sint)c->id == rank)
-    pts[0].ifSegment = 1;
+  if ((sint)c->id == rank) pts[0].ifSegment = 1;
 
   parrsb_print(c, verbose, "\t\t\t\tsss_aux_mark_first_point: done.");
 }
@@ -176,8 +161,7 @@ static uint find_bin_cr(const slong id, const struct comm *c, const int verbose,
     uint s = 0;
     while (s < arr.n) {
       uint e = s + 1;
-      for (; e < arr.n && pa[s].id == pa[e].id; e++)
-        pa[e].procm = pa[s].procm;
+      for (; e < arr.n && pa[s].id == pa[e].id; e++) pa[e].procm = pa[s].procm;
       s = e;
     }
   }
@@ -215,8 +199,7 @@ static void sort_segments_shared(struct array *shared, int dim, struct comm *c,
     sum += pts[0].ifSegment;
     array_cat(struct point_t, &segments[ngids - 1], &pts[0], 1);
     for (uint i = 1; i < shared->n; i++) {
-      if (pts[i].ifSegment > 0)
-        gids[1] = pts[i].globalId, ngids++;
+      if (pts[i].ifSegment > 0) gids[1] = pts[i].globalId, ngids++;
       sum += pts[i].ifSegment;
       array_cat(struct point_t, &segments[ngids - 1], &pts[i], 1);
     }
@@ -230,8 +213,7 @@ static void sort_segments_shared(struct array *shared, int dim, struct comm *c,
   // algo = 2 is a custom crystal router implementation.
   int algo = 0;
   char *val = getenv("PARRSB_FIND_BIN_ALGO");
-  if (val)
-    algo = atoi(val);
+  if (val) algo = atoi(val);
   assert(algo >= 0 && algo <= 2);
 
   // We sort the shared segments in two phases. All the segments having an even
@@ -285,8 +267,7 @@ static int talk_to_neighbor(struct point_t *pnt, const struct array *arr,
                             int dir, const struct comm *c) {
   assert(dir == -1 || dir == 1);
 
-  if (c->np <= 1)
-    return 0;
+  if (c->np <= 1) return 0;
 
   struct comm active;
   comm_split(c, arr->n > 0, c->id, &active);
@@ -312,8 +293,7 @@ static int talk_to_neighbor(struct point_t *pnt, const struct array *arr,
   sarray_transfer(struct point_t, &tmp, proc, 1, &cr);
   crystal_free(&cr);
 
-  if (tmp.n == 0)
-    return 0;
+  if (tmp.n == 0) return 0;
 
   pts = (struct point_t *)tmp.ptr, pnt[0] = pts[0];
   array_free(&tmp), comm_free(&active);
@@ -327,8 +307,7 @@ static void find_segments(struct array *arr, int i, scalar tol2,
     scalar d = diff_sqr(pts[j].x[i], pts[j - 1].x[i]);
     scalar dx = MIN(pts[j].dx, pts[j - 1].dx) * tol2;
 
-    if (d > dx)
-      pts[j].ifSegment = 1;
+    if (d > dx) pts[j].ifSegment = 1;
   }
 
   struct point_t pnt;
@@ -336,8 +315,7 @@ static void find_segments(struct array *arr, int i, scalar tol2,
   if (npts > 0) { // npts > 0 --> arr->n > 0
     scalar d = diff_sqr(pnt.x[i], pts[0].x[i]);
     scalar dx = MIN(pnt.dx, pts[0].dx) * tol2;
-    if (d > dx)
-      pts[0].ifSegment = 1;
+    if (d > dx) pts[0].ifSegment = 1;
   }
 }
 
@@ -345,8 +323,7 @@ static inline void remove_marked(struct array *arr) {
   struct point_t *pts = (struct point_t *)arr->ptr;
   uint count = 0;
   for (uint i = 0; i < arr->n; i++) {
-    if (pts[i].ifSegment != -1)
-      pts[count] = pts[i], count++;
+    if (pts[i].ifSegment != -1) pts[count] = pts[i], count++;
   }
   arr->n = count;
 }
@@ -404,8 +381,7 @@ static slong number_segments(struct array *local, struct array *shared,
   struct point_t *pts = (struct point_t *)local->ptr;
   uint lcnt = 0;
   for (uint i = 0; i < local->n; i++) {
-    if (pts[i].ifSegment)
-      lcnt++;
+    if (pts[i].ifSegment) lcnt++;
   }
 
   slong out[2][1], wrk[2][1], in = lcnt;
@@ -414,8 +390,7 @@ static slong number_segments(struct array *local, struct array *shared,
 
   ls--;
   for (uint i = 0; i < local->n; i++) {
-    if (pts[i].ifSegment)
-      ls++;
+    if (pts[i].ifSegment) ls++;
     assert(ls >= 0);
     pts[i].globalId = ls;
   }
@@ -423,8 +398,7 @@ static slong number_segments(struct array *local, struct array *shared,
   uint scnt = 0;
   pts = (struct point_t *)shared->ptr;
   for (uint i = 0; i < shared->n; i++) {
-    if (pts[i].ifSegment)
-      scnt++;
+    if (pts[i].ifSegment) scnt++;
   }
 
   in = scnt;
@@ -433,8 +407,7 @@ static slong number_segments(struct array *local, struct array *shared,
 
   ss = lt + ss, ss--;
   for (uint i = 0; i < shared->n; i++) {
-    if (pts[i].ifSegment)
-      ss++;
+    if (pts[i].ifSegment) ss++;
     assert(ss >= lt);
     pts[i].globalId = ss;
   }
@@ -451,16 +424,14 @@ static void number_points(struct array *elems, const struct array *local,
   slong s = out[0][0], nl = out[1][0];
 
   struct point_t *pts = (struct point_t *)local->ptr;
-  for (uint i = 0; i < local->n; i++)
-    pts[i].pntid = s + i;
+  for (uint i = 0; i < local->n; i++) pts[i].pntid = s + i;
 
   in = shared->n;
   comm_scan(out, c, gs_long, gs_add, &in, 1, wrk);
   s = out[0][0] + nl;
 
   pts = (struct point_t *)shared->ptr;
-  for (uint i = 0; i < shared->n; i++)
-    pts[i].pntid = s + i;
+  for (uint i = 0; i < shared->n; i++) pts[i].pntid = s + i;
 
   // Copy everything back to elements array.
   elems->n = 0;
@@ -483,8 +454,7 @@ int find_unique_vertices(Mesh mesh, struct comm *c, scalar tol, int verbose,
   // points are a single segment.
   struct array *elems = &mesh->elements;
   struct point_t *pts = (struct point_t *)elems->ptr;
-  for (uint i = 0; i < elems->n; i++)
-    pts[i].ifSegment = pts[i].globalId = 0;
+  for (uint i = 0; i < elems->n; i++) pts[i].ifSegment = pts[i].globalId = 0;
 
   slong npts = elems->n, wrk;
   comm_allreduce(c, gs_long, gs_add, &npts, 1, &wrk);

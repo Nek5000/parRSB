@@ -11,8 +11,7 @@ static uint *set_proc_from_val(struct sort *s, uint field,
   double range = extrema[1] - extrema[0];
 
   uint size = a->n;
-  if (size == 0)
-    return NULL;
+  if (size == 0) return NULL;
   uint *proc = tcalloc(uint, size);
 
   uint np = c->np;
@@ -29,8 +28,7 @@ static uint *set_proc_from_val(struct sort *s, uint field,
     }
     id++;
   } while (id < np && index < size);
-  for (; index < size; index++)
-    proc[index] = np - 1;
+  for (; index < size; index++) proc[index] = np - 1;
 
   return proc;
 }

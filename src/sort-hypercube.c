@@ -11,10 +11,8 @@ struct hypercube {
 static void init_probes(struct hypercube *data, const struct comm *c) {
   // Allocate space for probes and counts.
   int nprobes = data->nprobes = 3;
-  if (!data->probes)
-    data->probes = tcalloc(double, nprobes);
-  if (!data->probe_cnt)
-    data->probe_cnt = tcalloc(ulong, nprobes);
+  if (!data->probes) data->probes = tcalloc(double, nprobes);
+  if (!data->probe_cnt) data->probe_cnt = tcalloc(ulong, nprobes);
 
   double extrema[2];
   get_extrema((void *)extrema, data->data, 0, c);
@@ -32,15 +30,13 @@ static void update_probe_counts(struct hypercube *data, const struct comm *c) {
   gs_dom t = input->t[0];
 
   uint nprobes = data->nprobes;
-  for (uint i = 0; i < nprobes; i++)
-    data->probe_cnt[i] = 0;
+  for (uint i = 0; i < nprobes; i++) data->probe_cnt[i] = 0;
 
   struct array *a = input->a;
   for (uint e = 0; e < a->n; e++) {
     double val = get_scalar(a, e, offset, input->unit_size, t);
     for (uint i = 0; i < nprobes; i++) {
-      if (val < data->probes[i])
-        data->probe_cnt[i]++;
+      if (val < data->probes[i]) data->probe_cnt[i]++;
     }
   }
 
@@ -52,8 +48,7 @@ static void update_probes(slong nelem, double *probes, ulong *probe_cnt,
                           uint threshold) {
   assert(nelem >= 0);
   slong expected = nelem / 2;
-  if (llabs(expected - (slong)probe_cnt[1]) < threshold)
-    return;
+  if (llabs(expected - (slong)probe_cnt[1]) < threshold) return;
 
   if (probe_cnt[1] < (ulong)expected)
     probes[0] = probes[1];
@@ -88,8 +83,7 @@ static void transfer_elem(const struct hypercube *data, const struct comm *c) {
   uint *proc1 = set_proc_from_idx(lnp, lstart, lown, lelem);
   uint *proc2 = set_proc_from_idx(np - lnp, ustart, uppern, uelem);
   proc1 = trealloc(uint, proc1, size);
-  for (uint e = lown; e < size; e++)
-    proc1[e] = proc2[e - lown] + lnp;
+  for (uint e = lown; e < size; e++) proc1[e] = proc2[e - lown] + lnp;
 
   sarray_transfer_chunk(a, usize, proc1, c);
   free(proc1), free(proc2);
@@ -107,13 +101,11 @@ static void parallel_hypercube_sort_aux(struct hypercube *data,
   slong nelem = out[1][0];
 
   uint threshold = nelem / (10 * c->np);
-  if (threshold < 2)
-    threshold = 2;
+  if (threshold < 2) threshold = 2;
 
   sort_local(data->data);
 
-  if (c->np == 1)
-    return;
+  if (c->np == 1) return;
 
   init_probes(data, c);
   update_probe_counts(data, c);

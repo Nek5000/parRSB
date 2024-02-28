@@ -70,8 +70,7 @@ int find_min_neighbor_distance(Mesh mesh) {
   uint ndim = mesh->ndim;
   uint nv = mesh->nv;
 
-  if (ndim < 2 || ndim > 3)
-    return 1;
+  if (ndim < 2 || ndim > 3) return 1;
 
   uint i, j, k, neighbor;
   if (ndim == 3) {
@@ -117,8 +116,7 @@ static int set_global_id(Mesh mesh, struct comm *c) {
   if (bin == 1) {
     slong count = 0;
     for (uint i = 0; i < nPoints; i++)
-      if (points[i].ifSegment)
-        count++;
+      if (points[i].ifSegment) count++;
 
     slong in = count, out[2][1], buf[2][1];
     comm_scan(out, &nonZeroRanks, gs_long, gs_add, &in, 1, buf);
@@ -126,8 +124,7 @@ static int set_global_id(Mesh mesh, struct comm *c) {
 
     count = -1;
     for (uint i = 0; i < nPoints; i++) {
-      if (points[i].ifSegment)
-        count++;
+      if (points[i].ifSegment) count++;
       assert(start + count >= 0);
       points[i].globalId = start + count;
     }
@@ -200,8 +197,7 @@ int parrsb_conn_mesh(long long *vtx, double *coord, uint nelt, unsigned ndim,
   int verbose = 1;
   {
     const char *val = getenv("PARRSB_VERBOSE_LEVEL");
-    if (val != NULL)
-      verbose = atoi(val);
+    if (val != NULL) verbose = atoi(val);
   }
 
   parrsb_print(&c, verbose, "Running parCon ...");
@@ -279,8 +275,7 @@ int parrsb_conn_mesh(long long *vtx, double *coord, uint nelt, unsigned ndim,
   // Report timing info and finish
   {
     double gmin[8], gmax[8], buf[8];
-    for (unsigned i = 0; i < 8; i++)
-      gmax[i] = gmin[i] = duration[i];
+    for (unsigned i = 0; i < 8; i++) gmax[i] = gmin[i] = duration[i];
     comm_allreduce(&c, gs_double, gs_min, gmin, 8, buf);
     comm_allreduce(&c, gs_double, gs_max, gmax, 8, buf);
 

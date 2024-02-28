@@ -13,8 +13,7 @@ int main(int argc, char *argv[]) {
   int rank, size;
   MPI_Comm_rank(world, &rank);
   MPI_Comm_size(world, &size);
-  if (in->nactive > size)
-    in->nactive = size;
+  if (in->nactive > size) in->nactive = size;
 
   MPI_Comm comm;
   MPI_Comm_split(world, rank < in->nactive, rank, &comm);

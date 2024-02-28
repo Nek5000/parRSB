@@ -51,8 +51,7 @@ uint parrsb_get_neighbors(const struct array *const elems, const unsigned nv,
   uint s = 0;
   while (s < vertices.n) {
     uint e = s + 1;
-    while (e < vertices.n && pv[s].v == pv[e].v)
-      e++;
+    while (e < vertices.n && pv[s].v == pv[e].v) e++;
     for (uint i = s; i < e; i++) {
       struct vertex_t vt = pv[i];
       for (uint j = s; j < e; j++) {
@@ -101,8 +100,7 @@ uint parrsb_get_neighbors(const struct array *const elems, const unsigned nv,
     un = 1;
     struct unique_t *pu = (struct unique_t *)unique.ptr;
     for (uint i = 1; i < unique.n; i++) {
-      if (pu[i].partition > pu[un - 1].partition)
-        pu[un] = pu[i], un++;
+      if (pu[i].partition > pu[un - 1].partition) pu[un] = pu[i], un++;
     }
   }
   array_free(&unique);
@@ -127,8 +125,7 @@ struct pgeom_t {
 };
 
 void parrsb_dump_stats_start(const uint nv_) {
-  if (pgeom_initialized)
-    return;
+  if (pgeom_initialized) return;
 
   nv = nv_;
   level = 0;
@@ -140,8 +137,7 @@ void parrsb_dump_stats_start(const uint nv_) {
 
 void parrsb_dump_stats(const struct comm *const gc, const struct comm *const lc,
                        const struct array *const elems, buffer *bfr) {
-  if (!pgeom_initialized)
-    return;
+  if (!pgeom_initialized) return;
 
   const struct rsb_element *const pe =
       (const struct rsb_element *const)elems->ptr;
@@ -160,15 +156,13 @@ void parrsb_dump_stats(const struct comm *const gc, const struct comm *const lc,
       min[d] = (min[d] > c) ? c : min[d];
     }
   }
-  for (uint d = 0; d < ndim; d++)
-    centroid[d] /= n;
+  for (uint d = 0; d < ndim; d++) centroid[d] /= n;
 
   double wrk[3];
   comm_allreduce(lc, gs_double, gs_min, min, ndim, wrk);
   comm_allreduce(lc, gs_double, gs_max, max, ndim, wrk);
   comm_allreduce(lc, gs_double, gs_add, centroid, ndim, wrk);
-  for (uint d = 0; d < ndim; d++)
-    centroid[d] /= lc->np;
+  for (uint d = 0; d < ndim; d++) centroid[d] /= lc->np;
 
   // Partition root accumulates the partition geometry.
   level++;
@@ -178,13 +172,11 @@ void parrsb_dump_stats(const struct comm *const gc, const struct comm *const lc,
                        .max = {max[0], max[1], max[2]},
                        .min = {min[0], min[1], min[2]},
                        .p = 0};
-  if (lc->id == 0)
-    array_cat(struct pgeom_t, &pgeom, &pg, 1);
+  if (lc->id == 0) array_cat(struct pgeom_t, &pgeom, &pg, 1);
 }
 
 void parrsb_dump_stats_end(const struct comm *const gc, const char *prefix) {
-  if (!pgeom_initialized)
-    return;
+  if (!pgeom_initialized) return;
 
   const uint size = strnlen(prefix, 64);
   assert(size < 64 && "Prefix must be less than 64 characters.");

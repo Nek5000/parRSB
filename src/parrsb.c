@@ -139,8 +139,7 @@ static size_t load_balance(struct array *elist, uint nel, int nv,
       for (int v = 0; v < nv; v++)
         for (int n = 0; n < ndim; n++)
           pe->coord[n] += xyz[e * ndim * nv + v * ndim + n];
-      for (int n = 0; n < ndim; n++)
-        pe->coord[n] /= nv;
+      for (int n = 0; n < ndim; n++) pe->coord[n] /= nv;
     }
 
     array_cat_(unit_size, elist, pe, 1, __FILE__, __LINE__);
@@ -149,8 +148,7 @@ static size_t load_balance(struct array *elist, uint nel, int nv,
   if (vtx != NULL) { // RSB
     struct rsb_element *pr = (struct rsb_element *)elist->ptr;
     for (uint e = 0; e < nel; e++) {
-      for (int v = 0; v < nv; v++)
-        pr[e].vertices[v] = vtx[e * nv + v];
+      for (int v = 0; v < nv; v++) pr[e].vertices[v] = vtx[e * nv + v];
     }
   }
 
@@ -195,7 +193,7 @@ static void initialize_node_aux(struct comm *c, const struct comm *const gc) {
 #endif
 }
 
-static void initialize_levels(struct comm *const comms, int *const levels_,
+static void initialize_levels(struct comm *const comms, int *const levels_in,
                               const struct comm *const c, const int verbose) {
   // Level 1 communicator is the global communicator.
   comm_dup(&comms[0], c);
@@ -205,11 +203,11 @@ static void initialize_levels(struct comm *const comms, int *const levels_,
 
   // Find the number of nodes under the global communicator and number of MPI
   // ranks in the node level communicator.
-  uint nnodes, nranks_per_node;
+  uint num_nodes, nranks_per_node;
   {
     sint in = (nc.id == 0), wrk;
     comm_allreduce(c, gs_int, gs_add, &in, 1, &wrk);
-    nnodes = in;
+    num_nodes = in;
 
     nranks_per_node = nc.np;
     // Check invariant: nranks_per_node should be the same across all the nodes.
@@ -221,48 +219,19 @@ static void initialize_levels(struct comm *const comms, int *const levels_,
     assert(nranks_per_node > 0);
     parrsb_print(c, verbose,
                  "initialize_levels: num_nodes = %u, num_ranks_per_node = %u",
-                 nnodes, nranks_per_node);
+                 num_nodes, nranks_per_node);
   }
 
-  // Check if there are custom levels specified by the user. Size of the
-  // partition (in terms of number of nodes) in a given level must be a
-  // multiple of the partition size of the next level.
-  sint levels;
-  uint sizes[2] = {nnodes, 1};
-  {
-    const uint size_max = sizeof(sizes) / sizeof(sizes[0]);
-    uint start = 1;
-    while (start < size_max && sizes[start] >= sizes[0])
-      start++;
-    while (start < size_max && sizes[0] % sizes[start])
-      ++start;
+  // Hardcode the maximum number of levels to two for now.
+  sint levels = 2;
+  uint sizes[2] = {num_nodes, 1};
 
-    uint level = 1;
-    for (; start < size_max; ++start, ++level)
-      sizes[level] = sizes[start];
-    // Set the size of the last partition to 1 (since it is the node level
-    // partitioner).
-    sizes[level - 1] = 1;
+  *levels_in = levels = MIN(levels, *levels_in);
 
-    // Check assert: sizes should be strictly decreasing.
-    for (uint i = 1; i < level; i++)
-      assert(sizes[i - 1] > sizes[i]);
-
-    levels = level;
-  }
-
-  for (sint level = 1; level < levels - 1; ++level) {
-    comm_split(&comms[level - 1],
-               comms[level - 1].id / (sizes[level] * nranks_per_node),
-               comms[level - 1].id, &comms[level]);
-  }
-  levels = MIN(levels, *levels_);
-  if (levels > 1)
-    comm_dup(&comms[levels - 1], &nc);
-  *levels_ = levels;
-  parrsb_print(c, verbose, "initialize_levels: levels = %u", levels);
-
+  if (levels > 1) comm_dup(&comms[levels - 1], &nc);
   comm_free(&nc);
+
+  parrsb_print(c, verbose, "initialize_levels: levels = %u", levels);
 }
 
 static void parrsb_part_mesh_v0(int *part, const long long *const vtx,
@@ -279,8 +248,7 @@ static void parrsb_part_mesh_v0(int *part, const long long *const vtx,
         "parrsb_part_mesh_v0: Both vertices and coordinates can't be NULL");
     MPI_Abort(c->c, EXIT_FAILURE);
   }
-  if (xyz == NULL)
-    options->rsb_pre = 0;
+  if (xyz == NULL) options->rsb_pre = 0;
 
   struct array elist;
   size_t esize = load_balance(&elist, nel, nv, xyz, vtx, verbose, cr, bfr);
@@ -305,23 +273,15 @@ static void parrsb_part_mesh_v0(int *part, const long long *const vtx,
   if (elist.n > 0) {
     int ndim = (nv == 8) ? 3 : 2;
     switch (options->partitioner) {
-    case 0:
-      rsb(&elist, nv, options, comms, bfr);
-      break;
-    case 1:
-      rcb(&elist, esize, ndim, &ca, bfr);
-      break;
-    case 2:
-      rib(&elist, esize, ndim, &ca, bfr);
-      break;
-    default:
-      break;
+    case 0: rsb(&elist, nv, options, comms, bfr); break;
+    case 1: rcb(&elist, esize, ndim, &ca, bfr); break;
+    case 2: rib(&elist, esize, ndim, &ca, bfr); break;
+    default: break;
     }
   }
   comm_free(&ca);
 
-  for (uint l = 0; l < (uint)options->levels; l++)
-    comm_free(&comms[l]);
+  for (uint l = 0; l < (uint)options->levels; l++) comm_free(&comms[l]);
 
   parrsb_print(c, verbose, "parrsb_part_mesh_v0: restore original input");
   restore_original(part, cr, &elist, esize, bfr);
@@ -369,8 +329,7 @@ void parrsb_check_tagged_partitions(const long long *const eids,
     slong start = out[0][0];
 
     slong *lids = tcalloc(slong, nel);
-    for (uint i = 0; i < nel; i++)
-      lids[i] = start + i;
+    for (uint i = 0; i < nel; i++) lids[i] = start + i;
 
     gse = gs_setup(lids, nel, c, 0, gs_pairwise, 0);
     free(lids);
@@ -384,8 +343,7 @@ void parrsb_check_tagged_partitions(const long long *const eids,
   sint *mul = tcalloc(sint, size);
   {
     struct gs_data *gsl = gs_setup(vtx, size, &lc, 0, gs_pairwise, 0);
-    for (uint i = 0; i < size; i++)
-      mul[i] = 1;
+    for (uint i = 0; i < size; i++) mul[i] = 1;
     gs(mul, gs_int, gs_add, 0, gsl, &bfr);
     gs_free(gsl);
   }
@@ -404,8 +362,7 @@ void parrsb_check_tagged_partitions(const long long *const eids,
       gs(lmin, gs_int, gs_min, 0, gse, &bfr);
       gs(lmax, gs_int, gs_max, 0, gse, &bfr);
 
-      for (uint e = 0; e < nel; e++)
-        assert(lmin[e] == lmax[e]);
+      for (uint e = 0; e < nel; e++) assert(lmin[e] == lmax[e]);
     }
 
     free(lmin), free(lmax);
@@ -466,8 +423,7 @@ static void parrsb_part_mesh_v1(int *part, const long long *const vtx,
     if (unique.n > 0) {
       in = 1;
       for (uint i = 1; i < unique.n; i++) {
-        if (pu[i].tag > pu[i - 1].tag)
-          in++;
+        if (pu[i].tag > pu[i - 1].tag) in++;
       }
     }
 
@@ -493,8 +449,7 @@ static void parrsb_part_mesh_v1(int *part, const long long *const vtx,
     if (unique.n > 0) {
       pu[0].tagn = start;
       for (uint i = 1; i < unique.n; i++) {
-        if (pu[i].tag > pu[i - 1].tag)
-          start++;
+        if (pu[i].tag > pu[i - 1].tag) start++;
         pu[i].tagn = start;
       }
     }
@@ -511,8 +466,7 @@ static void parrsb_part_mesh_v1(int *part, const long long *const vtx,
     for (uint i = 0, s = 0; i < unique.n; i++) {
       uint e = s + 1;
       assert(pt[s].tag == pu[i].tag);
-      while (e < tags.n && pt[e].tag == pu[i].tag)
-        e++;
+      while (e < tags.n && pt[e].tag == pu[i].tag) e++;
       for (uint j = s; j < e; j++)
         pt[j].p = chunk_size * pu[i].tagn + pt[i].seq % chunk_size;
       s = e;
@@ -600,8 +554,7 @@ static void parrsb_part_mesh_v1(int *part, const long long *const vtx,
     sarray_sort(struct element_t, elements.ptr, elements.n, seq, 0, bfr);
     const struct element_t *const pe =
         (const struct element_t *const)elements.ptr;
-    for (uint i = 0; i < nel; i++)
-      part[i] = pe[i].part;
+    for (uint i = 0; i < nel; i++) part[i] = pe[i].part;
   }
 
   array_free(&elements);
@@ -616,8 +569,7 @@ static void update_frontier(sint *const target, sint *const hop,
   if (*target >= 0) {
     // Check invariant: *hop < INT_MAX
     assert(*hop < INT_MAX);
-    for (uint i = 0; i < nv; i++)
-      frontier[i] = *target;
+    for (uint i = 0; i < nv; i++) frontier[i] = *target;
     return;
   }
 
@@ -652,12 +604,10 @@ static void update_frontier(sint *const target, sint *const hop,
         current_target = pd[i].target, current_count = 1;
       }
     }
-    if (current_count > final_count)
-      final_target = current_target;
+    if (current_count > final_count) final_target = current_target;
 
     // Update frontier, target and hop.
-    for (uint j = 0; j < nv; j++)
-      frontier[j] = final_target;
+    for (uint j = 0; j < nv; j++) frontier[j] = final_target;
     *target = final_target, *hop = hid + 1;
   }
 
@@ -673,8 +623,7 @@ void parrsb_part_solid(int *part, const long long *const vtx2,
   parrsb_print(&c, 1, "Running greedy solid ... nel1 = %d nel2 = %d", nel1,
                nel2);
 
-  for (uint i = 0; i < nel2; i++)
-    part[i] = -1;
+  for (uint i = 0; i < nel2; i++) part[i] = -1;
 
   buffer bfr;
   buffer_init(&bfr, 1024);
@@ -706,10 +655,8 @@ void parrsb_part_solid(int *part, const long long *const vtx2,
   struct gs_data *gsh = NULL;
   {
     slong *vtx = tcalloc(slong, size);
-    for (size_t i = 0; i < size1; i++)
-      vtx[i] = vtx1[i];
-    for (size_t i = 0; i < size2; i++)
-      vtx[size1 + i] = vtx2[i];
+    for (size_t i = 0; i < size1; i++) vtx[i] = vtx1[i];
+    for (size_t i = 0; i < size2; i++) vtx[size1 + i] = vtx2[i];
 
     gsh = gs_setup(vtx, size, &c, 0, gs_pairwise, 0);
     free(vtx);
@@ -726,8 +673,7 @@ void parrsb_part_solid(int *part, const long long *const vtx2,
 
     sint *const component = tcalloc(sint, size);
     if (c.id + 1 == (uint)idmin) {
-      for (uint i = 0; i < nv; i++)
-        component[i] = 1;
+      for (uint i = 0; i < nv; i++) component[i] = 1;
     }
 
     slong marked0 = 0, marked1 = 1;
@@ -738,11 +684,9 @@ void parrsb_part_solid(int *part, const long long *const vtx2,
       marked0 = marked1, marked1 = 0;
       for (uint i = 0; i < nel1 + nel2; i++) {
         sint v = 0;
-        for (uint j = 0; j < nv; j++)
-          v += component[i * nv + j];
+        for (uint j = 0; j < nv; j++) v += component[i * nv + j];
         if (v > 0) {
-          for (uint j = 0; j < nv; j++)
-            component[i * nv + j] = 1;
+          for (uint j = 0; j < nv; j++) component[i * nv + j] = 1;
           marked1 += 1;
         }
       }
@@ -814,8 +758,7 @@ void parrsb_part_solid(int *part, const long long *const vtx2,
     // check for that later when we actually assign the elements to partitions.
     {
       sint id = c.id, hid = 0;
-      if (nrecv2 == nexp2)
-        id = -1, hid = INT_MAX;
+      if (nrecv2 == nexp2) id = -1, hid = INT_MAX;
 
       // Max id should be >= 0;
       sint wrk, idmax = id;
@@ -823,14 +766,10 @@ void parrsb_part_solid(int *part, const long long *const vtx2,
       assert(idmax >= 0);
 
       // Initialize frontier, target, and hop.
-      for (uint i = 0; i < size1; i++)
-        frontier[i] = id;
-      for (uint i = size1; i < size; i++)
-        frontier[i] = -1;
-      for (uint i = 0; i < nel1; i++)
-        target[i] = id, hop[i] = hid;
-      for (uint i = nel1; i < nelt; i++)
-        target[i] = -1, hop[i] = INT_MAX;
+      for (uint i = 0; i < size1; i++) frontier[i] = id;
+      for (uint i = size1; i < size; i++) frontier[i] = -1;
+      for (uint i = 0; i < nel1; i++) target[i] = id, hop[i] = hid;
+      for (uint i = nel1; i < nelt; i++) target[i] = -1, hop[i] = INT_MAX;
     }
 
     // Then perform a BFS till we assign all the elements in the solid mesh with
@@ -863,8 +802,7 @@ void parrsb_part_solid(int *part, const long long *const vtx2,
     {
       struct elem_t et = {.part = -1};
       for (uint i = 0; i < nel2; i++) {
-        if (part[i] >= 0)
-          continue;
+        if (part[i] >= 0) continue;
         et.sequence = i, et.target = target[nel1 + i], et.hop = hop[nel1 + i];
         array_cat(struct elem_t, &arr, &et, 1);
       }
@@ -880,8 +818,7 @@ void parrsb_part_solid(int *part, const long long *const vtx2,
       sarray_sort(struct elem_t, arr.ptr, arr.n, hop, 1, &bfr);
       struct elem_t *const pa = (struct elem_t *const)arr.ptr;
       uint keep = MIN(nexp2 - nrecv2, arr.n);
-      for (uint i = 0; i < keep; i++)
-        pa[i].part = c.id;
+      for (uint i = 0; i < keep; i++) pa[i].part = c.id;
       nrecv2 += keep;
       // Check for invariant: nrecv2 <= nexp2.
       assert(nrecv2 <= nexp2);
@@ -893,8 +830,7 @@ void parrsb_part_solid(int *part, const long long *const vtx2,
       sarray_transfer(struct elem_t, &arr, target, 0, &cr);
 
       const struct elem_t *const pa = (const struct elem_t *const)arr.ptr;
-      for (uint j = 0; j < arr.n; j++)
-        part[pa[j].sequence] = pa[j].part;
+      for (uint j = 0; j < arr.n; j++) part[pa[j].sequence] = pa[j].part;
       arr.n = 0;
     }
 

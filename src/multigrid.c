@@ -81,8 +81,7 @@ static int sparse_gemm(struct par_mat *WG, const struct par_mat *W,
 
   sarray_sort_2(struct mij, gij.ptr, gij.n, c, 1, r, 1, bfr);
   struct mij *pg = (struct mij *)gij.ptr;
-  for (i = 0; i < gij.n; i++)
-    pg[i].idx = i;
+  for (i = 0; i < gij.n; i++) pg[i].idx = i;
 
   for (uint p = 0; p < cr->comm.np; p++) {
     // Calculate dot product of each row of W with columns of G
@@ -93,22 +92,18 @@ static int sparse_gemm(struct par_mat *WG, const struct par_mat *W,
         m.c = pg[s].c, m.v = 0;
         for (j = W->adj_off[i], je = W->adj_off[i + 1]; j < je; j++) {
           ulong k = W->cols[W->adj_idx[j]];
-          while (e < gij.n && pg[s].c == pg[e].c && pg[e].r < k)
-            e++;
+          while (e < gij.n && pg[s].c == pg[e].c && pg[e].r < k) e++;
           if (e < gij.n && pg[s].c == pg[e].c && pg[e].r == k)
             m.v += W->adj_val[j] * pg[e].v;
         }
-        while (e < gij.n && pg[s].c == pg[e].c)
-          e++;
-        if (fabs(m.v) > 1e-12)
-          array_cat(struct mij, &sij, &m, 1);
+        while (e < gij.n && pg[s].c == pg[e].c) e++;
+        if (fabs(m.v) > 1e-12) array_cat(struct mij, &sij, &m, 1);
         s = e;
       }
     }
 
     sint next = (cr->comm.id + 1) % cr->comm.np;
-    for (i = 0; i < gij.n; i++)
-      pg[i].p = next;
+    for (i = 0; i < gij.n; i++) pg[i].p = next;
     sarray_transfer(struct mij, &gij, p, 0, cr);
 
     sarray_sort(struct mij, gij.ptr, gij.n, idx, 0, bfr);
@@ -178,8 +173,7 @@ static uint mg_setup_aux(struct mg *d, const int factor, struct crystal *cr,
 
   // Setup gs ids for coarse level (rhs interpolation )
   ids = (slong *)trealloc(slong, ids, k + M->rn);
-  for (i = 0; i < M->rn; i++)
-    ids[k++] = M->rows[i];
+  for (i = 0; i < M->rn; i++) ids[k++] = M->rows[i];
   d->levels[lvl - 1]->J = gs_setup(ids, k, c, 0, gs_pairwise, 0);
   free(ids);
 
@@ -248,15 +242,12 @@ struct mg *mg_setup(const struct par_mat *M, const int factor,
 //
 void mg_vcycle(scalar *u1, scalar *rhs, struct mg *d, struct comm *c,
                buffer *bfr) {
-  if (d->nlevels == 0)
-    return;
+  if (d->nlevels == 0) return;
 
   uint *lvl_off = d->level_off, nnz = lvl_off[d->nlevels];
   scalar *r = d->buf;
-  for (uint i = 0; i < 4 * nnz; i++)
-    r[i] = 0;
-  for (uint i = 0; i < lvl_off[1]; i++)
-    r[i] = rhs[i];
+  for (uint i = 0; i < 4 * nnz; i++) r[i] = 0;
+  for (uint i = 0; i < lvl_off[1]; i++) r[i] = rhs[i];
 
   scalar *s = r + nnz, *Gs = s + nnz, *u = Gs + nnz, *wrk = u + nnz;
 
@@ -270,15 +261,13 @@ void mg_vcycle(scalar *u1, scalar *rhs, struct mg *d, struct comm *c,
 
     // u = sigma * inv(D) * rhs
     scalar sigma = sigma_cheb(1, l->npres + 1, 1, 2);
-    for (j = 0; j < n; j++)
-      u[off + j] = sigma * r[off + j] / M->diag_val[j];
+    for (j = 0; j < n; j++) u[off + j] = sigma * r[off + j] / M->diag_val[j];
 
     // G*u
     mat_vec_csr(Gs + off, u + off, M, l->Q, wrk, bfr);
 
     // r = rhs - Gu
-    for (j = 0; j < n; j++)
-      r[off + j] = r[off + j] - Gs[off + j];
+    for (j = 0; j < n; j++) r[off + j] = r[off + j] - Gs[off + j];
 
     for (i = 1; i <= l->npres - 1; i++) {
       sigma = sigma_cheb(i + 1, l->npres + 1, 1, 2);
@@ -292,8 +281,7 @@ void mg_vcycle(scalar *u1, scalar *rhs, struct mg *d, struct comm *c,
 
       // r = r - Gs
       mat_vec_csr(Gs + off, s + off, M, l->Q, wrk, bfr);
-      for (j = 0; j < n; j++)
-        r[off + j] = r[off + j] - Gs[off + j];
+      for (j = 0; j < n; j++) r[off + j] = r[off + j] - Gs[off + j];
     }
 
     // Interpolate to coarser level
@@ -321,35 +309,26 @@ void mg_vcycle(scalar *u1, scalar *rhs, struct mg *d, struct comm *c,
 
     // u = u + over*S*J*e
     n = lvl_off[lvl + 1] - off;
-    for (j = 0; j < n; j++)
-      r[off + j] = l->over * r[off + j] + u[off + j];
+    for (j = 0; j < n; j++) r[off + j] = l->over * r[off + j] + u[off + j];
   }
 
   // Avoid this
-  for (i = 0; i < lvl_off[1]; i++)
-    u1[i] = r[i];
+  for (i = 0; i < lvl_off[1]; i++) u1[i] = r[i];
 }
 
 void mg_free(struct mg *d) {
   if (d != NULL) {
     struct mg_lvl **l = d->levels;
     for (uint i = 0; i < d->nlevels; i++) {
-      if (i > 0 && l[i]->M != NULL)
-        par_mat_free(l[i]->M), free(l[i]->M);
-      if (l[i]->J != NULL)
-        gs_free(l[i]->J), l[i]->J = NULL;
-      if (l[i]->Q != NULL)
-        gs_free(l[i]->Q), l[i]->Q = NULL;
-      if (l[i] != NULL)
-        free(l[i]), l[i] = NULL;
+      if (i > 0 && l[i]->M != NULL) par_mat_free(l[i]->M), free(l[i]->M);
+      if (l[i]->J != NULL) gs_free(l[i]->J), l[i]->J = NULL;
+      if (l[i]->Q != NULL) gs_free(l[i]->Q), l[i]->Q = NULL;
+      if (l[i] != NULL) free(l[i]), l[i] = NULL;
     }
 
-    if (d->levels != NULL)
-      free(d->levels), d->levels = NULL;
-    if (d->level_off != NULL)
-      free(d->level_off), d->level_off = NULL;
-    if (d->buf != NULL)
-      free(d->buf), d->buf = NULL;
+    if (d->levels != NULL) free(d->levels), d->levels = NULL;
+    if (d->level_off != NULL) free(d->level_off), d->level_off = NULL;
+    if (d->buf != NULL) free(d->buf), d->buf = NULL;
     free(d);
   }
 }

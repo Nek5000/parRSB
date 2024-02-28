@@ -22,13 +22,12 @@ void parrsb_print_stack(void) {
   free(symbols);
 }
 #else
-void parrsb_print_stack() {}
+void parrsb_print_stack(void) {}
 #endif // defined __GLIBC__
 
 int log2ll(long long n) {
   int k = 0;
-  while (n > 1)
-    n /= 2, k++;
+  while (n > 1) n /= 2, k++;
 
   return k;
 }
@@ -50,8 +49,7 @@ int parrsb_dist_mesh(unsigned int *nelt_, long long **vl_, double **coord_,
   uint e, n;
   for (e = 0; e < nelt; ++e) {
     data.proc = part[e];
-    for (n = 0; n < nv; ++n)
-      data.vtx[n] = vl[e * nv + n];
+    for (n = 0; n < nv; ++n) data.vtx[n] = vl[e * nv + n];
     array_cat(elem_data, &elements, &data, 1);
   }
   assert(elements.n == nelt);
@@ -61,8 +59,7 @@ int parrsb_dist_mesh(unsigned int *nelt_, long long **vl_, double **coord_,
   double *coord = (coord_ == NULL ? NULL : *coord_);
   if (coord != NULL) {
     for (e = 0; e < nelt; e++)
-      for (n = 0; n < ndim * nv; n++)
-        ed[e].coord[n] = coord[e * ndim * nv + n];
+      for (n = 0; n < ndim * nv; n++) ed[e].coord[n] = coord[e * ndim * nv + n];
   }
 
   struct comm c;
@@ -77,15 +74,13 @@ int parrsb_dist_mesh(unsigned int *nelt_, long long **vl_, double **coord_,
 
   vl = *vl_ = (long long *)realloc(*vl_, nv * nelt * sizeof(long long));
   for (e = 0; e < nelt; ++e)
-    for (n = 0; n < nv; ++n)
-      vl[e * nv + n] = ed[e].vtx[n];
+    for (n = 0; n < nv; ++n) vl[e * nv + n] = ed[e].vtx[n];
 
   if (coord != NULL) {
     coord = *coord_ =
         (double *)realloc(*coord_, ndim * nv * nelt * sizeof(double));
     for (e = 0; e < nelt; ++e) {
-      for (n = 0; n < ndim * nv; ++n)
-        coord[e * ndim * nv + n] = ed[e].coord[n];
+      for (n = 0; n < ndim * nv; ++n) coord[e * ndim * nv + n] = ed[e].coord[n];
     }
   }
 
@@ -140,13 +135,11 @@ void parrsb_get_part_stat(int *nc, int *ns, int *nss, int *nel, long long *vtx,
   comm_init(&comm, ce);
 
   uint np = comm.np;
-  if (np == 1)
-    return;
+  if (np == 1) return;
 
   size_t Npts = nelt * nv;
   slong *data = (slong *)malloc((Npts + 1) * sizeof(slong));
-  for (size_t i = 0; i < Npts; i++)
-    data[i] = vtx[i];
+  for (size_t i = 0; i < Npts; i++) data[i] = vtx[i];
   struct gs_data *gsh = gs_setup(data, Npts, &comm, 0, gs_pairwise, 0);
 
   int Nmsg;
@@ -251,7 +244,8 @@ void parrsb_print_part_stat(long long *vtx, unsigned nelt, unsigned nv,
   }
 }
 
-static void print_help() {}
+// TODO: Print options supported by parRSB.
+static void print_help(void) {}
 
 parrsb_cmd_line_opts *parrsb_parse_cmd_opts(int argc, char *argv[]) {
   parrsb_cmd_line_opts *in = tcalloc(parrsb_cmd_line_opts, 1);
@@ -271,8 +265,7 @@ parrsb_cmd_line_opts *parrsb_parse_cmd_opts(int argc, char *argv[]) {
   size_t len;
   for (;;) {
     int c = getopt_long(argc, argv, "", long_options, NULL);
-    if (c == -1)
-      break;
+    if (c == -1) break;
 
     switch (c) {
     case 0:
@@ -280,26 +273,13 @@ parrsb_cmd_line_opts *parrsb_parse_cmd_opts(int argc, char *argv[]) {
       in->mesh = tcalloc(char, len + 1);
       strncpy(in->mesh, optarg, len);
       break;
-    case 10:
-      in->tol = atof(optarg);
-      break;
-    case 20:
-      in->test = 1;
-      break;
-    case 30:
-      in->dump = 1;
-      break;
-    case 40:
-      in->nactive = atoi(optarg);
-      break;
-    case 50:
-      in->verbose = atoi(optarg);
-      break;
-    case 99:
-      print_help();
-      break;
-    default:
-      exit(EXIT_FAILURE);
+    case 10: in->tol = atof(optarg); break;
+    case 20: in->test = 1; break;
+    case 30: in->dump = 1; break;
+    case 40: in->nactive = atoi(optarg); break;
+    case 50: in->verbose = atoi(optarg); break;
+    case 99: print_help(); break;
+    default: exit(EXIT_FAILURE);
     }
   }
 
@@ -313,8 +293,7 @@ parrsb_cmd_line_opts *parrsb_parse_cmd_opts(int argc, char *argv[]) {
 
 void parrsb_cmd_opts_free(parrsb_cmd_line_opts *opts) {
   if (opts) {
-    if (opts->mesh)
-      free(opts->mesh);
+    if (opts->mesh) free(opts->mesh);
     free(opts);
   }
 }
@@ -374,8 +353,7 @@ int parrsb_vector_dump(const char *fname, scalar *y, struct rsb_element *elm,
 
   int ndim = (nv == 8) ? 3 : 2;
   uint write_size = ((ndim + 1) * sizeof(double) + sizeof(slong)) * nelt;
-  if (rank == 0)
-    write_size += sizeof(long) + sizeof(int); // for nelgt and ndim
+  if (rank == 0) write_size += sizeof(long) + sizeof(int); // for nelgt and ndim
 
   char *bfr, *bfr0;
   bfr = bfr0 = (char *)calloc(write_size, sizeof(char));

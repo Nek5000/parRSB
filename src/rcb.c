@@ -12,24 +12,18 @@ static void get_axis_len(double *length, size_t unit_size, char *elems,
   struct rcb_element *ei;
   for (uint i = 0; i < nel; i++) {
     ei = (struct rcb_element *)(elems + i * unit_size);
-    if (ei->coord[0] < min[0])
-      min[0] = ei->coord[0];
-    if (ei->coord[0] > max[0])
-      max[0] = ei->coord[0];
+    if (ei->coord[0] < min[0]) min[0] = ei->coord[0];
+    if (ei->coord[0] > max[0]) max[0] = ei->coord[0];
 
-    if (ei->coord[1] < min[1])
-      min[1] = ei->coord[1];
-    if (ei->coord[1] > max[1])
-      max[1] = ei->coord[1];
+    if (ei->coord[1] < min[1]) min[1] = ei->coord[1];
+    if (ei->coord[1] > max[1]) max[1] = ei->coord[1];
   }
 
   if (ndim == 3) {
     for (uint i = 0; i < nel; i++) {
       ei = (struct rcb_element *)(elems + i * unit_size);
-      if (ei->coord[2] < min[2])
-        min[2] = ei->coord[2];
-      if (ei->coord[2] > max[2])
-        max[2] = ei->coord[2];
+      if (ei->coord[2] < min[2]) min[2] = ei->coord[2];
+      if (ei->coord[2] > max[2]) max[2] = ei->coord[2];
     }
   }
 
@@ -39,54 +33,36 @@ static void get_axis_len(double *length, size_t unit_size, char *elems,
     comm_allreduce(c, gs_double, gs_max, max, 3, wrk);
   }
 
-  for (uint i = 0; i < ndim; i++)
-    length[i] = max[i] - min[i];
+  for (uint i = 0; i < ndim; i++) length[i] = max[i] - min[i];
 }
 
 void rcb_local(struct array *a, size_t unit_size, uint start, uint end,
                int ndim, buffer *buf) {
   sint size = end - start;
-  if (size <= 1)
-    return;
+  if (size <= 1) return;
 
   double length[3];
   char *st = (char *)a->ptr + unit_size * start;
   get_axis_len(length, unit_size, st, size, ndim, NULL);
 
   int axis = 0;
-  if (length[1] > length[0])
-    axis = 1;
+  if (length[1] > length[0]) axis = 1;
   if (ndim == 3)
-    if (length[2] > length[axis])
-      axis = 2;
+    if (length[2] > length[axis]) axis = 2;
 
   if (unit_size == sizeof(struct rcb_element)) {
     switch (axis) {
-    case 0:
-      sarray_sort(struct rcb_element, st, size, coord[0], 3, buf);
-      break;
-    case 1:
-      sarray_sort(struct rcb_element, st, size, coord[1], 3, buf);
-      break;
-    case 2:
-      sarray_sort(struct rcb_element, st, size, coord[2], 3, buf);
-      break;
-    default:
-      break;
+    case 0: sarray_sort(struct rcb_element, st, size, coord[0], 3, buf); break;
+    case 1: sarray_sort(struct rcb_element, st, size, coord[1], 3, buf); break;
+    case 2: sarray_sort(struct rcb_element, st, size, coord[2], 3, buf); break;
+    default: break;
     }
   } else if (unit_size == sizeof(struct rsb_element)) {
     switch (axis) {
-    case 0:
-      sarray_sort(struct rsb_element, st, size, coord[0], 3, buf);
-      break;
-    case 1:
-      sarray_sort(struct rsb_element, st, size, coord[1], 3, buf);
-      break;
-    case 2:
-      sarray_sort(struct rsb_element, st, size, coord[2], 3, buf);
-      break;
-    default:
-      break;
+    case 0: sarray_sort(struct rsb_element, st, size, coord[0], 3, buf); break;
+    case 1: sarray_sort(struct rsb_element, st, size, coord[1], 3, buf); break;
+    case 2: sarray_sort(struct rsb_element, st, size, coord[2], 3, buf); break;
+    default: break;
     }
   }
 
@@ -97,16 +73,14 @@ void rcb_local(struct array *a, size_t unit_size, uint start, uint end,
 
 static int rcb_level(struct array *a, size_t unit_size, int ndim,
                      struct comm *c, buffer *bfr) {
-  if (c->np == 1)
-    return 0;
+  if (c->np == 1) return 0;
 
   double length[3];
   get_axis_len(length, unit_size, (char *)a->ptr, a->n, ndim, c);
 
   int axis = 0, d;
   for (d = 1; d < ndim; d++)
-    if (length[d] > length[axis])
-      axis = d;
+    if (length[d] > length[axis]) axis = d;
 
   if (unit_size == sizeof(struct rcb_element)) {
     switch (axis) {
@@ -119,8 +93,7 @@ static int rcb_level(struct array *a, size_t unit_size, int ndim,
     case 2:
       parallel_sort(struct rcb_element, a, coord[2], gs_double, 0, 1, c, bfr);
       break;
-    default:
-      break;
+    default: break;
     }
   } else if (unit_size == sizeof(struct rsb_element)) {
     switch (axis) {
@@ -133,8 +106,7 @@ static int rcb_level(struct array *a, size_t unit_size, int ndim,
     case 2:
       parallel_sort(struct rsb_element, a, coord[2], gs_double, 0, 1, c, bfr);
       break;
-    default:
-      break;
+    default: break;
     }
   }
 

@@ -42,16 +42,16 @@ typedef enum {
   TOL_INIT
 } metric;
 
-void metric_init();
+void metric_init(void);
 void metric_acc(metric m, double val);
 void metric_set(metric m, double val);
 void metric_tic(struct comm *c, metric m);
 void metric_toc(struct comm *c, metric m);
 double metric_get_value(int level, metric m);
-void metric_push_level();
-uint metric_get_levels();
+void metric_push_level(void);
+uint metric_get_levels(void);
 void metric_rsb_print(struct comm *c, int profile_level);
 void metric_crs_print(struct comm *c, int profile_level);
-void metric_finalize();
+void metric_finalize(void);
 
 #endif

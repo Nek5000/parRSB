@@ -11,15 +11,9 @@ double get_scalar(struct array *a, uint i, uint offset, uint usize,
 
   double data;
   switch (type) {
-  case gs_int:
-    data = *((uint *)v);
-    break;
-  case gs_long:
-    data = *((ulong *)v);
-    break;
-  case gs_double:
-    data = *((double *)v);
-    break;
+  case gs_int: data = *((uint *)v); break;
+  case gs_long: data = *((ulong *)v); break;
+  case gs_double: data = *((double *)v); break;
   default:
     fprintf(stderr, "Error: Unknown type %d\n", type);
     exit(EXIT_FAILURE);
@@ -52,16 +46,14 @@ void get_extrema(void *extrema_, struct sort *data, uint field,
 }
 
 uint *set_proc_from_idx(uint size, sint np_, slong start, slong nelem) {
-  if (nelem == 0)
-    return NULL;
+  if (nelem == 0) return NULL;
   uint *proc = tcalloc(uint, size + 1);
 
   ulong np = np_;
   ulong nelt = nelem / np, nrem = nelem - np * nelt;
   assert(nrem < np);
   if (nrem == 0) {
-    for (uint i = 0; i < size; i++)
-      proc[i] = (uint)((start + i) / nelt);
+    for (uint i = 0; i < size; i++) proc[i] = (uint)((start + i) / nelt);
   } else {
     ulong s = np - nrem;
     ulong t1 = nelt * s;
@@ -94,8 +86,7 @@ static int sort_field(struct array *arr, size_t usize, gs_dom t, uint off,
   case gs_int: // FIXME gs_uint
     gslib_sortp_ui(buf, keep, (uint *)((char *)ptr + off), nunits, usize);
     break;
-  default:
-    break;
+  default: break;
   }
 
   return 0;
@@ -108,8 +99,7 @@ void sort_local(struct sort *s) {
   int i = s->nfields - 1;
 
   sort_field(a, usize, s->t[i], s->offset[i], buf, 0), i--;
-  while (i >= 0)
-    sort_field(a, usize, s->t[i], s->offset[i], buf, 1), i--;
+  while (i >= 0) sort_field(a, usize, s->t[i], s->offset[i], buf, 1), i--;
   sarray_permute_buf_(s->align, usize, a->ptr, a->n, buf);
 }
 
@@ -131,8 +121,7 @@ void sarray_transfer_chunk(struct array *arr, const size_t usize,
   // Calculate the global array size. If it is zero, nothing to do, just return.
   slong ng = arr->n, wrk[2];
   comm_allreduce(c, gs_long, gs_add, &ng, 1, wrk);
-  if (ng == 0)
-    return;
+  if (ng == 0) return;
 
   // Initialize the crystal router.
   struct crystal cr;
@@ -140,8 +129,7 @@ void sarray_transfer_chunk(struct array *arr, const size_t usize,
 
   // Allocate `proc` with some buffer space.
   uint *proc = tcalloc(uint, arr->n + 1);
-  for (uint i = 0; i < arr->n; i++)
-    proc[i] = proci[i];
+  for (uint i = 0; i < arr->n; i++) proc[i] = proci[i];
 
   // Transfer the array elements to destination processor. To avoid message
   // sizes larger than INT_MAX, we calculate total message size and then figure
@@ -213,14 +201,9 @@ void parallel_sort_(struct array *arr, size_t usize, size_t align,
   }
 
   switch (algo) {
-  case 0:
-    parallel_bin_sort(&sd, c);
-    break;
-  case 1:
-    parallel_hypercube_sort(&sd, c);
-    break;
-  default:
-    break;
+  case 0: parallel_bin_sort(&sd, c); break;
+  case 1: parallel_hypercube_sort(&sd, c); break;
+  default: break;
   }
 
   if (balance) {
