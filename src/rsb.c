@@ -43,6 +43,21 @@ static void test_component_versions(struct array *elements, struct comm *lc,
   crystal_free(&cr);
 }
 
+static void check_disconnected_components(const int i, const struct comm *gc,
+                                          void *bfr) {
+  sint minc = (sint)metric_get_value(i, RSB_COMPONENTS_NCOMP), maxc = minc;
+  comm_allreduce(gc, gs_int, gs_min, &minc, 1, (void *)bfr);
+  comm_allreduce(gc, gs_int, gs_max, &maxc, 1, (void *)bfr);
+
+  if (maxc > 1 && gc->id == 0) {
+    fprintf(stderr,
+            "Warning: Partition created %d/%d (min/max) disconnected "
+            "components in Level=%d!\n",
+            minc, maxc, i);
+    fflush(stderr);
+  }
+}
+
 static void check_rsb_partition(const struct comm *gc,
                                 const parrsb_options *const opts) {
   int max_levels = log2ll(gc->np);
@@ -88,17 +103,8 @@ static void check_rsb_partition(const struct comm *gc,
     }
     comm_free(&c);
 
-    sint minc, maxc;
-    minc = maxc = (sint)metric_get_value(i, RSB_COMPONENTS_NCOMP);
-    comm_allreduce(gc, gs_int, gs_min, &minc, 1, (void *)bfr);
-    comm_allreduce(gc, gs_int, gs_max, &maxc, 1, (void *)bfr);
-
-    if (maxc > 1 && gc->id == 0) {
-      printf("Warning: Partition created %d/%d (min/max) disconnected "
-             "components in Level=%d!\n",
-             minc, maxc, i);
-      fflush(stdout);
-    }
+    if (opts->find_num_comps == 1)
+      check_disconnected_components(i, gc, (void *)bfr);
   }
 }
 
@@ -309,15 +315,16 @@ void rsb(struct array *elements, int nv, const parrsb_options *const options,
       comm_split(&lc, bin, lc.id, &tc);
 
       // Find the number of disconnected components.
+      if (options->find_num_comps == 0) goto bisect_and_balance;
       parrsb_print(gc, verbose - 1,
                    "\trsb: level = %d, cut = %d, Components ...", level + 1,
                    cut + 1);
       metric_tic(&lc, RSB_COMPONENTS);
-      const uint ncomp =
-          get_components_v2(NULL, elements, nv, &tc, bfr, verbose - 2);
+      uint ncomp = get_components_v2(NULL, elements, nv, &tc, bfr, verbose - 2);
       metric_acc(RSB_COMPONENTS_NCOMP, ncomp);
       metric_toc(&lc, RSB_COMPONENTS);
 
+    bisect_and_balance:
       // Bisect and balance.
       parrsb_print(gc, verbose - 1, "\trsb: level = %d, cut = %d, Balance ...",
                    level + 1, cut + 1);
