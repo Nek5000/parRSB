@@ -227,10 +227,7 @@ static void initialize_levels(struct comm *const comms, int *const levels_in,
 
   // Hardcode the maximum number of levels to two for now.
   sint levels = 2;
-  uint sizes[2] = {num_nodes, 1};
-
   *levels_in = levels = MIN(levels, *levels_in);
-
   if (levels > 1) comm_dup(&comms[levels - 1], &nc);
   comm_free(&nc);
 
