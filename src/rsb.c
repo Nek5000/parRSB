@@ -227,7 +227,7 @@ static int balance_partitions(struct array *elements, unsigned nv,
 }
 
 static sint get_bin(const struct comm *const lc, const uint level,
-                    const uint levels, const struct comm comms[3]) {
+                    const uint levels, const struct comm *comms) {
   sint psize = lc->np, pid = lc->id;
   if (level < levels - 1) {
     sint out[2][1], wrk[2][1], in = (comms[level + 1].id == 0);
@@ -240,7 +240,7 @@ static sint get_bin(const struct comm *const lc, const uint level,
 }
 
 static uint get_level_cuts(const uint level, const uint levels,
-                           const struct comm comms[3]) {
+                           const struct comm *comms) {
   uint n = comms[level].np;
   if (level < levels - 1) {
     sint size = (comms[level + 1].id == 0), wrk;
@@ -258,7 +258,7 @@ static uint get_level_cuts(const uint level, const uint levels,
 }
 
 void rsb(struct array *elements, int nv, const parrsb_options *const options,
-         const struct comm comms[3], buffer *bfr) {
+         const struct comm *comms, buffer *bfr) {
   const unsigned levels = options->levels;
   const sint verbose = options->verbose_level;
   const uint ndim = (nv == 8) ? 3 : 2;
