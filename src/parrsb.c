@@ -107,8 +107,7 @@ static size_t load_balance(struct array *elist, uint nel, int nv,
   slong out[2][1], wrk[2][1], in = nel;
   comm_scan(out, c, gs_long, gs_add, &in, 1, wrk);
   slong start = out[0][0], nelg = out[1][0];
-  parrsb_print(c, verbose, "load_balance: start = %lld nelg = %lld", start,
-               nelg);
+  parrsb_print(c, verbose, "load_balance: nelg = %lld", nelg);
 
   uint nstar = nelg / c->np, nrem = nelg - nstar * c->np;
   slong lower = (nstar + 1) * nrem;
@@ -264,9 +263,10 @@ static void parrsb_part_mesh_v0(int *part, const long long *const vtx,
     const uint levels = options->levels;
     assert(levels <= sizeof(comms) / sizeof(comms[0]));
     initialize_levels(comms, &options->levels, &ca, verbose);
-    parrsb_print(c, verbose,
-                 "parrsb_part_mesh_v0: Levels:  requested = %d, enabled = %d",
-                 levels, options->levels);
+    parrsb_print(
+        c, verbose,
+        "parrsb_part_mesh_v0: levels requested = %d, levels enabled = %d",
+        levels, options->levels);
   }
 
   parrsb_print(c, verbose, "parrsb_part_mesh_v0: running partitioner ...");
