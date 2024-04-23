@@ -70,7 +70,6 @@ static void update_options(parrsb_options *const options) {
   UPDATE_OPTION(rsb_max_iter, "PARRSB_RSB_MAX_ITER", 1);
   UPDATE_OPTION(rsb_max_passes, "PARRSB_RSB_MAX_PASSES", 1);
   UPDATE_OPTION(rsb_tol, "PARRSB_RSB_TOL", 0);
-  UPDATE_OPTION(rsb_dump_stats, "PARRSB_DUMP_STATS", 1);
   UPDATE_OPTION(rsb_mg_grammian, "PARRSB_RSB_MG_GRAMMIAN", 1);
   UPDATE_OPTION(rsb_mg_factor, "PARRSB_RSB_MG_FACTOR", 1);
 
@@ -95,7 +94,6 @@ static void print_options(const struct comm *c,
   PRINT_OPTION(rsb_max_iter, "PARRSB_RSB_MAX_ITER", "%d");
   PRINT_OPTION(rsb_max_passes, "PARRSB_RSB_MAX_PASSES", "%d");
   PRINT_OPTION(rsb_tol, "PARRSB_RSB_TOL", "%lf");
-  PRINT_OPTION(rsb_dump_stats, "PARRSB_DUMP_STATS", "%d");
   PRINT_OPTION(rsb_mg_grammian, "PARRSB_RSB_MG_GRAMMIAN", "%d");
   PRINT_OPTION(rsb_mg_factor, "PARRSB_RSB_MG_FACTOR", "%d");
 
