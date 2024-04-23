@@ -105,7 +105,7 @@ static void check_rsb_partition(const struct comm *gc,
     }
     comm_free(&c);
 
-    if (opts->find_num_comps == 1)
+    if (opts->find_disconnected_comps == 1)
       check_disconnected_components(i, gc, (void *)bfr);
   }
 }
@@ -317,7 +317,7 @@ void rsb(struct array *elements, int nv, const parrsb_options *const options,
       comm_split(&lc, bin, lc.id, &tc);
 
       // Find the number of disconnected components.
-      if (options->find_num_comps == 0) goto bisect_and_balance;
+      if (options->find_disconnected_comps == 0) goto bisect_and_balance;
       parrsb_print(gc, verbose - 1,
                    "\trsb: level = %d, cut = %d, Components ...", level + 1,
                    cut + 1);

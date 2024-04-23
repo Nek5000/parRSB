@@ -28,7 +28,7 @@ parrsb_options parrsb_default_options = {
     .partitioner = 0,
     .tagged = 0,
     .levels = 2,
-    .find_num_comps = 1,
+    .find_disconnected_comps = 1,
     .repair = 0,
     .verbose_level = 1,
     .profile_level = 0,
@@ -60,7 +60,8 @@ static void update_options(parrsb_options *const options) {
   UPDATE_OPTION(partitioner, "PARRSB_PARTITIONER", 1);
   UPDATE_OPTION(tagged, "PARRSB_TAGGED", 1);
   UPDATE_OPTION(levels, "PARRSB_LEVELS", 1);
-  UPDATE_OPTION(find_num_comps, "PARRSB_FIND_NUM_COMPONENTS", 1);
+  UPDATE_OPTION(find_disconnected_comps, "PARRSB_FIND_DISCONNECTED_COMPONENTS",
+                1);
   UPDATE_OPTION(repair, "PARRSB_REPAIR", 1);
   UPDATE_OPTION(verbose_level, "PARRSB_VERBOSE_LEVEL", 1);
   UPDATE_OPTION(profile_level, "PARRSB_PROFILE_LEVEL", 1);
@@ -84,7 +85,8 @@ static void print_options(const struct comm *c,
   PRINT_OPTION(partitioner, "PARRSB_PARTITIONER", "%d");
   PRINT_OPTION(tagged, "PARRSB_TAGGED", "%d");
   PRINT_OPTION(levels, "PARRSB_LEVELS", "%d");
-  PRINT_OPTION(find_num_comps, "PARRSB_FIND_NUM_COMPONENTS", "%d");
+  PRINT_OPTION(find_disconnected_comps, "PARRSB_FIND_DISCONNECTED_COMPONENTS",
+               "%d");
   PRINT_OPTION(repair, "PARRSB_REPAIR", "%d");
   PRINT_OPTION(verbose_level, "PARRSB_VERBOSE_LEVEL", "%d");
   PRINT_OPTION(profile_level, "PARRSB_PROFILE_LEVEL", "%d");
