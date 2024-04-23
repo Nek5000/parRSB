@@ -87,17 +87,19 @@ static void check_rsb_partition(const struct comm *gc,
         double final = metric_get_value(i, TOL_FNL);
         comm_allreduce(&c, gs_double, gs_min, &final, 1, (void *)bfr);
         if (c.id == 0) {
-          printf("Warning: Lanczos reached a residual of %lf (target: %lf) "
-                 "after %d x %d iterations in Level=%d!\n",
-                 final, target, mpass, miter, i);
-          fflush(stdout);
+          fprintf(stderr,
+                  "Warning: Lanczos reached a residual of %lf (target: %lf) "
+                  "after %d x %d iterations in Level=%d!\n",
+                  final, target, mpass, miter, i);
+          fflush(stderr);
         }
       } else if (opts->rsb_algo == 1) {
         if (c.id == 0) {
-          printf("Warning: Inverse iteration didn't converge after %d "
-                 "iterations in Level = %d\n",
-                 mpass, i);
-          fflush(stdout);
+          fprintf(stderr,
+                  "Warning: Inverse iteration didn't converge after %d "
+                  "iterations in Level = %d\n",
+                  mpass, i);
+          fflush(stderr);
         }
       }
     }
