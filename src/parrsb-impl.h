@@ -47,7 +47,7 @@ struct rsb_element {
 };
 
 void rsb(struct array *elements, int nv, const parrsb_options *const options,
-         const struct comm comms[3], buffer *bfr);
+         const struct comm *comms, buffer *bfr);
 
 //------------------------------------------------------------------------------
 // Find number of components.

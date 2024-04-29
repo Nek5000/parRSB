@@ -28,6 +28,7 @@ parrsb_options parrsb_default_options = {
     .partitioner = 0,
     .tagged = 0,
     .levels = 2,
+    .find_disconnected_comps = 1,
     .repair = 0,
     .verbose_level = 1,
     .profile_level = 0,
@@ -59,6 +60,8 @@ static void update_options(parrsb_options *const options) {
   UPDATE_OPTION(partitioner, "PARRSB_PARTITIONER", 1);
   UPDATE_OPTION(tagged, "PARRSB_TAGGED", 1);
   UPDATE_OPTION(levels, "PARRSB_LEVELS", 1);
+  UPDATE_OPTION(find_disconnected_comps, "PARRSB_FIND_DISCONNECTED_COMPONENTS",
+                1);
   UPDATE_OPTION(repair, "PARRSB_REPAIR", 1);
   UPDATE_OPTION(verbose_level, "PARRSB_VERBOSE_LEVEL", 1);
   UPDATE_OPTION(profile_level, "PARRSB_PROFILE_LEVEL", 1);
@@ -67,7 +70,6 @@ static void update_options(parrsb_options *const options) {
   UPDATE_OPTION(rsb_max_iter, "PARRSB_RSB_MAX_ITER", 1);
   UPDATE_OPTION(rsb_max_passes, "PARRSB_RSB_MAX_PASSES", 1);
   UPDATE_OPTION(rsb_tol, "PARRSB_RSB_TOL", 0);
-  UPDATE_OPTION(rsb_dump_stats, "PARRSB_DUMP_STATS", 1);
   UPDATE_OPTION(rsb_mg_grammian, "PARRSB_RSB_MG_GRAMMIAN", 1);
   UPDATE_OPTION(rsb_mg_factor, "PARRSB_RSB_MG_FACTOR", 1);
 
@@ -82,6 +84,8 @@ static void print_options(const struct comm *c,
   PRINT_OPTION(partitioner, "PARRSB_PARTITIONER", "%d");
   PRINT_OPTION(tagged, "PARRSB_TAGGED", "%d");
   PRINT_OPTION(levels, "PARRSB_LEVELS", "%d");
+  PRINT_OPTION(find_disconnected_comps, "PARRSB_FIND_DISCONNECTED_COMPONENTS",
+               "%d");
   PRINT_OPTION(repair, "PARRSB_REPAIR", "%d");
   PRINT_OPTION(verbose_level, "PARRSB_VERBOSE_LEVEL", "%d");
   PRINT_OPTION(profile_level, "PARRSB_PROFILE_LEVEL", "%d");
@@ -90,7 +94,6 @@ static void print_options(const struct comm *c,
   PRINT_OPTION(rsb_max_iter, "PARRSB_RSB_MAX_ITER", "%d");
   PRINT_OPTION(rsb_max_passes, "PARRSB_RSB_MAX_PASSES", "%d");
   PRINT_OPTION(rsb_tol, "PARRSB_RSB_TOL", "%lf");
-  PRINT_OPTION(rsb_dump_stats, "PARRSB_DUMP_STATS", "%d");
   PRINT_OPTION(rsb_mg_grammian, "PARRSB_RSB_MG_GRAMMIAN", "%d");
   PRINT_OPTION(rsb_mg_factor, "PARRSB_RSB_MG_FACTOR", "%d");
 
@@ -104,8 +107,7 @@ static size_t load_balance(struct array *elist, uint nel, int nv,
   slong out[2][1], wrk[2][1], in = nel;
   comm_scan(out, c, gs_long, gs_add, &in, 1, wrk);
   slong start = out[0][0], nelg = out[1][0];
-  parrsb_print(c, verbose, "load_balance: start = %lld nelg = %lld", start,
-               nelg);
+  parrsb_print(c, verbose, "load_balance: nelg = %lld", nelg);
 
   uint nstar = nelg / c->np, nrem = nelg - nstar * c->np;
   slong lower = (nstar + 1) * nrem;
@@ -224,10 +226,7 @@ static void initialize_levels(struct comm *const comms, int *const levels_in,
 
   // Hardcode the maximum number of levels to two for now.
   sint levels = 2;
-  uint sizes[2] = {num_nodes, 1};
-
   *levels_in = levels = MIN(levels, *levels_in);
-
   if (levels > 1) comm_dup(&comms[levels - 1], &nc);
   comm_free(&nc);
 
@@ -264,9 +263,10 @@ static void parrsb_part_mesh_v0(int *part, const long long *const vtx,
     const uint levels = options->levels;
     assert(levels <= sizeof(comms) / sizeof(comms[0]));
     initialize_levels(comms, &options->levels, &ca, verbose);
-    parrsb_print(c, verbose,
-                 "parrsb_part_mesh_v0: Levels:  requested = %d, enabled = %d",
-                 levels, options->levels);
+    parrsb_print(
+        c, verbose,
+        "parrsb_part_mesh_v0: levels requested = %d, levels enabled = %d",
+        levels, options->levels);
   }
 
   parrsb_print(c, verbose, "parrsb_part_mesh_v0: running partitioner ...");

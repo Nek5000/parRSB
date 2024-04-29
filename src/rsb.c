@@ -43,6 +43,21 @@ static void test_component_versions(struct array *elements, struct comm *lc,
   crystal_free(&cr);
 }
 
+static void check_disconnected_components(const int i, const struct comm *gc,
+                                          void *bfr) {
+  sint minc = (sint)metric_get_value(i, RSB_COMPONENTS_NCOMP), maxc = minc;
+  comm_allreduce(gc, gs_int, gs_min, &minc, 1, (void *)bfr);
+  comm_allreduce(gc, gs_int, gs_max, &maxc, 1, (void *)bfr);
+
+  if (maxc > 1 && gc->id == 0) {
+    fprintf(stderr,
+            "Warning: Partition created %d/%d (min/max) disconnected "
+            "components in Level=%d!\n",
+            minc, maxc, i);
+    fflush(stderr);
+  }
+}
+
 static void check_rsb_partition(const struct comm *gc,
                                 const parrsb_options *const opts) {
   int max_levels = log2ll(gc->np);
@@ -72,33 +87,26 @@ static void check_rsb_partition(const struct comm *gc,
         double final = metric_get_value(i, TOL_FNL);
         comm_allreduce(&c, gs_double, gs_min, &final, 1, (void *)bfr);
         if (c.id == 0) {
-          printf("Warning: Lanczos reached a residual of %lf (target: %lf) "
-                 "after %d x %d iterations in Level=%d!\n",
-                 final, target, mpass, miter, i);
-          fflush(stdout);
+          fprintf(stderr,
+                  "Warning: Lanczos reached a residual of %lf (target: %lf) "
+                  "after %d x %d iterations in Level=%d!\n",
+                  final, target, mpass, miter, i);
+          fflush(stderr);
         }
       } else if (opts->rsb_algo == 1) {
         if (c.id == 0) {
-          printf("Warning: Inverse iteration didn't converge after %d "
-                 "iterations in Level = %d\n",
-                 mpass, i);
-          fflush(stdout);
+          fprintf(stderr,
+                  "Warning: Inverse iteration didn't converge after %d "
+                  "iterations in Level = %d\n",
+                  mpass, i);
+          fflush(stderr);
         }
       }
     }
     comm_free(&c);
 
-    sint minc, maxc;
-    minc = maxc = (sint)metric_get_value(i, RSB_COMPONENTS_NCOMP);
-    comm_allreduce(gc, gs_int, gs_min, &minc, 1, (void *)bfr);
-    comm_allreduce(gc, gs_int, gs_max, &maxc, 1, (void *)bfr);
-
-    if (maxc > 1 && gc->id == 0) {
-      printf("Warning: Partition created %d/%d (min/max) disconnected "
-             "components in Level=%d!\n",
-             minc, maxc, i);
-      fflush(stdout);
-    }
+    if (opts->find_disconnected_comps == 1)
+      check_disconnected_components(i, gc, (void *)bfr);
   }
 }
 
@@ -221,7 +229,7 @@ static int balance_partitions(struct array *elements, unsigned nv,
 }
 
 static sint get_bin(const struct comm *const lc, const uint level,
-                    const uint levels, const struct comm comms[3]) {
+                    const uint levels, const struct comm *comms) {
   sint psize = lc->np, pid = lc->id;
   if (level < levels - 1) {
     sint out[2][1], wrk[2][1], in = (comms[level + 1].id == 0);
@@ -234,7 +242,7 @@ static sint get_bin(const struct comm *const lc, const uint level,
 }
 
 static uint get_level_cuts(const uint level, const uint levels,
-                           const struct comm comms[3]) {
+                           const struct comm *comms) {
   uint n = comms[level].np;
   if (level < levels - 1) {
     sint size = (comms[level + 1].id == 0), wrk;
@@ -252,7 +260,7 @@ static uint get_level_cuts(const uint level, const uint levels,
 }
 
 void rsb(struct array *elements, int nv, const parrsb_options *const options,
-         const struct comm comms[3], buffer *bfr) {
+         const struct comm *comms, buffer *bfr) {
   const unsigned levels = options->levels;
   const sint verbose = options->verbose_level;
   const uint ndim = (nv == 8) ? 3 : 2;
@@ -309,15 +317,16 @@ void rsb(struct array *elements, int nv, const parrsb_options *const options,
       comm_split(&lc, bin, lc.id, &tc);
 
       // Find the number of disconnected components.
+      if (options->find_disconnected_comps == 0) goto bisect_and_balance;
       parrsb_print(gc, verbose - 1,
                    "\trsb: level = %d, cut = %d, Components ...", level + 1,
                    cut + 1);
       metric_tic(&lc, RSB_COMPONENTS);
-      const uint ncomp =
-          get_components_v2(NULL, elements, nv, &tc, bfr, verbose - 2);
+      uint ncomp = get_components_v2(NULL, elements, nv, &tc, bfr, verbose - 2);
       metric_acc(RSB_COMPONENTS_NCOMP, ncomp);
       metric_toc(&lc, RSB_COMPONENTS);
 
+    bisect_and_balance:
       // Bisect and balance.
       parrsb_print(gc, verbose - 1, "\trsb: level = %d, cut = %d, Balance ...",
                    level + 1, cut + 1);
