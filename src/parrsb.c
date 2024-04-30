@@ -29,7 +29,6 @@ parrsb_options parrsb_default_options = {
     .tagged = 0,
     .levels = 2,
     .find_disconnected_comps = 1,
-    .repair = 0,
     .verbose_level = 1,
     .profile_level = 0,
     // RSB common (Lanczos and MG) options
@@ -38,7 +37,6 @@ parrsb_options parrsb_default_options = {
     .rsb_max_iter = 50,
     .rsb_max_passes = 50,
     .rsb_tol = 1e-5,
-    .rsb_dump_stats = 0,
     // RSB MG specific options
     .rsb_mg_grammian = 0,
     .rsb_mg_factor = 2};
@@ -62,7 +60,6 @@ static void update_options(parrsb_options *const options) {
   UPDATE_OPTION(levels, "PARRSB_LEVELS", 1);
   UPDATE_OPTION(find_disconnected_comps, "PARRSB_FIND_DISCONNECTED_COMPONENTS",
                 1);
-  UPDATE_OPTION(repair, "PARRSB_REPAIR", 1);
   UPDATE_OPTION(verbose_level, "PARRSB_VERBOSE_LEVEL", 1);
   UPDATE_OPTION(profile_level, "PARRSB_PROFILE_LEVEL", 1);
   UPDATE_OPTION(rsb_algo, "PARRSB_RSB_ALGO", 1);
@@ -86,7 +83,6 @@ static void print_options(const struct comm *c,
   PRINT_OPTION(levels, "PARRSB_LEVELS", "%d");
   PRINT_OPTION(find_disconnected_comps, "PARRSB_FIND_DISCONNECTED_COMPONENTS",
                "%d");
-  PRINT_OPTION(repair, "PARRSB_REPAIR", "%d");
   PRINT_OPTION(verbose_level, "PARRSB_VERBOSE_LEVEL", "%d");
   PRINT_OPTION(profile_level, "PARRSB_PROFILE_LEVEL", "%d");
   PRINT_OPTION(rsb_algo, "PARRSB_RSB_ALGO", "%d");

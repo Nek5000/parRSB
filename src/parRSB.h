@@ -25,16 +25,14 @@ typedef struct {
   int levels;      // Number of levels: 1, or 2 (Default: 2)
   int find_disconnected_comps; // Find number of components: 0 - No, 1 - Yes
                                // (Default: 1)
-  int repair; // Repair disconnected components: 0 - No, 1 - Yes (Default: 0)
-  int verbose_level; // Verbose level: 0, 1, 2, .. etc (Default: 1)
-  int profile_level; // Profile level: 0, 1, 2, .. etc (Default: 0)
+  int verbose_level;           // Verbose level: 0, 1, 2, .. etc (Default: 1)
+  int profile_level;           // Profile level: 0, 1, 2, .. etc (Default: 0)
   // RSB common (Lanczos and MG) options
   int rsb_algo; // RSB algo: 0 - Lanczos, 1 - MG (Default: 0)
   int rsb_pre;  // RSB pre-partition : 0 - None, 1 - RCB , 2 - RIB (Default: 1)
   int rsb_max_iter;   // Max iterations in Lanczos / MG (Default: 50)
   int rsb_max_passes; // Max Lanczos restarts / Inverse iterations (Default: 50)
   double rsb_tol;     // Tolerance for Lanczos or RQI (Default: 1e-5)
-  int rsb_dump_stats; // Dump partition statistics to a text file.
   // RSB MG specific options
   int rsb_mg_grammian; // MG Grammian: 0 or 1 (Default: 0)
   int rsb_mg_factor;   // MG Coarsening factor (Default: 2, should be > 1)
