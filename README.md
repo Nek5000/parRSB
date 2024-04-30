@@ -76,7 +76,6 @@ typedef struct {
   int levels;      // Number of levels: 1, or 2 (Default: 2)
   int find_disconnected_comps; // Find number of components: 0 - No, 1 - Yes
                                // (Default: 1)
-  int repair; // Repair disconnected components: 0 - No, 1 - Yes (Default: 0)
   int verbose_level; // Verbose level: 0, 1, 2, .. etc (Default: 1)
   int profile_level; // Profile level: 0, 1, 2, .. etc (Default: 0)
   // RSB common (Lanczos and MG) options
@@ -106,7 +105,6 @@ PARRSB_PARTITIONER
 PARRSB_TAGGED
 PARRSB_LEVELS
 PARRSB_FIND_DISCONNECTED_COMPONENTS
-PARRSB_REPAIR
 PARRSB_VERBOSE_LEVEL
 PARRSB_PROFILE_LEVEL
 

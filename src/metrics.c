@@ -105,45 +105,6 @@ void metric_rsb_print(struct comm *c, int profile_level) {
   if (wrk) free(wrk);
 }
 
-void metric_crs_print(struct comm *c, int profile_level) {
-  double *wrk = tcalloc(double, 4 * MAXSIZE);
-  metric_print_aux(wrk, c);
-  double *min = wrk, *max = min + MAXSIZE, *sum = max + MAXSIZE;
-
-  for (unsigned i = 0; i < stack_size; i++) {
-    if (c->id == 0 && profile_level > 0) {
-      printf("level=%02d\n", i);
-      printf("  SCHUR_SOLVE_CHOL1                  : %e/%e/%e\n",
-             SUMMARY(i, SCHUR_SOLVE_CHOL1));
-      printf("  SCHUR_SOLVE_SETRHS1                : %e/%e/%e\n",
-             SUMMARY(i, SCHUR_SOLVE_SETRHS1));
-      printf("  SCHUR_SOLVE_PROJECT                : %e/%e/%e\n",
-             SUMMARY(i, SCHUR_SOLVE_PROJECT));
-      printf("    SCHUR_PROJECT_NITER              : %e/%e/%e\n",
-             SUMMARY(i, SCHUR_PROJECT_NITER));
-      printf("    SCHUR_PROJECT_OPERATOR           : %e/%e/%e\n",
-             SUMMARY(i, SCHUR_PROJECT_OPERATOR));
-      printf("      SCHUR_PROJECT_OPERATOR_FXI     : %e/%e/%e\n",
-             SUMMARY(i, SCHUR_PROJECT_OPERATOR_FXI));
-      printf("      SCHUR_PROJECT_OPERATOR_CHOL    : %e/%e/%e\n",
-             SUMMARY(i, SCHUR_PROJECT_OPERATOR_CHOL));
-      printf("      SCHUR_PROJECT_OPERATOR_EZL     : %e/%e/%e\n",
-             SUMMARY(i, SCHUR_PROJECT_OPERATOR_EZL));
-      printf("      SCHUR_PROJECT_OPERATOR_MATVEC  : %e/%e/%e\n",
-             SUMMARY(i, SCHUR_PROJECT_OPERATOR_MATVEC));
-      printf("    SCHUR_PROJECT_PRECOND            : %e/%e/%e\n",
-             SUMMARY(i, SCHUR_PROJECT_PRECOND));
-      printf("  SCHUR_SOLVE_SETRHS2                : %e/%e/%e\n",
-             SUMMARY(i, SCHUR_SOLVE_SETRHS2));
-      printf("  SCHUR_SOLVE_CHOL2                  : %e/%e/%e\n",
-             SUMMARY(i, SCHUR_SOLVE_CHOL2));
-    }
-    fflush(stdout);
-  }
-
-  if (wrk) free(wrk);
-}
-
 #undef SUMMARY
 
 void metric_finalize(void) {

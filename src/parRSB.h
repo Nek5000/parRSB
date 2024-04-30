@@ -25,9 +25,8 @@ typedef struct {
   int levels;      // Number of levels: 1, or 2 (Default: 2)
   int find_disconnected_comps; // Find number of components: 0 - No, 1 - Yes
                                // (Default: 1)
-  int repair; // Repair disconnected components: 0 - No, 1 - Yes (Default: 0)
-  int verbose_level; // Verbose level: 0, 1, 2, .. etc (Default: 1)
-  int profile_level; // Profile level: 0, 1, 2, .. etc (Default: 0)
+  int verbose_level;           // Verbose level: 0, 1, 2, .. etc (Default: 1)
+  int profile_level;           // Profile level: 0, 1, 2, .. etc (Default: 0)
   // RSB common (Lanczos and MG) options
   int rsb_algo; // RSB algo: 0 - Lanczos, 1 - MG (Default: 0)
   int rsb_pre;  // RSB pre-partition : 0 - None, 1 - RCB , 2 - RIB (Default: 1)
