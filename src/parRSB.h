@@ -34,7 +34,6 @@ typedef struct {
   int rsb_max_iter;   // Max iterations in Lanczos / MG (Default: 50)
   int rsb_max_passes; // Max Lanczos restarts / Inverse iterations (Default: 50)
   double rsb_tol;     // Tolerance for Lanczos or RQI (Default: 1e-5)
-  int rsb_dump_stats; // Dump partition statistics to a text file.
   // RSB MG specific options
   int rsb_mg_grammian; // MG Grammian: 0 or 1 (Default: 0)
   int rsb_mg_factor;   // MG Coarsening factor (Default: 2, should be > 1)

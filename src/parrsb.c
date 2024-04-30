@@ -38,7 +38,6 @@ parrsb_options parrsb_default_options = {
     .rsb_max_iter = 50,
     .rsb_max_passes = 50,
     .rsb_tol = 1e-5,
-    .rsb_dump_stats = 0,
     // RSB MG specific options
     .rsb_mg_grammian = 0,
     .rsb_mg_factor = 2};
