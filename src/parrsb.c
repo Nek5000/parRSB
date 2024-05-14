@@ -614,10 +614,10 @@ static void update_frontier(sint *const target, sint *const hop,
   array_free(&dests);
 }
 
-void parrsb_part_solid(int *part, const long long *const vtx2,
-                       const unsigned nel2, const long long *const vtx1,
-                       const unsigned nel1, const unsigned nv,
-                       const MPI_Comm comm) {
+int parrsb_part_solid(int *part, const long long *const vtx2,
+                      const unsigned nel2, const long long *const vtx1,
+                      const unsigned nel1, const unsigned nv,
+                      const MPI_Comm comm) {
   struct comm c;
   comm_init(&c, comm);
   parrsb_print(&c, 1, "Running greedy solid ... nel1 = %d nel2 = %d", nel1,
@@ -642,7 +642,7 @@ void parrsb_part_solid(int *part, const long long *const vtx2,
       crystal_free(&cr);
       buffer_free(&bfr);
       comm_free(&c);
-      return;
+      return 0;
     }
   }
 
@@ -703,7 +703,7 @@ void parrsb_part_solid(int *part, const long long *const vtx2,
         fprintf(stderr, "Fluid + Solid mesh is not connected.\n");
         fflush(stderr);
       }
-      exit(EXIT_FAILURE);
+      return 1;
     }
   }
 
@@ -848,6 +848,8 @@ void parrsb_part_solid(int *part, const long long *const vtx2,
   crystal_free(&cr);
   buffer_free(&bfr);
   comm_free(&c);
+
+  return 0;
 }
 
 int parrsb_part_mesh(int *part, const long long *const vtx,
