@@ -3,11 +3,11 @@
 
 #include "gslib.h"
 
-#if !defined(MPI)
+#if !defined(GSLIB_USE_MPI)
 #error "gslib needs to be compiled with MPI"
 #endif
 
-#if !defined(GLOBAL_LONG_LONG)
+#if !defined(GSLIB_USE_GLOBAL_LONG_LONG)
 #error "gslib needs to be compiled with GLOBAL_LONG_LONG"
 #endif
 
@@ -64,7 +64,7 @@ int parrsb_conn_mesh(long long *vtx, double *coord, uint nel, unsigned nDim,
                      MPI_Comm comm);
 
 #define fparrsb_conn_mesh                                                      \
-  FORTRAN_UNPREFIXED(fparrsb_conn_mesh, FPARRSB_CONN_MESH)
+  GS_FORTRAN_UNPREFIXED(fparrsb_conn_mesh, FPARRSB_CONN_MESH)
 void fparrsb_conn_mesh(long long *vtx, double *coord, int *nel, int *nDim,
                        long long *periodicInfo, int *nPeriodicFaces,
                        double *tol, MPI_Fint *fcomm, int *err);

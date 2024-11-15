@@ -184,7 +184,7 @@ static void restore_original(int *part, struct crystal *cr, struct array *elist,
 }
 
 static void initialize_node_aux(struct comm *c, const struct comm *const gc) {
-#ifdef MPI
+#ifdef PARRSB_MPI
   MPI_Comm node;
   MPI_Comm_split_type(gc->c, MPI_COMM_TYPE_SHARED, gc->id, MPI_INFO_NULL,
                       &node);

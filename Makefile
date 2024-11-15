@@ -2,7 +2,6 @@ CC ?= mpicc
 CFLAGS ?= -Wall -Wextra -Wpedantic -Wno-unused-function -Wno-unused-parameter -std=c99 -g
 LDFLAGS ?=
 DEBUG ?= 0
-MPI ?= 1
 UNDERSCORE ?= 1
 SYNC_BY_REDUCTION ?= 1
 BLAS ?= 0
@@ -40,9 +39,7 @@ else
   CFLAGS += -O2
 endif
 
-ifneq ($(MPI),0)
-  PP += -DMPI
-endif
+PP += -DPARRSB_MPI
 
 ifneq ($(UNDERSCORE),0)
   PP += -DPARRSB_UNDERSCORE
