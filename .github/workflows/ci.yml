@@ -5,22 +5,20 @@ on:
   pull_request:
     branch: [main]
 env:
-  GITHUB.TOKEN: ${{ secrets.token }}
   MPIEXE: "mpirun --oversubscribe"
-  BUILDDIR: ${GITHUB_WORKSPACE}/build
   CC: mpicc
 jobs:
   parRSB:
     runs-on: ubuntu-latest
+    env:
+      CIDIR: parRSB-github-ci
+      EXAMPLEDIR: "${{ github.workspace }}/build/examples"
     strategy:
       matrix:
         test: [box_2x2x2, pyramid, tgv, e3q, solid, ethier, vortex, expansion]
         np: [1, 2, 3, 4]
       fail-fast: false
     name: "parRSB: ${{ matrix.test }}, NP = ${{ matrix.np }}"
-    env:
-      GSVER: 1.0.7
-      CC: mpicc
     steps:
       - uses: actions/checkout@v3
       - name: Install apt dependencies
@@ -46,7 +44,7 @@ jobs:
       - name: gencon
         shell: bash
         run: |
-          cp ${EXAMPLESDIR}/gencon ${CIDIR}/${{ matrix.test }}
+          cp ${EXAMPLEDIR}/gencon ${CIDIR}/${{ matrix.test }}
           cd ${CIDIR}/${{ matrix.test }}
 
           tol=(`cat test.txt | grep tol`); tol=${tol[2]}
@@ -59,7 +57,7 @@ jobs:
           export PARRSB_RSB_ALGO=0
           export PARRSB_VERBOSE_LEVEL=2
 
-          cp ${EXAMPLESDIR}/genmap ${CIDIR}/${{ matrix.test }}
+          cp ${EXAMPLEDIR}/genmap ${CIDIR}/${{ matrix.test }}
           cd ${CIDIR}/${{ matrix.test }}
 
           tol=(`cat test.txt | grep tol`); tol=${tol[2]}
@@ -73,7 +71,7 @@ jobs:
           export PARRSB_RSB_MG_FACTOR=2
           export PARRSB_VERBOSE_LEVEL=2
 
-          cp ${EXAMPLESDIR}/genmap ${CIDIR}/${{ matrix.test }}
+          cp ${EXAMPLEDIR}/genmap ${CIDIR}/${{ matrix.test }}
           cd ${CIDIR}/${{ matrix.test }}
 
           tol=(`cat test.txt | grep tol`); tol=${tol[2]}
@@ -96,7 +94,7 @@ jobs:
   parCon:
     runs-on: ubuntu-latest
     env:
-      TESTDIR: ${BUILDDIR}/tests
+      TESTDIR: "${{ github.workspace }}/build/tests"
     steps:
       - uses: actions/checkout@v3
       - name: Install apt dependencies
