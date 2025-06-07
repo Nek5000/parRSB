@@ -64,9 +64,9 @@ static ulong findMinBelowI(ulong min, uint I, struct array *arr) {
 static int renumberPeriodicVertices(Mesh mesh, struct comm *c,
                                     struct array *matched, buffer *bfr) {
   uint size1 = mesh->elements.n, size2 = matched->n;
-  slong *mids = tcalloc(slong, size1 + 2 * size2),
-        *mnew = tcalloc(slong, size1 + 2 * size2),
-        *mcur = tcalloc(slong, size1);
+  slong *mids = tcalloc(slong, size1 + 2 * size2);
+  slong *mnew = tcalloc(slong, size1 + 2 * size2);
+  slong *mcur = tcalloc(slong, size1);
 
   struct point_t *pe = (struct point_t *)mesh->elements.ptr;
   for (uint i = 0; i < size1; i++) mids[i] = pe[i].globalId;
@@ -257,6 +257,12 @@ int match_periodic_faces(Mesh mesh, struct comm *c, int verbose, buffer *bfr) {
       "set_periodic_face_coords      ", "gather_matching_periodic_faces",
       "find_connected_periodic_faces ", "renumber_periodic_vertices    ",
       "compress_periodic_vertices    ", "send_back                     "};
+
+  parrsb_print(c, verbose, "\t\tcheck if there are periodic faces ...");
+  slong n = mesh->boundary.n, wrk;
+  comm_allreduce(c, gs_long, gs_add, &n, 1, &wrk);
+  parrsb_print(c, verbose, "\t\t\tnumber of periodic faces = %lld", n);
+  if (n == 0) return 0;
 
   parrsb_print(c, verbose, "\t\t%s ...", functions[0]);
   setPeriodicFaceCoordinates(mesh, c, bfr);
