@@ -17,7 +17,7 @@ jobs:
         np: [1, 2, 3, 4]
       fail-fast: false
     env:
-      TESTDIR: ${{ github.workspace }}/build/test
+      TESTDIR: ${{ github.workspace }}/install/test
     steps:
       - uses: actions/checkout@v3
       - name: Install apt dependencies
@@ -26,28 +26,25 @@ jobs:
           sudo apt -y update
           sudo apt install -y openmpi-bin libopenmpi-dev
           sudo apt install -y build-essential cmake
-      - name: Build parRSB and clone tests
+      - name: Build gslib
         shell: bash
         run: |
-          # Build gslib
-          git clone https://github.com/Nek5000/gslib.git
-          make -C gslib -j4
-
-          # Build parRSB
-          export GSLIB_DIR=`pwd`/gslib/build/
-          make -j4 test
+          git clone https://github.com/Nek5000/gslib.git -b general_graph
+          cmake -B ./gslib/build -S ./gslib -DCMAKE_INSTALL_PREFIX=./gslib/install
+          cmake --build ./gslib/build --target install
+      - name: Build parRSB
+        shell: bash
+        run: |
+          cmake -B build -S . -DCMAKE_INSTALL_PREFIX=./install -Dgs_DIR=./gslib/install/lib/cmake/gs
       - name: Test graph laplacian matrix
         shell: bash
         run: |
-          cd ${TESTDIR}
-          ${MPIEXE} -np ${{ matrix.np }} ./parrsb_000_graph_laplacian
+          ${MPIEXE} -np ${{ matrix.np }} ${TESTDIR}/parrsb_000_graph_laplacian
       - name: Test graph laplacian operator
         shell: bash
         run: |
-          cd ${TESTDIR}
-          ${MPIEXE} -np ${{ matrix.np }} ./parrsb_050_graph_laplacian_op
+          ${MPIEXE} -np ${{ matrix.np }} ${TESTDIR}/parrsb_050_graph_laplacian_op
       - name: Test graph laplacian eigenvalues
         shell: bash
         run: |
-          cd ${TESTDIR}
-          ${MPIEXE} -np ${{ matrix.np }} ./parrsb_100_graph_eigenvalues
+          ${MPIEXE} -np ${{ matrix.np }} ${TESTDIR}/parrsb_100_graph_eigenvalues
