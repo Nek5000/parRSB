@@ -26,7 +26,10 @@ jobs:
     env:
       TESTDIR: ${{ github.workspace }}/install/bin
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout actions
+        uses: actions/checkout@v6
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
       - name: Install apt dependencies
         shell: bash
         run: |
