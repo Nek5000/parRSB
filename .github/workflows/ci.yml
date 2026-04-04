@@ -1,4 +1,4 @@
-name: parRSB tests
+name: Unit tests
 on:
   push:
     branches:
@@ -7,92 +7,9 @@ on:
     branches:
       - master
 env:
-  GITHUB.TOKEN: ${{ secrets.token }}
   MPIEXE: "mpirun --oversubscribe"
   CC: mpicc
 jobs:
-  mesh:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        test: [box_2x2x2, pyramid, tgv, e3q, solid, ethier, vortex, expansion]
-        np: [1, 2, 3, 4]
-      fail-fast: false
-    name: "${{ matrix.test }}, np = ${{ matrix.np }}"
-    env:
-      CIDIR: parRSB-github-ci
-      EXAMPLEDIR: build/example
-    steps:
-      - uses: actions/checkout@v3
-      - name: Install apt dependencies
-        shell: bash
-        run: |
-          sudo apt -y update
-          sudo apt install -y openmpi-bin libopenmpi-dev
-          sudo apt install -y libblas-dev liblapack-dev
-          sudo apt install -y build-essential
-      - name: Build parRSB and clone tests
-        shell: bash
-        run: |
-          # Build gslib
-          git clone https://github.com/Nek5000/gslib.git
-          make -C gslib -j4
-
-          # Build parRSB
-          export GSLIB_DIR=`pwd`/gslib/build/
-          make -j4 example
-
-          # Clone tests
-          git clone https://github.com/thilinarmtb/${CIDIR}.git
-      - name: gencon
-        shell: bash
-        run: |
-          cp ${EXAMPLEDIR}/gencon ${CIDIR}/${{ matrix.test }}
-          cd ${CIDIR}/${{ matrix.test }}
-
-          tol=(`cat test.txt | grep tol`); tol=${tol[2]}
-          ${MPIEXE} -np ${{ matrix.np }} ./gencon --mesh ${{ matrix.test }} \
-            --tol=${tol} --dump=0 --test=1
-      - name: genmap-lanczos
-        shell: bash
-        run: |
-          export PARRSB_RSB_ALGO=0
-          export PARRSB_VERBOSE_LEVEL=2
-
-          cp ${EXAMPLEDIR}/genmap ${CIDIR}/${{ matrix.test }}
-          cd ${CIDIR}/${{ matrix.test }}
-
-          tol=(`cat test.txt | grep tol`); tol=${tol[2]}
-          ${MPIEXE} -np ${{ matrix.np }} ./genmap --mesh ${{ matrix.test }} \
-            --tol=${tol} --dump=0 --test=1
-      # - name: genmap-mg-factor-2
-      #   if: always()
-      #   shell: bash
-      #   run: |
-      #     export PARRSB_RSB_ALGO=1
-      #     export PARRSB_RSB_MG_FACTOR=2
-      #     export PARRSB_VERBOSE_LEVEL=2
-
-      #     cp ${EXAMPLEDIR}/genmap ${CIDIR}/${{ matrix.test }}
-      #     cd ${CIDIR}/${{ matrix.test }}
-
-      #     tol=(`cat test.txt | grep tol`); tol=${tol[2]}
-      #     ${MPIEXE} -np ${{ matrix.np }} ./genmap --mesh ${{ matrix.test }} \
-      #       --tol=${tol} --dump=0 --test=1
-      # - name: genmap-mg-factor-4
-      #   if: always()
-      #   shell: bash
-      #   run: |
-      #     export PARRSB_RSB_ALGO=1
-      #     export PARRSB_RSB_MG_FACTOR=4
-      #     export PARRSB_VERBOSE_LEVEL=2
-
-      #     cp ${EXAMPLEDIR}/genmap ${CIDIR}/${{ matrix.test }}
-      #     cd ${CIDIR}/${{ matrix.test }}
-
-      #     tol=(`cat test.txt | grep tol`); tol=${tol[2]}
-      #     ${MPIEXE} -np ${{ matrix.np }} ./genmap --mesh ${{ matrix.test }} \
-      #       --tol=${tol} --dump=0 --test=1
   graph:
     runs-on: ubuntu-latest
     strategy:
@@ -108,8 +25,7 @@ jobs:
         run: |
           sudo apt -y update
           sudo apt install -y openmpi-bin libopenmpi-dev
-          sudo apt install -y libblas-dev liblapack-dev
-          sudo apt install -y build-essential
+          sudo apt install -y build-essential cmake
       - name: Build parRSB and clone tests
         shell: bash
         run: |
