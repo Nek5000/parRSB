@@ -281,8 +281,8 @@ static int talk_to_neighbor(struct point_t *pnt, const struct array *arr,
   array_init(struct point_t, &tmp, 1);
 
   struct point_t *pts = (struct point_t *)arr->ptr;
-  sint dest = (sint)c->id + dir;
-  if (dest >= 0 && dest < (sint)c->np) {
+  sint dest = (sint)active.id + dir;
+  if (dest >= 0 && dest < (sint)active.np) {
     struct point_t p = (dir == 1) ? pts[arr->n - 1] : pts[0];
     p.proc = dest;
     array_cat(struct point_t, &tmp, &p, 1);
@@ -293,11 +293,10 @@ static int talk_to_neighbor(struct point_t *pnt, const struct array *arr,
   sarray_transfer(struct point_t, &tmp, proc, 1, &cr);
   crystal_free(&cr);
 
-  if (tmp.n == 0) return 0;
-
-  pts = (struct point_t *)tmp.ptr, pnt[0] = pts[0];
+  int npts = 0;
+  if (tmp.n > 0) pnt[0] = ((struct point_t *)tmp.ptr)[0], npts = 1;
   array_free(&tmp), comm_free(&active);
-  return 1;
+  return npts;
 }
 
 static void find_segments(struct array *arr, int i, scalar tol2,
@@ -336,6 +335,7 @@ static void separate_local_segments(struct array *local, struct array *shared,
   for (; s < shared->n && pts[s].ifSegment == 0; s++)
     ;
   sint lcheck = 0;
+  uint last = shared->n;
   while (s < shared->n) {
     uint e = s + 1;
     for (; e < shared->n && pts[e].ifSegment == 0; e++)
@@ -352,6 +352,7 @@ static void separate_local_segments(struct array *local, struct array *shared,
       // talk_to_neighbor if at least one of the process has to talk to the
       // neighbor.
       lcheck = 1;
+      last = s;
     }
     s = e;
   }
@@ -364,8 +365,8 @@ static void separate_local_segments(struct array *local, struct array *shared,
     // the local segment.
     struct point_t pnt;
     int npts = talk_to_neighbor(&pnt, shared, -1 /* recv */, c);
-    if (lcheck && (npts == 0 || (npts > 0 && pnt.ifSegment == 1))) {
-      for (uint i = s; i < shared->n; i++) {
+    if (lcheck && (npts == 0 || pnt.ifSegment != 0)) {
+      for (uint i = last; i < shared->n; i++) {
         array_cat(struct point_t, local, &pts[i], 1);
         // Mark the point to be removed from shared array.
         pts[i].ifSegment = -1;
