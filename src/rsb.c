@@ -135,8 +135,14 @@ static int balance_partitions(struct array *elements, unsigned nv,
   comm_allreduce(lc, gs_long, gs_add, &nelgt, 1, &wrk);
   comm_allreduce(gc, gs_long, gs_add, &nglob, 1, &wrk);
 
+  // Each half takes at most one remainder element per rank, halves of
+  // different size (node level) would otherwise exceed it.
   sint ne_ = nglob / gc->np, nrem = nglob - ne_ * gc->np;
-  slong nelgt_exp = ne_ * lc->np + nrem / 2 + (nrem % 2) * (1 - bin);
+  sint np0 = bin ? gc->np - lc->np : lc->np, np1 = gc->np - np0;
+  sint nrem0 = (nrem + 1) / 2;
+  if (nrem0 < nrem - np1) nrem0 = nrem - np1;
+  if (nrem0 > np0) nrem0 = np0;
+  slong nelgt_exp = ne_ * lc->np + (bin ? nrem - nrem0 : nrem0);
   slong send_cnt = (nelgt - nelgt_exp) > 0 ? (nelgt - nelgt_exp) : 0;
 
   // Setup gather-scatter.
